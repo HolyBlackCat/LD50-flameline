@@ -1,0 +1,89 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes" ?>
+<CodeBlocks_project_file>
+	<FileVersion major="1" minor="6" />
+	<Project>
+		<Option title="imp-re" />
+		<Option pch_mode="2" />
+		<Option compiler="gcc" />
+		<Build>
+			<Target title="Debug">
+				<Option output="bin/imp-re" prefix_auto="1" extension_auto="1" />
+				<Option working_dir="bin/" />
+				<Option object_output="obj/" />
+				<Option type="1" />
+				<Option compiler="gcc" />
+				<Compiler>
+					<Add option="-D_GLIBCXX_DEBUG" />
+					<Add option="-g" />
+				</Compiler>
+			</Target>
+			<Target title="Release">
+				<Option output="bin/imp-re" prefix_auto="1" extension_auto="1" />
+				<Option working_dir="bin/" />
+				<Option object_output="obj/" />
+				<Option type="0" />
+				<Option compiler="gcc" />
+				<Compiler>
+					<Add option="-O3" />
+					<Add option="-DNDEBUG" />
+				</Compiler>
+				<Linker>
+					<Add option="-s" />
+				</Linker>
+			</Target>
+			<Target title="Generate code">
+				<Option output="bin/imp-re" prefix_auto="1" extension_auto="1" />
+				<Option working_dir="bin/" />
+				<Option object_output="obj/" />
+				<Option type="0" />
+				<Option compiler="gcc" />
+			</Target>
+		</Build>
+		<Compiler>
+			<Add option="-pedantic-errors" />
+			<Add option="-Wextra" />
+			<Add option="-Wall" />
+			<Add option="-std=c++17" />
+			<Add directory="lib/include" />
+		</Compiler>
+		<Linker>
+			<Add option="-static" />
+			<Add library="mingw32" />
+			<Add library="SDL2main" />
+			<Add library="SDL2" />
+			<Add library="m" />
+			<Add library="dinput" />
+			<Add library="dxerr8" />
+			<Add library="user32" />
+			<Add library="gdi32" />
+			<Add library="winmm" />
+			<Add library="imm32" />
+			<Add library="ole32" />
+			<Add library="oleaut32" />
+			<Add library="shell32" />
+			<Add library="version" />
+			<Add library="uuid" />
+			<Add directory="lib" />
+		</Linker>
+		<Unit filename="gen/make_mat_h.cpp">
+			<Option link="0" />
+			<Option weight="100" />
+			<Option compiler="gcc" use="1" buildCommand="gen\make_mat_h.bat\ngen\touch.bat $object" />
+			<Option target="Generate code" />
+		</Unit>
+		<Unit filename="src/main.cpp">
+			<Option target="Debug" />
+			<Option target="Release" />
+		</Unit>
+		<Unit filename="src/mat.h">
+			<Option target="Debug" />
+			<Option target="Release" />
+		</Unit>
+		<Extensions>
+			<code_completion />
+			<envvars />
+			<debugger />
+			<lib_finder disable_auto="1" />
+		</Extensions>
+	</Project>
+</CodeBlocks_project_file>
