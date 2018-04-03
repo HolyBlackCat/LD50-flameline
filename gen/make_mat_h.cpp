@@ -148,6 +148,7 @@ int main()
 
     { // Includes
         output(1+R"(
+            #include <algorithm>
             #include <cstdint>
             #include <type_traits>
         )");
@@ -156,301 +157,330 @@ int main()
 
     section("namespace Math", []
     {
-        section("inline namespace Vector", []
+        section("inline namespace Vector // Declarations and aliases", []
         {
-            decorative_section("Class declarations and aliases", []
-            {
-                { // Main templates
-                    output(1+R"(
-                        template <int D, typename T> struct vec;
-                        template <int W, int H, typename T> using mat = vec<W, vec<H, T>>;
-                    )");
+            { // Main templates
+                output(1+R"(
+                    template <int D, typename T> struct vec;
+                    template <int W, int H, typename T> using mat = vec<W, vec<H, T>>;
+                )");
+            }
+
+            { // Type-generic
+                // Vectors of specific size
+                for (int i = 2; i <= 4; i++)
+                    output(" template <typename T> using vec", i, " = vec<", i, ",T>;");
+                next_line();
+
+                // Matrices of specific size
+                for (int h = 2; h <= 4; h++)
+                {
+                    for (int w = 2; w <= 4; w++)
+                        output(" template <typename T> using mat", w, "x", h, " = mat<", w, ",", h, ",T>;");
+                    next_line();
                 }
 
-                { // Type-generic
-                    // Vectors of specific size
-                    for (int i = 2; i <= 4; i++)
-                        output(" template <typename T> using vec", i, " = vec<", i, ",T>;");
-                    next_line();
+                // Square matrices of specific size
+                for (int i = 2; i <= 4; i++)
+                    output(" template <typename T> using mat", i, " = mat", i, "x", i, "<T>;");
+                next_line();
+            }
+            next_line();
 
-                    // Matrices of specific size
+            { // For specific types
+                for (int i = 0; i < data::type_list_len; i++)
+                {
+                    const auto &type = data::type_list[i];
+
+                    // Any size
+                    output("template <int D> using ", type.tag, "vec = vec<D,", type.name, ">;\n"
+                           "template <int W, int H> using ", type.tag, "mat = mat<W,H,", type.name, ">;\n");
+
+                    // Fixed size
+                    for (int d = 2; d <= 4; d++)
+                        output(" using ", type.tag, "vec", d, " = vec<", d, ',', type.name, ">;");
+                    next_line();
                     for (int h = 2; h <= 4; h++)
                     {
                         for (int w = 2; w <= 4; w++)
-                            output(" template <typename T> using mat", w, "x", h, " = mat<", w, ",", h, ",T>;");
+                            output(" using ", type.tag, "mat", w, "x", h, " = mat<", w, ",", h, ",", type.name, ">;");
                         next_line();
                     }
-
-                    // Square matrices of specific size
                     for (int i = 2; i <= 4; i++)
-                        output(" template <typename T> using mat", i, " = mat", i, "x", i, "<T>;");
+                        output(" using ", type.tag, "mat", i, " = ", type.tag, "mat", i, "x", i, ";");
                     next_line();
+
+                    if (i != data::type_list_len-1)
+                        next_line();
                 }
-                next_line();
+            }
+        });
 
-                { // For specific types
-                    for (int i = 0; i < data::type_list_len; i++)
+        next_line();
+
+        section("inline namespace Utility", []
+        {
+            output(1+R"(
+                template <typename T> struct base_type_impl {using type = T;};
+                template <int D, typename T> struct base_type_impl<vec<D,T>> {using type = typename base_type_impl<T>::type;};
+                template <typename T> using base_type_t = typename base_type_impl<T>::type;
+
+                template <typename T, typename TT> struct change_base_type_impl {using type = base_type_t<TT>;};
+                template <int D, typename T, typename TT> struct change_base_type_impl<vec<D,T>,TT> {using type = vec<D,base_type_t<TT>>;};
+                template <typename T, typename TT> using change_base_type_t = typename change_base_type_impl<T,TT>::type;
+
+                template <typename T> struct floating_point_impl {using type = std::conditional_t<std::is_floating_point_v<base_type_t<T>>, T, change_base_type_t<T, double>>;};
+                template <typename T> using floating_point_t = typename floating_point_impl<T>::type;
+            )");
+        });
+
+        next_line();
+
+        section("inline namespace Vector // Definitions", []
+        {
+            auto Make = [&](int w, int h)
+            {
+                bool is_vector = (h == 0),
+                     is_matrix = !is_vector;
+
+                auto LargeFields = [&](std::string fold_op, std::string pre = "", std::string post = "") -> std::string
+                {
+                    std::string ret;
+                    for (int i = 0; i < w; i++)
                     {
-                        const auto &type = data::type_list[i];
-
-                        // Any size
-                        output("template <int D> using ", type.tag, "vec = vec<D,", type.name, ">;\n"
-                               "template <int W, int H> using ", type.tag, "mat = mat<W,H,", type.name, ">;\n");
-
-                        // Fixed size
-                        for (int d = 2; d <= 4; d++)
-                            output(" using ", type.tag, "vec", d, " = vec<", d, ',', type.name, ">;");
-                        next_line();
-                        for (int h = 2; h <= 4; h++)
-                        {
-                            for (int w = 2; w <= 4; w++)
-                                output(" using ", type.tag, "mat", w, "x", h, " = mat<", w, ",", h, ",", type.name, ">;");
-                            next_line();
-                        }
-                        for (int i = 2; i <= 4; i++)
-                            output(" using ", type.tag, "mat", i, " = ", type.tag, "mat", i, "x", i, ";");
-                        next_line();
-
-                        if (i != data::type_list_len-1)
-                            next_line();
+                        if (i != 0)
+                            ret += fold_op;
+                        ret += pre + data::fields[i] + post;
                     }
+                    return ret;
+                };
+                auto SmallFields = [&](std::string fold_op, std::string pre = "", std::string post = "", std::string mid = ".") -> std::string
+                {
+                    if (is_vector)
+                        return LargeFields(fold_op, pre, post);
+                    std::string ret;
+                    for (int x = 0; x < w; x++)
+                    for (int y = 0; y < h; y++)
+                    {
+                        if (x != 0 || y != 0)
+                            ret += fold_op;
+                        ret += pre + data::fields[x] + mid + data::fields[y] + post;
+                    }
+                    return ret;
+                };
+                auto SmallFields_alt = [&](std::string fold_op, std::string pre = "", std::string post = "", std::string mid = ".") -> std::string
+                {
+                    if (is_vector)
+                        return LargeFields(fold_op, pre, post);
+                    std::string ret;
+                    for (int y = 0; y < h; y++)
+                    for (int x = 0; x < w; x++)
+                    {
+                        if (x != 0 || y != 0)
+                            ret += fold_op;
+                        ret += pre + data::fields[x] + mid + data::fields[y] + post;
+                    }
+                    return ret;
+                };
+
+                std::string typeless_name, size_name;
+                if (is_vector)
+                {
+                    typeless_name = make_str("vec", w);
+                    size_name = "size";
+                }
+                else
+                {
+                    typeless_name = make_str("mat", w, "x", h);
+                    size_name = "width";
+                }
+
+
+                { // Static assertions
+                    output("static_assert(!std::is_const_v<T> && !std::is_volatile_v<T>, \"The base type must have no cv-qualifiers.\");\n");
+                }
+
+                { // Dimensions
+                    if (is_vector)
+                        output("static constexpr int size = ", w, ";\n");
+                    else
+                    {
+                        output("static constexpr int width = ", w, ", height = ", h, ";\n");
+                        if (w == h)
+                            output("static constexpr int size = ", w, ";\n");
+                    }
+                }
+
+                { // Aliases
+                    output("using type = T;\n");
+                    if (is_vector)
+                        output("using member_type = T;\n");
+                    else
+                        output("using member_type = vec", h, "<T>;\n");
+                }
+
+                { // Members
+                    for (int i = 0; i < w; i++)
+                    {
+                        output("union {member_type ");
+                        for (int j = 0; j < data::fields_alt_count; j++)
+                        {
+                            if (j != 0)
+                                output(", ");
+                            output(data::fields_alt[j][i]);
+                        }
+                        output(";};\n");
+                    }
+                }
+
+                { // Constructors
+                    // Default
+                    output("constexpr vec() = default;\n");
+
+                    // Fill with a single value
+                    output("explicit constexpr vec(member_type obj) : ", LargeFields(", ", "", "(obj)"), " {}\n");
+
+                    // Element-wise
+                    output("constexpr vec(", LargeFields(", ", "member_type "), ") : ");
+                    for (int i = 0; i < w; i++)
+                    {
+                        if (i != 0)
+                            output(", ");
+                        output(data::fields[i], "(", data::fields[i], ")");
+                    }
+                    output(" {}\n");
+
+                    // Matrix-specific constructors
+                    if (is_matrix)
+                    {
+                        // Matrix fill with a single value
+                        output("explicit constexpr vec(type obj) : ", LargeFields(", ", "", "(obj)"), " {}\n");
+
+                        // Matrix element-wise
+                        output("constexpr vec(", SmallFields_alt(", ", "type ", "", ""), ") : ");
+                        for (int x = 0; x < w; x++)
+                        {
+                            if (x != 0)
+                                output(", ");
+                            output(data::fields[x], "(");
+                            for (int y = 0; y < h; y++)
+                            {
+                                if (y != 0)
+                                    output(",");
+                                output(data::fields[x], data::fields[y]);
+                            }
+                            output(")");
+                        }
+                        output(" {}\n");
+                    }
+
+                    // Converting
+                    output("template <typename TT> constexpr vec(const ", typeless_name, "<TT> &obj) : ");
+                    for (int i = 0; i < w; i++)
+                    {
+                        if (i != 0)
+                            output(", ");
+                        output(data::fields[i], "(obj.", data::fields[i], ")");
+                    }
+                    output(" {}\n");
+                }
+
+                { // Convert to type
+                    output("template <typename TT> [[nodiscard]] constexpr ", typeless_name, "<TT> to() const {return ", typeless_name, "<TT>(", SmallFields_alt(", ", "TT(", ")"), ");}\n");
+                }
+
+                { // Member access
+                    // Member pointers array
+                    output("static constexpr member_type vec::*pointers[", size_name, "] {");
+                    for (int i = 0; i < w; i++)
+                    {
+                        if (i != 0)
+                            output(", ");
+                        output("&vec::", data::fields[i]);
+                    }
+                    output("};\n");
+
+                    // Operator []
+                    output("[[nodiscard]] constexpr member_type &operator[](int i) {return *this.*pointers[i];}\n");
+                    output("[[nodiscard]] constexpr const member_type &operator[](int i) const {return *this.*pointers[i];}\n");
+
+                    // As array
+                    if (is_vector)
+                    {
+                        output("[[nodiscard]] type *as_array() {return &x;};\n");
+                        output("[[nodiscard]] const type *as_array() const {return &x;};\n");
+                    }
+                    else
+                    {
+                        output("[[nodiscard]] type *as_array() {return &x.x;};\n");
+                        output("[[nodiscard]] const type *as_array() const {return &x.x;};\n");
+                    }
+                }
+
+                { // Boolean
+                    // Convert to bool
+                    output("[[nodiscard]] explicit constexpr operator bool() const {return this->any(); static_assert(!std::is_same_v<type, bool>, \"Use .none(), .any(), or .all() for vectors/matrices of bool.\");}\n");
+
+                    // None of
+                    output("[[nodiscard]] constexpr bool none() const {return !this->any();}\n");
+
+                    // Any of
+                    output("[[nodiscard]] constexpr bool any() const {return ", SmallFields(" || "), ";}\n");
+
+                    // All of
+                    output("[[nodiscard]] constexpr bool all() const {return ", SmallFields(" && "), ";}\n");
+                }
+
+                { // Apply operators
+                    if (is_vector)
+                    {
+                        // Sum
+                        output("[[nodiscard]] constexpr auto sum() const {return ", LargeFields(" + "), ";}\n");
+
+                        // Product
+                        output("[[nodiscard]] constexpr auto prod() const {return ", LargeFields(" * "), ";}\n");
+
+                        // Ratio
+                        if (w == 2)
+                            output("[[nodiscard]] constexpr auto ratio() const {return ", LargeFields(" / "), ";}\n");
+                    }
+
+                    // Min
+                    output("[[nodiscard]] constexpr type min() const {return std::min({", SmallFields(","), "});}\n");
+                    // Max
+                    output("[[nodiscard]] constexpr type max() const {return std::max({", SmallFields(","), "});}\n");
+                }
+            };
+
+            decorative_section("Vectors", [&]
+            {
+                for (int d = 2; d <= 4; d++)
+                {
+                    if (d != 2)
+                        next_line();
+
+                    section_sc(make_str("template <typename T> struct vec<", d, ",T> // vec", d), [&]{
+                        Make(d, 0);
+                    });
                 }
             });
 
             next_line();
 
-            decorative_section("Class definitions", []
+            decorative_section("Matrices", [&]
             {
-                auto Make = [&](int w, int h)
+                for (int w = 2; w <= 4; w++)
+                for (int h = 2; h <= 4; h++)
                 {
-                    bool is_vector = (h == 0),
-                         is_matrix = !is_vector;
+                    if (w != 2 || h != 2)
+                        next_line();
 
-                    std::string typeless_name, size_name;
-                    if (is_vector)
-                    {
-                        typeless_name = make_str("vec", w);
-                        size_name = "size";
-                    }
-                    else
-                    {
-                        typeless_name = make_str("mat", w, "x", h);
-                        size_name = "width";
-                    }
-
-
-                    { // Static assertions
-                        output("static_assert(!std::is_const_v<T> && !std::is_volatile_v<T>, \"The base type must have no cv-qualifiers.\");\n");
-                    }
-
-                    { // Dimensions
-                        if (is_vector)
-                            output("static constexpr int size = ", w, ";\n");
-                        else
-                        {
-                            output("static constexpr int width = ", w, ", height = ", h, ";\n");
-                            if (w == h)
-                                output("static constexpr int size = ", w, ";\n");
-                        }
-                    }
-
-                    { // Aliases
-                        output("using type = T;\n");
-                        if (is_vector)
-                            output("using member_type = T;\n");
-                        else
-                            output("using member_type = vec", h, "<T>;\n");
-                    }
-
-                    { // Members
-                        for (int i = 0; i < w; i++)
-                        {
-                            output("union {member_type ");
-                            for (int j = 0; j < data::fields_alt_count; j++)
-                            {
-                                if (j != 0)
-                                    output(", ");
-                                output(data::fields_alt[j][i]);
-                            }
-                            output(";};\n");
-                        }
-                    }
-
-                    { // Constructors
-                        // Default
-                        output("constexpr vec() = default;\n");
-
-                        // Fill with a single value
-                        output("explicit constexpr vec(member_type obj) : ");
-                        for (int i = 0; i < w; i++)
-                        {
-                            if (i != 0)
-                                output(", ");
-                            output(data::fields[i], "(obj)");
-                        }
-                        output(" {}\n");
-
-                        // Element-wise
-                        output("constexpr vec(");
-                        for (int i = 0; i < w; i++)
-                        {
-                            if (i != 0)
-                                output(", ");
-                            output("member_type ", data::fields[i]);
-                        }
-                        output(") : ");
-                        for (int i = 0; i < w; i++)
-                        {
-                            if (i != 0)
-                                output(", ");
-                            output(data::fields[i], "(", data::fields[i], ")");
-                        }
-                        output(" {}\n");
-
-                        // Matrix-specific constructors
-                        if (is_matrix)
-                        {
-                            // Matrix fill with a single value
-                            output("explicit constexpr vec(type obj) : ");
-                            for (int i = 0; i < w; i++)
-                            {
-                                if (i != 0)
-                                    output(", ");
-                                output(data::fields[i], "(obj)");
-                            }
-                            output(" {}\n");
-
-                            // Matrix element-wise
-                            output("constexpr vec(");
-                            for (int y = 0; y < h; y++)
-                            for (int x = 0; x < w; x++)
-                            {
-                                if (x != 0 || y != 0)
-                                    output(", ");
-                                output("type ", data::fields[x], data::fields[y]);
-                            }
-                            output(") : ");
-                            for (int x = 0; x < w; x++)
-                            {
-                                if (x != 0)
-                                    output(", ");
-                                output(data::fields[x], "(");
-                                for (int y = 0; y < h; y++)
-                                {
-                                    if (y != 0)
-                                        output(",");
-                                    output(data::fields[x], data::fields[y]);
-                                }
-                                output(")");
-                            }
-                            output(" {}\n");
-                        }
-
-                        // Converting
-                        output("template <typename TT> constexpr vec(const ", typeless_name, "<TT> &obj) : ");
-                        for (int i = 0; i < w; i++)
-                        {
-                            if (i != 0)
-                                output(", ");
-                            output(data::fields[i], "(obj.", data::fields[i], ")");
-                        }
-                        output(" {}\n");
-                    }
-
-                    { // Convert to type
-                        output("template <typename TT> [[nodiscard]] constexpr ", typeless_name, "<TT> to() const {return {");
-                        if (is_vector)
-                        {
-                            for (int i = 0; i < w; i++)
-                            {
-                                if (i != 0)
-                                    output(", ");
-                                output("TT(", data::fields[i], ")");
-                            }
-                        }
-                        else
-                        {
-                            for (int y = 0; y < h; y++)
-                            for (int x = 0; x < w; x++)
-                            {
-                                if (x != 0 || y != 0)
-                                    output(", ");
-                                output("TT(", data::fields[x], ".", data::fields[y], ")");
-                            }
-                        }
-                        output("};}\n");
-                    }
-
-                    { // Member access
-                        // Member pointers array
-                        output("static constexpr member_type vec::*pointers[", size_name, "] {");
-                        for (int i = 0; i < w; i++)
-                        {
-                            if (i != 0)
-                                output(", ");
-                            output("&vec::", data::fields[i]);
-                        }
-                        output("};\n");
-
-                        // Operator []
-                        output("[[nodiscard]] constexpr member_type &operator[](int i) {return *this.*pointers[i];}\n");
-                        output("[[nodiscard]] constexpr const member_type &operator[](int i) const {return *this.*pointers[i];}\n");
-
-                        // As array
-                        if (is_vector)
-                        {
-                            output("[[nodiscard]] type *as_array() {return &x;};\n");
-                            output("[[nodiscard]] const type *as_array() const {return &x;};\n");
-                        }
-                        else
-                        {
-                            output("[[nodiscard]] type *as_array() {return &x.x;};\n");
-                            output("[[nodiscard]] const type *as_array() const {return &x.x;};\n");
-                        }
-
-
-
-
-                        //
-                    }
-                };
-
-                next_line();
-
-                decorative_section("Vectors", [&]
-                {
-                    for (int d = 2; d <= 4; d++)
-                    {
-                        if (d != 2)
-                            next_line();
-
-                        section_sc(make_str("template <typename T> struct vec<", d, ",T> // vec", d), [&]{
-                            Make(d, 0);
-                        });
-                    }
-                });
-
-                next_line();
-
-                decorative_section("Matrices", [&]
-                {
-                    for (int w = 2; w <= 4; w++)
-                    for (int h = 2; h <= 4; h++)
-                    {
-                        if (w != 2 || h != 2)
-                            next_line();
-
-                        section_sc(make_str("template <typename T> struct vec<", w, ",vec<", h, ",T>> // mat", w, "x", h), [&]{
-                            Make(w, h);
-                        });
-                    }
-                });
-
-                next_line();
+                    section_sc(make_str("template <typename T> struct vec<", w, ",vec<", h, ",T>> // mat", w, "x", h), [&]{
+                        Make(w, h);
+                    });
+                }
             });
         });
-
-
     });
 
     if (!impl::output_file)
