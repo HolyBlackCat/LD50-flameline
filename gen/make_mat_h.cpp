@@ -89,7 +89,7 @@ void output_str(const std::string &str)
             impl::at_line_start = 0;
         }
 
-        impl::output_file.put(ch);
+        impl::output_file.put(ch == '$' ? ' ' : ch);
 
         if (ch == '{' || ch == '(')
             impl::indentation++;
@@ -149,6 +149,7 @@ int main()
     { // Includes
         output(1+R"(
             #include <algorithm>
+            #include <cstddef>
             #include <cstdint>
             #include <type_traits>
         )");
@@ -221,16 +222,84 @@ int main()
         section("inline namespace Utility", []
         {
             output(1+R"(
-                template <typename T> struct base_type_impl {using type = T;};
-                template <int D, typename T> struct base_type_impl<vec<D,T>> {using type = typename base_type_impl<T>::type;};
-                template <typename T> using base_type_t = typename base_type_impl<T>::type;
+                template <typename T> struct properties
+                {
+                    static constexpr bool
+                    $   is_vec        = 0,
+                    $   is_mat        = 0,
+                    $   is_vec_or_mat = 0;
+                };
+                template <int D, typename T> struct properties<vec<D,T>>
+                {
+                    static constexpr bool
+                    $   is_vec        = 1,
+                    $   is_mat        = 0,
+                    $   is_vec_or_mat = 1;
+                };
+                template <int W, int H, typename T> struct properties<vec<W,vec<H,T>>>
+                {
+                    static constexpr bool
+                    $   is_vec        = 0,
+                    $   is_mat        = 1,
+                    $   is_vec_or_mat = 1;
+                };
 
-                template <typename T, typename TT> struct change_base_type_impl {using type = base_type_t<TT>;};
-                template <int D, typename T, typename TT> struct change_base_type_impl<vec<D,T>,TT> {using type = vec<D,base_type_t<TT>>;};
-                template <typename T, typename TT> using change_base_type_t = typename change_base_type_impl<T,TT>::type;
+                template <typename A, typename B> inline constexpr bool same_size_v = properties<A>::w == properties<B>::w && properties<A>::h == properties<B>::h;
 
-                template <typename T> struct floating_point_impl {using type = std::conditional_t<std::is_floating_point_v<base_type_t<T>>, T, change_base_type_t<T, double>>;};
+                template <typename T> struct base_impl {using type = T;};
+                template <int D, typename T> struct base_impl<vec<D,T>> {using type = typename base_impl<T>::type;};
+                template <typename T> using base_t = typename base_impl<T>::type;
+
+                template <typename T, typename TT> struct change_base_impl {using type = base_t<TT>;};
+                template <int D, typename T, typename TT> struct change_base_impl<vec<D,T>,TT> {using type = vec<D, typename change_base_impl<T, TT>::type>;};
+                template <typename T, typename TT> using change_base_t = typename change_base_impl<T,TT>::type;
+
+                template <typename A, typename B> inline constexpr bool same_size_v = std::is_same_v<A, change_base_t<B,A>>;
+
+                template <typename T> struct floating_point_impl {using type = std::conditional_t<std::is_floating_point_v<base_t<T>>, T, change_base_t<T, double>>;};
                 template <typename T> using floating_point_t = typename floating_point_impl<T>::type;
+
+                template <typename T> struct type_weight
+                {
+                    static constexpr std::size_t
+                    $   high = std::is_floating_point_v<base_t<T>> * 0x100,
+                    $   mid  = sizeof(base_t<T>),
+                    $   low  = 0x100;
+                };
+
+                template <typename A, typename B> inline constexpr int compare_weight_v =
+                $   type_weight<A>::high < type_weight<B>::high ? -1 :
+                $   type_weight<A>::high > type_weight<B>::high ?  1 :
+                $   type_weight<A>::mid  < type_weight<B>::mid  ? -1 :
+                $   type_weight<A>::mid  > type_weight<B>::mid  ?  1 :
+                $   type_weight<A>::low  < type_weight<B>::low  ? -1 :
+                $   type_weight<A>::low  > type_weight<B>::low  ?  1 : 0;
+
+                template <typename ...P> struct larger_impl {using type = void;};
+                template <typename T> struct larger_impl<T> {using type = T;};
+                template <typename T, typename ...P> struct larger_impl<T,P...> {using type = typename larger_impl<T, typename larger_impl<P...>::type>::type;};
+                template <typename A, typename B> struct larger_impl<A,B> {using type = std::conditional_t<compare_weight_v<A,B> == 0, void, std::conditional_t<(compare_weight_v<A,B> > 0), A, B>>;};
+                template <int D, typename A, typename B> struct larger_impl<vec<D,A>,B> {using type = change_base_t<vec<D,A>, typename larger_impl<A,B>::type>;};
+                template <int D, typename A, typename B> struct larger_impl<B,vec<D,A>> {using type = change_base_t<vec<D,A>, typename larger_impl<A,B>::type>;};
+                template <int DA, int DB, typename A, typename B> struct larger_impl<vec<DA,A>,vec<DB,B>>
+                {using type = std::conditional_t<same_size_v<vec<DA,A>,vec<DB,B>>, change_base_t<vec<DA,A>, typename larger_impl<A,B>::type>, void>;};
+
+                // Void on failure
+                template <typename ...P> using opt_larger_t = typename larger_impl<P...>::type; // void on failure
+
+                template <typename ...P> inline constexpr bool have_larger_type_v = !std::is_void_v<opt_larger_t<P...>>;
+
+                // Soft error on failure
+                template <typename ...P> using soft_larger_t = std::enable_if_t<have_larger_type_v<P...>, opt_larger_t<P...>>;
+
+                template <typename ...P> struct hard_larger_impl
+                {
+                    static_assert(have_larger_type_v<P...>, "Can't determine larger type.");
+                    using type = opt_larger_t<P...>;
+                };
+
+                // Hard error on failure
+                template <typename ...P> using larger_t = typename hard_larger_impl<P...>::type;
             )");
         });
 

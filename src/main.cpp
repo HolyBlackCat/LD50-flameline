@@ -2,12 +2,11 @@
 
 #include "mat.h"
 
+using namespace Math;
+
+template <typename T> struct S;
+
 int main(int, char **)
 {
-    Math::fvec4 m(1.2,2.2,3.2,4.2);
-    for (int x = 0; x < 4; x++)
-        std::cout << m[x] << ' ';
-    std::cout << '\n';
-    for (int x = 0; x < 4; x++)
-        std::cout << m.to<int>()[x] << ' ';
+    std::cout << same_size_v<fmat3x2, fvec3>;
 }
