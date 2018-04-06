@@ -285,9 +285,17 @@ namespace Math
         
         // Hard error on failure
         template <typename ...P> using larger_t = typename hard_larger_impl<P...>::type;
+        
+        template <typename A, typename B> struct copy_qualifiers_impl {using type = B;};
+        template <typename A, typename B> struct copy_qualifiers_impl<const A, B> {using type = const typename copy_qualifiers_impl<A,B>::type;};
+        template <typename A, typename B> struct copy_qualifiers_impl<A &, B> {using type = typename copy_qualifiers_impl<A,B>::type &;};
+        template <typename A, typename B> struct copy_qualifiers_impl<A &&, B> {using type = typename copy_qualifiers_impl<A,B>::type &&;};
+        template <typename A, typename B> using copy_qualifiers_t = typename copy_qualifiers_impl<A,B>::type;
+        
+        template <typename T> using propagate_qualifiers_t = copy_qualifiers_t<base_t<T>, change_base_t<T, std::remove_const_t<std::remove_reference_t<base_t<T>>>>>;
     }
     
-    inline namespace Vector // Definitions
+    inline namespace Vector
     {
         //{ Vectors
         template <typename T> struct vec<2,T> // vec2
@@ -644,5 +652,8 @@ namespace Math
             [[nodiscard]] constexpr type max() const {return std::max({x.x,x.y,x.z,x.w,y.x,y.y,y.z,y.w,z.x,z.y,z.z,z.w,w.x,w.y,w.z,w.w});}
         };
         //} Matrices
+        
+        //{ Operators
+        //} Operators
     }
 }

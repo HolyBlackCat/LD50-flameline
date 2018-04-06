@@ -8,5 +8,6 @@ template <typename T> struct S;
 
 int main(int, char **)
 {
-    std::cout << same_size_v<fmat3x2, fvec3>;
+    using T = propagate_qualifiers_t<const float &>;
+    S<T> s;
 }
