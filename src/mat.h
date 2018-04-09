@@ -310,14 +310,13 @@ namespace Math
             static constexpr int size = 2;
             using type = T;
             using member_type = T;
-            union {member_type x, r, s;};
-            union {member_type y, g, t;};
+            union {member_type x, r;};
+            union {member_type y, g;};
             constexpr vec() = default;
             explicit constexpr vec(member_type obj) : x(obj), y(obj) {}
             constexpr vec(member_type x, member_type y) : x(x), y(y) {}
             template <typename TT> constexpr vec(const vec2<TT> &obj) : x(obj.x), y(obj.y) {}
             template <typename TT> [[nodiscard]] constexpr vec2<TT> to() const {return vec2<TT>(TT(x), TT(y));}
-            static constexpr member_type vec::*pointers[size] {&vec::x, &vec::y};
             [[nodiscard]] constexpr member_type &operator[](int i) {return *(member_type *)((char *)this + sizeof(member_type)*i);}
             [[nodiscard]] constexpr const member_type &operator[](int i) const {return *(member_type *)((char *)this + sizeof(member_type)*i);}
             [[nodiscard]] type *as_array() {return &x;};
@@ -328,9 +327,19 @@ namespace Math
             [[nodiscard]] constexpr bool all() const {return x && y;}
             [[nodiscard]] constexpr auto sum() const {return x + y;}
             [[nodiscard]] constexpr auto prod() const {return x * y;}
-            [[nodiscard]] constexpr auto ratio() const {return x / y;}
+            [[nodiscard]] constexpr auto ratio() const {return floating_point_t<member_type>(x) / floating_point_t<member_type>(y);}
             [[nodiscard]] constexpr type min() const {return std::min({x,y});}
             [[nodiscard]] constexpr type max() const {return std::max({x,y});}
+            template <typename N> [[nodiscard]] constexpr vec set_x(const N &n) const {return vec(n, y);} template <typename N> [[nodiscard]] constexpr vec set_y(const N &n) const {return vec(x, n);}
+            template <typename N> [[nodiscard]] constexpr vec set_r(const N &n) const {return vec(n, g);} template <typename N> [[nodiscard]] constexpr vec set_g(const N &n) const {return vec(r, n);}
+            template <typename N> [[nodiscard]] constexpr auto add_x(const N &n) const {return vec2<decltype(x+n)>(x+n, y);} template <typename N> [[nodiscard]] constexpr auto add_y(const N &n) const {return vec2<decltype(x+n)>(x, y+n);}
+            template <typename N> [[nodiscard]] constexpr auto add_r(const N &n) const {return vec2<decltype(x+n)>(r+n, g);} template <typename N> [[nodiscard]] constexpr auto add_g(const N &n) const {return vec2<decltype(x+n)>(r, g+n);}
+            template <typename N> [[nodiscard]] constexpr auto sub_x(const N &n) const {return vec2<decltype(x-n)>(x-n, y);} template <typename N> [[nodiscard]] constexpr auto sub_y(const N &n) const {return vec2<decltype(x-n)>(x, y-n);}
+            template <typename N> [[nodiscard]] constexpr auto sub_r(const N &n) const {return vec2<decltype(x-n)>(r-n, g);} template <typename N> [[nodiscard]] constexpr auto sub_g(const N &n) const {return vec2<decltype(x-n)>(r, g-n);}
+            template <typename N> [[nodiscard]] constexpr auto mul_x(const N &n) const {return vec2<decltype(x*n)>(x*n, y);} template <typename N> [[nodiscard]] constexpr auto mul_y(const N &n) const {return vec2<decltype(x*n)>(x, y*n);}
+            template <typename N> [[nodiscard]] constexpr auto mul_r(const N &n) const {return vec2<decltype(x*n)>(r*n, g);} template <typename N> [[nodiscard]] constexpr auto mul_g(const N &n) const {return vec2<decltype(x*n)>(r, g*n);}
+            template <typename N> [[nodiscard]] constexpr auto div_x(const N &n) const {return vec2<decltype(x/n)>(x/n, y);} template <typename N> [[nodiscard]] constexpr auto div_y(const N &n) const {return vec2<decltype(x/n)>(x, y/n);}
+            template <typename N> [[nodiscard]] constexpr auto div_r(const N &n) const {return vec2<decltype(x/n)>(r/n, g);} template <typename N> [[nodiscard]] constexpr auto div_g(const N &n) const {return vec2<decltype(x/n)>(r, g/n);}
         };
         
         template <typename T> struct vec<3,T> // vec3
@@ -340,15 +349,14 @@ namespace Math
             static constexpr int size = 3;
             using type = T;
             using member_type = T;
-            union {member_type x, r, s;};
-            union {member_type y, g, t;};
-            union {member_type z, b, p;};
+            union {member_type x, r;};
+            union {member_type y, g;};
+            union {member_type z, b;};
             constexpr vec() = default;
             explicit constexpr vec(member_type obj) : x(obj), y(obj), z(obj) {}
             constexpr vec(member_type x, member_type y, member_type z) : x(x), y(y), z(z) {}
             template <typename TT> constexpr vec(const vec3<TT> &obj) : x(obj.x), y(obj.y), z(obj.z) {}
             template <typename TT> [[nodiscard]] constexpr vec3<TT> to() const {return vec3<TT>(TT(x), TT(y), TT(z));}
-            static constexpr member_type vec::*pointers[size] {&vec::x, &vec::y, &vec::z};
             [[nodiscard]] constexpr member_type &operator[](int i) {return *(member_type *)((char *)this + sizeof(member_type)*i);}
             [[nodiscard]] constexpr const member_type &operator[](int i) const {return *(member_type *)((char *)this + sizeof(member_type)*i);}
             [[nodiscard]] type *as_array() {return &x;};
@@ -361,6 +369,16 @@ namespace Math
             [[nodiscard]] constexpr auto prod() const {return x * y * z;}
             [[nodiscard]] constexpr type min() const {return std::min({x,y,z});}
             [[nodiscard]] constexpr type max() const {return std::max({x,y,z});}
+            template <typename N> [[nodiscard]] constexpr vec set_x(const N &n) const {return vec(n, y, z);} template <typename N> [[nodiscard]] constexpr vec set_y(const N &n) const {return vec(x, n, z);} template <typename N> [[nodiscard]] constexpr vec set_z(const N &n) const {return vec(x, y, n);}
+            template <typename N> [[nodiscard]] constexpr vec set_r(const N &n) const {return vec(n, g, b);} template <typename N> [[nodiscard]] constexpr vec set_g(const N &n) const {return vec(r, n, b);} template <typename N> [[nodiscard]] constexpr vec set_b(const N &n) const {return vec(r, g, n);}
+            template <typename N> [[nodiscard]] constexpr auto add_x(const N &n) const {return vec3<decltype(x+n)>(x+n, y, z);} template <typename N> [[nodiscard]] constexpr auto add_y(const N &n) const {return vec3<decltype(x+n)>(x, y+n, z);} template <typename N> [[nodiscard]] constexpr auto add_z(const N &n) const {return vec3<decltype(x+n)>(x, y, z+n);}
+            template <typename N> [[nodiscard]] constexpr auto add_r(const N &n) const {return vec3<decltype(x+n)>(r+n, g, b);} template <typename N> [[nodiscard]] constexpr auto add_g(const N &n) const {return vec3<decltype(x+n)>(r, g+n, b);} template <typename N> [[nodiscard]] constexpr auto add_b(const N &n) const {return vec3<decltype(x+n)>(r, g, b+n);}
+            template <typename N> [[nodiscard]] constexpr auto sub_x(const N &n) const {return vec3<decltype(x-n)>(x-n, y, z);} template <typename N> [[nodiscard]] constexpr auto sub_y(const N &n) const {return vec3<decltype(x-n)>(x, y-n, z);} template <typename N> [[nodiscard]] constexpr auto sub_z(const N &n) const {return vec3<decltype(x-n)>(x, y, z-n);}
+            template <typename N> [[nodiscard]] constexpr auto sub_r(const N &n) const {return vec3<decltype(x-n)>(r-n, g, b);} template <typename N> [[nodiscard]] constexpr auto sub_g(const N &n) const {return vec3<decltype(x-n)>(r, g-n, b);} template <typename N> [[nodiscard]] constexpr auto sub_b(const N &n) const {return vec3<decltype(x-n)>(r, g, b-n);}
+            template <typename N> [[nodiscard]] constexpr auto mul_x(const N &n) const {return vec3<decltype(x*n)>(x*n, y, z);} template <typename N> [[nodiscard]] constexpr auto mul_y(const N &n) const {return vec3<decltype(x*n)>(x, y*n, z);} template <typename N> [[nodiscard]] constexpr auto mul_z(const N &n) const {return vec3<decltype(x*n)>(x, y, z*n);}
+            template <typename N> [[nodiscard]] constexpr auto mul_r(const N &n) const {return vec3<decltype(x*n)>(r*n, g, b);} template <typename N> [[nodiscard]] constexpr auto mul_g(const N &n) const {return vec3<decltype(x*n)>(r, g*n, b);} template <typename N> [[nodiscard]] constexpr auto mul_b(const N &n) const {return vec3<decltype(x*n)>(r, g, b*n);}
+            template <typename N> [[nodiscard]] constexpr auto div_x(const N &n) const {return vec3<decltype(x/n)>(x/n, y, z);} template <typename N> [[nodiscard]] constexpr auto div_y(const N &n) const {return vec3<decltype(x/n)>(x, y/n, z);} template <typename N> [[nodiscard]] constexpr auto div_z(const N &n) const {return vec3<decltype(x/n)>(x, y, z/n);}
+            template <typename N> [[nodiscard]] constexpr auto div_r(const N &n) const {return vec3<decltype(x/n)>(r/n, g, b);} template <typename N> [[nodiscard]] constexpr auto div_g(const N &n) const {return vec3<decltype(x/n)>(r, g/n, b);} template <typename N> [[nodiscard]] constexpr auto div_b(const N &n) const {return vec3<decltype(x/n)>(r, g, b/n);}
         };
         
         template <typename T> struct vec<4,T> // vec4
@@ -370,16 +388,15 @@ namespace Math
             static constexpr int size = 4;
             using type = T;
             using member_type = T;
-            union {member_type x, r, s;};
-            union {member_type y, g, t;};
-            union {member_type z, b, p;};
-            union {member_type w, a, q;};
+            union {member_type x, r;};
+            union {member_type y, g;};
+            union {member_type z, b;};
+            union {member_type w, a;};
             constexpr vec() = default;
             explicit constexpr vec(member_type obj) : x(obj), y(obj), z(obj), w(obj) {}
             constexpr vec(member_type x, member_type y, member_type z, member_type w) : x(x), y(y), z(z), w(w) {}
             template <typename TT> constexpr vec(const vec4<TT> &obj) : x(obj.x), y(obj.y), z(obj.z), w(obj.w) {}
             template <typename TT> [[nodiscard]] constexpr vec4<TT> to() const {return vec4<TT>(TT(x), TT(y), TT(z), TT(w));}
-            static constexpr member_type vec::*pointers[size] {&vec::x, &vec::y, &vec::z, &vec::w};
             [[nodiscard]] constexpr member_type &operator[](int i) {return *(member_type *)((char *)this + sizeof(member_type)*i);}
             [[nodiscard]] constexpr const member_type &operator[](int i) const {return *(member_type *)((char *)this + sizeof(member_type)*i);}
             [[nodiscard]] type *as_array() {return &x;};
@@ -392,6 +409,16 @@ namespace Math
             [[nodiscard]] constexpr auto prod() const {return x * y * z * w;}
             [[nodiscard]] constexpr type min() const {return std::min({x,y,z,w});}
             [[nodiscard]] constexpr type max() const {return std::max({x,y,z,w});}
+            template <typename N> [[nodiscard]] constexpr vec set_x(const N &n) const {return vec(n, y, z, w);} template <typename N> [[nodiscard]] constexpr vec set_y(const N &n) const {return vec(x, n, z, w);} template <typename N> [[nodiscard]] constexpr vec set_z(const N &n) const {return vec(x, y, n, w);} template <typename N> [[nodiscard]] constexpr vec set_w(const N &n) const {return vec(x, y, z, n);}
+            template <typename N> [[nodiscard]] constexpr vec set_r(const N &n) const {return vec(n, g, b, a);} template <typename N> [[nodiscard]] constexpr vec set_g(const N &n) const {return vec(r, n, b, a);} template <typename N> [[nodiscard]] constexpr vec set_b(const N &n) const {return vec(r, g, n, a);} template <typename N> [[nodiscard]] constexpr vec set_a(const N &n) const {return vec(r, g, b, n);}
+            template <typename N> [[nodiscard]] constexpr auto add_x(const N &n) const {return vec4<decltype(x+n)>(x+n, y, z, w);} template <typename N> [[nodiscard]] constexpr auto add_y(const N &n) const {return vec4<decltype(x+n)>(x, y+n, z, w);} template <typename N> [[nodiscard]] constexpr auto add_z(const N &n) const {return vec4<decltype(x+n)>(x, y, z+n, w);} template <typename N> [[nodiscard]] constexpr auto add_w(const N &n) const {return vec4<decltype(x+n)>(x, y, z, w+n);}
+            template <typename N> [[nodiscard]] constexpr auto add_r(const N &n) const {return vec4<decltype(x+n)>(r+n, g, b, a);} template <typename N> [[nodiscard]] constexpr auto add_g(const N &n) const {return vec4<decltype(x+n)>(r, g+n, b, a);} template <typename N> [[nodiscard]] constexpr auto add_b(const N &n) const {return vec4<decltype(x+n)>(r, g, b+n, a);} template <typename N> [[nodiscard]] constexpr auto add_a(const N &n) const {return vec4<decltype(x+n)>(r, g, b, a+n);}
+            template <typename N> [[nodiscard]] constexpr auto sub_x(const N &n) const {return vec4<decltype(x-n)>(x-n, y, z, w);} template <typename N> [[nodiscard]] constexpr auto sub_y(const N &n) const {return vec4<decltype(x-n)>(x, y-n, z, w);} template <typename N> [[nodiscard]] constexpr auto sub_z(const N &n) const {return vec4<decltype(x-n)>(x, y, z-n, w);} template <typename N> [[nodiscard]] constexpr auto sub_w(const N &n) const {return vec4<decltype(x-n)>(x, y, z, w-n);}
+            template <typename N> [[nodiscard]] constexpr auto sub_r(const N &n) const {return vec4<decltype(x-n)>(r-n, g, b, a);} template <typename N> [[nodiscard]] constexpr auto sub_g(const N &n) const {return vec4<decltype(x-n)>(r, g-n, b, a);} template <typename N> [[nodiscard]] constexpr auto sub_b(const N &n) const {return vec4<decltype(x-n)>(r, g, b-n, a);} template <typename N> [[nodiscard]] constexpr auto sub_a(const N &n) const {return vec4<decltype(x-n)>(r, g, b, a-n);}
+            template <typename N> [[nodiscard]] constexpr auto mul_x(const N &n) const {return vec4<decltype(x*n)>(x*n, y, z, w);} template <typename N> [[nodiscard]] constexpr auto mul_y(const N &n) const {return vec4<decltype(x*n)>(x, y*n, z, w);} template <typename N> [[nodiscard]] constexpr auto mul_z(const N &n) const {return vec4<decltype(x*n)>(x, y, z*n, w);} template <typename N> [[nodiscard]] constexpr auto mul_w(const N &n) const {return vec4<decltype(x*n)>(x, y, z, w*n);}
+            template <typename N> [[nodiscard]] constexpr auto mul_r(const N &n) const {return vec4<decltype(x*n)>(r*n, g, b, a);} template <typename N> [[nodiscard]] constexpr auto mul_g(const N &n) const {return vec4<decltype(x*n)>(r, g*n, b, a);} template <typename N> [[nodiscard]] constexpr auto mul_b(const N &n) const {return vec4<decltype(x*n)>(r, g, b*n, a);} template <typename N> [[nodiscard]] constexpr auto mul_a(const N &n) const {return vec4<decltype(x*n)>(r, g, b, a*n);}
+            template <typename N> [[nodiscard]] constexpr auto div_x(const N &n) const {return vec4<decltype(x/n)>(x/n, y, z, w);} template <typename N> [[nodiscard]] constexpr auto div_y(const N &n) const {return vec4<decltype(x/n)>(x, y/n, z, w);} template <typename N> [[nodiscard]] constexpr auto div_z(const N &n) const {return vec4<decltype(x/n)>(x, y, z/n, w);} template <typename N> [[nodiscard]] constexpr auto div_w(const N &n) const {return vec4<decltype(x/n)>(x, y, z, w/n);}
+            template <typename N> [[nodiscard]] constexpr auto div_r(const N &n) const {return vec4<decltype(x/n)>(r/n, g, b, a);} template <typename N> [[nodiscard]] constexpr auto div_g(const N &n) const {return vec4<decltype(x/n)>(r, g/n, b, a);} template <typename N> [[nodiscard]] constexpr auto div_b(const N &n) const {return vec4<decltype(x/n)>(r, g, b/n, a);} template <typename N> [[nodiscard]] constexpr auto div_a(const N &n) const {return vec4<decltype(x/n)>(r, g, b, a/n);}
         };
         //} Vectors
         
@@ -404,8 +431,8 @@ namespace Math
             static constexpr int size = 2;
             using type = T;
             using member_type = vec2<T>;
-            union {member_type x, r, s;};
-            union {member_type y, g, t;};
+            union {member_type x, r;};
+            union {member_type y, g;};
             constexpr vec() = default;
             explicit constexpr vec(member_type obj) : x(obj), y(obj) {}
             constexpr vec(member_type x, member_type y) : x(x), y(y) {}
@@ -413,7 +440,6 @@ namespace Math
             constexpr vec(type xx, type yx, type xy, type yy) : x(xx,xy), y(yx,yy) {}
             template <typename TT> constexpr vec(const mat2x2<TT> &obj) : x(obj.x), y(obj.y) {}
             template <typename TT> [[nodiscard]] constexpr mat2x2<TT> to() const {return mat2x2<TT>(TT(x.x), TT(y.x), TT(x.y), TT(y.y));}
-            static constexpr member_type vec::*pointers[width] {&vec::x, &vec::y};
             [[nodiscard]] constexpr member_type &operator[](int i) {return *(member_type *)((char *)this + sizeof(member_type)*i);}
             [[nodiscard]] constexpr const member_type &operator[](int i) const {return *(member_type *)((char *)this + sizeof(member_type)*i);}
             [[nodiscard]] type *as_array() {return &x.x;};
@@ -433,8 +459,8 @@ namespace Math
             static constexpr int width = 2, height = 3;
             using type = T;
             using member_type = vec3<T>;
-            union {member_type x, r, s;};
-            union {member_type y, g, t;};
+            union {member_type x, r;};
+            union {member_type y, g;};
             constexpr vec() = default;
             explicit constexpr vec(member_type obj) : x(obj), y(obj) {}
             constexpr vec(member_type x, member_type y) : x(x), y(y) {}
@@ -442,7 +468,6 @@ namespace Math
             constexpr vec(type xx, type yx, type xy, type yy, type xz, type yz) : x(xx,xy,xz), y(yx,yy,yz) {}
             template <typename TT> constexpr vec(const mat2x3<TT> &obj) : x(obj.x), y(obj.y) {}
             template <typename TT> [[nodiscard]] constexpr mat2x3<TT> to() const {return mat2x3<TT>(TT(x.x), TT(y.x), TT(x.y), TT(y.y), TT(x.z), TT(y.z));}
-            static constexpr member_type vec::*pointers[width] {&vec::x, &vec::y};
             [[nodiscard]] constexpr member_type &operator[](int i) {return *(member_type *)((char *)this + sizeof(member_type)*i);}
             [[nodiscard]] constexpr const member_type &operator[](int i) const {return *(member_type *)((char *)this + sizeof(member_type)*i);}
             [[nodiscard]] type *as_array() {return &x.x;};
@@ -462,8 +487,8 @@ namespace Math
             static constexpr int width = 2, height = 4;
             using type = T;
             using member_type = vec4<T>;
-            union {member_type x, r, s;};
-            union {member_type y, g, t;};
+            union {member_type x, r;};
+            union {member_type y, g;};
             constexpr vec() = default;
             explicit constexpr vec(member_type obj) : x(obj), y(obj) {}
             constexpr vec(member_type x, member_type y) : x(x), y(y) {}
@@ -471,7 +496,6 @@ namespace Math
             constexpr vec(type xx, type yx, type xy, type yy, type xz, type yz, type xw, type yw) : x(xx,xy,xz,xw), y(yx,yy,yz,yw) {}
             template <typename TT> constexpr vec(const mat2x4<TT> &obj) : x(obj.x), y(obj.y) {}
             template <typename TT> [[nodiscard]] constexpr mat2x4<TT> to() const {return mat2x4<TT>(TT(x.x), TT(y.x), TT(x.y), TT(y.y), TT(x.z), TT(y.z), TT(x.w), TT(y.w));}
-            static constexpr member_type vec::*pointers[width] {&vec::x, &vec::y};
             [[nodiscard]] constexpr member_type &operator[](int i) {return *(member_type *)((char *)this + sizeof(member_type)*i);}
             [[nodiscard]] constexpr const member_type &operator[](int i) const {return *(member_type *)((char *)this + sizeof(member_type)*i);}
             [[nodiscard]] type *as_array() {return &x.x;};
@@ -491,9 +515,9 @@ namespace Math
             static constexpr int width = 3, height = 2;
             using type = T;
             using member_type = vec2<T>;
-            union {member_type x, r, s;};
-            union {member_type y, g, t;};
-            union {member_type z, b, p;};
+            union {member_type x, r;};
+            union {member_type y, g;};
+            union {member_type z, b;};
             constexpr vec() = default;
             explicit constexpr vec(member_type obj) : x(obj), y(obj), z(obj) {}
             constexpr vec(member_type x, member_type y, member_type z) : x(x), y(y), z(z) {}
@@ -501,7 +525,6 @@ namespace Math
             constexpr vec(type xx, type yx, type zx, type xy, type yy, type zy) : x(xx,xy), y(yx,yy), z(zx,zy) {}
             template <typename TT> constexpr vec(const mat3x2<TT> &obj) : x(obj.x), y(obj.y), z(obj.z) {}
             template <typename TT> [[nodiscard]] constexpr mat3x2<TT> to() const {return mat3x2<TT>(TT(x.x), TT(y.x), TT(z.x), TT(x.y), TT(y.y), TT(z.y));}
-            static constexpr member_type vec::*pointers[width] {&vec::x, &vec::y, &vec::z};
             [[nodiscard]] constexpr member_type &operator[](int i) {return *(member_type *)((char *)this + sizeof(member_type)*i);}
             [[nodiscard]] constexpr const member_type &operator[](int i) const {return *(member_type *)((char *)this + sizeof(member_type)*i);}
             [[nodiscard]] type *as_array() {return &x.x;};
@@ -522,9 +545,9 @@ namespace Math
             static constexpr int size = 3;
             using type = T;
             using member_type = vec3<T>;
-            union {member_type x, r, s;};
-            union {member_type y, g, t;};
-            union {member_type z, b, p;};
+            union {member_type x, r;};
+            union {member_type y, g;};
+            union {member_type z, b;};
             constexpr vec() = default;
             explicit constexpr vec(member_type obj) : x(obj), y(obj), z(obj) {}
             constexpr vec(member_type x, member_type y, member_type z) : x(x), y(y), z(z) {}
@@ -532,7 +555,6 @@ namespace Math
             constexpr vec(type xx, type yx, type zx, type xy, type yy, type zy, type xz, type yz, type zz) : x(xx,xy,xz), y(yx,yy,yz), z(zx,zy,zz) {}
             template <typename TT> constexpr vec(const mat3x3<TT> &obj) : x(obj.x), y(obj.y), z(obj.z) {}
             template <typename TT> [[nodiscard]] constexpr mat3x3<TT> to() const {return mat3x3<TT>(TT(x.x), TT(y.x), TT(z.x), TT(x.y), TT(y.y), TT(z.y), TT(x.z), TT(y.z), TT(z.z));}
-            static constexpr member_type vec::*pointers[width] {&vec::x, &vec::y, &vec::z};
             [[nodiscard]] constexpr member_type &operator[](int i) {return *(member_type *)((char *)this + sizeof(member_type)*i);}
             [[nodiscard]] constexpr const member_type &operator[](int i) const {return *(member_type *)((char *)this + sizeof(member_type)*i);}
             [[nodiscard]] type *as_array() {return &x.x;};
@@ -552,9 +574,9 @@ namespace Math
             static constexpr int width = 3, height = 4;
             using type = T;
             using member_type = vec4<T>;
-            union {member_type x, r, s;};
-            union {member_type y, g, t;};
-            union {member_type z, b, p;};
+            union {member_type x, r;};
+            union {member_type y, g;};
+            union {member_type z, b;};
             constexpr vec() = default;
             explicit constexpr vec(member_type obj) : x(obj), y(obj), z(obj) {}
             constexpr vec(member_type x, member_type y, member_type z) : x(x), y(y), z(z) {}
@@ -562,7 +584,6 @@ namespace Math
             constexpr vec(type xx, type yx, type zx, type xy, type yy, type zy, type xz, type yz, type zz, type xw, type yw, type zw) : x(xx,xy,xz,xw), y(yx,yy,yz,yw), z(zx,zy,zz,zw) {}
             template <typename TT> constexpr vec(const mat3x4<TT> &obj) : x(obj.x), y(obj.y), z(obj.z) {}
             template <typename TT> [[nodiscard]] constexpr mat3x4<TT> to() const {return mat3x4<TT>(TT(x.x), TT(y.x), TT(z.x), TT(x.y), TT(y.y), TT(z.y), TT(x.z), TT(y.z), TT(z.z), TT(x.w), TT(y.w), TT(z.w));}
-            static constexpr member_type vec::*pointers[width] {&vec::x, &vec::y, &vec::z};
             [[nodiscard]] constexpr member_type &operator[](int i) {return *(member_type *)((char *)this + sizeof(member_type)*i);}
             [[nodiscard]] constexpr const member_type &operator[](int i) const {return *(member_type *)((char *)this + sizeof(member_type)*i);}
             [[nodiscard]] type *as_array() {return &x.x;};
@@ -582,10 +603,10 @@ namespace Math
             static constexpr int width = 4, height = 2;
             using type = T;
             using member_type = vec2<T>;
-            union {member_type x, r, s;};
-            union {member_type y, g, t;};
-            union {member_type z, b, p;};
-            union {member_type w, a, q;};
+            union {member_type x, r;};
+            union {member_type y, g;};
+            union {member_type z, b;};
+            union {member_type w, a;};
             constexpr vec() = default;
             explicit constexpr vec(member_type obj) : x(obj), y(obj), z(obj), w(obj) {}
             constexpr vec(member_type x, member_type y, member_type z, member_type w) : x(x), y(y), z(z), w(w) {}
@@ -593,7 +614,6 @@ namespace Math
             constexpr vec(type xx, type yx, type zx, type wx, type xy, type yy, type zy, type wy) : x(xx,xy), y(yx,yy), z(zx,zy), w(wx,wy) {}
             template <typename TT> constexpr vec(const mat4x2<TT> &obj) : x(obj.x), y(obj.y), z(obj.z), w(obj.w) {}
             template <typename TT> [[nodiscard]] constexpr mat4x2<TT> to() const {return mat4x2<TT>(TT(x.x), TT(y.x), TT(z.x), TT(w.x), TT(x.y), TT(y.y), TT(z.y), TT(w.y));}
-            static constexpr member_type vec::*pointers[width] {&vec::x, &vec::y, &vec::z, &vec::w};
             [[nodiscard]] constexpr member_type &operator[](int i) {return *(member_type *)((char *)this + sizeof(member_type)*i);}
             [[nodiscard]] constexpr const member_type &operator[](int i) const {return *(member_type *)((char *)this + sizeof(member_type)*i);}
             [[nodiscard]] type *as_array() {return &x.x;};
@@ -613,10 +633,10 @@ namespace Math
             static constexpr int width = 4, height = 3;
             using type = T;
             using member_type = vec3<T>;
-            union {member_type x, r, s;};
-            union {member_type y, g, t;};
-            union {member_type z, b, p;};
-            union {member_type w, a, q;};
+            union {member_type x, r;};
+            union {member_type y, g;};
+            union {member_type z, b;};
+            union {member_type w, a;};
             constexpr vec() = default;
             explicit constexpr vec(member_type obj) : x(obj), y(obj), z(obj), w(obj) {}
             constexpr vec(member_type x, member_type y, member_type z, member_type w) : x(x), y(y), z(z), w(w) {}
@@ -624,7 +644,6 @@ namespace Math
             constexpr vec(type xx, type yx, type zx, type wx, type xy, type yy, type zy, type wy, type xz, type yz, type zz, type wz) : x(xx,xy,xz), y(yx,yy,yz), z(zx,zy,zz), w(wx,wy,wz) {}
             template <typename TT> constexpr vec(const mat4x3<TT> &obj) : x(obj.x), y(obj.y), z(obj.z), w(obj.w) {}
             template <typename TT> [[nodiscard]] constexpr mat4x3<TT> to() const {return mat4x3<TT>(TT(x.x), TT(y.x), TT(z.x), TT(w.x), TT(x.y), TT(y.y), TT(z.y), TT(w.y), TT(x.z), TT(y.z), TT(z.z), TT(w.z));}
-            static constexpr member_type vec::*pointers[width] {&vec::x, &vec::y, &vec::z, &vec::w};
             [[nodiscard]] constexpr member_type &operator[](int i) {return *(member_type *)((char *)this + sizeof(member_type)*i);}
             [[nodiscard]] constexpr const member_type &operator[](int i) const {return *(member_type *)((char *)this + sizeof(member_type)*i);}
             [[nodiscard]] type *as_array() {return &x.x;};
@@ -645,10 +664,10 @@ namespace Math
             static constexpr int size = 4;
             using type = T;
             using member_type = vec4<T>;
-            union {member_type x, r, s;};
-            union {member_type y, g, t;};
-            union {member_type z, b, p;};
-            union {member_type w, a, q;};
+            union {member_type x, r;};
+            union {member_type y, g;};
+            union {member_type z, b;};
+            union {member_type w, a;};
             constexpr vec() = default;
             explicit constexpr vec(member_type obj) : x(obj), y(obj), z(obj), w(obj) {}
             constexpr vec(member_type x, member_type y, member_type z, member_type w) : x(x), y(y), z(z), w(w) {}
@@ -656,7 +675,6 @@ namespace Math
             constexpr vec(type xx, type yx, type zx, type wx, type xy, type yy, type zy, type wy, type xz, type yz, type zz, type wz, type xw, type yw, type zw, type ww) : x(xx,xy,xz,xw), y(yx,yy,yz,yw), z(zx,zy,zz,zw), w(wx,wy,wz,ww) {}
             template <typename TT> constexpr vec(const mat4x4<TT> &obj) : x(obj.x), y(obj.y), z(obj.z), w(obj.w) {}
             template <typename TT> [[nodiscard]] constexpr mat4x4<TT> to() const {return mat4x4<TT>(TT(x.x), TT(y.x), TT(z.x), TT(w.x), TT(x.y), TT(y.y), TT(z.y), TT(w.y), TT(x.z), TT(y.z), TT(z.z), TT(w.z), TT(x.w), TT(y.w), TT(z.w), TT(w.w));}
-            static constexpr member_type vec::*pointers[width] {&vec::x, &vec::y, &vec::z, &vec::w};
             [[nodiscard]] constexpr member_type &operator[](int i) {return *(member_type *)((char *)this + sizeof(member_type)*i);}
             [[nodiscard]] constexpr const member_type &operator[](int i) const {return *(member_type *)((char *)this + sizeof(member_type)*i);}
             [[nodiscard]] type *as_array() {return &x.x;};
@@ -673,53 +691,53 @@ namespace Math
         //{ Operators
         //{  vec2
         template <typename A, typename B> [[nodiscard]] constexpr auto operator+(const vec2<A> &a, const vec2<B> &b) -> vec2<decltype(a.x + b.x)> {return {a.x + b.x, a.y + b.y};}
-        template <typename V, typename S, typename = if_scalar_t<S>> [[nodiscard]] constexpr decltype(auto) operator+(const vec2<V> &v, const S &s) {return v + vec_from_scalar<decltype(v)>(s);}
-        template <typename S, typename V, typename = if_scalar_t<S>> [[nodiscard]] constexpr decltype(auto) operator+(const S &s, const vec2<V> &v) {return vec_from_scalar<decltype(v)>(s) + v;}
+        template <typename V, typename S, typename = if_scalar_t<S>> [[nodiscard]] constexpr auto operator+(const vec2<V> &v, const S &s) {return v + vec_from_scalar<decltype(v)>(s);}
+        template <typename S, typename V, typename = if_scalar_t<S>> [[nodiscard]] constexpr auto operator+(const S &s, const vec2<V> &v) {return vec_from_scalar<decltype(v)>(s) + v;}
         template <typename A, typename B> [[nodiscard]] constexpr auto operator-(const vec2<A> &a, const vec2<B> &b) -> vec2<decltype(a.x - b.x)> {return {a.x - b.x, a.y - b.y};}
-        template <typename V, typename S, typename = if_scalar_t<S>> [[nodiscard]] constexpr decltype(auto) operator-(const vec2<V> &v, const S &s) {return v - vec_from_scalar<decltype(v)>(s);}
-        template <typename S, typename V, typename = if_scalar_t<S>> [[nodiscard]] constexpr decltype(auto) operator-(const S &s, const vec2<V> &v) {return vec_from_scalar<decltype(v)>(s) - v;}
+        template <typename V, typename S, typename = if_scalar_t<S>> [[nodiscard]] constexpr auto operator-(const vec2<V> &v, const S &s) {return v - vec_from_scalar<decltype(v)>(s);}
+        template <typename S, typename V, typename = if_scalar_t<S>> [[nodiscard]] constexpr auto operator-(const S &s, const vec2<V> &v) {return vec_from_scalar<decltype(v)>(s) - v;}
         template <typename A, typename B> [[nodiscard]] constexpr auto operator*(const vec2<A> &a, const vec2<B> &b) -> vec2<decltype(a.x * b.x)> {return {a.x * b.x, a.y * b.y};}
-        template <typename V, typename S, typename = if_scalar_t<S>> [[nodiscard]] constexpr decltype(auto) operator*(const vec2<V> &v, const S &s) {return v * vec_from_scalar<decltype(v)>(s);}
-        template <typename S, typename V, typename = if_scalar_t<S>> [[nodiscard]] constexpr decltype(auto) operator*(const S &s, const vec2<V> &v) {return vec_from_scalar<decltype(v)>(s) * v;}
+        template <typename V, typename S, typename = if_scalar_t<S>> [[nodiscard]] constexpr auto operator*(const vec2<V> &v, const S &s) {return v * vec_from_scalar<decltype(v)>(s);}
+        template <typename S, typename V, typename = if_scalar_t<S>> [[nodiscard]] constexpr auto operator*(const S &s, const vec2<V> &v) {return vec_from_scalar<decltype(v)>(s) * v;}
         template <typename A, typename B> [[nodiscard]] constexpr auto operator/(const vec2<A> &a, const vec2<B> &b) -> vec2<decltype(a.x / b.x)> {return {a.x / b.x, a.y / b.y};}
-        template <typename V, typename S, typename = if_scalar_t<S>> [[nodiscard]] constexpr decltype(auto) operator/(const vec2<V> &v, const S &s) {return v / vec_from_scalar<decltype(v)>(s);}
-        template <typename S, typename V, typename = if_scalar_t<S>> [[nodiscard]] constexpr decltype(auto) operator/(const S &s, const vec2<V> &v) {return vec_from_scalar<decltype(v)>(s) / v;}
+        template <typename V, typename S, typename = if_scalar_t<S>> [[nodiscard]] constexpr auto operator/(const vec2<V> &v, const S &s) {return v / vec_from_scalar<decltype(v)>(s);}
+        template <typename S, typename V, typename = if_scalar_t<S>> [[nodiscard]] constexpr auto operator/(const S &s, const vec2<V> &v) {return vec_from_scalar<decltype(v)>(s) / v;}
         template <typename A, typename B> [[nodiscard]] constexpr auto operator%(const vec2<A> &a, const vec2<B> &b) -> vec2<decltype(a.x % b.x)> {return {a.x % b.x, a.y % b.y};}
-        template <typename V, typename S, typename = if_scalar_t<S>> [[nodiscard]] constexpr decltype(auto) operator%(const vec2<V> &v, const S &s) {return v % vec_from_scalar<decltype(v)>(s);}
-        template <typename S, typename V, typename = if_scalar_t<S>> [[nodiscard]] constexpr decltype(auto) operator%(const S &s, const vec2<V> &v) {return vec_from_scalar<decltype(v)>(s) % v;}
+        template <typename V, typename S, typename = if_scalar_t<S>> [[nodiscard]] constexpr auto operator%(const vec2<V> &v, const S &s) {return v % vec_from_scalar<decltype(v)>(s);}
+        template <typename S, typename V, typename = if_scalar_t<S>> [[nodiscard]] constexpr auto operator%(const S &s, const vec2<V> &v) {return vec_from_scalar<decltype(v)>(s) % v;}
         template <typename A, typename B> [[nodiscard]] constexpr auto operator^(const vec2<A> &a, const vec2<B> &b) -> vec2<decltype(a.x ^ b.x)> {return {a.x ^ b.x, a.y ^ b.y};}
-        template <typename V, typename S, typename = if_scalar_t<S>> [[nodiscard]] constexpr decltype(auto) operator^(const vec2<V> &v, const S &s) {return v ^ vec_from_scalar<decltype(v)>(s);}
-        template <typename S, typename V, typename = if_scalar_t<S>> [[nodiscard]] constexpr decltype(auto) operator^(const S &s, const vec2<V> &v) {return vec_from_scalar<decltype(v)>(s) ^ v;}
+        template <typename V, typename S, typename = if_scalar_t<S>> [[nodiscard]] constexpr auto operator^(const vec2<V> &v, const S &s) {return v ^ vec_from_scalar<decltype(v)>(s);}
+        template <typename S, typename V, typename = if_scalar_t<S>> [[nodiscard]] constexpr auto operator^(const S &s, const vec2<V> &v) {return vec_from_scalar<decltype(v)>(s) ^ v;}
         template <typename A, typename B> [[nodiscard]] constexpr auto operator&(const vec2<A> &a, const vec2<B> &b) -> vec2<decltype(a.x & b.x)> {return {a.x & b.x, a.y & b.y};}
-        template <typename V, typename S, typename = if_scalar_t<S>> [[nodiscard]] constexpr decltype(auto) operator&(const vec2<V> &v, const S &s) {return v & vec_from_scalar<decltype(v)>(s);}
-        template <typename S, typename V, typename = if_scalar_t<S>> [[nodiscard]] constexpr decltype(auto) operator&(const S &s, const vec2<V> &v) {return vec_from_scalar<decltype(v)>(s) & v;}
+        template <typename V, typename S, typename = if_scalar_t<S>> [[nodiscard]] constexpr auto operator&(const vec2<V> &v, const S &s) {return v & vec_from_scalar<decltype(v)>(s);}
+        template <typename S, typename V, typename = if_scalar_t<S>> [[nodiscard]] constexpr auto operator&(const S &s, const vec2<V> &v) {return vec_from_scalar<decltype(v)>(s) & v;}
         template <typename A, typename B> [[nodiscard]] constexpr auto operator|(const vec2<A> &a, const vec2<B> &b) -> vec2<decltype(a.x | b.x)> {return {a.x | b.x, a.y | b.y};}
-        template <typename V, typename S, typename = if_scalar_t<S>> [[nodiscard]] constexpr decltype(auto) operator|(const vec2<V> &v, const S &s) {return v | vec_from_scalar<decltype(v)>(s);}
-        template <typename S, typename V, typename = if_scalar_t<S>> [[nodiscard]] constexpr decltype(auto) operator|(const S &s, const vec2<V> &v) {return vec_from_scalar<decltype(v)>(s) | v;}
+        template <typename V, typename S, typename = if_scalar_t<S>> [[nodiscard]] constexpr auto operator|(const vec2<V> &v, const S &s) {return v | vec_from_scalar<decltype(v)>(s);}
+        template <typename S, typename V, typename = if_scalar_t<S>> [[nodiscard]] constexpr auto operator|(const S &s, const vec2<V> &v) {return vec_from_scalar<decltype(v)>(s) | v;}
         template <typename A, typename B> [[nodiscard]] constexpr auto operator<<(const vec2<A> &a, const vec2<B> &b) -> vec2<decltype(a.x << b.x)> {return {a.x << b.x, a.y << b.y};}
-        template <typename V, typename S, typename = if_scalar_t<S>> [[nodiscard]] constexpr decltype(auto) operator<<(const vec2<V> &v, const S &s) {return v << vec_from_scalar<decltype(v)>(s);}
-        template <typename S, typename V, typename = if_scalar_t<S>> [[nodiscard]] constexpr decltype(auto) operator<<(const S &s, const vec2<V> &v) {return vec_from_scalar<decltype(v)>(s) << v;}
+        template <typename V, typename S, typename = if_scalar_t<S>> [[nodiscard]] constexpr auto operator<<(const vec2<V> &v, const S &s) {return v << vec_from_scalar<decltype(v)>(s);}
+        template <typename S, typename V, typename = if_scalar_t<S>> [[nodiscard]] constexpr auto operator<<(const S &s, const vec2<V> &v) {return vec_from_scalar<decltype(v)>(s) << v;}
         template <typename A, typename B> [[nodiscard]] constexpr auto operator>>(const vec2<A> &a, const vec2<B> &b) -> vec2<decltype(a.x >> b.x)> {return {a.x >> b.x, a.y >> b.y};}
-        template <typename V, typename S, typename = if_scalar_t<S>> [[nodiscard]] constexpr decltype(auto) operator>>(const vec2<V> &v, const S &s) {return v >> vec_from_scalar<decltype(v)>(s);}
-        template <typename S, typename V, typename = if_scalar_t<S>> [[nodiscard]] constexpr decltype(auto) operator>>(const S &s, const vec2<V> &v) {return vec_from_scalar<decltype(v)>(s) >> v;}
+        template <typename V, typename S, typename = if_scalar_t<S>> [[nodiscard]] constexpr auto operator>>(const vec2<V> &v, const S &s) {return v >> vec_from_scalar<decltype(v)>(s);}
+        template <typename S, typename V, typename = if_scalar_t<S>> [[nodiscard]] constexpr auto operator>>(const S &s, const vec2<V> &v) {return vec_from_scalar<decltype(v)>(s) >> v;}
         template <typename A, typename B> [[nodiscard]] constexpr auto operator<(const vec2<A> &a, const vec2<B> &b) -> vec2<decltype(a.x < b.x)> {return {a.x < b.x, a.y < b.y};}
-        template <typename V, typename S, typename = if_scalar_t<S>> [[nodiscard]] constexpr decltype(auto) operator<(const vec2<V> &v, const S &s) {return v < vec_from_scalar<decltype(v)>(s);}
-        template <typename S, typename V, typename = if_scalar_t<S>> [[nodiscard]] constexpr decltype(auto) operator<(const S &s, const vec2<V> &v) {return vec_from_scalar<decltype(v)>(s) < v;}
+        template <typename V, typename S, typename = if_scalar_t<S>> [[nodiscard]] constexpr auto operator<(const vec2<V> &v, const S &s) {return v < vec_from_scalar<decltype(v)>(s);}
+        template <typename S, typename V, typename = if_scalar_t<S>> [[nodiscard]] constexpr auto operator<(const S &s, const vec2<V> &v) {return vec_from_scalar<decltype(v)>(s) < v;}
         template <typename A, typename B> [[nodiscard]] constexpr auto operator>(const vec2<A> &a, const vec2<B> &b) -> vec2<decltype(a.x > b.x)> {return {a.x > b.x, a.y > b.y};}
-        template <typename V, typename S, typename = if_scalar_t<S>> [[nodiscard]] constexpr decltype(auto) operator>(const vec2<V> &v, const S &s) {return v > vec_from_scalar<decltype(v)>(s);}
-        template <typename S, typename V, typename = if_scalar_t<S>> [[nodiscard]] constexpr decltype(auto) operator>(const S &s, const vec2<V> &v) {return vec_from_scalar<decltype(v)>(s) > v;}
+        template <typename V, typename S, typename = if_scalar_t<S>> [[nodiscard]] constexpr auto operator>(const vec2<V> &v, const S &s) {return v > vec_from_scalar<decltype(v)>(s);}
+        template <typename S, typename V, typename = if_scalar_t<S>> [[nodiscard]] constexpr auto operator>(const S &s, const vec2<V> &v) {return vec_from_scalar<decltype(v)>(s) > v;}
         template <typename A, typename B> [[nodiscard]] constexpr auto operator<=(const vec2<A> &a, const vec2<B> &b) -> vec2<decltype(a.x <= b.x)> {return {a.x <= b.x, a.y <= b.y};}
-        template <typename V, typename S, typename = if_scalar_t<S>> [[nodiscard]] constexpr decltype(auto) operator<=(const vec2<V> &v, const S &s) {return v <= vec_from_scalar<decltype(v)>(s);}
-        template <typename S, typename V, typename = if_scalar_t<S>> [[nodiscard]] constexpr decltype(auto) operator<=(const S &s, const vec2<V> &v) {return vec_from_scalar<decltype(v)>(s) <= v;}
+        template <typename V, typename S, typename = if_scalar_t<S>> [[nodiscard]] constexpr auto operator<=(const vec2<V> &v, const S &s) {return v <= vec_from_scalar<decltype(v)>(s);}
+        template <typename S, typename V, typename = if_scalar_t<S>> [[nodiscard]] constexpr auto operator<=(const S &s, const vec2<V> &v) {return vec_from_scalar<decltype(v)>(s) <= v;}
         template <typename A, typename B> [[nodiscard]] constexpr auto operator>=(const vec2<A> &a, const vec2<B> &b) -> vec2<decltype(a.x >= b.x)> {return {a.x >= b.x, a.y >= b.y};}
-        template <typename V, typename S, typename = if_scalar_t<S>> [[nodiscard]] constexpr decltype(auto) operator>=(const vec2<V> &v, const S &s) {return v >= vec_from_scalar<decltype(v)>(s);}
-        template <typename S, typename V, typename = if_scalar_t<S>> [[nodiscard]] constexpr decltype(auto) operator>=(const S &s, const vec2<V> &v) {return vec_from_scalar<decltype(v)>(s) >= v;}
+        template <typename V, typename S, typename = if_scalar_t<S>> [[nodiscard]] constexpr auto operator>=(const vec2<V> &v, const S &s) {return v >= vec_from_scalar<decltype(v)>(s);}
+        template <typename S, typename V, typename = if_scalar_t<S>> [[nodiscard]] constexpr auto operator>=(const S &s, const vec2<V> &v) {return vec_from_scalar<decltype(v)>(s) >= v;}
         template <typename A, typename B> [[nodiscard]] constexpr bool operator==(const vec2<A> &a, const vec2<B> &b) {return a.x == b.x && a.y == b.y;}
-        template <typename V, typename S, typename = if_scalar_t<S>> [[nodiscard]] constexpr decltype(auto) operator==(const vec2<V> &v, const S &s) {return v == vec_from_scalar<decltype(v)>(s);}
-        template <typename S, typename V, typename = if_scalar_t<S>> [[nodiscard]] constexpr decltype(auto) operator==(const S &s, const vec2<V> &v) {return vec_from_scalar<decltype(v)>(s) == v;}
+        template <typename V, typename S, typename = if_scalar_t<S>> [[nodiscard]] constexpr bool operator==(const vec2<V> &v, const S &s) {return v == vec_from_scalar<decltype(v)>(s);}
+        template <typename S, typename V, typename = if_scalar_t<S>> [[nodiscard]] constexpr bool operator==(const S &s, const vec2<V> &v) {return vec_from_scalar<decltype(v)>(s) == v;}
         template <typename A, typename B> [[nodiscard]] constexpr bool operator!=(const vec2<A> &a, const vec2<B> &b) {return a.x != b.x || a.y != b.y;}
-        template <typename V, typename S, typename = if_scalar_t<S>> [[nodiscard]] constexpr decltype(auto) operator!=(const vec2<V> &v, const S &s) {return v != vec_from_scalar<decltype(v)>(s);}
-        template <typename S, typename V, typename = if_scalar_t<S>> [[nodiscard]] constexpr decltype(auto) operator!=(const S &s, const vec2<V> &v) {return vec_from_scalar<decltype(v)>(s) != v;}
+        template <typename V, typename S, typename = if_scalar_t<S>> [[nodiscard]] constexpr bool operator!=(const vec2<V> &v, const S &s) {return v != vec_from_scalar<decltype(v)>(s);}
+        template <typename S, typename V, typename = if_scalar_t<S>> [[nodiscard]] constexpr bool operator!=(const S &s, const vec2<V> &v) {return vec_from_scalar<decltype(v)>(s) != v;}
         template <typename A, typename B> [[nodiscard]] constexpr bool operator&&(const vec2<A> &a, const vec2<B> &b) {return bool(a) && bool(b);}
         template <typename A, typename B> [[nodiscard]] constexpr bool operator&&(const vec2<A> &a, const B &b) {return bool(a) && bool(b);}
         template <typename A, typename B> [[nodiscard]] constexpr bool operator&&(const A &a, const vec2<B> &b) {return bool(a) && bool(b);}
@@ -735,76 +753,76 @@ namespace Math
         template <typename T> constexpr vec2<T> &operator--(vec2<T> &v) {--v.x; --v.y; return v;}
         template <typename T> constexpr vec2<T> operator--(vec2<T> &v, int) {return {v.x--, v.y--};}
         template <typename A, typename B> constexpr vec2<A> &operator+=(vec2<A> &a, const vec2<B> &b) {a.x += b.x; a.y += b.y; return a;}
-        template <typename V, typename S, typename = if_scalar_t<S>> constexpr decltype(auto) operator+=(vec2<V> &v, const S &s) {return v += vec_from_scalar<decltype(v)>(s);}
+        template <typename V, typename S, typename = if_scalar_t<S>> constexpr vec2<V> &operator+=(vec2<V> &v, const S &s) {return v += vec_from_scalar<decltype(v)>(s);}
         template <typename A, typename B> constexpr vec2<A> &operator-=(vec2<A> &a, const vec2<B> &b) {a.x -= b.x; a.y -= b.y; return a;}
-        template <typename V, typename S, typename = if_scalar_t<S>> constexpr decltype(auto) operator-=(vec2<V> &v, const S &s) {return v -= vec_from_scalar<decltype(v)>(s);}
+        template <typename V, typename S, typename = if_scalar_t<S>> constexpr vec2<V> &operator-=(vec2<V> &v, const S &s) {return v -= vec_from_scalar<decltype(v)>(s);}
         template <typename A, typename B> constexpr vec2<A> &operator*=(vec2<A> &a, const vec2<B> &b) {a.x *= b.x; a.y *= b.y; return a;}
-        template <typename V, typename S, typename = if_scalar_t<S>> constexpr decltype(auto) operator*=(vec2<V> &v, const S &s) {return v *= vec_from_scalar<decltype(v)>(s);}
+        template <typename V, typename S, typename = if_scalar_t<S>> constexpr vec2<V> &operator*=(vec2<V> &v, const S &s) {return v *= vec_from_scalar<decltype(v)>(s);}
         template <typename A, typename B> constexpr vec2<A> &operator/=(vec2<A> &a, const vec2<B> &b) {a.x /= b.x; a.y /= b.y; return a;}
-        template <typename V, typename S, typename = if_scalar_t<S>> constexpr decltype(auto) operator/=(vec2<V> &v, const S &s) {return v /= vec_from_scalar<decltype(v)>(s);}
+        template <typename V, typename S, typename = if_scalar_t<S>> constexpr vec2<V> &operator/=(vec2<V> &v, const S &s) {return v /= vec_from_scalar<decltype(v)>(s);}
         template <typename A, typename B> constexpr vec2<A> &operator%=(vec2<A> &a, const vec2<B> &b) {a.x %= b.x; a.y %= b.y; return a;}
-        template <typename V, typename S, typename = if_scalar_t<S>> constexpr decltype(auto) operator%=(vec2<V> &v, const S &s) {return v %= vec_from_scalar<decltype(v)>(s);}
+        template <typename V, typename S, typename = if_scalar_t<S>> constexpr vec2<V> &operator%=(vec2<V> &v, const S &s) {return v %= vec_from_scalar<decltype(v)>(s);}
         template <typename A, typename B> constexpr vec2<A> &operator^=(vec2<A> &a, const vec2<B> &b) {a.x ^= b.x; a.y ^= b.y; return a;}
-        template <typename V, typename S, typename = if_scalar_t<S>> constexpr decltype(auto) operator^=(vec2<V> &v, const S &s) {return v ^= vec_from_scalar<decltype(v)>(s);}
+        template <typename V, typename S, typename = if_scalar_t<S>> constexpr vec2<V> &operator^=(vec2<V> &v, const S &s) {return v ^= vec_from_scalar<decltype(v)>(s);}
         template <typename A, typename B> constexpr vec2<A> &operator&=(vec2<A> &a, const vec2<B> &b) {a.x &= b.x; a.y &= b.y; return a;}
-        template <typename V, typename S, typename = if_scalar_t<S>> constexpr decltype(auto) operator&=(vec2<V> &v, const S &s) {return v &= vec_from_scalar<decltype(v)>(s);}
+        template <typename V, typename S, typename = if_scalar_t<S>> constexpr vec2<V> &operator&=(vec2<V> &v, const S &s) {return v &= vec_from_scalar<decltype(v)>(s);}
         template <typename A, typename B> constexpr vec2<A> &operator|=(vec2<A> &a, const vec2<B> &b) {a.x |= b.x; a.y |= b.y; return a;}
-        template <typename V, typename S, typename = if_scalar_t<S>> constexpr decltype(auto) operator|=(vec2<V> &v, const S &s) {return v |= vec_from_scalar<decltype(v)>(s);}
+        template <typename V, typename S, typename = if_scalar_t<S>> constexpr vec2<V> &operator|=(vec2<V> &v, const S &s) {return v |= vec_from_scalar<decltype(v)>(s);}
         template <typename A, typename B> constexpr vec2<A> &operator<<=(vec2<A> &a, const vec2<B> &b) {a.x <<= b.x; a.y <<= b.y; return a;}
-        template <typename V, typename S, typename = if_scalar_t<S>> constexpr decltype(auto) operator<<=(vec2<V> &v, const S &s) {return v <<= vec_from_scalar<decltype(v)>(s);}
+        template <typename V, typename S, typename = if_scalar_t<S>> constexpr vec2<V> &operator<<=(vec2<V> &v, const S &s) {return v <<= vec_from_scalar<decltype(v)>(s);}
         template <typename A, typename B> constexpr vec2<A> &operator>>=(vec2<A> &a, const vec2<B> &b) {a.x >>= b.x; a.y >>= b.y; return a;}
-        template <typename V, typename S, typename = if_scalar_t<S>> constexpr decltype(auto) operator>>=(vec2<V> &v, const S &s) {return v >>= vec_from_scalar<decltype(v)>(s);}
+        template <typename V, typename S, typename = if_scalar_t<S>> constexpr vec2<V> &operator>>=(vec2<V> &v, const S &s) {return v >>= vec_from_scalar<decltype(v)>(s);}
         //}  vec2
         
         //{  vec3
         template <typename A, typename B> [[nodiscard]] constexpr auto operator+(const vec3<A> &a, const vec3<B> &b) -> vec3<decltype(a.x + b.x)> {return {a.x + b.x, a.y + b.y, a.z + b.z};}
-        template <typename V, typename S, typename = if_scalar_t<S>> [[nodiscard]] constexpr decltype(auto) operator+(const vec3<V> &v, const S &s) {return v + vec_from_scalar<decltype(v)>(s);}
-        template <typename S, typename V, typename = if_scalar_t<S>> [[nodiscard]] constexpr decltype(auto) operator+(const S &s, const vec3<V> &v) {return vec_from_scalar<decltype(v)>(s) + v;}
+        template <typename V, typename S, typename = if_scalar_t<S>> [[nodiscard]] constexpr auto operator+(const vec3<V> &v, const S &s) {return v + vec_from_scalar<decltype(v)>(s);}
+        template <typename S, typename V, typename = if_scalar_t<S>> [[nodiscard]] constexpr auto operator+(const S &s, const vec3<V> &v) {return vec_from_scalar<decltype(v)>(s) + v;}
         template <typename A, typename B> [[nodiscard]] constexpr auto operator-(const vec3<A> &a, const vec3<B> &b) -> vec3<decltype(a.x - b.x)> {return {a.x - b.x, a.y - b.y, a.z - b.z};}
-        template <typename V, typename S, typename = if_scalar_t<S>> [[nodiscard]] constexpr decltype(auto) operator-(const vec3<V> &v, const S &s) {return v - vec_from_scalar<decltype(v)>(s);}
-        template <typename S, typename V, typename = if_scalar_t<S>> [[nodiscard]] constexpr decltype(auto) operator-(const S &s, const vec3<V> &v) {return vec_from_scalar<decltype(v)>(s) - v;}
+        template <typename V, typename S, typename = if_scalar_t<S>> [[nodiscard]] constexpr auto operator-(const vec3<V> &v, const S &s) {return v - vec_from_scalar<decltype(v)>(s);}
+        template <typename S, typename V, typename = if_scalar_t<S>> [[nodiscard]] constexpr auto operator-(const S &s, const vec3<V> &v) {return vec_from_scalar<decltype(v)>(s) - v;}
         template <typename A, typename B> [[nodiscard]] constexpr auto operator*(const vec3<A> &a, const vec3<B> &b) -> vec3<decltype(a.x * b.x)> {return {a.x * b.x, a.y * b.y, a.z * b.z};}
-        template <typename V, typename S, typename = if_scalar_t<S>> [[nodiscard]] constexpr decltype(auto) operator*(const vec3<V> &v, const S &s) {return v * vec_from_scalar<decltype(v)>(s);}
-        template <typename S, typename V, typename = if_scalar_t<S>> [[nodiscard]] constexpr decltype(auto) operator*(const S &s, const vec3<V> &v) {return vec_from_scalar<decltype(v)>(s) * v;}
+        template <typename V, typename S, typename = if_scalar_t<S>> [[nodiscard]] constexpr auto operator*(const vec3<V> &v, const S &s) {return v * vec_from_scalar<decltype(v)>(s);}
+        template <typename S, typename V, typename = if_scalar_t<S>> [[nodiscard]] constexpr auto operator*(const S &s, const vec3<V> &v) {return vec_from_scalar<decltype(v)>(s) * v;}
         template <typename A, typename B> [[nodiscard]] constexpr auto operator/(const vec3<A> &a, const vec3<B> &b) -> vec3<decltype(a.x / b.x)> {return {a.x / b.x, a.y / b.y, a.z / b.z};}
-        template <typename V, typename S, typename = if_scalar_t<S>> [[nodiscard]] constexpr decltype(auto) operator/(const vec3<V> &v, const S &s) {return v / vec_from_scalar<decltype(v)>(s);}
-        template <typename S, typename V, typename = if_scalar_t<S>> [[nodiscard]] constexpr decltype(auto) operator/(const S &s, const vec3<V> &v) {return vec_from_scalar<decltype(v)>(s) / v;}
+        template <typename V, typename S, typename = if_scalar_t<S>> [[nodiscard]] constexpr auto operator/(const vec3<V> &v, const S &s) {return v / vec_from_scalar<decltype(v)>(s);}
+        template <typename S, typename V, typename = if_scalar_t<S>> [[nodiscard]] constexpr auto operator/(const S &s, const vec3<V> &v) {return vec_from_scalar<decltype(v)>(s) / v;}
         template <typename A, typename B> [[nodiscard]] constexpr auto operator%(const vec3<A> &a, const vec3<B> &b) -> vec3<decltype(a.x % b.x)> {return {a.x % b.x, a.y % b.y, a.z % b.z};}
-        template <typename V, typename S, typename = if_scalar_t<S>> [[nodiscard]] constexpr decltype(auto) operator%(const vec3<V> &v, const S &s) {return v % vec_from_scalar<decltype(v)>(s);}
-        template <typename S, typename V, typename = if_scalar_t<S>> [[nodiscard]] constexpr decltype(auto) operator%(const S &s, const vec3<V> &v) {return vec_from_scalar<decltype(v)>(s) % v;}
+        template <typename V, typename S, typename = if_scalar_t<S>> [[nodiscard]] constexpr auto operator%(const vec3<V> &v, const S &s) {return v % vec_from_scalar<decltype(v)>(s);}
+        template <typename S, typename V, typename = if_scalar_t<S>> [[nodiscard]] constexpr auto operator%(const S &s, const vec3<V> &v) {return vec_from_scalar<decltype(v)>(s) % v;}
         template <typename A, typename B> [[nodiscard]] constexpr auto operator^(const vec3<A> &a, const vec3<B> &b) -> vec3<decltype(a.x ^ b.x)> {return {a.x ^ b.x, a.y ^ b.y, a.z ^ b.z};}
-        template <typename V, typename S, typename = if_scalar_t<S>> [[nodiscard]] constexpr decltype(auto) operator^(const vec3<V> &v, const S &s) {return v ^ vec_from_scalar<decltype(v)>(s);}
-        template <typename S, typename V, typename = if_scalar_t<S>> [[nodiscard]] constexpr decltype(auto) operator^(const S &s, const vec3<V> &v) {return vec_from_scalar<decltype(v)>(s) ^ v;}
+        template <typename V, typename S, typename = if_scalar_t<S>> [[nodiscard]] constexpr auto operator^(const vec3<V> &v, const S &s) {return v ^ vec_from_scalar<decltype(v)>(s);}
+        template <typename S, typename V, typename = if_scalar_t<S>> [[nodiscard]] constexpr auto operator^(const S &s, const vec3<V> &v) {return vec_from_scalar<decltype(v)>(s) ^ v;}
         template <typename A, typename B> [[nodiscard]] constexpr auto operator&(const vec3<A> &a, const vec3<B> &b) -> vec3<decltype(a.x & b.x)> {return {a.x & b.x, a.y & b.y, a.z & b.z};}
-        template <typename V, typename S, typename = if_scalar_t<S>> [[nodiscard]] constexpr decltype(auto) operator&(const vec3<V> &v, const S &s) {return v & vec_from_scalar<decltype(v)>(s);}
-        template <typename S, typename V, typename = if_scalar_t<S>> [[nodiscard]] constexpr decltype(auto) operator&(const S &s, const vec3<V> &v) {return vec_from_scalar<decltype(v)>(s) & v;}
+        template <typename V, typename S, typename = if_scalar_t<S>> [[nodiscard]] constexpr auto operator&(const vec3<V> &v, const S &s) {return v & vec_from_scalar<decltype(v)>(s);}
+        template <typename S, typename V, typename = if_scalar_t<S>> [[nodiscard]] constexpr auto operator&(const S &s, const vec3<V> &v) {return vec_from_scalar<decltype(v)>(s) & v;}
         template <typename A, typename B> [[nodiscard]] constexpr auto operator|(const vec3<A> &a, const vec3<B> &b) -> vec3<decltype(a.x | b.x)> {return {a.x | b.x, a.y | b.y, a.z | b.z};}
-        template <typename V, typename S, typename = if_scalar_t<S>> [[nodiscard]] constexpr decltype(auto) operator|(const vec3<V> &v, const S &s) {return v | vec_from_scalar<decltype(v)>(s);}
-        template <typename S, typename V, typename = if_scalar_t<S>> [[nodiscard]] constexpr decltype(auto) operator|(const S &s, const vec3<V> &v) {return vec_from_scalar<decltype(v)>(s) | v;}
+        template <typename V, typename S, typename = if_scalar_t<S>> [[nodiscard]] constexpr auto operator|(const vec3<V> &v, const S &s) {return v | vec_from_scalar<decltype(v)>(s);}
+        template <typename S, typename V, typename = if_scalar_t<S>> [[nodiscard]] constexpr auto operator|(const S &s, const vec3<V> &v) {return vec_from_scalar<decltype(v)>(s) | v;}
         template <typename A, typename B> [[nodiscard]] constexpr auto operator<<(const vec3<A> &a, const vec3<B> &b) -> vec3<decltype(a.x << b.x)> {return {a.x << b.x, a.y << b.y, a.z << b.z};}
-        template <typename V, typename S, typename = if_scalar_t<S>> [[nodiscard]] constexpr decltype(auto) operator<<(const vec3<V> &v, const S &s) {return v << vec_from_scalar<decltype(v)>(s);}
-        template <typename S, typename V, typename = if_scalar_t<S>> [[nodiscard]] constexpr decltype(auto) operator<<(const S &s, const vec3<V> &v) {return vec_from_scalar<decltype(v)>(s) << v;}
+        template <typename V, typename S, typename = if_scalar_t<S>> [[nodiscard]] constexpr auto operator<<(const vec3<V> &v, const S &s) {return v << vec_from_scalar<decltype(v)>(s);}
+        template <typename S, typename V, typename = if_scalar_t<S>> [[nodiscard]] constexpr auto operator<<(const S &s, const vec3<V> &v) {return vec_from_scalar<decltype(v)>(s) << v;}
         template <typename A, typename B> [[nodiscard]] constexpr auto operator>>(const vec3<A> &a, const vec3<B> &b) -> vec3<decltype(a.x >> b.x)> {return {a.x >> b.x, a.y >> b.y, a.z >> b.z};}
-        template <typename V, typename S, typename = if_scalar_t<S>> [[nodiscard]] constexpr decltype(auto) operator>>(const vec3<V> &v, const S &s) {return v >> vec_from_scalar<decltype(v)>(s);}
-        template <typename S, typename V, typename = if_scalar_t<S>> [[nodiscard]] constexpr decltype(auto) operator>>(const S &s, const vec3<V> &v) {return vec_from_scalar<decltype(v)>(s) >> v;}
+        template <typename V, typename S, typename = if_scalar_t<S>> [[nodiscard]] constexpr auto operator>>(const vec3<V> &v, const S &s) {return v >> vec_from_scalar<decltype(v)>(s);}
+        template <typename S, typename V, typename = if_scalar_t<S>> [[nodiscard]] constexpr auto operator>>(const S &s, const vec3<V> &v) {return vec_from_scalar<decltype(v)>(s) >> v;}
         template <typename A, typename B> [[nodiscard]] constexpr auto operator<(const vec3<A> &a, const vec3<B> &b) -> vec3<decltype(a.x < b.x)> {return {a.x < b.x, a.y < b.y, a.z < b.z};}
-        template <typename V, typename S, typename = if_scalar_t<S>> [[nodiscard]] constexpr decltype(auto) operator<(const vec3<V> &v, const S &s) {return v < vec_from_scalar<decltype(v)>(s);}
-        template <typename S, typename V, typename = if_scalar_t<S>> [[nodiscard]] constexpr decltype(auto) operator<(const S &s, const vec3<V> &v) {return vec_from_scalar<decltype(v)>(s) < v;}
+        template <typename V, typename S, typename = if_scalar_t<S>> [[nodiscard]] constexpr auto operator<(const vec3<V> &v, const S &s) {return v < vec_from_scalar<decltype(v)>(s);}
+        template <typename S, typename V, typename = if_scalar_t<S>> [[nodiscard]] constexpr auto operator<(const S &s, const vec3<V> &v) {return vec_from_scalar<decltype(v)>(s) < v;}
         template <typename A, typename B> [[nodiscard]] constexpr auto operator>(const vec3<A> &a, const vec3<B> &b) -> vec3<decltype(a.x > b.x)> {return {a.x > b.x, a.y > b.y, a.z > b.z};}
-        template <typename V, typename S, typename = if_scalar_t<S>> [[nodiscard]] constexpr decltype(auto) operator>(const vec3<V> &v, const S &s) {return v > vec_from_scalar<decltype(v)>(s);}
-        template <typename S, typename V, typename = if_scalar_t<S>> [[nodiscard]] constexpr decltype(auto) operator>(const S &s, const vec3<V> &v) {return vec_from_scalar<decltype(v)>(s) > v;}
+        template <typename V, typename S, typename = if_scalar_t<S>> [[nodiscard]] constexpr auto operator>(const vec3<V> &v, const S &s) {return v > vec_from_scalar<decltype(v)>(s);}
+        template <typename S, typename V, typename = if_scalar_t<S>> [[nodiscard]] constexpr auto operator>(const S &s, const vec3<V> &v) {return vec_from_scalar<decltype(v)>(s) > v;}
         template <typename A, typename B> [[nodiscard]] constexpr auto operator<=(const vec3<A> &a, const vec3<B> &b) -> vec3<decltype(a.x <= b.x)> {return {a.x <= b.x, a.y <= b.y, a.z <= b.z};}
-        template <typename V, typename S, typename = if_scalar_t<S>> [[nodiscard]] constexpr decltype(auto) operator<=(const vec3<V> &v, const S &s) {return v <= vec_from_scalar<decltype(v)>(s);}
-        template <typename S, typename V, typename = if_scalar_t<S>> [[nodiscard]] constexpr decltype(auto) operator<=(const S &s, const vec3<V> &v) {return vec_from_scalar<decltype(v)>(s) <= v;}
+        template <typename V, typename S, typename = if_scalar_t<S>> [[nodiscard]] constexpr auto operator<=(const vec3<V> &v, const S &s) {return v <= vec_from_scalar<decltype(v)>(s);}
+        template <typename S, typename V, typename = if_scalar_t<S>> [[nodiscard]] constexpr auto operator<=(const S &s, const vec3<V> &v) {return vec_from_scalar<decltype(v)>(s) <= v;}
         template <typename A, typename B> [[nodiscard]] constexpr auto operator>=(const vec3<A> &a, const vec3<B> &b) -> vec3<decltype(a.x >= b.x)> {return {a.x >= b.x, a.y >= b.y, a.z >= b.z};}
-        template <typename V, typename S, typename = if_scalar_t<S>> [[nodiscard]] constexpr decltype(auto) operator>=(const vec3<V> &v, const S &s) {return v >= vec_from_scalar<decltype(v)>(s);}
-        template <typename S, typename V, typename = if_scalar_t<S>> [[nodiscard]] constexpr decltype(auto) operator>=(const S &s, const vec3<V> &v) {return vec_from_scalar<decltype(v)>(s) >= v;}
+        template <typename V, typename S, typename = if_scalar_t<S>> [[nodiscard]] constexpr auto operator>=(const vec3<V> &v, const S &s) {return v >= vec_from_scalar<decltype(v)>(s);}
+        template <typename S, typename V, typename = if_scalar_t<S>> [[nodiscard]] constexpr auto operator>=(const S &s, const vec3<V> &v) {return vec_from_scalar<decltype(v)>(s) >= v;}
         template <typename A, typename B> [[nodiscard]] constexpr bool operator==(const vec3<A> &a, const vec3<B> &b) {return a.x == b.x && a.y == b.y && a.z == b.z;}
-        template <typename V, typename S, typename = if_scalar_t<S>> [[nodiscard]] constexpr decltype(auto) operator==(const vec3<V> &v, const S &s) {return v == vec_from_scalar<decltype(v)>(s);}
-        template <typename S, typename V, typename = if_scalar_t<S>> [[nodiscard]] constexpr decltype(auto) operator==(const S &s, const vec3<V> &v) {return vec_from_scalar<decltype(v)>(s) == v;}
+        template <typename V, typename S, typename = if_scalar_t<S>> [[nodiscard]] constexpr bool operator==(const vec3<V> &v, const S &s) {return v == vec_from_scalar<decltype(v)>(s);}
+        template <typename S, typename V, typename = if_scalar_t<S>> [[nodiscard]] constexpr bool operator==(const S &s, const vec3<V> &v) {return vec_from_scalar<decltype(v)>(s) == v;}
         template <typename A, typename B> [[nodiscard]] constexpr bool operator!=(const vec3<A> &a, const vec3<B> &b) {return a.x != b.x || a.y != b.y || a.z != b.z;}
-        template <typename V, typename S, typename = if_scalar_t<S>> [[nodiscard]] constexpr decltype(auto) operator!=(const vec3<V> &v, const S &s) {return v != vec_from_scalar<decltype(v)>(s);}
-        template <typename S, typename V, typename = if_scalar_t<S>> [[nodiscard]] constexpr decltype(auto) operator!=(const S &s, const vec3<V> &v) {return vec_from_scalar<decltype(v)>(s) != v;}
+        template <typename V, typename S, typename = if_scalar_t<S>> [[nodiscard]] constexpr bool operator!=(const vec3<V> &v, const S &s) {return v != vec_from_scalar<decltype(v)>(s);}
+        template <typename S, typename V, typename = if_scalar_t<S>> [[nodiscard]] constexpr bool operator!=(const S &s, const vec3<V> &v) {return vec_from_scalar<decltype(v)>(s) != v;}
         template <typename A, typename B> [[nodiscard]] constexpr bool operator&&(const vec3<A> &a, const vec3<B> &b) {return bool(a) && bool(b);}
         template <typename A, typename B> [[nodiscard]] constexpr bool operator&&(const vec3<A> &a, const B &b) {return bool(a) && bool(b);}
         template <typename A, typename B> [[nodiscard]] constexpr bool operator&&(const A &a, const vec3<B> &b) {return bool(a) && bool(b);}
@@ -820,76 +838,76 @@ namespace Math
         template <typename T> constexpr vec3<T> &operator--(vec3<T> &v) {--v.x; --v.y; --v.z; return v;}
         template <typename T> constexpr vec3<T> operator--(vec3<T> &v, int) {return {v.x--, v.y--, v.z--};}
         template <typename A, typename B> constexpr vec3<A> &operator+=(vec3<A> &a, const vec3<B> &b) {a.x += b.x; a.y += b.y; a.z += b.z; return a;}
-        template <typename V, typename S, typename = if_scalar_t<S>> constexpr decltype(auto) operator+=(vec3<V> &v, const S &s) {return v += vec_from_scalar<decltype(v)>(s);}
+        template <typename V, typename S, typename = if_scalar_t<S>> constexpr vec3<V> &operator+=(vec3<V> &v, const S &s) {return v += vec_from_scalar<decltype(v)>(s);}
         template <typename A, typename B> constexpr vec3<A> &operator-=(vec3<A> &a, const vec3<B> &b) {a.x -= b.x; a.y -= b.y; a.z -= b.z; return a;}
-        template <typename V, typename S, typename = if_scalar_t<S>> constexpr decltype(auto) operator-=(vec3<V> &v, const S &s) {return v -= vec_from_scalar<decltype(v)>(s);}
+        template <typename V, typename S, typename = if_scalar_t<S>> constexpr vec3<V> &operator-=(vec3<V> &v, const S &s) {return v -= vec_from_scalar<decltype(v)>(s);}
         template <typename A, typename B> constexpr vec3<A> &operator*=(vec3<A> &a, const vec3<B> &b) {a.x *= b.x; a.y *= b.y; a.z *= b.z; return a;}
-        template <typename V, typename S, typename = if_scalar_t<S>> constexpr decltype(auto) operator*=(vec3<V> &v, const S &s) {return v *= vec_from_scalar<decltype(v)>(s);}
+        template <typename V, typename S, typename = if_scalar_t<S>> constexpr vec3<V> &operator*=(vec3<V> &v, const S &s) {return v *= vec_from_scalar<decltype(v)>(s);}
         template <typename A, typename B> constexpr vec3<A> &operator/=(vec3<A> &a, const vec3<B> &b) {a.x /= b.x; a.y /= b.y; a.z /= b.z; return a;}
-        template <typename V, typename S, typename = if_scalar_t<S>> constexpr decltype(auto) operator/=(vec3<V> &v, const S &s) {return v /= vec_from_scalar<decltype(v)>(s);}
+        template <typename V, typename S, typename = if_scalar_t<S>> constexpr vec3<V> &operator/=(vec3<V> &v, const S &s) {return v /= vec_from_scalar<decltype(v)>(s);}
         template <typename A, typename B> constexpr vec3<A> &operator%=(vec3<A> &a, const vec3<B> &b) {a.x %= b.x; a.y %= b.y; a.z %= b.z; return a;}
-        template <typename V, typename S, typename = if_scalar_t<S>> constexpr decltype(auto) operator%=(vec3<V> &v, const S &s) {return v %= vec_from_scalar<decltype(v)>(s);}
+        template <typename V, typename S, typename = if_scalar_t<S>> constexpr vec3<V> &operator%=(vec3<V> &v, const S &s) {return v %= vec_from_scalar<decltype(v)>(s);}
         template <typename A, typename B> constexpr vec3<A> &operator^=(vec3<A> &a, const vec3<B> &b) {a.x ^= b.x; a.y ^= b.y; a.z ^= b.z; return a;}
-        template <typename V, typename S, typename = if_scalar_t<S>> constexpr decltype(auto) operator^=(vec3<V> &v, const S &s) {return v ^= vec_from_scalar<decltype(v)>(s);}
+        template <typename V, typename S, typename = if_scalar_t<S>> constexpr vec3<V> &operator^=(vec3<V> &v, const S &s) {return v ^= vec_from_scalar<decltype(v)>(s);}
         template <typename A, typename B> constexpr vec3<A> &operator&=(vec3<A> &a, const vec3<B> &b) {a.x &= b.x; a.y &= b.y; a.z &= b.z; return a;}
-        template <typename V, typename S, typename = if_scalar_t<S>> constexpr decltype(auto) operator&=(vec3<V> &v, const S &s) {return v &= vec_from_scalar<decltype(v)>(s);}
+        template <typename V, typename S, typename = if_scalar_t<S>> constexpr vec3<V> &operator&=(vec3<V> &v, const S &s) {return v &= vec_from_scalar<decltype(v)>(s);}
         template <typename A, typename B> constexpr vec3<A> &operator|=(vec3<A> &a, const vec3<B> &b) {a.x |= b.x; a.y |= b.y; a.z |= b.z; return a;}
-        template <typename V, typename S, typename = if_scalar_t<S>> constexpr decltype(auto) operator|=(vec3<V> &v, const S &s) {return v |= vec_from_scalar<decltype(v)>(s);}
+        template <typename V, typename S, typename = if_scalar_t<S>> constexpr vec3<V> &operator|=(vec3<V> &v, const S &s) {return v |= vec_from_scalar<decltype(v)>(s);}
         template <typename A, typename B> constexpr vec3<A> &operator<<=(vec3<A> &a, const vec3<B> &b) {a.x <<= b.x; a.y <<= b.y; a.z <<= b.z; return a;}
-        template <typename V, typename S, typename = if_scalar_t<S>> constexpr decltype(auto) operator<<=(vec3<V> &v, const S &s) {return v <<= vec_from_scalar<decltype(v)>(s);}
+        template <typename V, typename S, typename = if_scalar_t<S>> constexpr vec3<V> &operator<<=(vec3<V> &v, const S &s) {return v <<= vec_from_scalar<decltype(v)>(s);}
         template <typename A, typename B> constexpr vec3<A> &operator>>=(vec3<A> &a, const vec3<B> &b) {a.x >>= b.x; a.y >>= b.y; a.z >>= b.z; return a;}
-        template <typename V, typename S, typename = if_scalar_t<S>> constexpr decltype(auto) operator>>=(vec3<V> &v, const S &s) {return v >>= vec_from_scalar<decltype(v)>(s);}
+        template <typename V, typename S, typename = if_scalar_t<S>> constexpr vec3<V> &operator>>=(vec3<V> &v, const S &s) {return v >>= vec_from_scalar<decltype(v)>(s);}
         //}  vec3
         
         //{  vec4
         template <typename A, typename B> [[nodiscard]] constexpr auto operator+(const vec4<A> &a, const vec4<B> &b) -> vec4<decltype(a.x + b.x)> {return {a.x + b.x, a.y + b.y, a.z + b.z, a.w + b.w};}
-        template <typename V, typename S, typename = if_scalar_t<S>> [[nodiscard]] constexpr decltype(auto) operator+(const vec4<V> &v, const S &s) {return v + vec_from_scalar<decltype(v)>(s);}
-        template <typename S, typename V, typename = if_scalar_t<S>> [[nodiscard]] constexpr decltype(auto) operator+(const S &s, const vec4<V> &v) {return vec_from_scalar<decltype(v)>(s) + v;}
+        template <typename V, typename S, typename = if_scalar_t<S>> [[nodiscard]] constexpr auto operator+(const vec4<V> &v, const S &s) {return v + vec_from_scalar<decltype(v)>(s);}
+        template <typename S, typename V, typename = if_scalar_t<S>> [[nodiscard]] constexpr auto operator+(const S &s, const vec4<V> &v) {return vec_from_scalar<decltype(v)>(s) + v;}
         template <typename A, typename B> [[nodiscard]] constexpr auto operator-(const vec4<A> &a, const vec4<B> &b) -> vec4<decltype(a.x - b.x)> {return {a.x - b.x, a.y - b.y, a.z - b.z, a.w - b.w};}
-        template <typename V, typename S, typename = if_scalar_t<S>> [[nodiscard]] constexpr decltype(auto) operator-(const vec4<V> &v, const S &s) {return v - vec_from_scalar<decltype(v)>(s);}
-        template <typename S, typename V, typename = if_scalar_t<S>> [[nodiscard]] constexpr decltype(auto) operator-(const S &s, const vec4<V> &v) {return vec_from_scalar<decltype(v)>(s) - v;}
+        template <typename V, typename S, typename = if_scalar_t<S>> [[nodiscard]] constexpr auto operator-(const vec4<V> &v, const S &s) {return v - vec_from_scalar<decltype(v)>(s);}
+        template <typename S, typename V, typename = if_scalar_t<S>> [[nodiscard]] constexpr auto operator-(const S &s, const vec4<V> &v) {return vec_from_scalar<decltype(v)>(s) - v;}
         template <typename A, typename B> [[nodiscard]] constexpr auto operator*(const vec4<A> &a, const vec4<B> &b) -> vec4<decltype(a.x * b.x)> {return {a.x * b.x, a.y * b.y, a.z * b.z, a.w * b.w};}
-        template <typename V, typename S, typename = if_scalar_t<S>> [[nodiscard]] constexpr decltype(auto) operator*(const vec4<V> &v, const S &s) {return v * vec_from_scalar<decltype(v)>(s);}
-        template <typename S, typename V, typename = if_scalar_t<S>> [[nodiscard]] constexpr decltype(auto) operator*(const S &s, const vec4<V> &v) {return vec_from_scalar<decltype(v)>(s) * v;}
+        template <typename V, typename S, typename = if_scalar_t<S>> [[nodiscard]] constexpr auto operator*(const vec4<V> &v, const S &s) {return v * vec_from_scalar<decltype(v)>(s);}
+        template <typename S, typename V, typename = if_scalar_t<S>> [[nodiscard]] constexpr auto operator*(const S &s, const vec4<V> &v) {return vec_from_scalar<decltype(v)>(s) * v;}
         template <typename A, typename B> [[nodiscard]] constexpr auto operator/(const vec4<A> &a, const vec4<B> &b) -> vec4<decltype(a.x / b.x)> {return {a.x / b.x, a.y / b.y, a.z / b.z, a.w / b.w};}
-        template <typename V, typename S, typename = if_scalar_t<S>> [[nodiscard]] constexpr decltype(auto) operator/(const vec4<V> &v, const S &s) {return v / vec_from_scalar<decltype(v)>(s);}
-        template <typename S, typename V, typename = if_scalar_t<S>> [[nodiscard]] constexpr decltype(auto) operator/(const S &s, const vec4<V> &v) {return vec_from_scalar<decltype(v)>(s) / v;}
+        template <typename V, typename S, typename = if_scalar_t<S>> [[nodiscard]] constexpr auto operator/(const vec4<V> &v, const S &s) {return v / vec_from_scalar<decltype(v)>(s);}
+        template <typename S, typename V, typename = if_scalar_t<S>> [[nodiscard]] constexpr auto operator/(const S &s, const vec4<V> &v) {return vec_from_scalar<decltype(v)>(s) / v;}
         template <typename A, typename B> [[nodiscard]] constexpr auto operator%(const vec4<A> &a, const vec4<B> &b) -> vec4<decltype(a.x % b.x)> {return {a.x % b.x, a.y % b.y, a.z % b.z, a.w % b.w};}
-        template <typename V, typename S, typename = if_scalar_t<S>> [[nodiscard]] constexpr decltype(auto) operator%(const vec4<V> &v, const S &s) {return v % vec_from_scalar<decltype(v)>(s);}
-        template <typename S, typename V, typename = if_scalar_t<S>> [[nodiscard]] constexpr decltype(auto) operator%(const S &s, const vec4<V> &v) {return vec_from_scalar<decltype(v)>(s) % v;}
+        template <typename V, typename S, typename = if_scalar_t<S>> [[nodiscard]] constexpr auto operator%(const vec4<V> &v, const S &s) {return v % vec_from_scalar<decltype(v)>(s);}
+        template <typename S, typename V, typename = if_scalar_t<S>> [[nodiscard]] constexpr auto operator%(const S &s, const vec4<V> &v) {return vec_from_scalar<decltype(v)>(s) % v;}
         template <typename A, typename B> [[nodiscard]] constexpr auto operator^(const vec4<A> &a, const vec4<B> &b) -> vec4<decltype(a.x ^ b.x)> {return {a.x ^ b.x, a.y ^ b.y, a.z ^ b.z, a.w ^ b.w};}
-        template <typename V, typename S, typename = if_scalar_t<S>> [[nodiscard]] constexpr decltype(auto) operator^(const vec4<V> &v, const S &s) {return v ^ vec_from_scalar<decltype(v)>(s);}
-        template <typename S, typename V, typename = if_scalar_t<S>> [[nodiscard]] constexpr decltype(auto) operator^(const S &s, const vec4<V> &v) {return vec_from_scalar<decltype(v)>(s) ^ v;}
+        template <typename V, typename S, typename = if_scalar_t<S>> [[nodiscard]] constexpr auto operator^(const vec4<V> &v, const S &s) {return v ^ vec_from_scalar<decltype(v)>(s);}
+        template <typename S, typename V, typename = if_scalar_t<S>> [[nodiscard]] constexpr auto operator^(const S &s, const vec4<V> &v) {return vec_from_scalar<decltype(v)>(s) ^ v;}
         template <typename A, typename B> [[nodiscard]] constexpr auto operator&(const vec4<A> &a, const vec4<B> &b) -> vec4<decltype(a.x & b.x)> {return {a.x & b.x, a.y & b.y, a.z & b.z, a.w & b.w};}
-        template <typename V, typename S, typename = if_scalar_t<S>> [[nodiscard]] constexpr decltype(auto) operator&(const vec4<V> &v, const S &s) {return v & vec_from_scalar<decltype(v)>(s);}
-        template <typename S, typename V, typename = if_scalar_t<S>> [[nodiscard]] constexpr decltype(auto) operator&(const S &s, const vec4<V> &v) {return vec_from_scalar<decltype(v)>(s) & v;}
+        template <typename V, typename S, typename = if_scalar_t<S>> [[nodiscard]] constexpr auto operator&(const vec4<V> &v, const S &s) {return v & vec_from_scalar<decltype(v)>(s);}
+        template <typename S, typename V, typename = if_scalar_t<S>> [[nodiscard]] constexpr auto operator&(const S &s, const vec4<V> &v) {return vec_from_scalar<decltype(v)>(s) & v;}
         template <typename A, typename B> [[nodiscard]] constexpr auto operator|(const vec4<A> &a, const vec4<B> &b) -> vec4<decltype(a.x | b.x)> {return {a.x | b.x, a.y | b.y, a.z | b.z, a.w | b.w};}
-        template <typename V, typename S, typename = if_scalar_t<S>> [[nodiscard]] constexpr decltype(auto) operator|(const vec4<V> &v, const S &s) {return v | vec_from_scalar<decltype(v)>(s);}
-        template <typename S, typename V, typename = if_scalar_t<S>> [[nodiscard]] constexpr decltype(auto) operator|(const S &s, const vec4<V> &v) {return vec_from_scalar<decltype(v)>(s) | v;}
+        template <typename V, typename S, typename = if_scalar_t<S>> [[nodiscard]] constexpr auto operator|(const vec4<V> &v, const S &s) {return v | vec_from_scalar<decltype(v)>(s);}
+        template <typename S, typename V, typename = if_scalar_t<S>> [[nodiscard]] constexpr auto operator|(const S &s, const vec4<V> &v) {return vec_from_scalar<decltype(v)>(s) | v;}
         template <typename A, typename B> [[nodiscard]] constexpr auto operator<<(const vec4<A> &a, const vec4<B> &b) -> vec4<decltype(a.x << b.x)> {return {a.x << b.x, a.y << b.y, a.z << b.z, a.w << b.w};}
-        template <typename V, typename S, typename = if_scalar_t<S>> [[nodiscard]] constexpr decltype(auto) operator<<(const vec4<V> &v, const S &s) {return v << vec_from_scalar<decltype(v)>(s);}
-        template <typename S, typename V, typename = if_scalar_t<S>> [[nodiscard]] constexpr decltype(auto) operator<<(const S &s, const vec4<V> &v) {return vec_from_scalar<decltype(v)>(s) << v;}
+        template <typename V, typename S, typename = if_scalar_t<S>> [[nodiscard]] constexpr auto operator<<(const vec4<V> &v, const S &s) {return v << vec_from_scalar<decltype(v)>(s);}
+        template <typename S, typename V, typename = if_scalar_t<S>> [[nodiscard]] constexpr auto operator<<(const S &s, const vec4<V> &v) {return vec_from_scalar<decltype(v)>(s) << v;}
         template <typename A, typename B> [[nodiscard]] constexpr auto operator>>(const vec4<A> &a, const vec4<B> &b) -> vec4<decltype(a.x >> b.x)> {return {a.x >> b.x, a.y >> b.y, a.z >> b.z, a.w >> b.w};}
-        template <typename V, typename S, typename = if_scalar_t<S>> [[nodiscard]] constexpr decltype(auto) operator>>(const vec4<V> &v, const S &s) {return v >> vec_from_scalar<decltype(v)>(s);}
-        template <typename S, typename V, typename = if_scalar_t<S>> [[nodiscard]] constexpr decltype(auto) operator>>(const S &s, const vec4<V> &v) {return vec_from_scalar<decltype(v)>(s) >> v;}
+        template <typename V, typename S, typename = if_scalar_t<S>> [[nodiscard]] constexpr auto operator>>(const vec4<V> &v, const S &s) {return v >> vec_from_scalar<decltype(v)>(s);}
+        template <typename S, typename V, typename = if_scalar_t<S>> [[nodiscard]] constexpr auto operator>>(const S &s, const vec4<V> &v) {return vec_from_scalar<decltype(v)>(s) >> v;}
         template <typename A, typename B> [[nodiscard]] constexpr auto operator<(const vec4<A> &a, const vec4<B> &b) -> vec4<decltype(a.x < b.x)> {return {a.x < b.x, a.y < b.y, a.z < b.z, a.w < b.w};}
-        template <typename V, typename S, typename = if_scalar_t<S>> [[nodiscard]] constexpr decltype(auto) operator<(const vec4<V> &v, const S &s) {return v < vec_from_scalar<decltype(v)>(s);}
-        template <typename S, typename V, typename = if_scalar_t<S>> [[nodiscard]] constexpr decltype(auto) operator<(const S &s, const vec4<V> &v) {return vec_from_scalar<decltype(v)>(s) < v;}
+        template <typename V, typename S, typename = if_scalar_t<S>> [[nodiscard]] constexpr auto operator<(const vec4<V> &v, const S &s) {return v < vec_from_scalar<decltype(v)>(s);}
+        template <typename S, typename V, typename = if_scalar_t<S>> [[nodiscard]] constexpr auto operator<(const S &s, const vec4<V> &v) {return vec_from_scalar<decltype(v)>(s) < v;}
         template <typename A, typename B> [[nodiscard]] constexpr auto operator>(const vec4<A> &a, const vec4<B> &b) -> vec4<decltype(a.x > b.x)> {return {a.x > b.x, a.y > b.y, a.z > b.z, a.w > b.w};}
-        template <typename V, typename S, typename = if_scalar_t<S>> [[nodiscard]] constexpr decltype(auto) operator>(const vec4<V> &v, const S &s) {return v > vec_from_scalar<decltype(v)>(s);}
-        template <typename S, typename V, typename = if_scalar_t<S>> [[nodiscard]] constexpr decltype(auto) operator>(const S &s, const vec4<V> &v) {return vec_from_scalar<decltype(v)>(s) > v;}
+        template <typename V, typename S, typename = if_scalar_t<S>> [[nodiscard]] constexpr auto operator>(const vec4<V> &v, const S &s) {return v > vec_from_scalar<decltype(v)>(s);}
+        template <typename S, typename V, typename = if_scalar_t<S>> [[nodiscard]] constexpr auto operator>(const S &s, const vec4<V> &v) {return vec_from_scalar<decltype(v)>(s) > v;}
         template <typename A, typename B> [[nodiscard]] constexpr auto operator<=(const vec4<A> &a, const vec4<B> &b) -> vec4<decltype(a.x <= b.x)> {return {a.x <= b.x, a.y <= b.y, a.z <= b.z, a.w <= b.w};}
-        template <typename V, typename S, typename = if_scalar_t<S>> [[nodiscard]] constexpr decltype(auto) operator<=(const vec4<V> &v, const S &s) {return v <= vec_from_scalar<decltype(v)>(s);}
-        template <typename S, typename V, typename = if_scalar_t<S>> [[nodiscard]] constexpr decltype(auto) operator<=(const S &s, const vec4<V> &v) {return vec_from_scalar<decltype(v)>(s) <= v;}
+        template <typename V, typename S, typename = if_scalar_t<S>> [[nodiscard]] constexpr auto operator<=(const vec4<V> &v, const S &s) {return v <= vec_from_scalar<decltype(v)>(s);}
+        template <typename S, typename V, typename = if_scalar_t<S>> [[nodiscard]] constexpr auto operator<=(const S &s, const vec4<V> &v) {return vec_from_scalar<decltype(v)>(s) <= v;}
         template <typename A, typename B> [[nodiscard]] constexpr auto operator>=(const vec4<A> &a, const vec4<B> &b) -> vec4<decltype(a.x >= b.x)> {return {a.x >= b.x, a.y >= b.y, a.z >= b.z, a.w >= b.w};}
-        template <typename V, typename S, typename = if_scalar_t<S>> [[nodiscard]] constexpr decltype(auto) operator>=(const vec4<V> &v, const S &s) {return v >= vec_from_scalar<decltype(v)>(s);}
-        template <typename S, typename V, typename = if_scalar_t<S>> [[nodiscard]] constexpr decltype(auto) operator>=(const S &s, const vec4<V> &v) {return vec_from_scalar<decltype(v)>(s) >= v;}
+        template <typename V, typename S, typename = if_scalar_t<S>> [[nodiscard]] constexpr auto operator>=(const vec4<V> &v, const S &s) {return v >= vec_from_scalar<decltype(v)>(s);}
+        template <typename S, typename V, typename = if_scalar_t<S>> [[nodiscard]] constexpr auto operator>=(const S &s, const vec4<V> &v) {return vec_from_scalar<decltype(v)>(s) >= v;}
         template <typename A, typename B> [[nodiscard]] constexpr bool operator==(const vec4<A> &a, const vec4<B> &b) {return a.x == b.x && a.y == b.y && a.z == b.z && a.w == b.w;}
-        template <typename V, typename S, typename = if_scalar_t<S>> [[nodiscard]] constexpr decltype(auto) operator==(const vec4<V> &v, const S &s) {return v == vec_from_scalar<decltype(v)>(s);}
-        template <typename S, typename V, typename = if_scalar_t<S>> [[nodiscard]] constexpr decltype(auto) operator==(const S &s, const vec4<V> &v) {return vec_from_scalar<decltype(v)>(s) == v;}
+        template <typename V, typename S, typename = if_scalar_t<S>> [[nodiscard]] constexpr bool operator==(const vec4<V> &v, const S &s) {return v == vec_from_scalar<decltype(v)>(s);}
+        template <typename S, typename V, typename = if_scalar_t<S>> [[nodiscard]] constexpr bool operator==(const S &s, const vec4<V> &v) {return vec_from_scalar<decltype(v)>(s) == v;}
         template <typename A, typename B> [[nodiscard]] constexpr bool operator!=(const vec4<A> &a, const vec4<B> &b) {return a.x != b.x || a.y != b.y || a.z != b.z || a.w != b.w;}
-        template <typename V, typename S, typename = if_scalar_t<S>> [[nodiscard]] constexpr decltype(auto) operator!=(const vec4<V> &v, const S &s) {return v != vec_from_scalar<decltype(v)>(s);}
-        template <typename S, typename V, typename = if_scalar_t<S>> [[nodiscard]] constexpr decltype(auto) operator!=(const S &s, const vec4<V> &v) {return vec_from_scalar<decltype(v)>(s) != v;}
+        template <typename V, typename S, typename = if_scalar_t<S>> [[nodiscard]] constexpr bool operator!=(const vec4<V> &v, const S &s) {return v != vec_from_scalar<decltype(v)>(s);}
+        template <typename S, typename V, typename = if_scalar_t<S>> [[nodiscard]] constexpr bool operator!=(const S &s, const vec4<V> &v) {return vec_from_scalar<decltype(v)>(s) != v;}
         template <typename A, typename B> [[nodiscard]] constexpr bool operator&&(const vec4<A> &a, const vec4<B> &b) {return bool(a) && bool(b);}
         template <typename A, typename B> [[nodiscard]] constexpr bool operator&&(const vec4<A> &a, const B &b) {return bool(a) && bool(b);}
         template <typename A, typename B> [[nodiscard]] constexpr bool operator&&(const A &a, const vec4<B> &b) {return bool(a) && bool(b);}
@@ -905,25 +923,25 @@ namespace Math
         template <typename T> constexpr vec4<T> &operator--(vec4<T> &v) {--v.x; --v.y; --v.z; --v.w; return v;}
         template <typename T> constexpr vec4<T> operator--(vec4<T> &v, int) {return {v.x--, v.y--, v.z--, v.w--};}
         template <typename A, typename B> constexpr vec4<A> &operator+=(vec4<A> &a, const vec4<B> &b) {a.x += b.x; a.y += b.y; a.z += b.z; a.w += b.w; return a;}
-        template <typename V, typename S, typename = if_scalar_t<S>> constexpr decltype(auto) operator+=(vec4<V> &v, const S &s) {return v += vec_from_scalar<decltype(v)>(s);}
+        template <typename V, typename S, typename = if_scalar_t<S>> constexpr vec4<V> &operator+=(vec4<V> &v, const S &s) {return v += vec_from_scalar<decltype(v)>(s);}
         template <typename A, typename B> constexpr vec4<A> &operator-=(vec4<A> &a, const vec4<B> &b) {a.x -= b.x; a.y -= b.y; a.z -= b.z; a.w -= b.w; return a;}
-        template <typename V, typename S, typename = if_scalar_t<S>> constexpr decltype(auto) operator-=(vec4<V> &v, const S &s) {return v -= vec_from_scalar<decltype(v)>(s);}
+        template <typename V, typename S, typename = if_scalar_t<S>> constexpr vec4<V> &operator-=(vec4<V> &v, const S &s) {return v -= vec_from_scalar<decltype(v)>(s);}
         template <typename A, typename B> constexpr vec4<A> &operator*=(vec4<A> &a, const vec4<B> &b) {a.x *= b.x; a.y *= b.y; a.z *= b.z; a.w *= b.w; return a;}
-        template <typename V, typename S, typename = if_scalar_t<S>> constexpr decltype(auto) operator*=(vec4<V> &v, const S &s) {return v *= vec_from_scalar<decltype(v)>(s);}
+        template <typename V, typename S, typename = if_scalar_t<S>> constexpr vec4<V> &operator*=(vec4<V> &v, const S &s) {return v *= vec_from_scalar<decltype(v)>(s);}
         template <typename A, typename B> constexpr vec4<A> &operator/=(vec4<A> &a, const vec4<B> &b) {a.x /= b.x; a.y /= b.y; a.z /= b.z; a.w /= b.w; return a;}
-        template <typename V, typename S, typename = if_scalar_t<S>> constexpr decltype(auto) operator/=(vec4<V> &v, const S &s) {return v /= vec_from_scalar<decltype(v)>(s);}
+        template <typename V, typename S, typename = if_scalar_t<S>> constexpr vec4<V> &operator/=(vec4<V> &v, const S &s) {return v /= vec_from_scalar<decltype(v)>(s);}
         template <typename A, typename B> constexpr vec4<A> &operator%=(vec4<A> &a, const vec4<B> &b) {a.x %= b.x; a.y %= b.y; a.z %= b.z; a.w %= b.w; return a;}
-        template <typename V, typename S, typename = if_scalar_t<S>> constexpr decltype(auto) operator%=(vec4<V> &v, const S &s) {return v %= vec_from_scalar<decltype(v)>(s);}
+        template <typename V, typename S, typename = if_scalar_t<S>> constexpr vec4<V> &operator%=(vec4<V> &v, const S &s) {return v %= vec_from_scalar<decltype(v)>(s);}
         template <typename A, typename B> constexpr vec4<A> &operator^=(vec4<A> &a, const vec4<B> &b) {a.x ^= b.x; a.y ^= b.y; a.z ^= b.z; a.w ^= b.w; return a;}
-        template <typename V, typename S, typename = if_scalar_t<S>> constexpr decltype(auto) operator^=(vec4<V> &v, const S &s) {return v ^= vec_from_scalar<decltype(v)>(s);}
+        template <typename V, typename S, typename = if_scalar_t<S>> constexpr vec4<V> &operator^=(vec4<V> &v, const S &s) {return v ^= vec_from_scalar<decltype(v)>(s);}
         template <typename A, typename B> constexpr vec4<A> &operator&=(vec4<A> &a, const vec4<B> &b) {a.x &= b.x; a.y &= b.y; a.z &= b.z; a.w &= b.w; return a;}
-        template <typename V, typename S, typename = if_scalar_t<S>> constexpr decltype(auto) operator&=(vec4<V> &v, const S &s) {return v &= vec_from_scalar<decltype(v)>(s);}
+        template <typename V, typename S, typename = if_scalar_t<S>> constexpr vec4<V> &operator&=(vec4<V> &v, const S &s) {return v &= vec_from_scalar<decltype(v)>(s);}
         template <typename A, typename B> constexpr vec4<A> &operator|=(vec4<A> &a, const vec4<B> &b) {a.x |= b.x; a.y |= b.y; a.z |= b.z; a.w |= b.w; return a;}
-        template <typename V, typename S, typename = if_scalar_t<S>> constexpr decltype(auto) operator|=(vec4<V> &v, const S &s) {return v |= vec_from_scalar<decltype(v)>(s);}
+        template <typename V, typename S, typename = if_scalar_t<S>> constexpr vec4<V> &operator|=(vec4<V> &v, const S &s) {return v |= vec_from_scalar<decltype(v)>(s);}
         template <typename A, typename B> constexpr vec4<A> &operator<<=(vec4<A> &a, const vec4<B> &b) {a.x <<= b.x; a.y <<= b.y; a.z <<= b.z; a.w <<= b.w; return a;}
-        template <typename V, typename S, typename = if_scalar_t<S>> constexpr decltype(auto) operator<<=(vec4<V> &v, const S &s) {return v <<= vec_from_scalar<decltype(v)>(s);}
+        template <typename V, typename S, typename = if_scalar_t<S>> constexpr vec4<V> &operator<<=(vec4<V> &v, const S &s) {return v <<= vec_from_scalar<decltype(v)>(s);}
         template <typename A, typename B> constexpr vec4<A> &operator>>=(vec4<A> &a, const vec4<B> &b) {a.x >>= b.x; a.y >>= b.y; a.z >>= b.z; a.w >>= b.w; return a;}
-        template <typename V, typename S, typename = if_scalar_t<S>> constexpr decltype(auto) operator>>=(vec4<V> &v, const S &s) {return v >>= vec_from_scalar<decltype(v)>(s);}
+        template <typename V, typename S, typename = if_scalar_t<S>> constexpr vec4<V> &operator>>=(vec4<V> &v, const S &s) {return v >>= vec_from_scalar<decltype(v)>(s);}
         //}  vec4
         
         //{  input/output

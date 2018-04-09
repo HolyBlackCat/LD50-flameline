@@ -10,7 +10,7 @@
 
 namespace data
 {
-    constexpr struct {const char *tag, *name;} type_list[]
+    const struct {std::string tag, name;} type_list[]
     {
         "b",   "bool",
         "c",   "char",
@@ -38,13 +38,13 @@ namespace data
     };
     constexpr int type_list_len = std::extent_v<decltype(type_list)>;
 
-    constexpr const char *fields[4] {"x","y","z","w"};
-    constexpr int fields_alt_count = 3;
-    constexpr const char *fields_alt[fields_alt_count][4]
+    const std::string fields[4] {"x","y","z","w"};
+    constexpr int fields_alt_count = 2;
+    const std::string fields_alt[fields_alt_count][4]
     {
         fields[0], fields[1], fields[2], fields[3],
         "r","g","b","a",
-        "s","t","p","q",
+        // "s","t","p","q", // Who uses this anyway.
     };
 }
 
@@ -476,6 +476,7 @@ int main()
                 }
 
                 { // Member access
+                    /*
                     // Member pointers array
                     output("static constexpr member_type vec::*pointers[", size_name, "] {");
                     for (int i = 0; i < w; i++)
@@ -485,6 +486,7 @@ int main()
                         output("&vec::", data::fields[i]);
                     }
                     output("};\n");
+                    */
 
                     // Operator []
                     output("[[nodiscard]] constexpr member_type &operator[](int i) {return *(member_type *)((char *)this + sizeof(member_type)*i);}\n");
@@ -528,13 +530,46 @@ int main()
 
                         // Ratio
                         if (w == 2)
-                            output("[[nodiscard]] constexpr auto ratio() const {return ", LargeFields(" / "), ";}\n");
+                            output("[[nodiscard]] constexpr auto ratio() const {return ", LargeFields(" / ","floating_point_t<member_type>(",")"), ";}\n");
                     }
 
                     // Min
                     output("[[nodiscard]] constexpr type min() const {return std::min({", SmallFields(","), "});}\n");
                     // Max
                     output("[[nodiscard]] constexpr type max() const {return std::max({", SmallFields(","), "});}\n");
+                }
+
+                { // Copy with modified members
+                    if (is_vector)
+                    {
+                        struct Operator
+                        {
+                            std::string name, str;
+                        };
+                        const Operator operators[]{{"set",""},{"add","+"},{"sub","-"},{"mul","*"},{"div","/"}};
+
+                        for (const auto &op : operators)
+                        for (int i = 0; i < data::fields_alt_count; i++)
+                        {
+                            for (int j = 0; j < w; j++)
+                            {
+                                bool op_set = op.str == "";
+                                output(" template <typename N> [[nodiscard]] constexpr ",(op_set ? "vec" : "auto")," ",op.name,"_",data::fields_alt[i][j],"(const N &n) const {return ",
+                                       (op_set ? "vec" : make_str("vec",w,"<decltype(x",op.str,"n)>")),"(");
+                                for (int k = 0; k < w; k++)
+                                {
+                                    if (k != 0)
+                                        output(", ");
+                                    if (k == j)
+                                        output(op_set ? "n" : data::fields_alt[i][k] + op.str + "n");
+                                    else
+                                        output(data::fields_alt[i][k]);
+                                }
+                                output(");}");
+                            }
+                            next_line();
+                        }
+                    }
                 }
             };
 
@@ -605,10 +640,10 @@ int main()
                             output((boolean ? "" : "}"),";}\n");
 
                             // vec @ scalar
-                            output("template <typename V, typename S, typename = if_scalar_t<S>> [[nodiscard]] constexpr decltype(auto) operator",op,"(const vec",d,"<V> &v, const S &s) {return v ",op," vec_from_scalar<decltype(v)>(s);}\n");
+                            output("template <typename V, typename S, typename = if_scalar_t<S>> [[nodiscard]] constexpr ",(boolean ? "bool" : "auto")," operator",op,"(const vec",d,"<V> &v, const S &s) {return v ",op," vec_from_scalar<decltype(v)>(s);}\n");
 
                             // scalar @ vec
-                            output("template <typename S, typename V, typename = if_scalar_t<S>> [[nodiscard]] constexpr decltype(auto) operator",op,"(const S &s, const vec",d,"<V> &v) {return vec_from_scalar<decltype(v)>(s) ",op," v;}\n");
+                            output("template <typename S, typename V, typename = if_scalar_t<S>> [[nodiscard]] constexpr ",(boolean ? "bool" : "auto")," operator",op,"(const S &s, const vec",d,"<V> &v) {return vec_from_scalar<decltype(v)>(s) ",op," v;}\n");
                         }
 
                         for (auto op : ops2bool)
@@ -670,7 +705,7 @@ int main()
                             output("return a;}\n");
 
                             // vec @ scalar
-                            output("template <typename V, typename S, typename = if_scalar_t<S>> constexpr decltype(auto) operator",op,"(vec",d,"<V> &v, const S &s) {return v ",op," vec_from_scalar<decltype(v)>(s);}\n");
+                            output("template <typename V, typename S, typename = if_scalar_t<S>> constexpr vec",d,"<V> &operator",op,"(vec",d,"<V> &v, const S &s) {return v ",op," vec_from_scalar<decltype(v)>(s);}\n");
                         }
                     });
                 }
