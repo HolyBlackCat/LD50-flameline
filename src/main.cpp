@@ -4,10 +4,8 @@
 
 using namespace Math;
 
-template <typename T> struct S;
-
 int main(int, char **)
 {
-    using T = propagate_qualifiers_t<const float &>;
-    S<T> s;
+    ivec3 v(1,2,3);
+    std::cout << (v || ivec3(0,0,0));
 }

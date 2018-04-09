@@ -57,6 +57,7 @@ namespace impl
 
     bool at_line_start = 1;
     int indentation = 0;
+    int section_depth = 0;
 
     constexpr const char *indentation_string = "    ";
 }
@@ -119,10 +120,12 @@ void section_sc(std::string header, std::function<void()> func) // 'sc' stands f
 
 void decorative_section(std::string name, std::function<void()> func)
 {
-    output("//{ ", name, "\n");
+    output("//{", std::string(impl::section_depth+1, ' '), name, "\n");
     impl::indentation--;
+    impl::section_depth++;
     func();
-    output("//} ", name, "\n");
+    impl::section_depth--;
+    output("//}", std::string(impl::section_depth+1, ' '), name, "\n");
     impl::indentation++;
 }
 
@@ -151,6 +154,8 @@ int main()
             #include <algorithm>
             #include <cstddef>
             #include <cstdint>
+            #include <istream>
+            #include <ostream>
             #include <type_traits>
         )");
         next_line();
@@ -158,7 +163,7 @@ int main()
 
     section("namespace Math", []
     {
-        section("inline namespace Vector // Declarations and aliases", []
+        section("inline namespace Vector // Declarations", []
         {
             { // Main templates
                 output(1+R"(
@@ -225,6 +230,7 @@ int main()
                 template <typename T> struct properties
                 {
                     static constexpr bool
+                    $   is_scalar     = 1,
                     $   is_vec        = 0,
                     $   is_mat        = 0,
                     $   is_vec_or_mat = 0;
@@ -232,6 +238,7 @@ int main()
                 template <int D, typename T> struct properties<vec<D,T>>
                 {
                     static constexpr bool
+                    $   is_scalar     = 0,
                     $   is_vec        = 1,
                     $   is_mat        = 0,
                     $   is_vec_or_mat = 1;
@@ -239,6 +246,7 @@ int main()
                 template <int W, int H, typename T> struct properties<vec<W,vec<H,T>>>
                 {
                     static constexpr bool
+                    $   is_scalar     = 0,
                     $   is_vec        = 0,
                     $   is_mat        = 1,
                     $   is_vec_or_mat = 1;
@@ -301,13 +309,13 @@ int main()
                 // Hard error on failure
                 template <typename ...P> using larger_t = typename hard_larger_impl<P...>::type;
 
-                template <typename A, typename B> struct copy_qualifiers_impl {using type = B;};
-                template <typename A, typename B> struct copy_qualifiers_impl<const A, B> {using type = const typename copy_qualifiers_impl<A,B>::type;};
-                template <typename A, typename B> struct copy_qualifiers_impl<A &, B> {using type = typename copy_qualifiers_impl<A,B>::type &;};
-                template <typename A, typename B> struct copy_qualifiers_impl<A &&, B> {using type = typename copy_qualifiers_impl<A,B>::type &&;};
-                template <typename A, typename B> using copy_qualifiers_t = typename copy_qualifiers_impl<A,B>::type;
+                template <typename Structure, typename T> [[nodiscard]] auto vec_from_scalar(const T &value)
+                {
+                    static_assert(properties<T>::is_scalar, "Must be a scalar.");
+                    return change_base_t<std::remove_cv_t<std::remove_reference_t<Structure>>, T>(value);
+                }
 
-                template <typename T> using propagate_qualifiers_t = copy_qualifiers_t<base_t<T>, change_base_t<T, std::remove_const_t<std::remove_reference_t<base_t<T>>>>>;
+                template <typename A, typename B = void> using if_scalar_t = std::enable_if_t<properties<A>::is_scalar, B>;
             )");
         });
 
@@ -375,6 +383,7 @@ int main()
 
                 { // Static assertions
                     output("static_assert(!std::is_const_v<T> && !std::is_volatile_v<T>, \"The base type must have no cv-qualifiers.\");\n");
+                    output("static_assert(!std::is_reference_v<T>, \"The base type must not be a reference.\");\n");
                 }
 
                 { // Dimensions
@@ -478,8 +487,8 @@ int main()
                     output("};\n");
 
                     // Operator []
-                    output("[[nodiscard]] constexpr member_type &operator[](int i) {return *this.*pointers[i];}\n");
-                    output("[[nodiscard]] constexpr const member_type &operator[](int i) const {return *this.*pointers[i];}\n");
+                    output("[[nodiscard]] constexpr member_type &operator[](int i) {return *(member_type *)((char *)this + sizeof(member_type)*i);}\n");
+                    output("[[nodiscard]] constexpr const member_type &operator[](int i) const {return *(member_type *)((char *)this + sizeof(member_type)*i);}\n");
 
                     // As array
                     if (is_vector)
@@ -562,7 +571,159 @@ int main()
 
             decorative_section("Operators", []
             {
+                constexpr const char
+                    *ops2[]{"+","-","*","/","%","^","&","|","<<",">>","<",">","<=",">=","==","!="},
+                    *ops2bool[]{"&&","||"},
+                    *ops1[]{"~","+","-"},
+                    *ops1incdec[]{"++","--"},
+                    *ops1bool[]{"!"},
+                    *ops2as[]{"+=","-=","*=","/=","%=","^=","&=","|=","<<=",">>="};
 
+                for (int d = 2; d <= 4; d++)
+                {
+                    if (d != 2)
+                        next_line();
+
+                    decorative_section(make_str("vec", d), [&]
+                    {
+                        for (auto op : ops2)
+                        {
+                            bool all_of = (op == std::string("==")),
+                                 any_of = (op == std::string("!=")),
+                                 boolean = all_of || any_of;
+
+                            // vec @ vec
+                            output("template <typename A, typename B> [[nodiscard]] constexpr ",(boolean ? "bool" : "auto")," operator",op,"(const vec",d,"<A> &a, const vec",d,"<B> &b)",
+                                   (boolean ? "" : make_str(" -> vec",d,"<decltype(a.x ",op," b.x)>"))," {return ",(boolean ? "" : "{"));
+                            for (int i = 0; i < d; i++)
+                            {
+                                if (i != 0)
+                                    output(all_of ? " && " :
+                                           any_of ? " || " : ", ");
+                                output("a.",data::fields[i]," ",op," b.", data::fields[i]);
+                            }
+                            output((boolean ? "" : "}"),";}\n");
+
+                            // vec @ scalar
+                            output("template <typename V, typename S, typename = if_scalar_t<S>> [[nodiscard]] constexpr decltype(auto) operator",op,"(const vec",d,"<V> &v, const S &s) {return v ",op," vec_from_scalar<decltype(v)>(s);}\n");
+
+                            // scalar @ vec
+                            output("template <typename S, typename V, typename = if_scalar_t<S>> [[nodiscard]] constexpr decltype(auto) operator",op,"(const S &s, const vec",d,"<V> &v) {return vec_from_scalar<decltype(v)>(s) ",op," v;}\n");
+                        }
+
+                        for (auto op : ops2bool)
+                        {
+                            // vec @ vec
+                            output("template <typename A, typename B> [[nodiscard]] constexpr bool operator",op,"(const vec",d,"<A> &a, const vec",d,"<B> &b) {return bool(a) ",op," bool(b);}\n");
+
+                            // vec @ any
+                            output("template <typename A, typename B> [[nodiscard]] constexpr bool operator",op,"(const vec",d,"<A> &a, const B &b) {return bool(a) ",op," bool(b);}\n");
+
+                            // any @ vec
+                            output("template <typename A, typename B> [[nodiscard]] constexpr bool operator",op,"(const A &a, const vec",d,"<B> &b) {return bool(a) ",op," bool(b);}\n");
+                        }
+
+                        for (auto op : ops1)
+                        {
+                            // @ vec
+                            output("template <typename T> [[nodiscard]] constexpr auto operator",op,"(const vec",d,"<T> &v) -> vec",d,"<decltype(",op,"v.x)> {return {");
+                            for (int i = 0; i < d; i++)
+                            {
+                                if (i != 0)
+                                    output(", ");
+                                output(op, "v.", data::fields[i]);
+                            }
+                            output("};}\n");
+                        }
+
+                        for (auto op : ops1bool)
+                        {
+                            // @ vec
+                            output("template <typename T> [[nodiscard]] constexpr bool operator",op,"(const vec",d,"<T> &v) {return ",op,"bool(v);}\n");
+                        }
+
+                        for (auto op : ops1incdec)
+                        {
+                            // @ vec
+                            output("template <typename T> constexpr vec",d,"<T> &operator",op,"(vec",d,"<T> &v) {");
+                            for (int i = 0; i < d; i++)
+                                output(op,"v.",data::fields[i],"; ");
+                            output("return v;}\n");
+
+                            // vec @
+                            output("template <typename T> constexpr vec",d,"<T> operator",op,"(vec",d,"<T> &v, int) {return {");
+                            for (int i = 0; i < d; i++)
+                            {
+                                if (i != 0)
+                                    output(", ");
+                                output("v.",data::fields[i],op);
+                            }
+                            output("};}\n");
+                        }
+
+                        for (auto op : ops2as)
+                        {
+                            // vec @ vec
+                            output("template <typename A, typename B> constexpr vec",d,"<A> &operator",op,"(vec",d,"<A> &a, const vec",d,"<B> &b) {");
+                            for (int i = 0; i < d; i++)
+                                output("a.",data::fields[i]," ",op," b.",data::fields[i],"; ");
+                            output("return a;}\n");
+
+                            // vec @ scalar
+                            output("template <typename V, typename S, typename = if_scalar_t<S>> constexpr decltype(auto) operator",op,"(vec",d,"<V> &v, const S &s) {return v ",op," vec_from_scalar<decltype(v)>(s);}\n");
+                        }
+                    });
+                }
+
+                next_line();
+
+                decorative_section("input/output", [&]
+                {
+                    output(
+                    R"( template <typename A, typename B, int D, typename T> std::basic_ostream<A,B> &operator<<(std::basic_ostream<A,B> &s, const vec<D,T> &v)
+                        {
+                            s << '[';
+                            for (int i = 0; i < D; i++)
+                            {
+                                if (i != 0)
+                                    s << ',';
+                                s << v[i];
+                            }
+                            s << ']';
+                            return s;
+                        }
+                        template <typename A, typename B, int W, int H, typename T> std::basic_ostream<A,B> &operator<<(std::basic_ostream<A,B> &s, const vec<W,vec<H,T>> &v)
+                        {
+                            s << '[';
+                            for (int y = 0; y < H; y++)
+                            {
+                                if (y != 0)
+                                    s << ';';
+                                for (int x = 0; x < W; x++)
+                                {
+                                    if (x != 0)
+                                        s << ',';
+                                    s << v[x][y];
+                                }
+                            }
+                            s << ']';
+                            return s;
+                        }
+                        template <typename A, typename B, int D, typename T> std::basic_istream<A,B> &operator>>(std::basic_istream<A,B> &s, vec<D,T> &v)
+                        {
+                            for (int i = 0; i < D; i++)
+                            $   s >> v[i];
+                            return s;
+                        }
+                        template <typename A, typename B, int W, int H, typename T> std::basic_istream<A,B> &operator>>(std::basic_istream<A,B> &s, vec<W,vec<H,T>> &v)
+                        {
+                            for (int y = 0; y < H; y++)
+                            for (int x = 0; x < W; x++)
+                            $   s >> v[x][y];
+                            return s;
+                        }
+                    )");
+                });
             });
         });
     });
