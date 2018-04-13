@@ -152,6 +152,7 @@ int main()
     { // Includes
         output(1+R"(
             #include <algorithm>
+            #include <cmath>
             #include <cstddef>
             #include <cstdint>
             #include <istream>
@@ -569,6 +570,27 @@ int main()
                             }
                             next_line();
                         }
+                    }
+                }
+
+                { // Length and normalization
+                    if (is_vector)
+                    {
+                        // Squared length
+                        output("[[nodiscard]] constexpr auto len_sqr() const {return ");
+                        for (int i = 0; i < w; i++)
+                        {
+                            if (i != 0)
+                                output(" + ");
+                            output(data::fields[i],"*",data::fields[i]);
+                        }
+                        output(";}\n");
+
+                        // Length
+                        output("[[nodiscard]] constexpr auto len() const {return std::sqrt(len_sqr());}\n");
+
+                        // Normalize
+                        output("[[nodiscard]] constexpr auto norm() const -> vec",w,"<decltype(type{}/len())> {if (auto l = len(); l != 0) return *this / l; else return vec(0);}\n");
                     }
                 }
             };
