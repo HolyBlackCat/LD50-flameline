@@ -478,16 +478,16 @@ namespace Math
             [[nodiscard]] constexpr vec4<member_type> to_vec4(member_type nz, member_type nw) const {return {x, y, nz, nw};}
             [[nodiscard]] constexpr vec3<member_type> to_vec3() const {return to_vec3({});}
             [[nodiscard]] constexpr vec4<member_type> to_vec4() const {return to_vec4({}, {});}
-            [[nodiscard]] constexpr mat3x2<T> to_mat3x2() const {return {x.x,y.x,0,x.y,y.y,0};}
-            [[nodiscard]] constexpr mat4x2<T> to_mat4x2() const {return {x.x,y.x,0,0,x.y,y.y,0,0};}
-            [[nodiscard]] constexpr mat2x3<T> to_mat2x3() const {return {x.x,y.x,x.y,y.y,0,0};}
-            [[nodiscard]] constexpr mat3x3<T> to_mat3x3() const {return {x.x,y.x,0,x.y,y.y,0,0,0,1};}
-            [[nodiscard]] constexpr mat3<T> to_mat3() const {return to_mat3x3();}
-            [[nodiscard]] constexpr mat4x3<T> to_mat4x3() const {return {x.x,y.x,0,0,x.y,y.y,0,0,0,0,1,0};}
-            [[nodiscard]] constexpr mat2x4<T> to_mat2x4() const {return {x.x,y.x,x.y,y.y,0,0,0,0};}
-            [[nodiscard]] constexpr mat3x4<T> to_mat3x4() const {return {x.x,y.x,0,x.y,y.y,0,0,0,1,0,0,0};}
-            [[nodiscard]] constexpr mat4x4<T> to_mat4x4() const {return {x.x,y.x,0,0,x.y,y.y,0,0,0,0,1,0,0,0,0,1};}
-            [[nodiscard]] constexpr mat4<T> to_mat4() const {return to_mat4x4();}
+            [[nodiscard]] constexpr mat3x2<type> to_mat3x2() const {return {x.x,y.x,0,x.y,y.y,0};}
+            [[nodiscard]] constexpr mat4x2<type> to_mat4x2() const {return {x.x,y.x,0,0,x.y,y.y,0,0};}
+            [[nodiscard]] constexpr mat2x3<type> to_mat2x3() const {return {x.x,y.x,x.y,y.y,0,0};}
+            [[nodiscard]] constexpr mat3x3<type> to_mat3x3() const {return {x.x,y.x,0,x.y,y.y,0,0,0,1};}
+            [[nodiscard]] constexpr mat3<type> to_mat3() const {return to_mat3x3();}
+            [[nodiscard]] constexpr mat4x3<type> to_mat4x3() const {return {x.x,y.x,0,0,x.y,y.y,0,0,0,0,1,0};}
+            [[nodiscard]] constexpr mat2x4<type> to_mat2x4() const {return {x.x,y.x,x.y,y.y,0,0,0,0};}
+            [[nodiscard]] constexpr mat3x4<type> to_mat3x4() const {return {x.x,y.x,0,x.y,y.y,0,0,0,1,0,0,0};}
+            [[nodiscard]] constexpr mat4x4<type> to_mat4x4() const {return {x.x,y.x,0,0,x.y,y.y,0,0,0,0,1,0,0,0,0,1};}
+            [[nodiscard]] constexpr mat4<type> to_mat4() const {return to_mat4x4();}
         };
         
         template <typename T> struct vec<2,vec<3,T>> // mat2x3
@@ -520,17 +520,17 @@ namespace Math
             [[nodiscard]] constexpr vec4<member_type> to_vec4(member_type nz, member_type nw) const {return {x, y, nz, nw};}
             [[nodiscard]] constexpr vec3<member_type> to_vec3() const {return to_vec3({});}
             [[nodiscard]] constexpr vec4<member_type> to_vec4() const {return to_vec4({}, {});}
-            [[nodiscard]] constexpr mat2x2<T> to_mat2x2() const {return {x.x,y.x,x.y,y.y};}
-            [[nodiscard]] constexpr mat2<T> to_mat2() const {return to_mat2x2();}
-            [[nodiscard]] constexpr mat3x2<T> to_mat3x2() const {return {x.x,y.x,0,x.y,y.y,0};}
-            [[nodiscard]] constexpr mat4x2<T> to_mat4x2() const {return {x.x,y.x,0,0,x.y,y.y,0,0};}
-            [[nodiscard]] constexpr mat3x3<T> to_mat3x3() const {return {x.x,y.x,0,x.y,y.y,0,x.z,y.z,1};}
-            [[nodiscard]] constexpr mat3<T> to_mat3() const {return to_mat3x3();}
-            [[nodiscard]] constexpr mat4x3<T> to_mat4x3() const {return {x.x,y.x,0,0,x.y,y.y,0,0,x.z,y.z,1,0};}
-            [[nodiscard]] constexpr mat2x4<T> to_mat2x4() const {return {x.x,y.x,x.y,y.y,x.z,y.z,0,0};}
-            [[nodiscard]] constexpr mat3x4<T> to_mat3x4() const {return {x.x,y.x,0,x.y,y.y,0,x.z,y.z,1,0,0,0};}
-            [[nodiscard]] constexpr mat4x4<T> to_mat4x4() const {return {x.x,y.x,0,0,x.y,y.y,0,0,x.z,y.z,1,0,0,0,0,1};}
-            [[nodiscard]] constexpr mat4<T> to_mat4() const {return to_mat4x4();}
+            [[nodiscard]] constexpr mat2x2<type> to_mat2x2() const {return {x.x,y.x,x.y,y.y};}
+            [[nodiscard]] constexpr mat2<type> to_mat2() const {return to_mat2x2();}
+            [[nodiscard]] constexpr mat3x2<type> to_mat3x2() const {return {x.x,y.x,0,x.y,y.y,0};}
+            [[nodiscard]] constexpr mat4x2<type> to_mat4x2() const {return {x.x,y.x,0,0,x.y,y.y,0,0};}
+            [[nodiscard]] constexpr mat3x3<type> to_mat3x3() const {return {x.x,y.x,0,x.y,y.y,0,x.z,y.z,1};}
+            [[nodiscard]] constexpr mat3<type> to_mat3() const {return to_mat3x3();}
+            [[nodiscard]] constexpr mat4x3<type> to_mat4x3() const {return {x.x,y.x,0,0,x.y,y.y,0,0,x.z,y.z,1,0};}
+            [[nodiscard]] constexpr mat2x4<type> to_mat2x4() const {return {x.x,y.x,x.y,y.y,x.z,y.z,0,0};}
+            [[nodiscard]] constexpr mat3x4<type> to_mat3x4() const {return {x.x,y.x,0,x.y,y.y,0,x.z,y.z,1,0,0,0};}
+            [[nodiscard]] constexpr mat4x4<type> to_mat4x4() const {return {x.x,y.x,0,0,x.y,y.y,0,0,x.z,y.z,1,0,0,0,0,1};}
+            [[nodiscard]] constexpr mat4<type> to_mat4() const {return to_mat4x4();}
         };
         
         template <typename T> struct vec<2,vec<4,T>> // mat2x4
@@ -563,17 +563,17 @@ namespace Math
             [[nodiscard]] constexpr vec4<member_type> to_vec4(member_type nz, member_type nw) const {return {x, y, nz, nw};}
             [[nodiscard]] constexpr vec3<member_type> to_vec3() const {return to_vec3({});}
             [[nodiscard]] constexpr vec4<member_type> to_vec4() const {return to_vec4({}, {});}
-            [[nodiscard]] constexpr mat2x2<T> to_mat2x2() const {return {x.x,y.x,x.y,y.y};}
-            [[nodiscard]] constexpr mat2<T> to_mat2() const {return to_mat2x2();}
-            [[nodiscard]] constexpr mat3x2<T> to_mat3x2() const {return {x.x,y.x,0,x.y,y.y,0};}
-            [[nodiscard]] constexpr mat4x2<T> to_mat4x2() const {return {x.x,y.x,0,0,x.y,y.y,0,0};}
-            [[nodiscard]] constexpr mat2x3<T> to_mat2x3() const {return {x.x,y.x,x.y,y.y,x.z,y.z};}
-            [[nodiscard]] constexpr mat3x3<T> to_mat3x3() const {return {x.x,y.x,0,x.y,y.y,0,x.z,y.z,1};}
-            [[nodiscard]] constexpr mat3<T> to_mat3() const {return to_mat3x3();}
-            [[nodiscard]] constexpr mat4x3<T> to_mat4x3() const {return {x.x,y.x,0,0,x.y,y.y,0,0,x.z,y.z,1,0};}
-            [[nodiscard]] constexpr mat3x4<T> to_mat3x4() const {return {x.x,y.x,0,x.y,y.y,0,x.z,y.z,1,x.w,y.w,0};}
-            [[nodiscard]] constexpr mat4x4<T> to_mat4x4() const {return {x.x,y.x,0,0,x.y,y.y,0,0,x.z,y.z,1,0,x.w,y.w,0,1};}
-            [[nodiscard]] constexpr mat4<T> to_mat4() const {return to_mat4x4();}
+            [[nodiscard]] constexpr mat2x2<type> to_mat2x2() const {return {x.x,y.x,x.y,y.y};}
+            [[nodiscard]] constexpr mat2<type> to_mat2() const {return to_mat2x2();}
+            [[nodiscard]] constexpr mat3x2<type> to_mat3x2() const {return {x.x,y.x,0,x.y,y.y,0};}
+            [[nodiscard]] constexpr mat4x2<type> to_mat4x2() const {return {x.x,y.x,0,0,x.y,y.y,0,0};}
+            [[nodiscard]] constexpr mat2x3<type> to_mat2x3() const {return {x.x,y.x,x.y,y.y,x.z,y.z};}
+            [[nodiscard]] constexpr mat3x3<type> to_mat3x3() const {return {x.x,y.x,0,x.y,y.y,0,x.z,y.z,1};}
+            [[nodiscard]] constexpr mat3<type> to_mat3() const {return to_mat3x3();}
+            [[nodiscard]] constexpr mat4x3<type> to_mat4x3() const {return {x.x,y.x,0,0,x.y,y.y,0,0,x.z,y.z,1,0};}
+            [[nodiscard]] constexpr mat3x4<type> to_mat3x4() const {return {x.x,y.x,0,x.y,y.y,0,x.z,y.z,1,x.w,y.w,0};}
+            [[nodiscard]] constexpr mat4x4<type> to_mat4x4() const {return {x.x,y.x,0,0,x.y,y.y,0,0,x.z,y.z,1,0,x.w,y.w,0,1};}
+            [[nodiscard]] constexpr mat4<type> to_mat4() const {return to_mat4x4();}
         };
         
         template <typename T> struct vec<3,vec<2,T>> // mat3x2
@@ -606,17 +606,17 @@ namespace Math
             [[nodiscard]] constexpr vec2<member_type> to_vec2() const {return {x, y};}
             [[nodiscard]] constexpr vec4<member_type> to_vec4(member_type nw) const {return {x, y, z, nw};}
             [[nodiscard]] constexpr vec4<member_type> to_vec4() const {return to_vec4({});}
-            [[nodiscard]] constexpr mat2x2<T> to_mat2x2() const {return {x.x,y.x,x.y,y.y};}
-            [[nodiscard]] constexpr mat2<T> to_mat2() const {return to_mat2x2();}
-            [[nodiscard]] constexpr mat4x2<T> to_mat4x2() const {return {x.x,y.x,z.x,0,x.y,y.y,z.y,0};}
-            [[nodiscard]] constexpr mat2x3<T> to_mat2x3() const {return {x.x,y.x,x.y,y.y,0,0};}
-            [[nodiscard]] constexpr mat3x3<T> to_mat3x3() const {return {x.x,y.x,z.x,x.y,y.y,z.y,0,0,1};}
-            [[nodiscard]] constexpr mat3<T> to_mat3() const {return to_mat3x3();}
-            [[nodiscard]] constexpr mat4x3<T> to_mat4x3() const {return {x.x,y.x,z.x,0,x.y,y.y,z.y,0,0,0,1,0};}
-            [[nodiscard]] constexpr mat2x4<T> to_mat2x4() const {return {x.x,y.x,x.y,y.y,0,0,0,0};}
-            [[nodiscard]] constexpr mat3x4<T> to_mat3x4() const {return {x.x,y.x,z.x,x.y,y.y,z.y,0,0,1,0,0,0};}
-            [[nodiscard]] constexpr mat4x4<T> to_mat4x4() const {return {x.x,y.x,z.x,0,x.y,y.y,z.y,0,0,0,1,0,0,0,0,1};}
-            [[nodiscard]] constexpr mat4<T> to_mat4() const {return to_mat4x4();}
+            [[nodiscard]] constexpr mat2x2<type> to_mat2x2() const {return {x.x,y.x,x.y,y.y};}
+            [[nodiscard]] constexpr mat2<type> to_mat2() const {return to_mat2x2();}
+            [[nodiscard]] constexpr mat4x2<type> to_mat4x2() const {return {x.x,y.x,z.x,0,x.y,y.y,z.y,0};}
+            [[nodiscard]] constexpr mat2x3<type> to_mat2x3() const {return {x.x,y.x,x.y,y.y,0,0};}
+            [[nodiscard]] constexpr mat3x3<type> to_mat3x3() const {return {x.x,y.x,z.x,x.y,y.y,z.y,0,0,1};}
+            [[nodiscard]] constexpr mat3<type> to_mat3() const {return to_mat3x3();}
+            [[nodiscard]] constexpr mat4x3<type> to_mat4x3() const {return {x.x,y.x,z.x,0,x.y,y.y,z.y,0,0,0,1,0};}
+            [[nodiscard]] constexpr mat2x4<type> to_mat2x4() const {return {x.x,y.x,x.y,y.y,0,0,0,0};}
+            [[nodiscard]] constexpr mat3x4<type> to_mat3x4() const {return {x.x,y.x,z.x,x.y,y.y,z.y,0,0,1,0,0,0};}
+            [[nodiscard]] constexpr mat4x4<type> to_mat4x4() const {return {x.x,y.x,z.x,0,x.y,y.y,z.y,0,0,0,1,0,0,0,0,1};}
+            [[nodiscard]] constexpr mat4<type> to_mat4() const {return to_mat4x4();}
         };
         
         template <typename T> struct vec<3,vec<3,T>> // mat3x3
@@ -650,16 +650,16 @@ namespace Math
             [[nodiscard]] constexpr vec2<member_type> to_vec2() const {return {x, y};}
             [[nodiscard]] constexpr vec4<member_type> to_vec4(member_type nw) const {return {x, y, z, nw};}
             [[nodiscard]] constexpr vec4<member_type> to_vec4() const {return to_vec4({});}
-            [[nodiscard]] constexpr mat2x2<T> to_mat2x2() const {return {x.x,y.x,x.y,y.y};}
-            [[nodiscard]] constexpr mat2<T> to_mat2() const {return to_mat2x2();}
-            [[nodiscard]] constexpr mat3x2<T> to_mat3x2() const {return {x.x,y.x,z.x,x.y,y.y,z.y};}
-            [[nodiscard]] constexpr mat4x2<T> to_mat4x2() const {return {x.x,y.x,z.x,0,x.y,y.y,z.y,0};}
-            [[nodiscard]] constexpr mat2x3<T> to_mat2x3() const {return {x.x,y.x,x.y,y.y,x.z,y.z};}
-            [[nodiscard]] constexpr mat4x3<T> to_mat4x3() const {return {x.x,y.x,z.x,0,x.y,y.y,z.y,0,x.z,y.z,z.z,0};}
-            [[nodiscard]] constexpr mat2x4<T> to_mat2x4() const {return {x.x,y.x,x.y,y.y,x.z,y.z,0,0};}
-            [[nodiscard]] constexpr mat3x4<T> to_mat3x4() const {return {x.x,y.x,z.x,x.y,y.y,z.y,x.z,y.z,z.z,0,0,0};}
-            [[nodiscard]] constexpr mat4x4<T> to_mat4x4() const {return {x.x,y.x,z.x,0,x.y,y.y,z.y,0,x.z,y.z,z.z,0,0,0,0,1};}
-            [[nodiscard]] constexpr mat4<T> to_mat4() const {return to_mat4x4();}
+            [[nodiscard]] constexpr mat2x2<type> to_mat2x2() const {return {x.x,y.x,x.y,y.y};}
+            [[nodiscard]] constexpr mat2<type> to_mat2() const {return to_mat2x2();}
+            [[nodiscard]] constexpr mat3x2<type> to_mat3x2() const {return {x.x,y.x,z.x,x.y,y.y,z.y};}
+            [[nodiscard]] constexpr mat4x2<type> to_mat4x2() const {return {x.x,y.x,z.x,0,x.y,y.y,z.y,0};}
+            [[nodiscard]] constexpr mat2x3<type> to_mat2x3() const {return {x.x,y.x,x.y,y.y,x.z,y.z};}
+            [[nodiscard]] constexpr mat4x3<type> to_mat4x3() const {return {x.x,y.x,z.x,0,x.y,y.y,z.y,0,x.z,y.z,z.z,0};}
+            [[nodiscard]] constexpr mat2x4<type> to_mat2x4() const {return {x.x,y.x,x.y,y.y,x.z,y.z,0,0};}
+            [[nodiscard]] constexpr mat3x4<type> to_mat3x4() const {return {x.x,y.x,z.x,x.y,y.y,z.y,x.z,y.z,z.z,0,0,0};}
+            [[nodiscard]] constexpr mat4x4<type> to_mat4x4() const {return {x.x,y.x,z.x,0,x.y,y.y,z.y,0,x.z,y.z,z.z,0,0,0,0,1};}
+            [[nodiscard]] constexpr mat4<type> to_mat4() const {return to_mat4x4();}
         };
         
         template <typename T> struct vec<3,vec<4,T>> // mat3x4
@@ -692,17 +692,17 @@ namespace Math
             [[nodiscard]] constexpr vec2<member_type> to_vec2() const {return {x, y};}
             [[nodiscard]] constexpr vec4<member_type> to_vec4(member_type nw) const {return {x, y, z, nw};}
             [[nodiscard]] constexpr vec4<member_type> to_vec4() const {return to_vec4({});}
-            [[nodiscard]] constexpr mat2x2<T> to_mat2x2() const {return {x.x,y.x,x.y,y.y};}
-            [[nodiscard]] constexpr mat2<T> to_mat2() const {return to_mat2x2();}
-            [[nodiscard]] constexpr mat3x2<T> to_mat3x2() const {return {x.x,y.x,z.x,x.y,y.y,z.y};}
-            [[nodiscard]] constexpr mat4x2<T> to_mat4x2() const {return {x.x,y.x,z.x,0,x.y,y.y,z.y,0};}
-            [[nodiscard]] constexpr mat2x3<T> to_mat2x3() const {return {x.x,y.x,x.y,y.y,x.z,y.z};}
-            [[nodiscard]] constexpr mat3x3<T> to_mat3x3() const {return {x.x,y.x,z.x,x.y,y.y,z.y,x.z,y.z,z.z};}
-            [[nodiscard]] constexpr mat3<T> to_mat3() const {return to_mat3x3();}
-            [[nodiscard]] constexpr mat4x3<T> to_mat4x3() const {return {x.x,y.x,z.x,0,x.y,y.y,z.y,0,x.z,y.z,z.z,0};}
-            [[nodiscard]] constexpr mat2x4<T> to_mat2x4() const {return {x.x,y.x,x.y,y.y,x.z,y.z,x.w,y.w};}
-            [[nodiscard]] constexpr mat4x4<T> to_mat4x4() const {return {x.x,y.x,z.x,0,x.y,y.y,z.y,0,x.z,y.z,z.z,0,x.w,y.w,z.w,1};}
-            [[nodiscard]] constexpr mat4<T> to_mat4() const {return to_mat4x4();}
+            [[nodiscard]] constexpr mat2x2<type> to_mat2x2() const {return {x.x,y.x,x.y,y.y};}
+            [[nodiscard]] constexpr mat2<type> to_mat2() const {return to_mat2x2();}
+            [[nodiscard]] constexpr mat3x2<type> to_mat3x2() const {return {x.x,y.x,z.x,x.y,y.y,z.y};}
+            [[nodiscard]] constexpr mat4x2<type> to_mat4x2() const {return {x.x,y.x,z.x,0,x.y,y.y,z.y,0};}
+            [[nodiscard]] constexpr mat2x3<type> to_mat2x3() const {return {x.x,y.x,x.y,y.y,x.z,y.z};}
+            [[nodiscard]] constexpr mat3x3<type> to_mat3x3() const {return {x.x,y.x,z.x,x.y,y.y,z.y,x.z,y.z,z.z};}
+            [[nodiscard]] constexpr mat3<type> to_mat3() const {return to_mat3x3();}
+            [[nodiscard]] constexpr mat4x3<type> to_mat4x3() const {return {x.x,y.x,z.x,0,x.y,y.y,z.y,0,x.z,y.z,z.z,0};}
+            [[nodiscard]] constexpr mat2x4<type> to_mat2x4() const {return {x.x,y.x,x.y,y.y,x.z,y.z,x.w,y.w};}
+            [[nodiscard]] constexpr mat4x4<type> to_mat4x4() const {return {x.x,y.x,z.x,0,x.y,y.y,z.y,0,x.z,y.z,z.z,0,x.w,y.w,z.w,1};}
+            [[nodiscard]] constexpr mat4<type> to_mat4() const {return to_mat4x4();}
         };
         
         template <typename T> struct vec<4,vec<2,T>> // mat4x2
@@ -735,17 +735,17 @@ namespace Math
             [[nodiscard]] constexpr type max() const {return std::max({x.x,x.y,y.x,y.y,z.x,z.y,w.x,w.y});}
             [[nodiscard]] constexpr vec2<member_type> to_vec2() const {return {x, y};}
             [[nodiscard]] constexpr vec3<member_type> to_vec3() const {return {x, y, z};}
-            [[nodiscard]] constexpr mat2x2<T> to_mat2x2() const {return {x.x,y.x,x.y,y.y};}
-            [[nodiscard]] constexpr mat2<T> to_mat2() const {return to_mat2x2();}
-            [[nodiscard]] constexpr mat3x2<T> to_mat3x2() const {return {x.x,y.x,z.x,x.y,y.y,z.y};}
-            [[nodiscard]] constexpr mat2x3<T> to_mat2x3() const {return {x.x,y.x,x.y,y.y,0,0};}
-            [[nodiscard]] constexpr mat3x3<T> to_mat3x3() const {return {x.x,y.x,z.x,x.y,y.y,z.y,0,0,1};}
-            [[nodiscard]] constexpr mat3<T> to_mat3() const {return to_mat3x3();}
-            [[nodiscard]] constexpr mat4x3<T> to_mat4x3() const {return {x.x,y.x,z.x,w.x,x.y,y.y,z.y,w.y,0,0,1,0};}
-            [[nodiscard]] constexpr mat2x4<T> to_mat2x4() const {return {x.x,y.x,x.y,y.y,0,0,0,0};}
-            [[nodiscard]] constexpr mat3x4<T> to_mat3x4() const {return {x.x,y.x,z.x,x.y,y.y,z.y,0,0,1,0,0,0};}
-            [[nodiscard]] constexpr mat4x4<T> to_mat4x4() const {return {x.x,y.x,z.x,w.x,x.y,y.y,z.y,w.y,0,0,1,0,0,0,0,1};}
-            [[nodiscard]] constexpr mat4<T> to_mat4() const {return to_mat4x4();}
+            [[nodiscard]] constexpr mat2x2<type> to_mat2x2() const {return {x.x,y.x,x.y,y.y};}
+            [[nodiscard]] constexpr mat2<type> to_mat2() const {return to_mat2x2();}
+            [[nodiscard]] constexpr mat3x2<type> to_mat3x2() const {return {x.x,y.x,z.x,x.y,y.y,z.y};}
+            [[nodiscard]] constexpr mat2x3<type> to_mat2x3() const {return {x.x,y.x,x.y,y.y,0,0};}
+            [[nodiscard]] constexpr mat3x3<type> to_mat3x3() const {return {x.x,y.x,z.x,x.y,y.y,z.y,0,0,1};}
+            [[nodiscard]] constexpr mat3<type> to_mat3() const {return to_mat3x3();}
+            [[nodiscard]] constexpr mat4x3<type> to_mat4x3() const {return {x.x,y.x,z.x,w.x,x.y,y.y,z.y,w.y,0,0,1,0};}
+            [[nodiscard]] constexpr mat2x4<type> to_mat2x4() const {return {x.x,y.x,x.y,y.y,0,0,0,0};}
+            [[nodiscard]] constexpr mat3x4<type> to_mat3x4() const {return {x.x,y.x,z.x,x.y,y.y,z.y,0,0,1,0,0,0};}
+            [[nodiscard]] constexpr mat4x4<type> to_mat4x4() const {return {x.x,y.x,z.x,w.x,x.y,y.y,z.y,w.y,0,0,1,0,0,0,0,1};}
+            [[nodiscard]] constexpr mat4<type> to_mat4() const {return to_mat4x4();}
         };
         
         template <typename T> struct vec<4,vec<3,T>> // mat4x3
@@ -778,17 +778,17 @@ namespace Math
             [[nodiscard]] constexpr type max() const {return std::max({x.x,x.y,x.z,y.x,y.y,y.z,z.x,z.y,z.z,w.x,w.y,w.z});}
             [[nodiscard]] constexpr vec2<member_type> to_vec2() const {return {x, y};}
             [[nodiscard]] constexpr vec3<member_type> to_vec3() const {return {x, y, z};}
-            [[nodiscard]] constexpr mat2x2<T> to_mat2x2() const {return {x.x,y.x,x.y,y.y};}
-            [[nodiscard]] constexpr mat2<T> to_mat2() const {return to_mat2x2();}
-            [[nodiscard]] constexpr mat3x2<T> to_mat3x2() const {return {x.x,y.x,z.x,x.y,y.y,z.y};}
-            [[nodiscard]] constexpr mat4x2<T> to_mat4x2() const {return {x.x,y.x,z.x,w.x,x.y,y.y,z.y,w.y};}
-            [[nodiscard]] constexpr mat2x3<T> to_mat2x3() const {return {x.x,y.x,x.y,y.y,x.z,y.z};}
-            [[nodiscard]] constexpr mat3x3<T> to_mat3x3() const {return {x.x,y.x,z.x,x.y,y.y,z.y,x.z,y.z,z.z};}
-            [[nodiscard]] constexpr mat3<T> to_mat3() const {return to_mat3x3();}
-            [[nodiscard]] constexpr mat2x4<T> to_mat2x4() const {return {x.x,y.x,x.y,y.y,x.z,y.z,0,0};}
-            [[nodiscard]] constexpr mat3x4<T> to_mat3x4() const {return {x.x,y.x,z.x,x.y,y.y,z.y,x.z,y.z,z.z,0,0,0};}
-            [[nodiscard]] constexpr mat4x4<T> to_mat4x4() const {return {x.x,y.x,z.x,w.x,x.y,y.y,z.y,w.y,x.z,y.z,z.z,w.z,0,0,0,1};}
-            [[nodiscard]] constexpr mat4<T> to_mat4() const {return to_mat4x4();}
+            [[nodiscard]] constexpr mat2x2<type> to_mat2x2() const {return {x.x,y.x,x.y,y.y};}
+            [[nodiscard]] constexpr mat2<type> to_mat2() const {return to_mat2x2();}
+            [[nodiscard]] constexpr mat3x2<type> to_mat3x2() const {return {x.x,y.x,z.x,x.y,y.y,z.y};}
+            [[nodiscard]] constexpr mat4x2<type> to_mat4x2() const {return {x.x,y.x,z.x,w.x,x.y,y.y,z.y,w.y};}
+            [[nodiscard]] constexpr mat2x3<type> to_mat2x3() const {return {x.x,y.x,x.y,y.y,x.z,y.z};}
+            [[nodiscard]] constexpr mat3x3<type> to_mat3x3() const {return {x.x,y.x,z.x,x.y,y.y,z.y,x.z,y.z,z.z};}
+            [[nodiscard]] constexpr mat3<type> to_mat3() const {return to_mat3x3();}
+            [[nodiscard]] constexpr mat2x4<type> to_mat2x4() const {return {x.x,y.x,x.y,y.y,x.z,y.z,0,0};}
+            [[nodiscard]] constexpr mat3x4<type> to_mat3x4() const {return {x.x,y.x,z.x,x.y,y.y,z.y,x.z,y.z,z.z,0,0,0};}
+            [[nodiscard]] constexpr mat4x4<type> to_mat4x4() const {return {x.x,y.x,z.x,w.x,x.y,y.y,z.y,w.y,x.z,y.z,z.z,w.z,0,0,0,1};}
+            [[nodiscard]] constexpr mat4<type> to_mat4() const {return to_mat4x4();}
         };
         
         template <typename T> struct vec<4,vec<4,T>> // mat4x4
@@ -822,16 +822,16 @@ namespace Math
             [[nodiscard]] constexpr type max() const {return std::max({x.x,x.y,x.z,x.w,y.x,y.y,y.z,y.w,z.x,z.y,z.z,z.w,w.x,w.y,w.z,w.w});}
             [[nodiscard]] constexpr vec2<member_type> to_vec2() const {return {x, y};}
             [[nodiscard]] constexpr vec3<member_type> to_vec3() const {return {x, y, z};}
-            [[nodiscard]] constexpr mat2x2<T> to_mat2x2() const {return {x.x,y.x,x.y,y.y};}
-            [[nodiscard]] constexpr mat2<T> to_mat2() const {return to_mat2x2();}
-            [[nodiscard]] constexpr mat3x2<T> to_mat3x2() const {return {x.x,y.x,z.x,x.y,y.y,z.y};}
-            [[nodiscard]] constexpr mat4x2<T> to_mat4x2() const {return {x.x,y.x,z.x,w.x,x.y,y.y,z.y,w.y};}
-            [[nodiscard]] constexpr mat2x3<T> to_mat2x3() const {return {x.x,y.x,x.y,y.y,x.z,y.z};}
-            [[nodiscard]] constexpr mat3x3<T> to_mat3x3() const {return {x.x,y.x,z.x,x.y,y.y,z.y,x.z,y.z,z.z};}
-            [[nodiscard]] constexpr mat3<T> to_mat3() const {return to_mat3x3();}
-            [[nodiscard]] constexpr mat4x3<T> to_mat4x3() const {return {x.x,y.x,z.x,w.x,x.y,y.y,z.y,w.y,x.z,y.z,z.z,w.z};}
-            [[nodiscard]] constexpr mat2x4<T> to_mat2x4() const {return {x.x,y.x,x.y,y.y,x.z,y.z,x.w,y.w};}
-            [[nodiscard]] constexpr mat3x4<T> to_mat3x4() const {return {x.x,y.x,z.x,x.y,y.y,z.y,x.z,y.z,z.z,x.w,y.w,z.w};}
+            [[nodiscard]] constexpr mat2x2<type> to_mat2x2() const {return {x.x,y.x,x.y,y.y};}
+            [[nodiscard]] constexpr mat2<type> to_mat2() const {return to_mat2x2();}
+            [[nodiscard]] constexpr mat3x2<type> to_mat3x2() const {return {x.x,y.x,z.x,x.y,y.y,z.y};}
+            [[nodiscard]] constexpr mat4x2<type> to_mat4x2() const {return {x.x,y.x,z.x,w.x,x.y,y.y,z.y,w.y};}
+            [[nodiscard]] constexpr mat2x3<type> to_mat2x3() const {return {x.x,y.x,x.y,y.y,x.z,y.z};}
+            [[nodiscard]] constexpr mat3x3<type> to_mat3x3() const {return {x.x,y.x,z.x,x.y,y.y,z.y,x.z,y.z,z.z};}
+            [[nodiscard]] constexpr mat3<type> to_mat3() const {return to_mat3x3();}
+            [[nodiscard]] constexpr mat4x3<type> to_mat4x3() const {return {x.x,y.x,z.x,w.x,x.y,y.y,z.y,w.y,x.z,y.z,z.z,w.z};}
+            [[nodiscard]] constexpr mat2x4<type> to_mat2x4() const {return {x.x,y.x,x.y,y.y,x.z,y.z,x.w,y.w};}
+            [[nodiscard]] constexpr mat3x4<type> to_mat3x4() const {return {x.x,y.x,z.x,x.y,y.y,z.y,x.z,y.z,z.z,x.w,y.w,z.w};}
         };
         //} Matrices
         

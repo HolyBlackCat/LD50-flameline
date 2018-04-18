@@ -618,7 +618,7 @@ int main()
                             {
                                 if (www == w && hhh == h)
                                     continue;
-                                output("[[nodiscard]] constexpr mat",www,'x',hhh,"<T> to_mat",www,'x',hhh,"() const {return {");
+                                output("[[nodiscard]] constexpr mat",www,'x',hhh,"<type> to_mat",www,'x',hhh,"() const {return {");
                                 for (int hh = 0; hh < hhh; hh++)
                                 {
                                     for (int ww = 0; ww < www; ww++)
@@ -633,7 +633,7 @@ int main()
                                 }
                                 output("};}\n");
                                 if (www == hhh)
-                                    output("[[nodiscard]] constexpr mat",www,"<T> to_mat",www,"() const {return to_mat",www,'x',www,"();}\n");
+                                    output("[[nodiscard]] constexpr mat",www,"<type> to_mat",www,"() const {return to_mat",www,'x',www,"();}\n");
                             }
                         }
                     }
