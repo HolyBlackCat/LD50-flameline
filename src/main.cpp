@@ -6,6 +6,5 @@ using namespace Math;
 
 int main(int, char **)
 {
-    imat2 m(1,2,3,4);
-    std::cout << m << "\n" << m.to_mat2x3();
+    std::cout << fmat2(0,0,1,1).mul(fvec2(2,3));
 }

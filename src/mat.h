@@ -269,7 +269,7 @@ namespace Math
         template <typename ...P> struct larger_impl {using type = void;};
         template <typename T> struct larger_impl<T> {using type = T;};
         template <typename T, typename ...P> struct larger_impl<T,P...> {using type = typename larger_impl<T, typename larger_impl<P...>::type>::type;};
-        template <typename A, typename B> struct larger_impl<A,B> {using type = std::conditional_t<compare_weight_v<A,B> == 0, void, std::conditional_t<(compare_weight_v<A,B> > 0), A, B>>;};
+        template <typename A, typename B> struct larger_impl<A,B> {using type = std::conditional_t<compare_weight_v<A,B> == 0, std::conditional_t<(compare_weight_v<A,B> > 0), A, B>, std::conditional_t<std::is_same_v<A,B>, A, void>>;};
         template <int D, typename A, typename B> struct larger_impl<vec<D,A>,B> {using type = change_base_t<vec<D,A>, typename larger_impl<A,B>::type>;};
         template <int D, typename A, typename B> struct larger_impl<B,vec<D,A>> {using type = change_base_t<vec<D,A>, typename larger_impl<A,B>::type>;};
         template <int DA, int DB, typename A, typename B> struct larger_impl<vec<DA,A>,vec<DB,B>>
@@ -350,6 +350,10 @@ namespace Math
             [[nodiscard]] constexpr auto norm() const -> vec2<decltype(type{}/len())> {if (auto l = len(); l != 0) return *this / l; else return vec(0);}
             template <typename TT> [[nodiscard]] constexpr auto dot(const vec2<TT> &o) const {return x * o.x + y * o.y;}
             template <typename TT> [[nodiscard]] constexpr auto cross(const vec2<TT> &o) const {return x * o.y - y * o.x;}
+            template <typename TT> [[nodiscard]] constexpr larger_t<type,TT> mul(const vec2<TT> &m) const {return {x*m.x + y*m.y};}
+            template <typename TT> [[nodiscard]] constexpr vec2<larger_t<type,TT>> mul(const mat2x2<TT> &m) const {return {x*m.x.x + y*m.x.y, x*m.y.x + y*m.y.y};}
+            template <typename TT> [[nodiscard]] constexpr vec3<larger_t<type,TT>> mul(const mat3x2<TT> &m) const {return {x*m.x.x + y*m.x.y, x*m.y.x + y*m.y.y, x*m.z.x + y*m.z.y};}
+            template <typename TT> [[nodiscard]] constexpr vec4<larger_t<type,TT>> mul(const mat4x2<TT> &m) const {return {x*m.x.x + y*m.x.y, x*m.y.x + y*m.y.y, x*m.z.x + y*m.z.y, x*m.w.x + y*m.w.y};}
         };
         
         template <typename T> struct vec<3,T> // vec3
@@ -397,6 +401,10 @@ namespace Math
             [[nodiscard]] constexpr auto norm() const -> vec3<decltype(type{}/len())> {if (auto l = len(); l != 0) return *this / l; else return vec(0);}
             template <typename TT> [[nodiscard]] constexpr auto dot(const vec3<TT> &o) const {return x * o.x + y * o.y + z * o.z;}
             template <typename TT> [[nodiscard]] constexpr auto cross(const vec3<TT> &o) const -> vec3<decltype(x * o.x - x * o.x)> {return {y * o.z - z * o.y, z * o.x - x * o.z, x * o.y - y * o.x};}
+            template <typename TT> [[nodiscard]] constexpr larger_t<type,TT> mul(const vec3<TT> &m) const {return {x*m.x + y*m.y + z*m.z};}
+            template <typename TT> [[nodiscard]] constexpr vec2<larger_t<type,TT>> mul(const mat2x3<TT> &m) const {return {x*m.x.x + y*m.x.y + z*m.x.z, x*m.y.x + y*m.y.y + z*m.y.z};}
+            template <typename TT> [[nodiscard]] constexpr vec3<larger_t<type,TT>> mul(const mat3x3<TT> &m) const {return {x*m.x.x + y*m.x.y + z*m.x.z, x*m.y.x + y*m.y.y + z*m.y.z, x*m.z.x + y*m.z.y + z*m.z.z};}
+            template <typename TT> [[nodiscard]] constexpr vec4<larger_t<type,TT>> mul(const mat4x3<TT> &m) const {return {x*m.x.x + y*m.x.y + z*m.x.z, x*m.y.x + y*m.y.y + z*m.y.z, x*m.z.x + y*m.z.y + z*m.z.z, x*m.w.x + y*m.w.y + z*m.w.z};}
         };
         
         template <typename T> struct vec<4,T> // vec4
@@ -443,6 +451,10 @@ namespace Math
             [[nodiscard]] constexpr auto len() const {return std::sqrt(len_sqr());}
             [[nodiscard]] constexpr auto norm() const -> vec4<decltype(type{}/len())> {if (auto l = len(); l != 0) return *this / l; else return vec(0);}
             template <typename TT> [[nodiscard]] constexpr auto dot(const vec4<TT> &o) const {return x * o.x + y * o.y + z * o.z + w * o.w;}
+            template <typename TT> [[nodiscard]] constexpr larger_t<type,TT> mul(const vec4<TT> &m) const {return {x*m.x + y*m.y + z*m.z + w*m.w};}
+            template <typename TT> [[nodiscard]] constexpr vec2<larger_t<type,TT>> mul(const mat2x4<TT> &m) const {return {x*m.x.x + y*m.x.y + z*m.x.z + w*m.x.w, x*m.y.x + y*m.y.y + z*m.y.z + w*m.y.w};}
+            template <typename TT> [[nodiscard]] constexpr vec3<larger_t<type,TT>> mul(const mat3x4<TT> &m) const {return {x*m.x.x + y*m.x.y + z*m.x.z + w*m.x.w, x*m.y.x + y*m.y.y + z*m.y.z + w*m.y.w, x*m.z.x + y*m.z.y + z*m.z.z + w*m.z.w};}
+            template <typename TT> [[nodiscard]] constexpr vec4<larger_t<type,TT>> mul(const mat4x4<TT> &m) const {return {x*m.x.x + y*m.x.y + z*m.x.z + w*m.x.w, x*m.y.x + y*m.y.y + z*m.y.z + w*m.y.w, x*m.z.x + y*m.z.y + z*m.z.z + w*m.z.w, x*m.w.x + y*m.w.y + z*m.w.z + w*m.w.w};}
         };
         //} Vectors
         
@@ -488,6 +500,10 @@ namespace Math
             [[nodiscard]] constexpr mat3x4<type> to_mat3x4() const {return {x.x,y.x,0,x.y,y.y,0,0,0,1,0,0,0};}
             [[nodiscard]] constexpr mat4x4<type> to_mat4x4() const {return {x.x,y.x,0,0,x.y,y.y,0,0,0,0,1,0,0,0,0,1};}
             [[nodiscard]] constexpr mat4<type> to_mat4() const {return to_mat4x4();}
+            template <typename TT> [[nodiscard]] constexpr vec2<larger_t<type,TT>> mul(const vec2<TT> &m) const {return {x.x*m.x + y.x*m.y, x.y*m.x + y.y*m.y};}
+            template <typename TT> [[nodiscard]] constexpr mat2x2<larger_t<type,TT>> mul(const mat2x2<TT> &m) const {return {x.x*m.x.x + y.x*m.x.y, x.x*m.y.x + y.x*m.y.y, x.y*m.x.x + y.y*m.x.y, x.y*m.y.x + y.y*m.y.y};}
+            template <typename TT> [[nodiscard]] constexpr mat3x2<larger_t<type,TT>> mul(const mat3x2<TT> &m) const {return {x.x*m.x.x + y.x*m.x.y, x.x*m.y.x + y.x*m.y.y, x.x*m.z.x + y.x*m.z.y, x.y*m.x.x + y.y*m.x.y, x.y*m.y.x + y.y*m.y.y, x.y*m.z.x + y.y*m.z.y};}
+            template <typename TT> [[nodiscard]] constexpr mat4x2<larger_t<type,TT>> mul(const mat4x2<TT> &m) const {return {x.x*m.x.x + y.x*m.x.y, x.x*m.y.x + y.x*m.y.y, x.x*m.z.x + y.x*m.z.y, x.x*m.w.x + y.x*m.w.y, x.y*m.x.x + y.y*m.x.y, x.y*m.y.x + y.y*m.y.y, x.y*m.z.x + y.y*m.z.y, x.y*m.w.x + y.y*m.w.y};}
         };
         
         template <typename T> struct vec<2,vec<3,T>> // mat2x3
@@ -531,6 +547,10 @@ namespace Math
             [[nodiscard]] constexpr mat3x4<type> to_mat3x4() const {return {x.x,y.x,0,x.y,y.y,0,x.z,y.z,1,0,0,0};}
             [[nodiscard]] constexpr mat4x4<type> to_mat4x4() const {return {x.x,y.x,0,0,x.y,y.y,0,0,x.z,y.z,1,0,0,0,0,1};}
             [[nodiscard]] constexpr mat4<type> to_mat4() const {return to_mat4x4();}
+            template <typename TT> [[nodiscard]] constexpr vec3<larger_t<type,TT>> mul(const vec2<TT> &m) const {return {x.x*m.x + y.x*m.y, x.y*m.x + y.y*m.y, x.z*m.x + y.z*m.y};}
+            template <typename TT> [[nodiscard]] constexpr mat2x3<larger_t<type,TT>> mul(const mat2x2<TT> &m) const {return {x.x*m.x.x + y.x*m.x.y, x.x*m.y.x + y.x*m.y.y, x.y*m.x.x + y.y*m.x.y, x.y*m.y.x + y.y*m.y.y, x.z*m.x.x + y.z*m.x.y, x.z*m.y.x + y.z*m.y.y};}
+            template <typename TT> [[nodiscard]] constexpr mat3x3<larger_t<type,TT>> mul(const mat3x2<TT> &m) const {return {x.x*m.x.x + y.x*m.x.y, x.x*m.y.x + y.x*m.y.y, x.x*m.z.x + y.x*m.z.y, x.y*m.x.x + y.y*m.x.y, x.y*m.y.x + y.y*m.y.y, x.y*m.z.x + y.y*m.z.y, x.z*m.x.x + y.z*m.x.y, x.z*m.y.x + y.z*m.y.y, x.z*m.z.x + y.z*m.z.y};}
+            template <typename TT> [[nodiscard]] constexpr mat4x3<larger_t<type,TT>> mul(const mat4x2<TT> &m) const {return {x.x*m.x.x + y.x*m.x.y, x.x*m.y.x + y.x*m.y.y, x.x*m.z.x + y.x*m.z.y, x.x*m.w.x + y.x*m.w.y, x.y*m.x.x + y.y*m.x.y, x.y*m.y.x + y.y*m.y.y, x.y*m.z.x + y.y*m.z.y, x.y*m.w.x + y.y*m.w.y, x.z*m.x.x + y.z*m.x.y, x.z*m.y.x + y.z*m.y.y, x.z*m.z.x + y.z*m.z.y, x.z*m.w.x + y.z*m.w.y};}
         };
         
         template <typename T> struct vec<2,vec<4,T>> // mat2x4
@@ -574,6 +594,10 @@ namespace Math
             [[nodiscard]] constexpr mat3x4<type> to_mat3x4() const {return {x.x,y.x,0,x.y,y.y,0,x.z,y.z,1,x.w,y.w,0};}
             [[nodiscard]] constexpr mat4x4<type> to_mat4x4() const {return {x.x,y.x,0,0,x.y,y.y,0,0,x.z,y.z,1,0,x.w,y.w,0,1};}
             [[nodiscard]] constexpr mat4<type> to_mat4() const {return to_mat4x4();}
+            template <typename TT> [[nodiscard]] constexpr vec4<larger_t<type,TT>> mul(const vec2<TT> &m) const {return {x.x*m.x + y.x*m.y, x.y*m.x + y.y*m.y, x.z*m.x + y.z*m.y, x.w*m.x + y.w*m.y};}
+            template <typename TT> [[nodiscard]] constexpr mat2x4<larger_t<type,TT>> mul(const mat2x2<TT> &m) const {return {x.x*m.x.x + y.x*m.x.y, x.x*m.y.x + y.x*m.y.y, x.y*m.x.x + y.y*m.x.y, x.y*m.y.x + y.y*m.y.y, x.z*m.x.x + y.z*m.x.y, x.z*m.y.x + y.z*m.y.y, x.w*m.x.x + y.w*m.x.y, x.w*m.y.x + y.w*m.y.y};}
+            template <typename TT> [[nodiscard]] constexpr mat3x4<larger_t<type,TT>> mul(const mat3x2<TT> &m) const {return {x.x*m.x.x + y.x*m.x.y, x.x*m.y.x + y.x*m.y.y, x.x*m.z.x + y.x*m.z.y, x.y*m.x.x + y.y*m.x.y, x.y*m.y.x + y.y*m.y.y, x.y*m.z.x + y.y*m.z.y, x.z*m.x.x + y.z*m.x.y, x.z*m.y.x + y.z*m.y.y, x.z*m.z.x + y.z*m.z.y, x.w*m.x.x + y.w*m.x.y, x.w*m.y.x + y.w*m.y.y, x.w*m.z.x + y.w*m.z.y};}
+            template <typename TT> [[nodiscard]] constexpr mat4x4<larger_t<type,TT>> mul(const mat4x2<TT> &m) const {return {x.x*m.x.x + y.x*m.x.y, x.x*m.y.x + y.x*m.y.y, x.x*m.z.x + y.x*m.z.y, x.x*m.w.x + y.x*m.w.y, x.y*m.x.x + y.y*m.x.y, x.y*m.y.x + y.y*m.y.y, x.y*m.z.x + y.y*m.z.y, x.y*m.w.x + y.y*m.w.y, x.z*m.x.x + y.z*m.x.y, x.z*m.y.x + y.z*m.y.y, x.z*m.z.x + y.z*m.z.y, x.z*m.w.x + y.z*m.w.y, x.w*m.x.x + y.w*m.x.y, x.w*m.y.x + y.w*m.y.y, x.w*m.z.x + y.w*m.z.y, x.w*m.w.x + y.w*m.w.y};}
         };
         
         template <typename T> struct vec<3,vec<2,T>> // mat3x2
@@ -617,6 +641,10 @@ namespace Math
             [[nodiscard]] constexpr mat3x4<type> to_mat3x4() const {return {x.x,y.x,z.x,x.y,y.y,z.y,0,0,1,0,0,0};}
             [[nodiscard]] constexpr mat4x4<type> to_mat4x4() const {return {x.x,y.x,z.x,0,x.y,y.y,z.y,0,0,0,1,0,0,0,0,1};}
             [[nodiscard]] constexpr mat4<type> to_mat4() const {return to_mat4x4();}
+            template <typename TT> [[nodiscard]] constexpr vec2<larger_t<type,TT>> mul(const vec3<TT> &m) const {return {x.x*m.x + y.x*m.y + z.x*m.z, x.y*m.x + y.y*m.y + z.y*m.z};}
+            template <typename TT> [[nodiscard]] constexpr mat2x2<larger_t<type,TT>> mul(const mat2x3<TT> &m) const {return {x.x*m.x.x + y.x*m.x.y + z.x*m.x.z, x.x*m.y.x + y.x*m.y.y + z.x*m.y.z, x.y*m.x.x + y.y*m.x.y + z.y*m.x.z, x.y*m.y.x + y.y*m.y.y + z.y*m.y.z};}
+            template <typename TT> [[nodiscard]] constexpr mat3x2<larger_t<type,TT>> mul(const mat3x3<TT> &m) const {return {x.x*m.x.x + y.x*m.x.y + z.x*m.x.z, x.x*m.y.x + y.x*m.y.y + z.x*m.y.z, x.x*m.z.x + y.x*m.z.y + z.x*m.z.z, x.y*m.x.x + y.y*m.x.y + z.y*m.x.z, x.y*m.y.x + y.y*m.y.y + z.y*m.y.z, x.y*m.z.x + y.y*m.z.y + z.y*m.z.z};}
+            template <typename TT> [[nodiscard]] constexpr mat4x2<larger_t<type,TT>> mul(const mat4x3<TT> &m) const {return {x.x*m.x.x + y.x*m.x.y + z.x*m.x.z, x.x*m.y.x + y.x*m.y.y + z.x*m.y.z, x.x*m.z.x + y.x*m.z.y + z.x*m.z.z, x.x*m.w.x + y.x*m.w.y + z.x*m.w.z, x.y*m.x.x + y.y*m.x.y + z.y*m.x.z, x.y*m.y.x + y.y*m.y.y + z.y*m.y.z, x.y*m.z.x + y.y*m.z.y + z.y*m.z.z, x.y*m.w.x + y.y*m.w.y + z.y*m.w.z};}
         };
         
         template <typename T> struct vec<3,vec<3,T>> // mat3x3
@@ -660,6 +688,10 @@ namespace Math
             [[nodiscard]] constexpr mat3x4<type> to_mat3x4() const {return {x.x,y.x,z.x,x.y,y.y,z.y,x.z,y.z,z.z,0,0,0};}
             [[nodiscard]] constexpr mat4x4<type> to_mat4x4() const {return {x.x,y.x,z.x,0,x.y,y.y,z.y,0,x.z,y.z,z.z,0,0,0,0,1};}
             [[nodiscard]] constexpr mat4<type> to_mat4() const {return to_mat4x4();}
+            template <typename TT> [[nodiscard]] constexpr vec3<larger_t<type,TT>> mul(const vec3<TT> &m) const {return {x.x*m.x + y.x*m.y + z.x*m.z, x.y*m.x + y.y*m.y + z.y*m.z, x.z*m.x + y.z*m.y + z.z*m.z};}
+            template <typename TT> [[nodiscard]] constexpr mat2x3<larger_t<type,TT>> mul(const mat2x3<TT> &m) const {return {x.x*m.x.x + y.x*m.x.y + z.x*m.x.z, x.x*m.y.x + y.x*m.y.y + z.x*m.y.z, x.y*m.x.x + y.y*m.x.y + z.y*m.x.z, x.y*m.y.x + y.y*m.y.y + z.y*m.y.z, x.z*m.x.x + y.z*m.x.y + z.z*m.x.z, x.z*m.y.x + y.z*m.y.y + z.z*m.y.z};}
+            template <typename TT> [[nodiscard]] constexpr mat3x3<larger_t<type,TT>> mul(const mat3x3<TT> &m) const {return {x.x*m.x.x + y.x*m.x.y + z.x*m.x.z, x.x*m.y.x + y.x*m.y.y + z.x*m.y.z, x.x*m.z.x + y.x*m.z.y + z.x*m.z.z, x.y*m.x.x + y.y*m.x.y + z.y*m.x.z, x.y*m.y.x + y.y*m.y.y + z.y*m.y.z, x.y*m.z.x + y.y*m.z.y + z.y*m.z.z, x.z*m.x.x + y.z*m.x.y + z.z*m.x.z, x.z*m.y.x + y.z*m.y.y + z.z*m.y.z, x.z*m.z.x + y.z*m.z.y + z.z*m.z.z};}
+            template <typename TT> [[nodiscard]] constexpr mat4x3<larger_t<type,TT>> mul(const mat4x3<TT> &m) const {return {x.x*m.x.x + y.x*m.x.y + z.x*m.x.z, x.x*m.y.x + y.x*m.y.y + z.x*m.y.z, x.x*m.z.x + y.x*m.z.y + z.x*m.z.z, x.x*m.w.x + y.x*m.w.y + z.x*m.w.z, x.y*m.x.x + y.y*m.x.y + z.y*m.x.z, x.y*m.y.x + y.y*m.y.y + z.y*m.y.z, x.y*m.z.x + y.y*m.z.y + z.y*m.z.z, x.y*m.w.x + y.y*m.w.y + z.y*m.w.z, x.z*m.x.x + y.z*m.x.y + z.z*m.x.z, x.z*m.y.x + y.z*m.y.y + z.z*m.y.z, x.z*m.z.x + y.z*m.z.y + z.z*m.z.z, x.z*m.w.x + y.z*m.w.y + z.z*m.w.z};}
         };
         
         template <typename T> struct vec<3,vec<4,T>> // mat3x4
@@ -703,6 +735,10 @@ namespace Math
             [[nodiscard]] constexpr mat2x4<type> to_mat2x4() const {return {x.x,y.x,x.y,y.y,x.z,y.z,x.w,y.w};}
             [[nodiscard]] constexpr mat4x4<type> to_mat4x4() const {return {x.x,y.x,z.x,0,x.y,y.y,z.y,0,x.z,y.z,z.z,0,x.w,y.w,z.w,1};}
             [[nodiscard]] constexpr mat4<type> to_mat4() const {return to_mat4x4();}
+            template <typename TT> [[nodiscard]] constexpr vec4<larger_t<type,TT>> mul(const vec3<TT> &m) const {return {x.x*m.x + y.x*m.y + z.x*m.z, x.y*m.x + y.y*m.y + z.y*m.z, x.z*m.x + y.z*m.y + z.z*m.z, x.w*m.x + y.w*m.y + z.w*m.z};}
+            template <typename TT> [[nodiscard]] constexpr mat2x4<larger_t<type,TT>> mul(const mat2x3<TT> &m) const {return {x.x*m.x.x + y.x*m.x.y + z.x*m.x.z, x.x*m.y.x + y.x*m.y.y + z.x*m.y.z, x.y*m.x.x + y.y*m.x.y + z.y*m.x.z, x.y*m.y.x + y.y*m.y.y + z.y*m.y.z, x.z*m.x.x + y.z*m.x.y + z.z*m.x.z, x.z*m.y.x + y.z*m.y.y + z.z*m.y.z, x.w*m.x.x + y.w*m.x.y + z.w*m.x.z, x.w*m.y.x + y.w*m.y.y + z.w*m.y.z};}
+            template <typename TT> [[nodiscard]] constexpr mat3x4<larger_t<type,TT>> mul(const mat3x3<TT> &m) const {return {x.x*m.x.x + y.x*m.x.y + z.x*m.x.z, x.x*m.y.x + y.x*m.y.y + z.x*m.y.z, x.x*m.z.x + y.x*m.z.y + z.x*m.z.z, x.y*m.x.x + y.y*m.x.y + z.y*m.x.z, x.y*m.y.x + y.y*m.y.y + z.y*m.y.z, x.y*m.z.x + y.y*m.z.y + z.y*m.z.z, x.z*m.x.x + y.z*m.x.y + z.z*m.x.z, x.z*m.y.x + y.z*m.y.y + z.z*m.y.z, x.z*m.z.x + y.z*m.z.y + z.z*m.z.z, x.w*m.x.x + y.w*m.x.y + z.w*m.x.z, x.w*m.y.x + y.w*m.y.y + z.w*m.y.z, x.w*m.z.x + y.w*m.z.y + z.w*m.z.z};}
+            template <typename TT> [[nodiscard]] constexpr mat4x4<larger_t<type,TT>> mul(const mat4x3<TT> &m) const {return {x.x*m.x.x + y.x*m.x.y + z.x*m.x.z, x.x*m.y.x + y.x*m.y.y + z.x*m.y.z, x.x*m.z.x + y.x*m.z.y + z.x*m.z.z, x.x*m.w.x + y.x*m.w.y + z.x*m.w.z, x.y*m.x.x + y.y*m.x.y + z.y*m.x.z, x.y*m.y.x + y.y*m.y.y + z.y*m.y.z, x.y*m.z.x + y.y*m.z.y + z.y*m.z.z, x.y*m.w.x + y.y*m.w.y + z.y*m.w.z, x.z*m.x.x + y.z*m.x.y + z.z*m.x.z, x.z*m.y.x + y.z*m.y.y + z.z*m.y.z, x.z*m.z.x + y.z*m.z.y + z.z*m.z.z, x.z*m.w.x + y.z*m.w.y + z.z*m.w.z, x.w*m.x.x + y.w*m.x.y + z.w*m.x.z, x.w*m.y.x + y.w*m.y.y + z.w*m.y.z, x.w*m.z.x + y.w*m.z.y + z.w*m.z.z, x.w*m.w.x + y.w*m.w.y + z.w*m.w.z};}
         };
         
         template <typename T> struct vec<4,vec<2,T>> // mat4x2
@@ -746,6 +782,10 @@ namespace Math
             [[nodiscard]] constexpr mat3x4<type> to_mat3x4() const {return {x.x,y.x,z.x,x.y,y.y,z.y,0,0,1,0,0,0};}
             [[nodiscard]] constexpr mat4x4<type> to_mat4x4() const {return {x.x,y.x,z.x,w.x,x.y,y.y,z.y,w.y,0,0,1,0,0,0,0,1};}
             [[nodiscard]] constexpr mat4<type> to_mat4() const {return to_mat4x4();}
+            template <typename TT> [[nodiscard]] constexpr vec2<larger_t<type,TT>> mul(const vec4<TT> &m) const {return {x.x*m.x + y.x*m.y + z.x*m.z + w.x*m.w, x.y*m.x + y.y*m.y + z.y*m.z + w.y*m.w};}
+            template <typename TT> [[nodiscard]] constexpr mat2x2<larger_t<type,TT>> mul(const mat2x4<TT> &m) const {return {x.x*m.x.x + y.x*m.x.y + z.x*m.x.z + w.x*m.x.w, x.x*m.y.x + y.x*m.y.y + z.x*m.y.z + w.x*m.y.w, x.y*m.x.x + y.y*m.x.y + z.y*m.x.z + w.y*m.x.w, x.y*m.y.x + y.y*m.y.y + z.y*m.y.z + w.y*m.y.w};}
+            template <typename TT> [[nodiscard]] constexpr mat3x2<larger_t<type,TT>> mul(const mat3x4<TT> &m) const {return {x.x*m.x.x + y.x*m.x.y + z.x*m.x.z + w.x*m.x.w, x.x*m.y.x + y.x*m.y.y + z.x*m.y.z + w.x*m.y.w, x.x*m.z.x + y.x*m.z.y + z.x*m.z.z + w.x*m.z.w, x.y*m.x.x + y.y*m.x.y + z.y*m.x.z + w.y*m.x.w, x.y*m.y.x + y.y*m.y.y + z.y*m.y.z + w.y*m.y.w, x.y*m.z.x + y.y*m.z.y + z.y*m.z.z + w.y*m.z.w};}
+            template <typename TT> [[nodiscard]] constexpr mat4x2<larger_t<type,TT>> mul(const mat4x4<TT> &m) const {return {x.x*m.x.x + y.x*m.x.y + z.x*m.x.z + w.x*m.x.w, x.x*m.y.x + y.x*m.y.y + z.x*m.y.z + w.x*m.y.w, x.x*m.z.x + y.x*m.z.y + z.x*m.z.z + w.x*m.z.w, x.x*m.w.x + y.x*m.w.y + z.x*m.w.z + w.x*m.w.w, x.y*m.x.x + y.y*m.x.y + z.y*m.x.z + w.y*m.x.w, x.y*m.y.x + y.y*m.y.y + z.y*m.y.z + w.y*m.y.w, x.y*m.z.x + y.y*m.z.y + z.y*m.z.z + w.y*m.z.w, x.y*m.w.x + y.y*m.w.y + z.y*m.w.z + w.y*m.w.w};}
         };
         
         template <typename T> struct vec<4,vec<3,T>> // mat4x3
@@ -789,6 +829,10 @@ namespace Math
             [[nodiscard]] constexpr mat3x4<type> to_mat3x4() const {return {x.x,y.x,z.x,x.y,y.y,z.y,x.z,y.z,z.z,0,0,0};}
             [[nodiscard]] constexpr mat4x4<type> to_mat4x4() const {return {x.x,y.x,z.x,w.x,x.y,y.y,z.y,w.y,x.z,y.z,z.z,w.z,0,0,0,1};}
             [[nodiscard]] constexpr mat4<type> to_mat4() const {return to_mat4x4();}
+            template <typename TT> [[nodiscard]] constexpr vec3<larger_t<type,TT>> mul(const vec4<TT> &m) const {return {x.x*m.x + y.x*m.y + z.x*m.z + w.x*m.w, x.y*m.x + y.y*m.y + z.y*m.z + w.y*m.w, x.z*m.x + y.z*m.y + z.z*m.z + w.z*m.w};}
+            template <typename TT> [[nodiscard]] constexpr mat2x3<larger_t<type,TT>> mul(const mat2x4<TT> &m) const {return {x.x*m.x.x + y.x*m.x.y + z.x*m.x.z + w.x*m.x.w, x.x*m.y.x + y.x*m.y.y + z.x*m.y.z + w.x*m.y.w, x.y*m.x.x + y.y*m.x.y + z.y*m.x.z + w.y*m.x.w, x.y*m.y.x + y.y*m.y.y + z.y*m.y.z + w.y*m.y.w, x.z*m.x.x + y.z*m.x.y + z.z*m.x.z + w.z*m.x.w, x.z*m.y.x + y.z*m.y.y + z.z*m.y.z + w.z*m.y.w};}
+            template <typename TT> [[nodiscard]] constexpr mat3x3<larger_t<type,TT>> mul(const mat3x4<TT> &m) const {return {x.x*m.x.x + y.x*m.x.y + z.x*m.x.z + w.x*m.x.w, x.x*m.y.x + y.x*m.y.y + z.x*m.y.z + w.x*m.y.w, x.x*m.z.x + y.x*m.z.y + z.x*m.z.z + w.x*m.z.w, x.y*m.x.x + y.y*m.x.y + z.y*m.x.z + w.y*m.x.w, x.y*m.y.x + y.y*m.y.y + z.y*m.y.z + w.y*m.y.w, x.y*m.z.x + y.y*m.z.y + z.y*m.z.z + w.y*m.z.w, x.z*m.x.x + y.z*m.x.y + z.z*m.x.z + w.z*m.x.w, x.z*m.y.x + y.z*m.y.y + z.z*m.y.z + w.z*m.y.w, x.z*m.z.x + y.z*m.z.y + z.z*m.z.z + w.z*m.z.w};}
+            template <typename TT> [[nodiscard]] constexpr mat4x3<larger_t<type,TT>> mul(const mat4x4<TT> &m) const {return {x.x*m.x.x + y.x*m.x.y + z.x*m.x.z + w.x*m.x.w, x.x*m.y.x + y.x*m.y.y + z.x*m.y.z + w.x*m.y.w, x.x*m.z.x + y.x*m.z.y + z.x*m.z.z + w.x*m.z.w, x.x*m.w.x + y.x*m.w.y + z.x*m.w.z + w.x*m.w.w, x.y*m.x.x + y.y*m.x.y + z.y*m.x.z + w.y*m.x.w, x.y*m.y.x + y.y*m.y.y + z.y*m.y.z + w.y*m.y.w, x.y*m.z.x + y.y*m.z.y + z.y*m.z.z + w.y*m.z.w, x.y*m.w.x + y.y*m.w.y + z.y*m.w.z + w.y*m.w.w, x.z*m.x.x + y.z*m.x.y + z.z*m.x.z + w.z*m.x.w, x.z*m.y.x + y.z*m.y.y + z.z*m.y.z + w.z*m.y.w, x.z*m.z.x + y.z*m.z.y + z.z*m.z.z + w.z*m.z.w, x.z*m.w.x + y.z*m.w.y + z.z*m.w.z + w.z*m.w.w};}
         };
         
         template <typename T> struct vec<4,vec<4,T>> // mat4x4
@@ -832,6 +876,10 @@ namespace Math
             [[nodiscard]] constexpr mat4x3<type> to_mat4x3() const {return {x.x,y.x,z.x,w.x,x.y,y.y,z.y,w.y,x.z,y.z,z.z,w.z};}
             [[nodiscard]] constexpr mat2x4<type> to_mat2x4() const {return {x.x,y.x,x.y,y.y,x.z,y.z,x.w,y.w};}
             [[nodiscard]] constexpr mat3x4<type> to_mat3x4() const {return {x.x,y.x,z.x,x.y,y.y,z.y,x.z,y.z,z.z,x.w,y.w,z.w};}
+            template <typename TT> [[nodiscard]] constexpr vec4<larger_t<type,TT>> mul(const vec4<TT> &m) const {return {x.x*m.x + y.x*m.y + z.x*m.z + w.x*m.w, x.y*m.x + y.y*m.y + z.y*m.z + w.y*m.w, x.z*m.x + y.z*m.y + z.z*m.z + w.z*m.w, x.w*m.x + y.w*m.y + z.w*m.z + w.w*m.w};}
+            template <typename TT> [[nodiscard]] constexpr mat2x4<larger_t<type,TT>> mul(const mat2x4<TT> &m) const {return {x.x*m.x.x + y.x*m.x.y + z.x*m.x.z + w.x*m.x.w, x.x*m.y.x + y.x*m.y.y + z.x*m.y.z + w.x*m.y.w, x.y*m.x.x + y.y*m.x.y + z.y*m.x.z + w.y*m.x.w, x.y*m.y.x + y.y*m.y.y + z.y*m.y.z + w.y*m.y.w, x.z*m.x.x + y.z*m.x.y + z.z*m.x.z + w.z*m.x.w, x.z*m.y.x + y.z*m.y.y + z.z*m.y.z + w.z*m.y.w, x.w*m.x.x + y.w*m.x.y + z.w*m.x.z + w.w*m.x.w, x.w*m.y.x + y.w*m.y.y + z.w*m.y.z + w.w*m.y.w};}
+            template <typename TT> [[nodiscard]] constexpr mat3x4<larger_t<type,TT>> mul(const mat3x4<TT> &m) const {return {x.x*m.x.x + y.x*m.x.y + z.x*m.x.z + w.x*m.x.w, x.x*m.y.x + y.x*m.y.y + z.x*m.y.z + w.x*m.y.w, x.x*m.z.x + y.x*m.z.y + z.x*m.z.z + w.x*m.z.w, x.y*m.x.x + y.y*m.x.y + z.y*m.x.z + w.y*m.x.w, x.y*m.y.x + y.y*m.y.y + z.y*m.y.z + w.y*m.y.w, x.y*m.z.x + y.y*m.z.y + z.y*m.z.z + w.y*m.z.w, x.z*m.x.x + y.z*m.x.y + z.z*m.x.z + w.z*m.x.w, x.z*m.y.x + y.z*m.y.y + z.z*m.y.z + w.z*m.y.w, x.z*m.z.x + y.z*m.z.y + z.z*m.z.z + w.z*m.z.w, x.w*m.x.x + y.w*m.x.y + z.w*m.x.z + w.w*m.x.w, x.w*m.y.x + y.w*m.y.y + z.w*m.y.z + w.w*m.y.w, x.w*m.z.x + y.w*m.z.y + z.w*m.z.z + w.w*m.z.w};}
+            template <typename TT> [[nodiscard]] constexpr mat4x4<larger_t<type,TT>> mul(const mat4x4<TT> &m) const {return {x.x*m.x.x + y.x*m.x.y + z.x*m.x.z + w.x*m.x.w, x.x*m.y.x + y.x*m.y.y + z.x*m.y.z + w.x*m.y.w, x.x*m.z.x + y.x*m.z.y + z.x*m.z.z + w.x*m.z.w, x.x*m.w.x + y.x*m.w.y + z.x*m.w.z + w.x*m.w.w, x.y*m.x.x + y.y*m.x.y + z.y*m.x.z + w.y*m.x.w, x.y*m.y.x + y.y*m.y.y + z.y*m.y.z + w.y*m.y.w, x.y*m.z.x + y.y*m.z.y + z.y*m.z.z + w.y*m.z.w, x.y*m.w.x + y.y*m.w.y + z.y*m.w.z + w.y*m.w.w, x.z*m.x.x + y.z*m.x.y + z.z*m.x.z + w.z*m.x.w, x.z*m.y.x + y.z*m.y.y + z.z*m.y.z + w.z*m.y.w, x.z*m.z.x + y.z*m.z.y + z.z*m.z.z + w.z*m.z.w, x.z*m.w.x + y.z*m.w.y + z.z*m.w.z + w.z*m.w.w, x.w*m.x.x + y.w*m.x.y + z.w*m.x.z + w.w*m.x.w, x.w*m.y.x + y.w*m.y.y + z.w*m.y.z + w.w*m.y.w, x.w*m.z.x + y.w*m.z.y + z.w*m.z.z + w.w*m.z.w, x.w*m.w.x + y.w*m.w.y + z.w*m.w.z + w.w*m.w.w};}
         };
         //} Matrices
         

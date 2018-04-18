@@ -287,7 +287,7 @@ int main()
                 template <typename ...P> struct larger_impl {using type = void;};
                 template <typename T> struct larger_impl<T> {using type = T;};
                 template <typename T, typename ...P> struct larger_impl<T,P...> {using type = typename larger_impl<T, typename larger_impl<P...>::type>::type;};
-                template <typename A, typename B> struct larger_impl<A,B> {using type = std::conditional_t<compare_weight_v<A,B> == 0, void, std::conditional_t<(compare_weight_v<A,B> > 0), A, B>>;};
+                template <typename A, typename B> struct larger_impl<A,B> {using type = std::conditional_t<compare_weight_v<A,B> == 0, std::conditional_t<(compare_weight_v<A,B> > 0), A, B>, std::conditional_t<std::is_same_v<A,B>, A, void>>;};
                 template <int D, typename A, typename B> struct larger_impl<vec<D,A>,B> {using type = change_base_t<vec<D,A>, typename larger_impl<A,B>::type>;};
                 template <int D, typename A, typename B> struct larger_impl<B,vec<D,A>> {using type = change_base_t<vec<D,A>, typename larger_impl<A,B>::type>;};
                 template <int DA, int DB, typename A, typename B> struct larger_impl<vec<DA,A>,vec<DB,B>>
@@ -326,7 +326,7 @@ int main()
         {
             auto Make = [&](int w, int h)
             {
-                bool is_vector = (h == 0),
+                bool is_vector = (h == 1),
                      is_matrix = !is_vector;
 
                 auto LargeFields = [&](std::string fold_op, std::string pre = "", std::string post = "") -> std::string
@@ -682,6 +682,47 @@ int main()
                             output("template <typename TT> [[nodiscard]] constexpr auto cross(const vec2<TT> &o) const {return x * o.y - y * o.x;}\n");
                     }
                 }
+
+                { // Matrix multiplication
+                    auto Matrix = [&](int x, int y, std::string t) -> std::string
+                    {
+                        if (x == 1 && y == 1)
+                            return t;
+                        if (x == 1)
+                            return make_str("vec",y,"<",t,">");
+                        if (y == 1)
+                            return make_str("vec",x,"<",t,">");
+                        return make_str("mat",x,"x",y,"<",t,">");
+                    };
+                    auto Field = [&](int x, int y, int w, int h) -> std::string
+                    {
+                        if (w == 1 && h == 1)
+                            return "";
+                        if (w == 1)
+                            return data::fields[y];
+                        if (h == 1)
+                            return data::fields[x];
+                        return make_str(data::fields[x], ".", data::fields[y]);
+                    };
+
+                    for (int i = 1; i <= 4; i++)
+                    {
+                        output("template <typename TT> [[nodiscard]] constexpr ",Matrix(i,h,"larger_t<type,TT>")," mul(const ",Matrix(i,w,"TT")," &m) const {return {");
+                        for (int y = 0; y < h; y++)
+                        for (int x = 0; x < i; x++)
+                        {
+                            if (y != 0 || x != 0)
+                                output(", ");
+                            for (int j = 0; j < w; j++)
+                            {
+                                if (j != 0)
+                                    output(" + ");
+                                output(Field(j,y,w,h),"*m.",Field(x,j,i,w));
+                            }
+                        }
+                        output("};}\n");
+                    }
+                }
             };
 
             decorative_section("Vectors", [&]
@@ -692,7 +733,7 @@ int main()
                         next_line();
 
                     section_sc(make_str("template <typename T> struct vec<", d, ",T> // vec", d), [&]{
-                        Make(d, 0);
+                        Make(d, 1);
                     });
                 }
             });
