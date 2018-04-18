@@ -593,6 +593,29 @@ int main()
                         output("[[nodiscard]] constexpr auto norm() const -> vec",w,"<decltype(type{}/len())> {if (auto l = len(); l != 0) return *this / l; else return vec(0);}\n");
                     }
                 }
+
+                { // Dot and cross products
+                    if (is_vector)
+                    {
+                        // Dot product
+                        output("template <typename TT> [[nodiscard]] constexpr auto dot(const vec",w,"<TT> &o) const {return ");
+                        for (int i = 0; i < w; i++)
+                        {
+                            if (i != 0)
+                                output(" + ");
+                            output(data::fields[i]," * o.",data::fields[i]);
+                        }
+                        output(";}\n");
+
+                        // Cross product
+                        if (w == 3)
+                            output("template <typename TT> [[nodiscard]] constexpr auto cross(const vec3<TT> &o) const -> vec3<decltype(x * o.x - x * o.x)> {return {y * o.z - z * o.y, z * o.x - x * o.z, x * o.y - y * o.x};}\n");
+
+                        // Cross product z component
+                        if (w == 2)
+                            output("template <typename TT> [[nodiscard]] constexpr auto cross_z(const vec2<TT> &o) const {return x * o.y - y * o.x;}\n");
+                    }
+                }
             };
 
             decorative_section("Vectors", [&]

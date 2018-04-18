@@ -344,6 +344,8 @@ namespace Math
             [[nodiscard]] constexpr auto len_sqr() const {return x*x + y*y;}
             [[nodiscard]] constexpr auto len() const {return std::sqrt(len_sqr());}
             [[nodiscard]] constexpr auto norm() const -> vec2<decltype(type{}/len())> {if (auto l = len(); l != 0) return *this / l; else return vec(0);}
+            template <typename TT> [[nodiscard]] constexpr auto dot(const vec2<TT> &o) const {return x * o.x + y * o.y;}
+            template <typename TT> [[nodiscard]] constexpr auto cross_z(const vec2<TT> &o) const {return x * o.y - y * o.x;}
         };
         
         template <typename T> struct vec<3,T> // vec3
@@ -386,6 +388,8 @@ namespace Math
             [[nodiscard]] constexpr auto len_sqr() const {return x*x + y*y + z*z;}
             [[nodiscard]] constexpr auto len() const {return std::sqrt(len_sqr());}
             [[nodiscard]] constexpr auto norm() const -> vec3<decltype(type{}/len())> {if (auto l = len(); l != 0) return *this / l; else return vec(0);}
+            template <typename TT> [[nodiscard]] constexpr auto dot(const vec3<TT> &o) const {return x * o.x + y * o.y + z * o.z;}
+            template <typename TT> [[nodiscard]] constexpr auto cross(const vec3<TT> &o) const -> vec3<decltype(x * o.x - x * o.x)> {return {y * o.z - z * o.y, z * o.x - x * o.z, x * o.y - y * o.x};}
         };
         
         template <typename T> struct vec<4,T> // vec4
@@ -429,6 +433,7 @@ namespace Math
             [[nodiscard]] constexpr auto len_sqr() const {return x*x + y*y + z*z + w*w;}
             [[nodiscard]] constexpr auto len() const {return std::sqrt(len_sqr());}
             [[nodiscard]] constexpr auto norm() const -> vec4<decltype(type{}/len())> {if (auto l = len(); l != 0) return *this / l; else return vec(0);}
+            template <typename TT> [[nodiscard]] constexpr auto dot(const vec4<TT> &o) const {return x * o.x + y * o.y + z * o.z + w * o.w;}
         };
         //} Vectors
         
