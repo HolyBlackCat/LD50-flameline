@@ -573,6 +573,72 @@ int main()
                     }
                 }
 
+                { // Resize
+                    // One-dimensional, for both vectors and matrices
+                    for (int i = 2; i <= 4; i++)
+                    {
+                        if (i == w)
+                            continue;
+                        output("[[nodiscard]] constexpr vec",i,"<member_type> to_vec",i,"(");
+                        for (int j = w; j < i; j++)
+                        {
+                            if (j != w)
+                                output(", ");
+                            output("member_type n",data::fields[j]);
+                        }
+                        output(") const {return {");
+                        for (int j = 0; j < i; j++)
+                        {
+                            if (j != 0)
+                                output(", ");
+                            if (j >= w)
+                                output("n");
+                            output(data::fields[j]);
+                        }
+                        output("};}\n");
+                    }
+                    for (int i = w+1; i <= 4; i++)
+                    {
+                        output("[[nodiscard]] constexpr vec",i,"<member_type> to_vec",i,"() const {return to_vec",i,"(");
+                        for (int j = w; j < i; j++)
+                        {
+                            if (j != w)
+                                output(", ");
+                            output("{}");
+                        }
+                        output(");}\n");
+                    }
+
+                    // Two-dimensional, for matrices only
+                    if (is_matrix)
+                    {
+                        for (int hhh = 2; hhh <= 4; hhh++)
+                        {
+                            for (int www = 2; www <= 4; www++)
+                            {
+                                if (www == w && hhh == h)
+                                    continue;
+                                output("[[nodiscard]] constexpr mat",www,'x',hhh,"<T> to_mat",www,'x',hhh,"() const {return {");
+                                for (int hh = 0; hh < hhh; hh++)
+                                {
+                                    for (int ww = 0; ww < www; ww++)
+                                    {
+                                        if (ww != 0 || hh != 0)
+                                            output(',');
+                                        if (ww < w && hh < h)
+                                            output(data::fields[ww],'.',data::fields[hh]);
+                                        else
+                                            output("01"[ww == hh]);
+                                    }
+                                }
+                                output("};}\n");
+                                if (www == hhh)
+                                    output("[[nodiscard]] constexpr mat",www,"<T> to_mat",www,"() const {return to_mat",www,'x',www,"();}\n");
+                            }
+                        }
+                    }
+                }
+
                 { // Length and normalization
                     if (is_vector)
                     {
@@ -613,7 +679,7 @@ int main()
 
                         // Cross product z component
                         if (w == 2)
-                            output("template <typename TT> [[nodiscard]] constexpr auto cross_z(const vec2<TT> &o) const {return x * o.y - y * o.x;}\n");
+                            output("template <typename TT> [[nodiscard]] constexpr auto cross(const vec2<TT> &o) const {return x * o.y - y * o.x;}\n");
                     }
                 }
             };

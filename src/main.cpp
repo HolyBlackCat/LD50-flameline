@@ -6,6 +6,6 @@ using namespace Math;
 
 int main(int, char **)
 {
-    ivec3 v(1,2,3);
-    std::cout << v.len_sqr() << ' ' << v.len() << ' ' << v.norm() << ' ' << v.norm().len();
+    imat2 m(1,2,3,4);
+    std::cout << m << "\n" << m.to_mat2x3();
 }
