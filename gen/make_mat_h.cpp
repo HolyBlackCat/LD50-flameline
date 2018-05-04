@@ -424,9 +424,6 @@ int main()
                     // Default
                     output("constexpr vec() = default;\n");
 
-                    // Fill with a single value
-                    output("explicit constexpr vec(member_type obj) : ", LargeFields(", ", "", "(obj)"), " {}\n");
-
                     // Element-wise
                     output("constexpr vec(", LargeFields(", ", "member_type "), ") : ");
                     for (int i = 0; i < w; i++)
@@ -437,11 +434,73 @@ int main()
                     }
                     output(" {}\n");
 
+                    // Vector-specific constructors
+                    if (is_vector)
+                    {
+                        // Fill with a single value
+                        output("explicit constexpr vec(member_type obj) : ", LargeFields(", ", "", "(obj)"), " {}\n");
+                    }
+
                     // Matrix-specific constructors
                     if (is_matrix)
                     {
-                        // Matrix fill with a single value
-                        output("explicit constexpr vec(type obj) : ", LargeFields(", ", "", "(obj)"), " {}\n");
+                        // Uniform scale
+                        output("explicit constexpr vec(type obj) : ");
+                        for (int x = 0; x < w; x++)
+                        {
+                            if (x != 0)
+                                output(", ");
+                            output(data::fields[x],"(");
+                            for (int y = 0; y < h; y++)
+                            {
+                                if (y != 0)
+                                    output(",");
+                                output(x == y ? "obj" : "0");
+                            }
+                            output(")");
+                        }
+                        output(" {}\n");
+
+                        // Non-uniform scale
+                        output("explicit constexpr vec(vec",std::min(w,h),"<type> obj) : ");
+                        for (int x = 0; x < w; x++)
+                        {
+                            if (x != 0)
+                                output(", ");
+                            output(data::fields[x],"(");
+                            for (int y = 0; y < h; y++)
+                            {
+                                if (y != 0)
+                                    output(",");
+                                output(x == y ? make_str("obj.",data::fields[x]) : "0");
+                            }
+                            output(")");
+                        }
+                        output(" {}\n");
+
+                        // Non-uniform scale with scalar parameters
+                        output("constexpr vec(");
+                        for (int i = 0; i < std::min(w,h); i++)
+                        {
+                            if (i != 0)
+                                output(", ");
+                            output("type s",data::fields[i]);
+                        }
+                        output(") : ");
+                        for (int x = 0; x < w; x++)
+                        {
+                            if (x != 0)
+                                output(", ");
+                            output(data::fields[x],"(");
+                            for (int y = 0; y < h; y++)
+                            {
+                                if (y != 0)
+                                    output(",");
+                                output(x == y ? make_str("s",data::fields[x]) : "0");
+                            }
+                            output(")");
+                        }
+                        output(" {}\n");
 
                         // Matrix element-wise
                         output("constexpr vec(", SmallFields_alt(", ", "type ", "", ""), ") : ");
@@ -722,6 +781,10 @@ int main()
                         }
                         output("};}\n");
                     }
+                }
+
+                { // Matrix presets
+                    "";
                 }
             };
 

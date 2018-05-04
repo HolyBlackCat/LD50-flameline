@@ -314,8 +314,8 @@ namespace Math
             union {member_type x, r;};
             union {member_type y, g;};
             constexpr vec() = default;
-            explicit constexpr vec(member_type obj) : x(obj), y(obj) {}
             constexpr vec(member_type x, member_type y) : x(x), y(y) {}
+            explicit constexpr vec(member_type obj) : x(obj), y(obj) {}
             template <typename TT> constexpr vec(const vec2<TT> &obj) : x(obj.x), y(obj.y) {}
             template <typename TT> [[nodiscard]] constexpr vec2<TT> to() const {return vec2<TT>(TT(x), TT(y));}
             [[nodiscard]] constexpr member_type &operator[](int i) {return *(member_type *)((char *)this + sizeof(member_type)*i);}
@@ -367,8 +367,8 @@ namespace Math
             union {member_type y, g;};
             union {member_type z, b;};
             constexpr vec() = default;
-            explicit constexpr vec(member_type obj) : x(obj), y(obj), z(obj) {}
             constexpr vec(member_type x, member_type y, member_type z) : x(x), y(y), z(z) {}
+            explicit constexpr vec(member_type obj) : x(obj), y(obj), z(obj) {}
             template <typename TT> constexpr vec(const vec3<TT> &obj) : x(obj.x), y(obj.y), z(obj.z) {}
             template <typename TT> [[nodiscard]] constexpr vec3<TT> to() const {return vec3<TT>(TT(x), TT(y), TT(z));}
             [[nodiscard]] constexpr member_type &operator[](int i) {return *(member_type *)((char *)this + sizeof(member_type)*i);}
@@ -419,8 +419,8 @@ namespace Math
             union {member_type z, b;};
             union {member_type w, a;};
             constexpr vec() = default;
-            explicit constexpr vec(member_type obj) : x(obj), y(obj), z(obj), w(obj) {}
             constexpr vec(member_type x, member_type y, member_type z, member_type w) : x(x), y(y), z(z), w(w) {}
+            explicit constexpr vec(member_type obj) : x(obj), y(obj), z(obj), w(obj) {}
             template <typename TT> constexpr vec(const vec4<TT> &obj) : x(obj.x), y(obj.y), z(obj.z), w(obj.w) {}
             template <typename TT> [[nodiscard]] constexpr vec4<TT> to() const {return vec4<TT>(TT(x), TT(y), TT(z), TT(w));}
             [[nodiscard]] constexpr member_type &operator[](int i) {return *(member_type *)((char *)this + sizeof(member_type)*i);}
@@ -470,9 +470,10 @@ namespace Math
             union {member_type x, r;};
             union {member_type y, g;};
             constexpr vec() = default;
-            explicit constexpr vec(member_type obj) : x(obj), y(obj) {}
             constexpr vec(member_type x, member_type y) : x(x), y(y) {}
-            explicit constexpr vec(type obj) : x(obj), y(obj) {}
+            explicit constexpr vec(type obj) : x(obj,0), y(0,obj) {}
+            explicit constexpr vec(vec2<type> obj) : x(obj.x,0), y(0,obj.y) {}
+            constexpr vec(type sx, type sy) : x(sx,0), y(0,sy) {}
             constexpr vec(type xx, type yx, type xy, type yy) : x(xx,xy), y(yx,yy) {}
             template <typename TT> constexpr vec(const mat2x2<TT> &obj) : x(obj.x), y(obj.y) {}
             template <typename TT> [[nodiscard]] constexpr mat2x2<TT> to() const {return mat2x2<TT>(TT(x.x), TT(y.x), TT(x.y), TT(y.y));}
@@ -516,9 +517,10 @@ namespace Math
             union {member_type x, r;};
             union {member_type y, g;};
             constexpr vec() = default;
-            explicit constexpr vec(member_type obj) : x(obj), y(obj) {}
             constexpr vec(member_type x, member_type y) : x(x), y(y) {}
-            explicit constexpr vec(type obj) : x(obj), y(obj) {}
+            explicit constexpr vec(type obj) : x(obj,0,0), y(0,obj,0) {}
+            explicit constexpr vec(vec2<type> obj) : x(obj.x,0,0), y(0,obj.y,0) {}
+            constexpr vec(type sx, type sy) : x(sx,0,0), y(0,sy,0) {}
             constexpr vec(type xx, type yx, type xy, type yy, type xz, type yz) : x(xx,xy,xz), y(yx,yy,yz) {}
             template <typename TT> constexpr vec(const mat2x3<TT> &obj) : x(obj.x), y(obj.y) {}
             template <typename TT> [[nodiscard]] constexpr mat2x3<TT> to() const {return mat2x3<TT>(TT(x.x), TT(y.x), TT(x.y), TT(y.y), TT(x.z), TT(y.z));}
@@ -563,9 +565,10 @@ namespace Math
             union {member_type x, r;};
             union {member_type y, g;};
             constexpr vec() = default;
-            explicit constexpr vec(member_type obj) : x(obj), y(obj) {}
             constexpr vec(member_type x, member_type y) : x(x), y(y) {}
-            explicit constexpr vec(type obj) : x(obj), y(obj) {}
+            explicit constexpr vec(type obj) : x(obj,0,0,0), y(0,obj,0,0) {}
+            explicit constexpr vec(vec2<type> obj) : x(obj.x,0,0,0), y(0,obj.y,0,0) {}
+            constexpr vec(type sx, type sy) : x(sx,0,0,0), y(0,sy,0,0) {}
             constexpr vec(type xx, type yx, type xy, type yy, type xz, type yz, type xw, type yw) : x(xx,xy,xz,xw), y(yx,yy,yz,yw) {}
             template <typename TT> constexpr vec(const mat2x4<TT> &obj) : x(obj.x), y(obj.y) {}
             template <typename TT> [[nodiscard]] constexpr mat2x4<TT> to() const {return mat2x4<TT>(TT(x.x), TT(y.x), TT(x.y), TT(y.y), TT(x.z), TT(y.z), TT(x.w), TT(y.w));}
@@ -611,9 +614,10 @@ namespace Math
             union {member_type y, g;};
             union {member_type z, b;};
             constexpr vec() = default;
-            explicit constexpr vec(member_type obj) : x(obj), y(obj), z(obj) {}
             constexpr vec(member_type x, member_type y, member_type z) : x(x), y(y), z(z) {}
-            explicit constexpr vec(type obj) : x(obj), y(obj), z(obj) {}
+            explicit constexpr vec(type obj) : x(obj,0), y(0,obj), z(0,0) {}
+            explicit constexpr vec(vec2<type> obj) : x(obj.x,0), y(0,obj.y), z(0,0) {}
+            constexpr vec(type sx, type sy) : x(sx,0), y(0,sy), z(0,0) {}
             constexpr vec(type xx, type yx, type zx, type xy, type yy, type zy) : x(xx,xy), y(yx,yy), z(zx,zy) {}
             template <typename TT> constexpr vec(const mat3x2<TT> &obj) : x(obj.x), y(obj.y), z(obj.z) {}
             template <typename TT> [[nodiscard]] constexpr mat3x2<TT> to() const {return mat3x2<TT>(TT(x.x), TT(y.x), TT(z.x), TT(x.y), TT(y.y), TT(z.y));}
@@ -659,9 +663,10 @@ namespace Math
             union {member_type y, g;};
             union {member_type z, b;};
             constexpr vec() = default;
-            explicit constexpr vec(member_type obj) : x(obj), y(obj), z(obj) {}
             constexpr vec(member_type x, member_type y, member_type z) : x(x), y(y), z(z) {}
-            explicit constexpr vec(type obj) : x(obj), y(obj), z(obj) {}
+            explicit constexpr vec(type obj) : x(obj,0,0), y(0,obj,0), z(0,0,obj) {}
+            explicit constexpr vec(vec3<type> obj) : x(obj.x,0,0), y(0,obj.y,0), z(0,0,obj.z) {}
+            constexpr vec(type sx, type sy, type sz) : x(sx,0,0), y(0,sy,0), z(0,0,sz) {}
             constexpr vec(type xx, type yx, type zx, type xy, type yy, type zy, type xz, type yz, type zz) : x(xx,xy,xz), y(yx,yy,yz), z(zx,zy,zz) {}
             template <typename TT> constexpr vec(const mat3x3<TT> &obj) : x(obj.x), y(obj.y), z(obj.z) {}
             template <typename TT> [[nodiscard]] constexpr mat3x3<TT> to() const {return mat3x3<TT>(TT(x.x), TT(y.x), TT(z.x), TT(x.y), TT(y.y), TT(z.y), TT(x.z), TT(y.z), TT(z.z));}
@@ -705,9 +710,10 @@ namespace Math
             union {member_type y, g;};
             union {member_type z, b;};
             constexpr vec() = default;
-            explicit constexpr vec(member_type obj) : x(obj), y(obj), z(obj) {}
             constexpr vec(member_type x, member_type y, member_type z) : x(x), y(y), z(z) {}
-            explicit constexpr vec(type obj) : x(obj), y(obj), z(obj) {}
+            explicit constexpr vec(type obj) : x(obj,0,0,0), y(0,obj,0,0), z(0,0,obj,0) {}
+            explicit constexpr vec(vec3<type> obj) : x(obj.x,0,0,0), y(0,obj.y,0,0), z(0,0,obj.z,0) {}
+            constexpr vec(type sx, type sy, type sz) : x(sx,0,0,0), y(0,sy,0,0), z(0,0,sz,0) {}
             constexpr vec(type xx, type yx, type zx, type xy, type yy, type zy, type xz, type yz, type zz, type xw, type yw, type zw) : x(xx,xy,xz,xw), y(yx,yy,yz,yw), z(zx,zy,zz,zw) {}
             template <typename TT> constexpr vec(const mat3x4<TT> &obj) : x(obj.x), y(obj.y), z(obj.z) {}
             template <typename TT> [[nodiscard]] constexpr mat3x4<TT> to() const {return mat3x4<TT>(TT(x.x), TT(y.x), TT(z.x), TT(x.y), TT(y.y), TT(z.y), TT(x.z), TT(y.z), TT(z.z), TT(x.w), TT(y.w), TT(z.w));}
@@ -753,9 +759,10 @@ namespace Math
             union {member_type z, b;};
             union {member_type w, a;};
             constexpr vec() = default;
-            explicit constexpr vec(member_type obj) : x(obj), y(obj), z(obj), w(obj) {}
             constexpr vec(member_type x, member_type y, member_type z, member_type w) : x(x), y(y), z(z), w(w) {}
-            explicit constexpr vec(type obj) : x(obj), y(obj), z(obj), w(obj) {}
+            explicit constexpr vec(type obj) : x(obj,0), y(0,obj), z(0,0), w(0,0) {}
+            explicit constexpr vec(vec2<type> obj) : x(obj.x,0), y(0,obj.y), z(0,0), w(0,0) {}
+            constexpr vec(type sx, type sy) : x(sx,0), y(0,sy), z(0,0), w(0,0) {}
             constexpr vec(type xx, type yx, type zx, type wx, type xy, type yy, type zy, type wy) : x(xx,xy), y(yx,yy), z(zx,zy), w(wx,wy) {}
             template <typename TT> constexpr vec(const mat4x2<TT> &obj) : x(obj.x), y(obj.y), z(obj.z), w(obj.w) {}
             template <typename TT> [[nodiscard]] constexpr mat4x2<TT> to() const {return mat4x2<TT>(TT(x.x), TT(y.x), TT(z.x), TT(w.x), TT(x.y), TT(y.y), TT(z.y), TT(w.y));}
@@ -800,9 +807,10 @@ namespace Math
             union {member_type z, b;};
             union {member_type w, a;};
             constexpr vec() = default;
-            explicit constexpr vec(member_type obj) : x(obj), y(obj), z(obj), w(obj) {}
             constexpr vec(member_type x, member_type y, member_type z, member_type w) : x(x), y(y), z(z), w(w) {}
-            explicit constexpr vec(type obj) : x(obj), y(obj), z(obj), w(obj) {}
+            explicit constexpr vec(type obj) : x(obj,0,0), y(0,obj,0), z(0,0,obj), w(0,0,0) {}
+            explicit constexpr vec(vec3<type> obj) : x(obj.x,0,0), y(0,obj.y,0), z(0,0,obj.z), w(0,0,0) {}
+            constexpr vec(type sx, type sy, type sz) : x(sx,0,0), y(0,sy,0), z(0,0,sz), w(0,0,0) {}
             constexpr vec(type xx, type yx, type zx, type wx, type xy, type yy, type zy, type wy, type xz, type yz, type zz, type wz) : x(xx,xy,xz), y(yx,yy,yz), z(zx,zy,zz), w(wx,wy,wz) {}
             template <typename TT> constexpr vec(const mat4x3<TT> &obj) : x(obj.x), y(obj.y), z(obj.z), w(obj.w) {}
             template <typename TT> [[nodiscard]] constexpr mat4x3<TT> to() const {return mat4x3<TT>(TT(x.x), TT(y.x), TT(z.x), TT(w.x), TT(x.y), TT(y.y), TT(z.y), TT(w.y), TT(x.z), TT(y.z), TT(z.z), TT(w.z));}
@@ -848,9 +856,10 @@ namespace Math
             union {member_type z, b;};
             union {member_type w, a;};
             constexpr vec() = default;
-            explicit constexpr vec(member_type obj) : x(obj), y(obj), z(obj), w(obj) {}
             constexpr vec(member_type x, member_type y, member_type z, member_type w) : x(x), y(y), z(z), w(w) {}
-            explicit constexpr vec(type obj) : x(obj), y(obj), z(obj), w(obj) {}
+            explicit constexpr vec(type obj) : x(obj,0,0,0), y(0,obj,0,0), z(0,0,obj,0), w(0,0,0,obj) {}
+            explicit constexpr vec(vec4<type> obj) : x(obj.x,0,0,0), y(0,obj.y,0,0), z(0,0,obj.z,0), w(0,0,0,obj.w) {}
+            constexpr vec(type sx, type sy, type sz, type sw) : x(sx,0,0,0), y(0,sy,0,0), z(0,0,sz,0), w(0,0,0,sw) {}
             constexpr vec(type xx, type yx, type zx, type wx, type xy, type yy, type zy, type wy, type xz, type yz, type zz, type wz, type xw, type yw, type zw, type ww) : x(xx,xy,xz,xw), y(yx,yy,yz,yw), z(zx,zy,zz,zw), w(wx,wy,wz,ww) {}
             template <typename TT> constexpr vec(const mat4x4<TT> &obj) : x(obj.x), y(obj.y), z(obj.z), w(obj.w) {}
             template <typename TT> [[nodiscard]] constexpr mat4x4<TT> to() const {return mat4x4<TT>(TT(x.x), TT(y.x), TT(z.x), TT(w.x), TT(x.y), TT(y.y), TT(z.y), TT(w.y), TT(x.z), TT(y.z), TT(z.z), TT(w.z), TT(x.w), TT(y.w), TT(z.w), TT(w.w));}
