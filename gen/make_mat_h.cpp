@@ -873,7 +873,7 @@ int main()
                             for (int i = 0; i < D; i++)
                             {
                                 if (i != 0)
-                                    s << ',';
+                                $   s << ',';
                                 s << v[i];
                             }
                             s << ']';
@@ -885,11 +885,11 @@ int main()
                             for (int y = 0; y < H; y++)
                             {
                                 if (y != 0)
-                                    s << ';';
+                                $   s << ';';
                                 for (int x = 0; x < W; x++)
                                 {
                                     if (x != 0)
-                                        s << ',';
+                                    $   s << ',';
                                     s << v[x][y];
                                 }
                             }
