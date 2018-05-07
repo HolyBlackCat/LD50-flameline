@@ -292,10 +292,15 @@ namespace Math
         // Hard error on failure
         template <typename ...P> using larger_t = typename hard_larger_impl<P...>::type;
         
-        template <typename Structure, typename T> [[nodiscard]] auto vec_from_scalar(const T &value)
+        template <typename V, typename S> [[nodiscard]] auto vec_from_scalar(const S &value)
         {
-            static_assert(properties<T>::is_scalar, "Must be a scalar.");
-            return change_base_t<std::remove_cv_t<std::remove_reference_t<Structure>>, T>(value);
+            static_assert(properties<S>::is_scalar, "The parameter must be a scalar.");
+            using type = std::remove_cv_t<std::remove_reference_t<V>>;
+            static_assert(properties<type>::is_vec_or_mat, "The type must be a vector or a matrix.");
+            if constexpr (properties<type>::is_vec)
+                return change_base_t<type, S>(value);
+            else
+                return change_base_t<type, S>::fill(value);
         }
         
         template <typename A, typename B = void> using if_scalar_t = std::enable_if_t<properties<A>::is_scalar, B>;
@@ -308,9 +313,10 @@ namespace Math
         {
             static_assert(!std::is_const_v<T> && !std::is_volatile_v<T>, "The base type must have no cv-qualifiers.");
             static_assert(!std::is_reference_v<T>, "The base type must not be a reference.");
-            static constexpr int size = 2;
             using type = T;
             using member_type = T;
+            static constexpr int size = 2;
+            static constexpr bool is_floating_point = std::is_floating_point_v<type>;
             union {member_type x, r;};
             union {member_type y, g;};
             constexpr vec() = default;
@@ -343,8 +349,8 @@ namespace Math
             template <typename N> [[nodiscard]] constexpr auto div_r(const N &n) const {return vec2<decltype(x/n)>(r/n, g);} template <typename N> [[nodiscard]] constexpr auto div_g(const N &n) const {return vec2<decltype(x/n)>(r, g/n);}
             [[nodiscard]] constexpr vec3<member_type> to_vec3(member_type nz) const {return {x, y, nz};}
             [[nodiscard]] constexpr vec4<member_type> to_vec4(member_type nz, member_type nw) const {return {x, y, nz, nw};}
-            [[nodiscard]] constexpr vec3<member_type> to_vec3() const {return to_vec3({});}
-            [[nodiscard]] constexpr vec4<member_type> to_vec4() const {return to_vec4({}, {});}
+            [[nodiscard]] constexpr vec3<member_type> to_vec3() const {return to_vec3(0);}
+            [[nodiscard]] constexpr vec4<member_type> to_vec4() const {return to_vec4(0, 1);}
             [[nodiscard]] constexpr auto len_sqr() const {return x*x + y*y;}
             [[nodiscard]] constexpr auto len() const {return std::sqrt(len_sqr());}
             [[nodiscard]] constexpr auto norm() const -> vec2<decltype(type{}/len())> {if (auto l = len(); l != 0) return *this / l; else return vec(0);}
@@ -360,9 +366,10 @@ namespace Math
         {
             static_assert(!std::is_const_v<T> && !std::is_volatile_v<T>, "The base type must have no cv-qualifiers.");
             static_assert(!std::is_reference_v<T>, "The base type must not be a reference.");
-            static constexpr int size = 3;
             using type = T;
             using member_type = T;
+            static constexpr int size = 3;
+            static constexpr bool is_floating_point = std::is_floating_point_v<type>;
             union {member_type x, r;};
             union {member_type y, g;};
             union {member_type z, b;};
@@ -395,7 +402,7 @@ namespace Math
             template <typename N> [[nodiscard]] constexpr auto div_r(const N &n) const {return vec3<decltype(x/n)>(r/n, g, b);} template <typename N> [[nodiscard]] constexpr auto div_g(const N &n) const {return vec3<decltype(x/n)>(r, g/n, b);} template <typename N> [[nodiscard]] constexpr auto div_b(const N &n) const {return vec3<decltype(x/n)>(r, g, b/n);}
             [[nodiscard]] constexpr vec2<member_type> to_vec2() const {return {x, y};}
             [[nodiscard]] constexpr vec4<member_type> to_vec4(member_type nw) const {return {x, y, z, nw};}
-            [[nodiscard]] constexpr vec4<member_type> to_vec4() const {return to_vec4({});}
+            [[nodiscard]] constexpr vec4<member_type> to_vec4() const {return to_vec4(1);}
             [[nodiscard]] constexpr auto len_sqr() const {return x*x + y*y + z*z;}
             [[nodiscard]] constexpr auto len() const {return std::sqrt(len_sqr());}
             [[nodiscard]] constexpr auto norm() const -> vec3<decltype(type{}/len())> {if (auto l = len(); l != 0) return *this / l; else return vec(0);}
@@ -411,9 +418,10 @@ namespace Math
         {
             static_assert(!std::is_const_v<T> && !std::is_volatile_v<T>, "The base type must have no cv-qualifiers.");
             static_assert(!std::is_reference_v<T>, "The base type must not be a reference.");
-            static constexpr int size = 4;
             using type = T;
             using member_type = T;
+            static constexpr int size = 4;
+            static constexpr bool is_floating_point = std::is_floating_point_v<type>;
             union {member_type x, r;};
             union {member_type y, g;};
             union {member_type z, b;};
@@ -463,10 +471,11 @@ namespace Math
         {
             static_assert(!std::is_const_v<T> && !std::is_volatile_v<T>, "The base type must have no cv-qualifiers.");
             static_assert(!std::is_reference_v<T>, "The base type must not be a reference.");
-            static constexpr int width = 2, height = 2;
-            static constexpr int size = 2;
             using type = T;
             using member_type = vec2<T>;
+            static constexpr int width = 2, height = 2;
+            static constexpr int size = 2;
+            static constexpr bool is_floating_point = std::is_floating_point_v<type>;
             union {member_type x, r;};
             union {member_type y, g;};
             constexpr vec() = default;
@@ -505,15 +514,48 @@ namespace Math
             template <typename TT> [[nodiscard]] constexpr mat2x2<larger_t<type,TT>> mul(const mat2x2<TT> &m) const {return {x.x*m.x.x + y.x*m.x.y, x.x*m.y.x + y.x*m.y.y, x.y*m.x.x + y.y*m.x.y, x.y*m.y.x + y.y*m.y.y};}
             template <typename TT> [[nodiscard]] constexpr mat3x2<larger_t<type,TT>> mul(const mat3x2<TT> &m) const {return {x.x*m.x.x + y.x*m.x.y, x.x*m.y.x + y.x*m.y.y, x.x*m.z.x + y.x*m.z.y, x.y*m.x.x + y.y*m.x.y, x.y*m.y.x + y.y*m.y.y, x.y*m.z.x + y.y*m.z.y};}
             template <typename TT> [[nodiscard]] constexpr mat4x2<larger_t<type,TT>> mul(const mat4x2<TT> &m) const {return {x.x*m.x.x + y.x*m.x.y, x.x*m.y.x + y.x*m.y.y, x.x*m.z.x + y.x*m.z.y, x.x*m.w.x + y.x*m.w.y, x.y*m.x.x + y.y*m.x.y, x.y*m.y.x + y.y*m.y.y, x.y*m.z.x + y.y*m.z.y, x.y*m.w.x + y.y*m.w.y};}
+            inline static constexpr vec identity = vec(1);
+            [[nodiscard]] constexpr mat2x2<T> transpose() const {return {x.x,x.y,y.x,y.y};}
+            [[nodiscard]] static constexpr vec fill(type obj) {return vec(obj, obj, obj, obj);}
+            [[nodiscard]] constexpr vec inverse()
+            {
+                vec ret{};
+                
+                ret.x.x =  y.y;
+                ret.y.x = -y.x;
+                
+                type d = x.x * ret.x.x + x.y * ret.y.x;
+                if (d == 0) return identity;
+                
+                ret.x.y = -x.y;
+                ret.y.y =  x.x;
+                
+                d = 1 / d;
+                return ret * d;
+            }
+            [[nodiscard]] static constexpr vec scale(vec2<type> v)
+            {
+                return {v.x, 0,
+                        0, v.y};
+            }
+            [[nodiscard]] static constexpr vec rotate(type angle)
+            {
+                static_assert(is_floating_point, "This function only makes sense for floating-point matrices.");
+                type c = std::cos(angle);
+                type s = std::sin(angle);
+                return {c, -s,
+                        s,  c};
+            }
         };
         
         template <typename T> struct vec<2,vec<3,T>> // mat2x3
         {
             static_assert(!std::is_const_v<T> && !std::is_volatile_v<T>, "The base type must have no cv-qualifiers.");
             static_assert(!std::is_reference_v<T>, "The base type must not be a reference.");
-            static constexpr int width = 2, height = 3;
             using type = T;
             using member_type = vec3<T>;
+            static constexpr int width = 2, height = 3;
+            static constexpr bool is_floating_point = std::is_floating_point_v<type>;
             union {member_type x, r;};
             union {member_type y, g;};
             constexpr vec() = default;
@@ -553,15 +595,21 @@ namespace Math
             template <typename TT> [[nodiscard]] constexpr mat2x3<larger_t<type,TT>> mul(const mat2x2<TT> &m) const {return {x.x*m.x.x + y.x*m.x.y, x.x*m.y.x + y.x*m.y.y, x.y*m.x.x + y.y*m.x.y, x.y*m.y.x + y.y*m.y.y, x.z*m.x.x + y.z*m.x.y, x.z*m.y.x + y.z*m.y.y};}
             template <typename TT> [[nodiscard]] constexpr mat3x3<larger_t<type,TT>> mul(const mat3x2<TT> &m) const {return {x.x*m.x.x + y.x*m.x.y, x.x*m.y.x + y.x*m.y.y, x.x*m.z.x + y.x*m.z.y, x.y*m.x.x + y.y*m.x.y, x.y*m.y.x + y.y*m.y.y, x.y*m.z.x + y.y*m.z.y, x.z*m.x.x + y.z*m.x.y, x.z*m.y.x + y.z*m.y.y, x.z*m.z.x + y.z*m.z.y};}
             template <typename TT> [[nodiscard]] constexpr mat4x3<larger_t<type,TT>> mul(const mat4x2<TT> &m) const {return {x.x*m.x.x + y.x*m.x.y, x.x*m.y.x + y.x*m.y.y, x.x*m.z.x + y.x*m.z.y, x.x*m.w.x + y.x*m.w.y, x.y*m.x.x + y.y*m.x.y, x.y*m.y.x + y.y*m.y.y, x.y*m.z.x + y.y*m.z.y, x.y*m.w.x + y.y*m.w.y, x.z*m.x.x + y.z*m.x.y, x.z*m.y.x + y.z*m.y.y, x.z*m.z.x + y.z*m.z.y, x.z*m.w.x + y.z*m.w.y};}
+            inline static constexpr vec identity = vec(1);
+            [[nodiscard]] constexpr mat3x2<T> transpose() const {return {x.x,x.y,x.z,y.x,y.y,y.z};}
+            [[nodiscard]] static constexpr vec fill(type obj) {return vec(obj, obj, obj, obj, obj, obj);}
+            [[nodiscard]] static constexpr vec scale(vec2<type> v) {return mat2x2<T>::scale(v).to_mat2x3();}
+            [[nodiscard]] static constexpr vec rotate(type angle) {return mat2x2<T>::rotate(angle).to_mat2x3();}
         };
         
         template <typename T> struct vec<2,vec<4,T>> // mat2x4
         {
             static_assert(!std::is_const_v<T> && !std::is_volatile_v<T>, "The base type must have no cv-qualifiers.");
             static_assert(!std::is_reference_v<T>, "The base type must not be a reference.");
-            static constexpr int width = 2, height = 4;
             using type = T;
             using member_type = vec4<T>;
+            static constexpr int width = 2, height = 4;
+            static constexpr bool is_floating_point = std::is_floating_point_v<type>;
             union {member_type x, r;};
             union {member_type y, g;};
             constexpr vec() = default;
@@ -601,15 +649,19 @@ namespace Math
             template <typename TT> [[nodiscard]] constexpr mat2x4<larger_t<type,TT>> mul(const mat2x2<TT> &m) const {return {x.x*m.x.x + y.x*m.x.y, x.x*m.y.x + y.x*m.y.y, x.y*m.x.x + y.y*m.x.y, x.y*m.y.x + y.y*m.y.y, x.z*m.x.x + y.z*m.x.y, x.z*m.y.x + y.z*m.y.y, x.w*m.x.x + y.w*m.x.y, x.w*m.y.x + y.w*m.y.y};}
             template <typename TT> [[nodiscard]] constexpr mat3x4<larger_t<type,TT>> mul(const mat3x2<TT> &m) const {return {x.x*m.x.x + y.x*m.x.y, x.x*m.y.x + y.x*m.y.y, x.x*m.z.x + y.x*m.z.y, x.y*m.x.x + y.y*m.x.y, x.y*m.y.x + y.y*m.y.y, x.y*m.z.x + y.y*m.z.y, x.z*m.x.x + y.z*m.x.y, x.z*m.y.x + y.z*m.y.y, x.z*m.z.x + y.z*m.z.y, x.w*m.x.x + y.w*m.x.y, x.w*m.y.x + y.w*m.y.y, x.w*m.z.x + y.w*m.z.y};}
             template <typename TT> [[nodiscard]] constexpr mat4x4<larger_t<type,TT>> mul(const mat4x2<TT> &m) const {return {x.x*m.x.x + y.x*m.x.y, x.x*m.y.x + y.x*m.y.y, x.x*m.z.x + y.x*m.z.y, x.x*m.w.x + y.x*m.w.y, x.y*m.x.x + y.y*m.x.y, x.y*m.y.x + y.y*m.y.y, x.y*m.z.x + y.y*m.z.y, x.y*m.w.x + y.y*m.w.y, x.z*m.x.x + y.z*m.x.y, x.z*m.y.x + y.z*m.y.y, x.z*m.z.x + y.z*m.z.y, x.z*m.w.x + y.z*m.w.y, x.w*m.x.x + y.w*m.x.y, x.w*m.y.x + y.w*m.y.y, x.w*m.z.x + y.w*m.z.y, x.w*m.w.x + y.w*m.w.y};}
+            inline static constexpr vec identity = vec(1);
+            [[nodiscard]] constexpr mat4x2<T> transpose() const {return {x.x,x.y,x.z,x.w,y.x,y.y,y.z,y.w};}
+            [[nodiscard]] static constexpr vec fill(type obj) {return vec(obj, obj, obj, obj, obj, obj, obj, obj);}
         };
         
         template <typename T> struct vec<3,vec<2,T>> // mat3x2
         {
             static_assert(!std::is_const_v<T> && !std::is_volatile_v<T>, "The base type must have no cv-qualifiers.");
             static_assert(!std::is_reference_v<T>, "The base type must not be a reference.");
-            static constexpr int width = 3, height = 2;
             using type = T;
             using member_type = vec2<T>;
+            static constexpr int width = 3, height = 2;
+            static constexpr bool is_floating_point = std::is_floating_point_v<type>;
             union {member_type x, r;};
             union {member_type y, g;};
             union {member_type z, b;};
@@ -649,16 +701,33 @@ namespace Math
             template <typename TT> [[nodiscard]] constexpr mat2x2<larger_t<type,TT>> mul(const mat2x3<TT> &m) const {return {x.x*m.x.x + y.x*m.x.y + z.x*m.x.z, x.x*m.y.x + y.x*m.y.y + z.x*m.y.z, x.y*m.x.x + y.y*m.x.y + z.y*m.x.z, x.y*m.y.x + y.y*m.y.y + z.y*m.y.z};}
             template <typename TT> [[nodiscard]] constexpr mat3x2<larger_t<type,TT>> mul(const mat3x3<TT> &m) const {return {x.x*m.x.x + y.x*m.x.y + z.x*m.x.z, x.x*m.y.x + y.x*m.y.y + z.x*m.y.z, x.x*m.z.x + y.x*m.z.y + z.x*m.z.z, x.y*m.x.x + y.y*m.x.y + z.y*m.x.z, x.y*m.y.x + y.y*m.y.y + z.y*m.y.z, x.y*m.z.x + y.y*m.z.y + z.y*m.z.z};}
             template <typename TT> [[nodiscard]] constexpr mat4x2<larger_t<type,TT>> mul(const mat4x3<TT> &m) const {return {x.x*m.x.x + y.x*m.x.y + z.x*m.x.z, x.x*m.y.x + y.x*m.y.y + z.x*m.y.z, x.x*m.z.x + y.x*m.z.y + z.x*m.z.z, x.x*m.w.x + y.x*m.w.y + z.x*m.w.z, x.y*m.x.x + y.y*m.x.y + z.y*m.x.z, x.y*m.y.x + y.y*m.y.y + z.y*m.y.z, x.y*m.z.x + y.y*m.z.y + z.y*m.z.z, x.y*m.w.x + y.y*m.w.y + z.y*m.w.z};}
+            inline static constexpr vec identity = vec(1);
+            [[nodiscard]] constexpr mat2x3<T> transpose() const {return {x.x,x.y,y.x,y.y,z.x,z.y};}
+            [[nodiscard]] static constexpr vec fill(type obj) {return vec(obj, obj, obj, obj, obj, obj);}
+            [[nodiscard]] static constexpr vec scale(vec2<type> v) {return mat2x2<T>::scale(v).to_mat3x2();}
+            [[nodiscard]] static constexpr vec ortho(vec2<type> min, vec2<type> max)
+            {
+                static_assert(is_floating_point, "This function only makes sense for floating-point matrices.");
+                return {2 / (max.x - min.x), 0, (min.x + max.x) / (min.x - max.x),
+                        0, 2 / (max.y - min.y), (min.y + max.y) / (min.y - max.y)};
+            }
+            [[nodiscard]] static constexpr vec translate(vec2<type> v)
+            {
+                return {1, 0, v.x,
+                        0, 1, v.y};
+            }
+            [[nodiscard]] static constexpr vec rotate(type angle) {return mat2x2<T>::rotate(angle).to_mat3x2();}
         };
         
         template <typename T> struct vec<3,vec<3,T>> // mat3x3
         {
             static_assert(!std::is_const_v<T> && !std::is_volatile_v<T>, "The base type must have no cv-qualifiers.");
             static_assert(!std::is_reference_v<T>, "The base type must not be a reference.");
-            static constexpr int width = 3, height = 3;
-            static constexpr int size = 3;
             using type = T;
             using member_type = vec3<T>;
+            static constexpr int width = 3, height = 3;
+            static constexpr int size = 3;
+            static constexpr bool is_floating_point = std::is_floating_point_v<type>;
             union {member_type x, r;};
             union {member_type y, g;};
             union {member_type z, b;};
@@ -697,15 +766,63 @@ namespace Math
             template <typename TT> [[nodiscard]] constexpr mat2x3<larger_t<type,TT>> mul(const mat2x3<TT> &m) const {return {x.x*m.x.x + y.x*m.x.y + z.x*m.x.z, x.x*m.y.x + y.x*m.y.y + z.x*m.y.z, x.y*m.x.x + y.y*m.x.y + z.y*m.x.z, x.y*m.y.x + y.y*m.y.y + z.y*m.y.z, x.z*m.x.x + y.z*m.x.y + z.z*m.x.z, x.z*m.y.x + y.z*m.y.y + z.z*m.y.z};}
             template <typename TT> [[nodiscard]] constexpr mat3x3<larger_t<type,TT>> mul(const mat3x3<TT> &m) const {return {x.x*m.x.x + y.x*m.x.y + z.x*m.x.z, x.x*m.y.x + y.x*m.y.y + z.x*m.y.z, x.x*m.z.x + y.x*m.z.y + z.x*m.z.z, x.y*m.x.x + y.y*m.x.y + z.y*m.x.z, x.y*m.y.x + y.y*m.y.y + z.y*m.y.z, x.y*m.z.x + y.y*m.z.y + z.y*m.z.z, x.z*m.x.x + y.z*m.x.y + z.z*m.x.z, x.z*m.y.x + y.z*m.y.y + z.z*m.y.z, x.z*m.z.x + y.z*m.z.y + z.z*m.z.z};}
             template <typename TT> [[nodiscard]] constexpr mat4x3<larger_t<type,TT>> mul(const mat4x3<TT> &m) const {return {x.x*m.x.x + y.x*m.x.y + z.x*m.x.z, x.x*m.y.x + y.x*m.y.y + z.x*m.y.z, x.x*m.z.x + y.x*m.z.y + z.x*m.z.z, x.x*m.w.x + y.x*m.w.y + z.x*m.w.z, x.y*m.x.x + y.y*m.x.y + z.y*m.x.z, x.y*m.y.x + y.y*m.y.y + z.y*m.y.z, x.y*m.z.x + y.y*m.z.y + z.y*m.z.z, x.y*m.w.x + y.y*m.w.y + z.y*m.w.z, x.z*m.x.x + y.z*m.x.y + z.z*m.x.z, x.z*m.y.x + y.z*m.y.y + z.z*m.y.z, x.z*m.z.x + y.z*m.z.y + z.z*m.z.z, x.z*m.w.x + y.z*m.w.y + z.z*m.w.z};}
+            inline static constexpr vec identity = vec(1);
+            [[nodiscard]] constexpr mat3x3<T> transpose() const {return {x.x,x.y,x.z,y.x,y.y,y.z,z.x,z.y,z.z};}
+            [[nodiscard]] static constexpr vec fill(type obj) {return vec(obj, obj, obj, obj, obj, obj, obj, obj, obj);}
+            [[nodiscard]] constexpr vec inverse() const
+            {
+                vec ret{};
+                
+                ret.x.x =  y.y * z.z - z.y * y.z;
+                ret.y.x = -y.x * z.z + z.x * y.z;
+                ret.z.x =  y.x * z.y - z.x * y.y;
+                
+                type d = x.x * ret.x.x + x.y * ret.y.x + x.z * ret.z.x;
+                if (d == 0) return identity;
+                
+                ret.x.y = -x.y * z.z + z.y * x.z;
+                ret.y.y =  x.x * z.z - z.x * x.z;
+                ret.z.y = -x.x * z.y + z.x * x.y;
+                ret.x.z =  x.y * y.z - y.y * x.z;
+                ret.y.z = -x.x * y.z + y.x * x.z;
+                ret.z.z =  x.x * y.y - y.x * x.y;
+                
+                d = 1 / d;
+                return ret * d;
+            }
+            [[nodiscard]] static constexpr vec scale(vec2<type> v) {return mat2x2<T>::scale(v).to_mat3x3();}
+            [[nodiscard]] static constexpr vec scale(vec3<type> v)
+            {
+                return {v.x, 0, 0,
+                        0, v.y, 0,
+                        0, 0, v.z};
+            }
+            [[nodiscard]] static constexpr vec ortho(vec2<type> min, vec2<type> max) {return mat3x2<T>::ortho(min, max).to_mat3x3();}
+            [[nodiscard]] static constexpr vec translate(vec2<type> v) {return mat3x2<T>::translate(v).to_mat3x3();}
+            [[nodiscard]] static constexpr vec rotate(type angle) {return mat2x2<T>::rotate(angle).to_mat3x3();}
+            [[nodiscard]] static constexpr vec rotate_with_normalized_axis(vec3<type> axis, type angle)
+            {
+                type c = std::cos(angle);
+                type s = std::sin(angle);
+                return {axis.x * axis.x * (1 - c) + c, axis.x * axis.y * (1 - c) - axis.z * s, axis.x * axis.z * (1 - c) + axis.y * s,
+                        axis.y * axis.x * (1 - c) + axis.z * s, axis.y * axis.y * (1 - c) + c, axis.y * axis.z * (1 - c) - axis.x * s,
+                        axis.x * axis.z * (1 - c) - axis.y * s, axis.y * axis.z * (1 - c) + axis.x * s, axis.z * axis.z * (1 - c) + c};
+            }
+            [[nodiscard]] static constexpr vec rotate(vec3<type> axis, type angle)
+            {
+                static_assert(is_floating_point, "This function only makes sense for floating-point matrices.");
+                return rotate_with_normalized_axis(axis.norm(), angle);
+            }
         };
         
         template <typename T> struct vec<3,vec<4,T>> // mat3x4
         {
             static_assert(!std::is_const_v<T> && !std::is_volatile_v<T>, "The base type must have no cv-qualifiers.");
             static_assert(!std::is_reference_v<T>, "The base type must not be a reference.");
-            static constexpr int width = 3, height = 4;
             using type = T;
             using member_type = vec4<T>;
+            static constexpr int width = 3, height = 4;
+            static constexpr bool is_floating_point = std::is_floating_point_v<type>;
             union {member_type x, r;};
             union {member_type y, g;};
             union {member_type z, b;};
@@ -745,15 +862,22 @@ namespace Math
             template <typename TT> [[nodiscard]] constexpr mat2x4<larger_t<type,TT>> mul(const mat2x3<TT> &m) const {return {x.x*m.x.x + y.x*m.x.y + z.x*m.x.z, x.x*m.y.x + y.x*m.y.y + z.x*m.y.z, x.y*m.x.x + y.y*m.x.y + z.y*m.x.z, x.y*m.y.x + y.y*m.y.y + z.y*m.y.z, x.z*m.x.x + y.z*m.x.y + z.z*m.x.z, x.z*m.y.x + y.z*m.y.y + z.z*m.y.z, x.w*m.x.x + y.w*m.x.y + z.w*m.x.z, x.w*m.y.x + y.w*m.y.y + z.w*m.y.z};}
             template <typename TT> [[nodiscard]] constexpr mat3x4<larger_t<type,TT>> mul(const mat3x3<TT> &m) const {return {x.x*m.x.x + y.x*m.x.y + z.x*m.x.z, x.x*m.y.x + y.x*m.y.y + z.x*m.y.z, x.x*m.z.x + y.x*m.z.y + z.x*m.z.z, x.y*m.x.x + y.y*m.x.y + z.y*m.x.z, x.y*m.y.x + y.y*m.y.y + z.y*m.y.z, x.y*m.z.x + y.y*m.z.y + z.y*m.z.z, x.z*m.x.x + y.z*m.x.y + z.z*m.x.z, x.z*m.y.x + y.z*m.y.y + z.z*m.y.z, x.z*m.z.x + y.z*m.z.y + z.z*m.z.z, x.w*m.x.x + y.w*m.x.y + z.w*m.x.z, x.w*m.y.x + y.w*m.y.y + z.w*m.y.z, x.w*m.z.x + y.w*m.z.y + z.w*m.z.z};}
             template <typename TT> [[nodiscard]] constexpr mat4x4<larger_t<type,TT>> mul(const mat4x3<TT> &m) const {return {x.x*m.x.x + y.x*m.x.y + z.x*m.x.z, x.x*m.y.x + y.x*m.y.y + z.x*m.y.z, x.x*m.z.x + y.x*m.z.y + z.x*m.z.z, x.x*m.w.x + y.x*m.w.y + z.x*m.w.z, x.y*m.x.x + y.y*m.x.y + z.y*m.x.z, x.y*m.y.x + y.y*m.y.y + z.y*m.y.z, x.y*m.z.x + y.y*m.z.y + z.y*m.z.z, x.y*m.w.x + y.y*m.w.y + z.y*m.w.z, x.z*m.x.x + y.z*m.x.y + z.z*m.x.z, x.z*m.y.x + y.z*m.y.y + z.z*m.y.z, x.z*m.z.x + y.z*m.z.y + z.z*m.z.z, x.z*m.w.x + y.z*m.w.y + z.z*m.w.z, x.w*m.x.x + y.w*m.x.y + z.w*m.x.z, x.w*m.y.x + y.w*m.y.y + z.w*m.y.z, x.w*m.z.x + y.w*m.z.y + z.w*m.z.z, x.w*m.w.x + y.w*m.w.y + z.w*m.w.z};}
+            inline static constexpr vec identity = vec(1);
+            [[nodiscard]] constexpr mat4x3<T> transpose() const {return {x.x,x.y,x.z,x.w,y.x,y.y,y.z,y.w,z.x,z.y,z.z,z.w};}
+            [[nodiscard]] static constexpr vec fill(type obj) {return vec(obj, obj, obj, obj, obj, obj, obj, obj, obj, obj, obj, obj);}
+            [[nodiscard]] static constexpr vec scale(vec3<type> v) {return mat3x3<T>::scale(v).to_mat3x4();}
+            [[nodiscard]] static constexpr vec rotate_with_normalized_axis(vec3<type> axis, type angle) {return mat3x3<T>::rotate_with_normalized_axis(axis, angle).to_mat3x4();}
+            [[nodiscard]] static constexpr vec rotate(vec3<type> axis, type angle) {return mat3x3<T>::rotate(axis, angle).to_mat3x4();}
         };
         
         template <typename T> struct vec<4,vec<2,T>> // mat4x2
         {
             static_assert(!std::is_const_v<T> && !std::is_volatile_v<T>, "The base type must have no cv-qualifiers.");
             static_assert(!std::is_reference_v<T>, "The base type must not be a reference.");
-            static constexpr int width = 4, height = 2;
             using type = T;
             using member_type = vec2<T>;
+            static constexpr int width = 4, height = 2;
+            static constexpr bool is_floating_point = std::is_floating_point_v<type>;
             union {member_type x, r;};
             union {member_type y, g;};
             union {member_type z, b;};
@@ -793,15 +917,19 @@ namespace Math
             template <typename TT> [[nodiscard]] constexpr mat2x2<larger_t<type,TT>> mul(const mat2x4<TT> &m) const {return {x.x*m.x.x + y.x*m.x.y + z.x*m.x.z + w.x*m.x.w, x.x*m.y.x + y.x*m.y.y + z.x*m.y.z + w.x*m.y.w, x.y*m.x.x + y.y*m.x.y + z.y*m.x.z + w.y*m.x.w, x.y*m.y.x + y.y*m.y.y + z.y*m.y.z + w.y*m.y.w};}
             template <typename TT> [[nodiscard]] constexpr mat3x2<larger_t<type,TT>> mul(const mat3x4<TT> &m) const {return {x.x*m.x.x + y.x*m.x.y + z.x*m.x.z + w.x*m.x.w, x.x*m.y.x + y.x*m.y.y + z.x*m.y.z + w.x*m.y.w, x.x*m.z.x + y.x*m.z.y + z.x*m.z.z + w.x*m.z.w, x.y*m.x.x + y.y*m.x.y + z.y*m.x.z + w.y*m.x.w, x.y*m.y.x + y.y*m.y.y + z.y*m.y.z + w.y*m.y.w, x.y*m.z.x + y.y*m.z.y + z.y*m.z.z + w.y*m.z.w};}
             template <typename TT> [[nodiscard]] constexpr mat4x2<larger_t<type,TT>> mul(const mat4x4<TT> &m) const {return {x.x*m.x.x + y.x*m.x.y + z.x*m.x.z + w.x*m.x.w, x.x*m.y.x + y.x*m.y.y + z.x*m.y.z + w.x*m.y.w, x.x*m.z.x + y.x*m.z.y + z.x*m.z.z + w.x*m.z.w, x.x*m.w.x + y.x*m.w.y + z.x*m.w.z + w.x*m.w.w, x.y*m.x.x + y.y*m.x.y + z.y*m.x.z + w.y*m.x.w, x.y*m.y.x + y.y*m.y.y + z.y*m.y.z + w.y*m.y.w, x.y*m.z.x + y.y*m.z.y + z.y*m.z.z + w.y*m.z.w, x.y*m.w.x + y.y*m.w.y + z.y*m.w.z + w.y*m.w.w};}
+            inline static constexpr vec identity = vec(1);
+            [[nodiscard]] constexpr mat2x4<T> transpose() const {return {x.x,x.y,y.x,y.y,z.x,z.y,w.x,w.y};}
+            [[nodiscard]] static constexpr vec fill(type obj) {return vec(obj, obj, obj, obj, obj, obj, obj, obj);}
         };
         
         template <typename T> struct vec<4,vec<3,T>> // mat4x3
         {
             static_assert(!std::is_const_v<T> && !std::is_volatile_v<T>, "The base type must have no cv-qualifiers.");
             static_assert(!std::is_reference_v<T>, "The base type must not be a reference.");
-            static constexpr int width = 4, height = 3;
             using type = T;
             using member_type = vec3<T>;
+            static constexpr int width = 4, height = 3;
+            static constexpr bool is_floating_point = std::is_floating_point_v<type>;
             union {member_type x, r;};
             union {member_type y, g;};
             union {member_type z, b;};
@@ -841,16 +969,46 @@ namespace Math
             template <typename TT> [[nodiscard]] constexpr mat2x3<larger_t<type,TT>> mul(const mat2x4<TT> &m) const {return {x.x*m.x.x + y.x*m.x.y + z.x*m.x.z + w.x*m.x.w, x.x*m.y.x + y.x*m.y.y + z.x*m.y.z + w.x*m.y.w, x.y*m.x.x + y.y*m.x.y + z.y*m.x.z + w.y*m.x.w, x.y*m.y.x + y.y*m.y.y + z.y*m.y.z + w.y*m.y.w, x.z*m.x.x + y.z*m.x.y + z.z*m.x.z + w.z*m.x.w, x.z*m.y.x + y.z*m.y.y + z.z*m.y.z + w.z*m.y.w};}
             template <typename TT> [[nodiscard]] constexpr mat3x3<larger_t<type,TT>> mul(const mat3x4<TT> &m) const {return {x.x*m.x.x + y.x*m.x.y + z.x*m.x.z + w.x*m.x.w, x.x*m.y.x + y.x*m.y.y + z.x*m.y.z + w.x*m.y.w, x.x*m.z.x + y.x*m.z.y + z.x*m.z.z + w.x*m.z.w, x.y*m.x.x + y.y*m.x.y + z.y*m.x.z + w.y*m.x.w, x.y*m.y.x + y.y*m.y.y + z.y*m.y.z + w.y*m.y.w, x.y*m.z.x + y.y*m.z.y + z.y*m.z.z + w.y*m.z.w, x.z*m.x.x + y.z*m.x.y + z.z*m.x.z + w.z*m.x.w, x.z*m.y.x + y.z*m.y.y + z.z*m.y.z + w.z*m.y.w, x.z*m.z.x + y.z*m.z.y + z.z*m.z.z + w.z*m.z.w};}
             template <typename TT> [[nodiscard]] constexpr mat4x3<larger_t<type,TT>> mul(const mat4x4<TT> &m) const {return {x.x*m.x.x + y.x*m.x.y + z.x*m.x.z + w.x*m.x.w, x.x*m.y.x + y.x*m.y.y + z.x*m.y.z + w.x*m.y.w, x.x*m.z.x + y.x*m.z.y + z.x*m.z.z + w.x*m.z.w, x.x*m.w.x + y.x*m.w.y + z.x*m.w.z + w.x*m.w.w, x.y*m.x.x + y.y*m.x.y + z.y*m.x.z + w.y*m.x.w, x.y*m.y.x + y.y*m.y.y + z.y*m.y.z + w.y*m.y.w, x.y*m.z.x + y.y*m.z.y + z.y*m.z.z + w.y*m.z.w, x.y*m.w.x + y.y*m.w.y + z.y*m.w.z + w.y*m.w.w, x.z*m.x.x + y.z*m.x.y + z.z*m.x.z + w.z*m.x.w, x.z*m.y.x + y.z*m.y.y + z.z*m.y.z + w.z*m.y.w, x.z*m.z.x + y.z*m.z.y + z.z*m.z.z + w.z*m.z.w, x.z*m.w.x + y.z*m.w.y + z.z*m.w.z + w.z*m.w.w};}
+            inline static constexpr vec identity = vec(1);
+            [[nodiscard]] constexpr mat3x4<T> transpose() const {return {x.x,x.y,x.z,y.x,y.y,y.z,z.x,z.y,z.z,w.x,w.y,w.z};}
+            [[nodiscard]] static constexpr vec fill(type obj) {return vec(obj, obj, obj, obj, obj, obj, obj, obj, obj, obj, obj, obj);}
+            [[nodiscard]] static constexpr vec scale(vec3<type> v) {return mat3x3<T>::scale(v).to_mat4x3();}
+            [[nodiscard]] static constexpr vec ortho(vec2<type> min, vec2<type> max, type near, type far)
+            {
+                static_assert(is_floating_point, "This function only makes sense for floating-point matrices.");
+                return {2 / (max.x - min.x), 0, 0, (min.x + max.x) / (min.x - max.x),
+                        0, 2 / (max.y - min.y), 0, (min.y + max.y) / (min.y - max.y),
+                        0, 0, 2 / (near - far), (near + far) / (near - far)};
+            }
+            [[nodiscard]] static constexpr vec look_at(vec3<type> src, vec3<type> dst, vec3<type> local_up)
+            {
+                static_assert(is_floating_point, "This function only makes sense for floating-point matrices.");
+                vec3<type> v3 = (src-dst).norm();
+                vec3<type> v1 = local_up.cross(v3).norm();
+                vec3<type> v2 = v3.cross(v1);
+                return {v1.x, v1.y, v1.z, -src.x*v1.x - src.y*v1.y - src.z*v1.z,
+                        v2.x, v2.y, v2.z, -src.x*v2.x - src.y*v2.y - src.z*v2.z,
+                        v3.x, v3.y, v3.z, -src.x*v3.x - src.y*v3.y - src.z*v3.z};
+            }
+            [[nodiscard]] static constexpr vec translate(vec3<type> v)
+            {
+                return {1, 0, 0, v.x,
+                        0, 1, 0, v.y,
+                        0, 0, 1, v.z};
+            }
+            [[nodiscard]] static constexpr vec rotate_with_normalized_axis(vec3<type> axis, type angle) {return mat3x3<T>::rotate_with_normalized_axis(axis, angle).to_mat4x3();}
+            [[nodiscard]] static constexpr vec rotate(vec3<type> axis, type angle) {return mat3x3<T>::rotate(axis, angle).to_mat4x3();}
         };
         
         template <typename T> struct vec<4,vec<4,T>> // mat4x4
         {
             static_assert(!std::is_const_v<T> && !std::is_volatile_v<T>, "The base type must have no cv-qualifiers.");
             static_assert(!std::is_reference_v<T>, "The base type must not be a reference.");
-            static constexpr int width = 4, height = 4;
-            static constexpr int size = 4;
             using type = T;
             using member_type = vec4<T>;
+            static constexpr int width = 4, height = 4;
+            static constexpr int size = 4;
+            static constexpr bool is_floating_point = std::is_floating_point_v<type>;
             union {member_type x, r;};
             union {member_type y, g;};
             union {member_type z, b;};
@@ -889,6 +1047,52 @@ namespace Math
             template <typename TT> [[nodiscard]] constexpr mat2x4<larger_t<type,TT>> mul(const mat2x4<TT> &m) const {return {x.x*m.x.x + y.x*m.x.y + z.x*m.x.z + w.x*m.x.w, x.x*m.y.x + y.x*m.y.y + z.x*m.y.z + w.x*m.y.w, x.y*m.x.x + y.y*m.x.y + z.y*m.x.z + w.y*m.x.w, x.y*m.y.x + y.y*m.y.y + z.y*m.y.z + w.y*m.y.w, x.z*m.x.x + y.z*m.x.y + z.z*m.x.z + w.z*m.x.w, x.z*m.y.x + y.z*m.y.y + z.z*m.y.z + w.z*m.y.w, x.w*m.x.x + y.w*m.x.y + z.w*m.x.z + w.w*m.x.w, x.w*m.y.x + y.w*m.y.y + z.w*m.y.z + w.w*m.y.w};}
             template <typename TT> [[nodiscard]] constexpr mat3x4<larger_t<type,TT>> mul(const mat3x4<TT> &m) const {return {x.x*m.x.x + y.x*m.x.y + z.x*m.x.z + w.x*m.x.w, x.x*m.y.x + y.x*m.y.y + z.x*m.y.z + w.x*m.y.w, x.x*m.z.x + y.x*m.z.y + z.x*m.z.z + w.x*m.z.w, x.y*m.x.x + y.y*m.x.y + z.y*m.x.z + w.y*m.x.w, x.y*m.y.x + y.y*m.y.y + z.y*m.y.z + w.y*m.y.w, x.y*m.z.x + y.y*m.z.y + z.y*m.z.z + w.y*m.z.w, x.z*m.x.x + y.z*m.x.y + z.z*m.x.z + w.z*m.x.w, x.z*m.y.x + y.z*m.y.y + z.z*m.y.z + w.z*m.y.w, x.z*m.z.x + y.z*m.z.y + z.z*m.z.z + w.z*m.z.w, x.w*m.x.x + y.w*m.x.y + z.w*m.x.z + w.w*m.x.w, x.w*m.y.x + y.w*m.y.y + z.w*m.y.z + w.w*m.y.w, x.w*m.z.x + y.w*m.z.y + z.w*m.z.z + w.w*m.z.w};}
             template <typename TT> [[nodiscard]] constexpr mat4x4<larger_t<type,TT>> mul(const mat4x4<TT> &m) const {return {x.x*m.x.x + y.x*m.x.y + z.x*m.x.z + w.x*m.x.w, x.x*m.y.x + y.x*m.y.y + z.x*m.y.z + w.x*m.y.w, x.x*m.z.x + y.x*m.z.y + z.x*m.z.z + w.x*m.z.w, x.x*m.w.x + y.x*m.w.y + z.x*m.w.z + w.x*m.w.w, x.y*m.x.x + y.y*m.x.y + z.y*m.x.z + w.y*m.x.w, x.y*m.y.x + y.y*m.y.y + z.y*m.y.z + w.y*m.y.w, x.y*m.z.x + y.y*m.z.y + z.y*m.z.z + w.y*m.z.w, x.y*m.w.x + y.y*m.w.y + z.y*m.w.z + w.y*m.w.w, x.z*m.x.x + y.z*m.x.y + z.z*m.x.z + w.z*m.x.w, x.z*m.y.x + y.z*m.y.y + z.z*m.y.z + w.z*m.y.w, x.z*m.z.x + y.z*m.z.y + z.z*m.z.z + w.z*m.z.w, x.z*m.w.x + y.z*m.w.y + z.z*m.w.z + w.z*m.w.w, x.w*m.x.x + y.w*m.x.y + z.w*m.x.z + w.w*m.x.w, x.w*m.y.x + y.w*m.y.y + z.w*m.y.z + w.w*m.y.w, x.w*m.z.x + y.w*m.z.y + z.w*m.z.z + w.w*m.z.w, x.w*m.w.x + y.w*m.w.y + z.w*m.w.z + w.w*m.w.w};}
+            inline static constexpr vec identity = vec(1);
+            [[nodiscard]] constexpr mat4x4<T> transpose() const {return {x.x,x.y,x.z,x.w,y.x,y.y,y.z,y.w,z.x,z.y,z.z,z.w,w.x,w.y,w.z,w.w};}
+            [[nodiscard]] static constexpr vec fill(type obj) {return vec(obj, obj, obj, obj, obj, obj, obj, obj, obj, obj, obj, obj, obj, obj, obj, obj);}
+            [[nodiscard]] constexpr vec inverse() const
+            {
+                vec ret;
+                
+                ret.x.x =  y.y * z.z * w.w - y.y * z.w * w.z - z.y * y.z * w.w + z.y * y.w * w.z + w.y * y.z * z.w - w.y * y.w * z.z;
+                ret.y.x = -y.x * z.z * w.w + y.x * z.w * w.z + z.x * y.z * w.w - z.x * y.w * w.z - w.x * y.z * z.w + w.x * y.w * z.z;
+                ret.z.x =  y.x * z.y * w.w - y.x * z.w * w.y - z.x * y.y * w.w + z.x * y.w * w.y + w.x * y.y * z.w - w.x * y.w * z.y;
+                ret.w.x = -y.x * z.y * w.z + y.x * z.z * w.y + z.x * y.y * w.z - z.x * y.z * w.y - w.x * y.y * z.z + w.x * y.z * z.y;
+                
+                type d = x.x * ret.x.x + x.y * ret.y.x + x.z * ret.z.x + x.w * ret.w.x;
+                if (d == 0) return identity;
+                
+                ret.x.y = -x.y * z.z * w.w + x.y * z.w * w.z + z.y * x.z * w.w - z.y * x.w * w.z - w.y * x.z * z.w + w.y * x.w * z.z;
+                ret.y.y =  x.x * z.z * w.w - x.x * z.w * w.z - z.x * x.z * w.w + z.x * x.w * w.z + w.x * x.z * z.w - w.x * x.w * z.z;
+                ret.z.y = -x.x * z.y * w.w + x.x * z.w * w.y + z.x * x.y * w.w - z.x * x.w * w.y - w.x * x.y * z.w + w.x * x.w * z.y;
+                ret.w.y =  x.x * z.y * w.z - x.x * z.z * w.y - z.x * x.y * w.z + z.x * x.z * w.y + w.x * x.y * z.z - w.x * x.z * z.y;
+                ret.x.z =  x.y * y.z * w.w - x.y * y.w * w.z - y.y * x.z * w.w + y.y * x.w * w.z + w.y * x.z * y.w - w.y * x.w * y.z;
+                ret.y.z = -x.x * y.z * w.w + x.x * y.w * w.z + y.x * x.z * w.w - y.x * x.w * w.z - w.x * x.z * y.w + w.x * x.w * y.z;
+                ret.z.z =  x.x * y.y * w.w - x.x * y.w * w.y - y.x * x.y * w.w + y.x * x.w * w.y + w.x * x.y * y.w - w.x * x.w * y.y;
+                ret.w.z = -x.x * y.y * w.z + x.x * y.z * w.y + y.x * x.y * w.z - y.x * x.z * w.y - w.x * x.y * y.z + w.x * x.z * y.y;
+                ret.x.w = -x.y * y.z * z.w + x.y * y.w * z.z + y.y * x.z * z.w - y.y * x.w * z.z - z.y * x.z * y.w + z.y * x.w * y.z;
+                ret.y.w =  x.x * y.z * z.w - x.x * y.w * z.z - y.x * x.z * z.w + y.x * x.w * z.z + z.x * x.z * y.w - z.x * x.w * y.z;
+                ret.z.w = -x.x * y.y * z.w + x.x * y.w * z.y + y.x * x.y * z.w - y.x * x.w * z.y - z.x * x.y * y.w + z.x * x.w * y.y;
+                ret.w.w =  x.x * y.y * z.z - x.x * y.z * z.y - y.x * x.y * z.z + y.x * x.z * z.y + z.x * x.y * y.z - z.x * x.z * y.y;
+                
+                d = 1 / d;
+                return ret * d;
+            }
+            [[nodiscard]] static constexpr vec scale(vec3<type> v) {return mat3x3<T>::scale(v).to_mat4x4();}
+            [[nodiscard]] static constexpr vec ortho(vec2<type> min, vec2<type> max, type near, type far) {return mat4x3<T>::ortho(min, max, near, far).to_mat4x4();}
+            [[nodiscard]] static constexpr vec look_at(vec3<type> src, vec3<type> dst, vec3<type> local_up) {return mat4x3<T>::look_at(src, dst, local_up).to_mat4x4();}
+            [[nodiscard]] static constexpr vec translate(vec3<type> v) {return mat4x3<T>::translate(v).to_mat4x4();}
+            [[nodiscard]] static constexpr vec rotate_with_normalized_axis(vec3<type> axis, type angle) {return mat3x3<T>::rotate_with_normalized_axis(axis, angle).to_mat4x4();}
+            [[nodiscard]] static constexpr vec rotate(vec3<type> axis, type angle) {return mat3x3<T>::rotate(axis, angle).to_mat4x4();}
+            [[nodiscard]] static constexpr vec perspective(type wh_aspect, type y_fov, type near, type far)
+            {
+                static_assert(is_floating_point, "This function only makes sense for floating-point matrices.");
+                y_fov = (T)1 / std::tan(y_fov / 2);
+                return {y_fov / wh_aspect , 0     , 0                           , 0                             ,
+                        0                 , y_fov , 0                           , 0                             ,
+                        0                 , 0     , (near + far) / (near - far) , 2 * near * far / (near - far) ,
+                        0                 , 0     , -1                          , 0                             };
+            }
         };
         //} Matrices
         

@@ -310,10 +310,15 @@ int main()
                 // Hard error on failure
                 template <typename ...P> using larger_t = typename hard_larger_impl<P...>::type;
 
-                template <typename Structure, typename T> [[nodiscard]] auto vec_from_scalar(const T &value)
+                template <typename V, typename S> [[nodiscard]] auto vec_from_scalar(const S &value)
                 {
-                    static_assert(properties<T>::is_scalar, "Must be a scalar.");
-                    return change_base_t<std::remove_cv_t<std::remove_reference_t<Structure>>, T>(value);
+                    static_assert(properties<S>::is_scalar, "The parameter must be a scalar.");
+                    using type = std::remove_cv_t<std::remove_reference_t<V>>;
+                    static_assert(properties<type>::is_vec_or_mat, "The type must be a vector or a matrix.");
+                    if constexpr (properties<type>::is_vec)
+                    $   return change_base_t<type, S>(value);
+                    else
+                    $   return change_base_t<type, S>::fill(value);
                 }
 
                 template <typename A, typename B = void> using if_scalar_t = std::enable_if_t<properties<A>::is_scalar, B>;
@@ -387,7 +392,15 @@ int main()
                     output("static_assert(!std::is_reference_v<T>, \"The base type must not be a reference.\");\n");
                 }
 
-                { // Dimensions
+                { // Aliases
+                    output("using type = T;\n");
+                    if (is_vector)
+                        output("using member_type = T;\n");
+                    else
+                        output("using member_type = vec", h, "<T>;\n");
+                }
+
+                { // Properties
                     if (is_vector)
                         output("static constexpr int size = ", w, ";\n");
                     else
@@ -396,14 +409,8 @@ int main()
                         if (w == h)
                             output("static constexpr int size = ", w, ";\n");
                     }
-                }
 
-                { // Aliases
-                    output("using type = T;\n");
-                    if (is_vector)
-                        output("using member_type = T;\n");
-                    else
-                        output("using member_type = vec", h, "<T>;\n");
+                    output("static constexpr bool is_floating_point = std::is_floating_point_v<type>;\n");
                 }
 
                 { // Members
@@ -663,7 +670,10 @@ int main()
                         {
                             if (j != w)
                                 output(", ");
-                            output("{}");
+                            if (is_vector)
+                                output("01"[j == 3]);
+                            else
+                                output("{}");
                         }
                         output(");}\n");
                     }
@@ -783,8 +793,217 @@ int main()
                     }
                 }
 
+                { // Matrix identity
+                    if (is_matrix)
+                    {
+                        output("inline static constexpr vec identity = vec(1);\n");
+                    }
+                }
+
+                { // Transpose
+                    if (is_matrix)
+                    {
+                        output("[[nodiscard]] constexpr mat",h,"x",w,"<T> transpose() const {return {");
+                        for (int x = 0; x < w; x++)
+                        for (int y = 0; y < h; y++)
+                        {
+                            if (x != 0 || y != 0)
+                                output(",");
+                            output(data::fields[x],".",data::fields[y]);
+                        }
+                        output("};}\n");
+                    }
+                }
+
+                { // Matrix fill
+                    if (is_matrix)
+                    {
+                        output("[[nodiscard]] static constexpr vec fill(type obj) {return vec(");
+                        for (int i = 0; i < w*h; i++)
+                        {
+                            if (i != 0)
+                                output(", ");
+                            output("obj");
+                        }
+                        output(");}\n");
+                    }
+                }
+
+                { // Inverse
+                    if (is_matrix && w == h)
+                    {
+                        // NOTE: `ret{}` is used instead of `ret`, because otherwise those functions wouldn't be constexpr due to an uninitialized variable.
+
+                        switch (w)
+                        {
+                          case 2:
+                            output(1+R"(
+                                [[nodiscard]] constexpr vec inverse()
+                                {
+                                    vec ret{};
+
+                                    ret.x.x =  y.y;
+                                    ret.y.x = -y.x;
+
+                                    type d = x.x * ret.x.x + x.y * ret.y.x;
+                                    if (d == 0) return identity;
+
+                                    ret.x.y = -x.y;
+                                    ret.y.y =  x.x;
+
+                                    d = 1 / d;
+                                    return ret * d;
+                                }
+                            )");
+                            break;
+                          case 3:
+                            output(1+R"(
+                                [[nodiscard]] constexpr vec inverse() const
+                                {
+                                    vec ret{};
+
+                                    ret.x.x =  y.y * z.z - z.y * y.z;
+                                    ret.y.x = -y.x * z.z + z.x * y.z;
+                                    ret.z.x =  y.x * z.y - z.x * y.y;
+
+                                    type d = x.x * ret.x.x + x.y * ret.y.x + x.z * ret.z.x;
+                                    if (d == 0) return identity;
+
+                                    ret.x.y = -x.y * z.z + z.y * x.z;
+                                    ret.y.y =  x.x * z.z - z.x * x.z;
+                                    ret.z.y = -x.x * z.y + z.x * x.y;
+                                    ret.x.z =  x.y * y.z - y.y * x.z;
+                                    ret.y.z = -x.x * y.z + y.x * x.z;
+                                    ret.z.z =  x.x * y.y - y.x * x.y;
+
+                                    d = 1 / d;
+                                    return ret * d;
+                                }
+                            )");
+                            break;
+                          case 4:
+                            output(1+R"(
+                                [[nodiscard]] constexpr vec inverse() const
+                                {
+                                    vec ret;
+
+                                    ret.x.x =  y.y * z.z * w.w - y.y * z.w * w.z - z.y * y.z * w.w + z.y * y.w * w.z + w.y * y.z * z.w - w.y * y.w * z.z;
+                                    ret.y.x = -y.x * z.z * w.w + y.x * z.w * w.z + z.x * y.z * w.w - z.x * y.w * w.z - w.x * y.z * z.w + w.x * y.w * z.z;
+                                    ret.z.x =  y.x * z.y * w.w - y.x * z.w * w.y - z.x * y.y * w.w + z.x * y.w * w.y + w.x * y.y * z.w - w.x * y.w * z.y;
+                                    ret.w.x = -y.x * z.y * w.z + y.x * z.z * w.y + z.x * y.y * w.z - z.x * y.z * w.y - w.x * y.y * z.z + w.x * y.z * z.y;
+
+                                    type d = x.x * ret.x.x + x.y * ret.y.x + x.z * ret.z.x + x.w * ret.w.x;
+                                    if (d == 0) return identity;
+
+                                    ret.x.y = -x.y * z.z * w.w + x.y * z.w * w.z + z.y * x.z * w.w - z.y * x.w * w.z - w.y * x.z * z.w + w.y * x.w * z.z;
+                                    ret.y.y =  x.x * z.z * w.w - x.x * z.w * w.z - z.x * x.z * w.w + z.x * x.w * w.z + w.x * x.z * z.w - w.x * x.w * z.z;
+                                    ret.z.y = -x.x * z.y * w.w + x.x * z.w * w.y + z.x * x.y * w.w - z.x * x.w * w.y - w.x * x.y * z.w + w.x * x.w * z.y;
+                                    ret.w.y =  x.x * z.y * w.z - x.x * z.z * w.y - z.x * x.y * w.z + z.x * x.z * w.y + w.x * x.y * z.z - w.x * x.z * z.y;
+                                    ret.x.z =  x.y * y.z * w.w - x.y * y.w * w.z - y.y * x.z * w.w + y.y * x.w * w.z + w.y * x.z * y.w - w.y * x.w * y.z;
+                                    ret.y.z = -x.x * y.z * w.w + x.x * y.w * w.z + y.x * x.z * w.w - y.x * x.w * w.z - w.x * x.z * y.w + w.x * x.w * y.z;
+                                    ret.z.z =  x.x * y.y * w.w - x.x * y.w * w.y - y.x * x.y * w.w + y.x * x.w * w.y + w.x * x.y * y.w - w.x * x.w * y.y;
+                                    ret.w.z = -x.x * y.y * w.z + x.x * y.z * w.y + y.x * x.y * w.z - y.x * x.z * w.y - w.x * x.y * y.z + w.x * x.z * y.y;
+                                    ret.x.w = -x.y * y.z * z.w + x.y * y.w * z.z + y.y * x.z * z.w - y.y * x.w * z.z - z.y * x.z * y.w + z.y * x.w * y.z;
+                                    ret.y.w =  x.x * y.z * z.w - x.x * y.w * z.z - y.x * x.z * z.w + y.x * x.w * z.z + z.x * x.z * y.w - z.x * x.w * y.z;
+                                    ret.z.w = -x.x * y.y * z.w + x.x * y.w * z.y + y.x * x.y * z.w - y.x * x.w * z.y - z.x * x.y * y.w + z.x * x.w * y.y;
+                                    ret.w.w =  x.x * y.y * z.z - x.x * y.z * z.y - y.x * x.y * z.z + y.x * x.z * z.y + z.x * x.y * y.z - z.x * x.z * y.y;
+
+                                    d = 1 / d;
+                                    return ret * d;
+                                }
+                            )");
+                            break;
+                        }
+                    }
+                }
+
                 { // Matrix presets
-                    "";
+                    auto MakePreset = [&](int minw, int minh, std::string name, std::string params, std::string param_names, std::string body, bool float_only = 1)
+                    {
+                        if (w == minw && h == minh)
+                        {
+                            output("[[nodiscard]] static constexpr vec ",name,"(",params,")\n{\n");
+                            if (float_only)
+                                output("static_assert(is_floating_point, \"This function only makes sense for floating-point matrices.\");\n");
+                            output(body,"}\n");
+                        }
+                        else if (w >= minw && h >= minh)
+                        {
+                            output("[[nodiscard]] static constexpr vec ",name,"(",params,") {return mat",minw,"x",minh,"<T>::",name,"(",param_names,").to_mat",w,"x",h,"();}\n");
+                        }
+                    };
+
+                    if (w <= 3 && h <= 3)
+                    MakePreset(2, 2, "scale", "vec2<type> v", "v", 1+R"(
+                        return {v.x, 0,
+                            $   0, v.y};
+                    )", 0);
+
+                    MakePreset(3, 3, "scale", "vec3<type> v", "v", 1+R"(
+                        return {v.x, 0, 0,
+                            $   0, v.y, 0,
+                            $   0, 0, v.z};
+                    )", 0);
+
+                    if (w <= 3 && h <= 3)
+                    MakePreset(3, 2, "ortho", "vec2<type> min, vec2<type> max", "min, max", 1+R"(
+                        return {2 / (max.x - min.x), 0, (min.x + max.x) / (min.x - max.x),
+                            $   0, 2 / (max.y - min.y), (min.y + max.y) / (min.y - max.y)};
+                    )");
+
+                    MakePreset(4, 3, "ortho", "vec2<type> min, vec2<type> max, type near, type far", "min, max, near, far", 1+R"(
+                        return {2 / (max.x - min.x), 0, 0, (min.x + max.x) / (min.x - max.x),
+                            $   0, 2 / (max.y - min.y), 0, (min.y + max.y) / (min.y - max.y),
+                            $   0, 0, 2 / (near - far), (near + far) / (near - far)};
+                    )");
+
+                    MakePreset(4, 3, "look_at", "vec3<type> src, vec3<type> dst, vec3<type> local_up", "src, dst, local_up", 1+R"(
+                        vec3<type> v3 = (src-dst).norm();
+                        vec3<type> v1 = local_up.cross(v3).norm();
+                        vec3<type> v2 = v3.cross(v1);
+                        return {v1.x, v1.y, v1.z, -src.x*v1.x - src.y*v1.y - src.z*v1.z,
+                            $   v2.x, v2.y, v2.z, -src.x*v2.x - src.y*v2.y - src.z*v2.z,
+                            $   v3.x, v3.y, v3.z, -src.x*v3.x - src.y*v3.y - src.z*v3.z};
+                    )");
+
+                    if (w <= 3 && h <= 3)
+                    MakePreset(3, 2, "translate", "vec2<type> v", "v", 1+R"(
+                        return {1, 0, v.x,
+                            $   0, 1, v.y};
+                    )", 0);
+
+                    MakePreset(4, 3, "translate", "vec3<type> v", "v", 1+R"(
+                        return {1, 0, 0, v.x,
+                            $   0, 1, 0, v.y,
+                            $   0, 0, 1, v.z};
+                    )", 0);
+
+                    if (w <= 3 && h <= 3)
+                    MakePreset(2, 2, "rotate", "type angle", "angle", 1+R"(
+                        type c = std::cos(angle);
+                        type s = std::sin(angle);
+                        return {c, -s,
+                            $   s,  c};
+                    )");
+
+                    MakePreset(3, 3, "rotate_with_normalized_axis", "vec3<type> axis, type angle", "axis, angle", 1+R"(
+                        type c = std::cos(angle);
+                        type s = std::sin(angle);
+                        return {axis.x * axis.x * (1 - c) + c, axis.x * axis.y * (1 - c) - axis.z * s, axis.x * axis.z * (1 - c) + axis.y * s,
+                            $   axis.y * axis.x * (1 - c) + axis.z * s, axis.y * axis.y * (1 - c) + c, axis.y * axis.z * (1 - c) - axis.x * s,
+                            $   axis.x * axis.z * (1 - c) - axis.y * s, axis.y * axis.z * (1 - c) + axis.x * s, axis.z * axis.z * (1 - c) + c};
+                    )", 0);
+                    MakePreset(3, 3, "rotate", "vec3<type> axis, type angle", "axis, angle", 1+R"(
+                        return rotate_with_normalized_axis(axis.norm(), angle);
+                    )");
+
+                    MakePreset(4, 4, "perspective", "type wh_aspect, type y_fov, type near, type far", "wh_aspect, y_fov, near, far", 1+R"(
+                        y_fov = (T)1 / std::tan(y_fov / 2);
+                        return {y_fov / wh_aspect , 0     , 0                           , 0                             ,
+                            $   0                 , y_fov , 0                           , 0                             ,
+                            $   0                 , 0     , (near + far) / (near - far) , 2 * near * far / (near - far) ,
+                            $   0                 , 0     , -1                          , 0                             };
+                    )");
                 }
             };
 
