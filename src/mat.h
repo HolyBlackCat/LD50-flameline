@@ -20,7 +20,7 @@ namespace Math
     inline namespace Vector // Declarations
     {
         template <int D, typename T> struct vec;
-        template <int W, int H, typename T> using mat = vec<W, vec<H, T>>;
+        template <int W, int H, typename T> struct mat;
         template <typename T> using vec2 = vec<2,T>; template <typename T> using vec3 = vec<3,T>; template <typename T> using vec4 = vec<4,T>;
         template <typename T> using mat2x2 = mat<2,2,T>; template <typename T> using mat3x2 = mat<3,2,T>; template <typename T> using mat4x2 = mat<4,2,T>;
         template <typename T> using mat2x3 = mat<2,3,T>; template <typename T> using mat3x3 = mat<3,3,T>; template <typename T> using mat4x3 = mat<4,3,T>;
@@ -219,35 +219,34 @@ namespace Math
             static constexpr bool
                 is_scalar     = 1,
                 is_vec        = 0,
-                is_mat        = 0,
-                is_vec_or_mat = 0;
+                is_mat        = 0;
         };
         template <int D, typename T> struct properties<vec<D,T>>
         {
             static constexpr bool
                 is_scalar     = 0,
                 is_vec        = 1,
-                is_mat        = 0,
-                is_vec_or_mat = 1;
+                is_mat        = 0;
         };
-        template <int W, int H, typename T> struct properties<vec<W,vec<H,T>>>
+        template <int W, int H, typename T> struct properties<mat<W,H,T>>
         {
             static constexpr bool
                 is_scalar     = 0,
                 is_vec        = 0,
-                is_mat        = 1,
-                is_vec_or_mat = 1;
+                is_mat        = 1;
         };
         
         template <typename T> struct base_impl {using type = T;};
-        template <int D, typename T> struct base_impl<vec<D,T>> {using type = typename base_impl<T>::type;};
+        template <int D, typename T> struct base_impl<vec<D,T>> {using type = T;};
         template <typename T> using base_t = typename base_impl<T>::type;
         
-        template <typename T, typename TT> struct change_base_impl {using type = base_t<TT>;};
-        template <int D, typename T, typename TT> struct change_base_impl<vec<D,T>,TT> {using type = vec<D, typename change_base_impl<T, TT>::type>;};
-        template <typename T, typename TT> using change_base_t = typename change_base_impl<T,TT>::type;
+        template <typename A, typename B> struct change_base_impl {using type = B;};
+        template <int D, typename A, typename B> struct change_base_impl<vec<D,A>,B> {using type = vec<D, B>;};
+        template <typename A> struct change_base_impl<A, void> {using type = void;};
+        template <int D, typename A> struct change_base_impl<vec<D,A>, void> {using type = void;};
+        template <typename A, typename B> using change_base_t = typename change_base_impl<A,B>::type;
         
-        template <typename A, typename B> inline constexpr bool same_size_v = std::is_same_v<A, change_base_t<B,A>>;
+        template <typename A, typename B> inline constexpr bool same_size_v = std::is_same_v<A, change_base_t<B,base_t<A>>>;
         
         template <typename T> struct floating_point_impl {using type = std::conditional_t<std::is_floating_point_v<base_t<T>>, T, change_base_t<T, double>>;};
         template <typename T> using floating_point_t = typename floating_point_impl<T>::type;
@@ -313,19 +312,18 @@ namespace Math
             static_assert(!std::is_const_v<T> && !std::is_volatile_v<T>, "The base type must have no cv-qualifiers.");
             static_assert(!std::is_reference_v<T>, "The base type must not be a reference.");
             using type = T;
-            using member_type = T;
             static constexpr int size = 2;
             static constexpr bool is_floating_point = std::is_floating_point_v<type>;
-            union {member_type x, r;};
-            union {member_type y, g;};
+            union {type x, r;};
+            union {type y, g;};
             constexpr vec() = default;
-            constexpr vec(member_type x, member_type y) : x(x), y(y) {}
-            explicit constexpr vec(member_type obj) : x(obj), y(obj) {}
+            constexpr vec(type x, type y) : x(x), y(y) {}
+            explicit constexpr vec(type obj) : x(obj), y(obj) {}
             template <typename TT> constexpr vec(const vec2<TT> &obj) : x(obj.x), y(obj.y) {}
             [[nodiscard]] static constexpr vec fill(type obj) {return vec(obj, obj);}
             template <typename TT> [[nodiscard]] constexpr vec2<TT> to() const {return vec2<TT>(TT(x), TT(y));}
-            [[nodiscard]] constexpr member_type &operator[](int i) {return *(member_type *)((char *)this + sizeof(member_type)*i);}
-            [[nodiscard]] constexpr const member_type &operator[](int i) const {return *(member_type *)((char *)this + sizeof(member_type)*i);}
+            [[nodiscard]] constexpr type &operator[](int i) {return *(type *)((char *)this + sizeof(type)*i);}
+            [[nodiscard]] constexpr const type &operator[](int i) const {return *(type *)((char *)this + sizeof(type)*i);}
             [[nodiscard]] type *as_array() {return &x;};
             [[nodiscard]] const type *as_array() const {return &x;};
             [[nodiscard]] explicit constexpr operator bool() const {return this->any(); static_assert(!std::is_same_v<type, bool>, "Use .none(), .any(), or .all() for vectors/matrices of bool.");}
@@ -334,7 +332,7 @@ namespace Math
             [[nodiscard]] constexpr bool all() const {return x && y;}
             [[nodiscard]] constexpr auto sum() const {return x + y;}
             [[nodiscard]] constexpr auto prod() const {return x * y;}
-            [[nodiscard]] constexpr auto ratio() const {return floating_point_t<member_type>(x) / floating_point_t<member_type>(y);}
+            [[nodiscard]] constexpr auto ratio() const {return floating_point_t<type>(x) / floating_point_t<type>(y);}
             [[nodiscard]] constexpr type min() const {return std::min({x,y});}
             [[nodiscard]] constexpr type max() const {return std::max({x,y});}
             template <typename N> [[nodiscard]] constexpr vec set_x(const N &n) const {return vec(n, y);} template <typename N> [[nodiscard]] constexpr vec set_y(const N &n) const {return vec(x, n);}
@@ -347,19 +345,15 @@ namespace Math
             template <typename N> [[nodiscard]] constexpr auto mul_r(const N &n) const {return vec2<decltype(x*n)>(r*n, g);} template <typename N> [[nodiscard]] constexpr auto mul_g(const N &n) const {return vec2<decltype(x*n)>(r, g*n);}
             template <typename N> [[nodiscard]] constexpr auto div_x(const N &n) const {return vec2<decltype(x/n)>(x/n, y);} template <typename N> [[nodiscard]] constexpr auto div_y(const N &n) const {return vec2<decltype(x/n)>(x, y/n);}
             template <typename N> [[nodiscard]] constexpr auto div_r(const N &n) const {return vec2<decltype(x/n)>(r/n, g);} template <typename N> [[nodiscard]] constexpr auto div_g(const N &n) const {return vec2<decltype(x/n)>(r, g/n);}
-            [[nodiscard]] constexpr vec3<member_type> to_vec3(member_type nz) const {return {x, y, nz};}
-            [[nodiscard]] constexpr vec4<member_type> to_vec4(member_type nz, member_type nw) const {return {x, y, nz, nw};}
-            [[nodiscard]] constexpr vec3<member_type> to_vec3() const {return to_vec3(0);}
-            [[nodiscard]] constexpr vec4<member_type> to_vec4() const {return to_vec4(0, 1);}
+            [[nodiscard]] constexpr vec3<type> to_vec3(type nz) const {return {x, y, nz};}
+            [[nodiscard]] constexpr vec4<type> to_vec4(type nz, type nw) const {return {x, y, nz, nw};}
+            [[nodiscard]] constexpr vec3<type> to_vec3() const {return to_vec3(0);}
+            [[nodiscard]] constexpr vec4<type> to_vec4() const {return to_vec4(0, 1);}
             [[nodiscard]] constexpr auto len_sqr() const {return x*x + y*y;}
             [[nodiscard]] constexpr auto len() const {return std::sqrt(len_sqr());}
             [[nodiscard]] constexpr auto norm() const -> vec2<decltype(type{}/len())> {if (auto l = len(); l != 0) return *this / l; else return vec(0);}
             template <typename TT> [[nodiscard]] constexpr auto dot(const vec2<TT> &o) const {return x * o.x + y * o.y;}
             template <typename TT> [[nodiscard]] constexpr auto cross(const vec2<TT> &o) const {return x * o.y - y * o.x;}
-            template <typename TT> [[nodiscard]] constexpr larger_t<type,TT> mul(const vec2<TT> &m) const {return {x*m.x + y*m.y};}
-            template <typename TT> [[nodiscard]] constexpr vec2<larger_t<type,TT>> mul(const mat2x2<TT> &m) const {return {x*m.x.x + y*m.x.y, x*m.y.x + y*m.y.y};}
-            template <typename TT> [[nodiscard]] constexpr vec3<larger_t<type,TT>> mul(const mat3x2<TT> &m) const {return {x*m.x.x + y*m.x.y, x*m.y.x + y*m.y.y, x*m.z.x + y*m.z.y};}
-            template <typename TT> [[nodiscard]] constexpr vec4<larger_t<type,TT>> mul(const mat4x2<TT> &m) const {return {x*m.x.x + y*m.x.y, x*m.y.x + y*m.y.y, x*m.z.x + y*m.z.y, x*m.w.x + y*m.w.y};}
         };
         
         template <typename T> struct vec<3,T> // vec3
@@ -367,20 +361,19 @@ namespace Math
             static_assert(!std::is_const_v<T> && !std::is_volatile_v<T>, "The base type must have no cv-qualifiers.");
             static_assert(!std::is_reference_v<T>, "The base type must not be a reference.");
             using type = T;
-            using member_type = T;
             static constexpr int size = 3;
             static constexpr bool is_floating_point = std::is_floating_point_v<type>;
-            union {member_type x, r;};
-            union {member_type y, g;};
-            union {member_type z, b;};
+            union {type x, r;};
+            union {type y, g;};
+            union {type z, b;};
             constexpr vec() = default;
-            constexpr vec(member_type x, member_type y, member_type z) : x(x), y(y), z(z) {}
-            explicit constexpr vec(member_type obj) : x(obj), y(obj), z(obj) {}
+            constexpr vec(type x, type y, type z) : x(x), y(y), z(z) {}
+            explicit constexpr vec(type obj) : x(obj), y(obj), z(obj) {}
             template <typename TT> constexpr vec(const vec3<TT> &obj) : x(obj.x), y(obj.y), z(obj.z) {}
             [[nodiscard]] static constexpr vec fill(type obj) {return vec(obj, obj, obj);}
             template <typename TT> [[nodiscard]] constexpr vec3<TT> to() const {return vec3<TT>(TT(x), TT(y), TT(z));}
-            [[nodiscard]] constexpr member_type &operator[](int i) {return *(member_type *)((char *)this + sizeof(member_type)*i);}
-            [[nodiscard]] constexpr const member_type &operator[](int i) const {return *(member_type *)((char *)this + sizeof(member_type)*i);}
+            [[nodiscard]] constexpr type &operator[](int i) {return *(type *)((char *)this + sizeof(type)*i);}
+            [[nodiscard]] constexpr const type &operator[](int i) const {return *(type *)((char *)this + sizeof(type)*i);}
             [[nodiscard]] type *as_array() {return &x;};
             [[nodiscard]] const type *as_array() const {return &x;};
             [[nodiscard]] explicit constexpr operator bool() const {return this->any(); static_assert(!std::is_same_v<type, bool>, "Use .none(), .any(), or .all() for vectors/matrices of bool.");}
@@ -401,18 +394,14 @@ namespace Math
             template <typename N> [[nodiscard]] constexpr auto mul_r(const N &n) const {return vec3<decltype(x*n)>(r*n, g, b);} template <typename N> [[nodiscard]] constexpr auto mul_g(const N &n) const {return vec3<decltype(x*n)>(r, g*n, b);} template <typename N> [[nodiscard]] constexpr auto mul_b(const N &n) const {return vec3<decltype(x*n)>(r, g, b*n);}
             template <typename N> [[nodiscard]] constexpr auto div_x(const N &n) const {return vec3<decltype(x/n)>(x/n, y, z);} template <typename N> [[nodiscard]] constexpr auto div_y(const N &n) const {return vec3<decltype(x/n)>(x, y/n, z);} template <typename N> [[nodiscard]] constexpr auto div_z(const N &n) const {return vec3<decltype(x/n)>(x, y, z/n);}
             template <typename N> [[nodiscard]] constexpr auto div_r(const N &n) const {return vec3<decltype(x/n)>(r/n, g, b);} template <typename N> [[nodiscard]] constexpr auto div_g(const N &n) const {return vec3<decltype(x/n)>(r, g/n, b);} template <typename N> [[nodiscard]] constexpr auto div_b(const N &n) const {return vec3<decltype(x/n)>(r, g, b/n);}
-            [[nodiscard]] constexpr vec2<member_type> to_vec2() const {return {x, y};}
-            [[nodiscard]] constexpr vec4<member_type> to_vec4(member_type nw) const {return {x, y, z, nw};}
-            [[nodiscard]] constexpr vec4<member_type> to_vec4() const {return to_vec4(1);}
+            [[nodiscard]] constexpr vec2<type> to_vec2() const {return {x, y};}
+            [[nodiscard]] constexpr vec4<type> to_vec4(type nw) const {return {x, y, z, nw};}
+            [[nodiscard]] constexpr vec4<type> to_vec4() const {return to_vec4(1);}
             [[nodiscard]] constexpr auto len_sqr() const {return x*x + y*y + z*z;}
             [[nodiscard]] constexpr auto len() const {return std::sqrt(len_sqr());}
             [[nodiscard]] constexpr auto norm() const -> vec3<decltype(type{}/len())> {if (auto l = len(); l != 0) return *this / l; else return vec(0);}
             template <typename TT> [[nodiscard]] constexpr auto dot(const vec3<TT> &o) const {return x * o.x + y * o.y + z * o.z;}
             template <typename TT> [[nodiscard]] constexpr auto cross(const vec3<TT> &o) const -> vec3<decltype(x * o.x - x * o.x)> {return {y * o.z - z * o.y, z * o.x - x * o.z, x * o.y - y * o.x};}
-            template <typename TT> [[nodiscard]] constexpr larger_t<type,TT> mul(const vec3<TT> &m) const {return {x*m.x + y*m.y + z*m.z};}
-            template <typename TT> [[nodiscard]] constexpr vec2<larger_t<type,TT>> mul(const mat2x3<TT> &m) const {return {x*m.x.x + y*m.x.y + z*m.x.z, x*m.y.x + y*m.y.y + z*m.y.z};}
-            template <typename TT> [[nodiscard]] constexpr vec3<larger_t<type,TT>> mul(const mat3x3<TT> &m) const {return {x*m.x.x + y*m.x.y + z*m.x.z, x*m.y.x + y*m.y.y + z*m.y.z, x*m.z.x + y*m.z.y + z*m.z.z};}
-            template <typename TT> [[nodiscard]] constexpr vec4<larger_t<type,TT>> mul(const mat4x3<TT> &m) const {return {x*m.x.x + y*m.x.y + z*m.x.z, x*m.y.x + y*m.y.y + z*m.y.z, x*m.z.x + y*m.z.y + z*m.z.z, x*m.w.x + y*m.w.y + z*m.w.z};}
         };
         
         template <typename T> struct vec<4,T> // vec4
@@ -420,21 +409,20 @@ namespace Math
             static_assert(!std::is_const_v<T> && !std::is_volatile_v<T>, "The base type must have no cv-qualifiers.");
             static_assert(!std::is_reference_v<T>, "The base type must not be a reference.");
             using type = T;
-            using member_type = T;
             static constexpr int size = 4;
             static constexpr bool is_floating_point = std::is_floating_point_v<type>;
-            union {member_type x, r;};
-            union {member_type y, g;};
-            union {member_type z, b;};
-            union {member_type w, a;};
+            union {type x, r;};
+            union {type y, g;};
+            union {type z, b;};
+            union {type w, a;};
             constexpr vec() = default;
-            constexpr vec(member_type x, member_type y, member_type z, member_type w) : x(x), y(y), z(z), w(w) {}
-            explicit constexpr vec(member_type obj) : x(obj), y(obj), z(obj), w(obj) {}
+            constexpr vec(type x, type y, type z, type w) : x(x), y(y), z(z), w(w) {}
+            explicit constexpr vec(type obj) : x(obj), y(obj), z(obj), w(obj) {}
             template <typename TT> constexpr vec(const vec4<TT> &obj) : x(obj.x), y(obj.y), z(obj.z), w(obj.w) {}
             [[nodiscard]] static constexpr vec fill(type obj) {return vec(obj, obj, obj, obj);}
             template <typename TT> [[nodiscard]] constexpr vec4<TT> to() const {return vec4<TT>(TT(x), TT(y), TT(z), TT(w));}
-            [[nodiscard]] constexpr member_type &operator[](int i) {return *(member_type *)((char *)this + sizeof(member_type)*i);}
-            [[nodiscard]] constexpr const member_type &operator[](int i) const {return *(member_type *)((char *)this + sizeof(member_type)*i);}
+            [[nodiscard]] constexpr type &operator[](int i) {return *(type *)((char *)this + sizeof(type)*i);}
+            [[nodiscard]] constexpr const type &operator[](int i) const {return *(type *)((char *)this + sizeof(type)*i);}
             [[nodiscard]] type *as_array() {return &x;};
             [[nodiscard]] const type *as_array() const {return &x;};
             [[nodiscard]] explicit constexpr operator bool() const {return this->any(); static_assert(!std::is_same_v<type, bool>, "Use .none(), .any(), or .all() for vectors/matrices of bool.");}
@@ -455,21 +443,17 @@ namespace Math
             template <typename N> [[nodiscard]] constexpr auto mul_r(const N &n) const {return vec4<decltype(x*n)>(r*n, g, b, a);} template <typename N> [[nodiscard]] constexpr auto mul_g(const N &n) const {return vec4<decltype(x*n)>(r, g*n, b, a);} template <typename N> [[nodiscard]] constexpr auto mul_b(const N &n) const {return vec4<decltype(x*n)>(r, g, b*n, a);} template <typename N> [[nodiscard]] constexpr auto mul_a(const N &n) const {return vec4<decltype(x*n)>(r, g, b, a*n);}
             template <typename N> [[nodiscard]] constexpr auto div_x(const N &n) const {return vec4<decltype(x/n)>(x/n, y, z, w);} template <typename N> [[nodiscard]] constexpr auto div_y(const N &n) const {return vec4<decltype(x/n)>(x, y/n, z, w);} template <typename N> [[nodiscard]] constexpr auto div_z(const N &n) const {return vec4<decltype(x/n)>(x, y, z/n, w);} template <typename N> [[nodiscard]] constexpr auto div_w(const N &n) const {return vec4<decltype(x/n)>(x, y, z, w/n);}
             template <typename N> [[nodiscard]] constexpr auto div_r(const N &n) const {return vec4<decltype(x/n)>(r/n, g, b, a);} template <typename N> [[nodiscard]] constexpr auto div_g(const N &n) const {return vec4<decltype(x/n)>(r, g/n, b, a);} template <typename N> [[nodiscard]] constexpr auto div_b(const N &n) const {return vec4<decltype(x/n)>(r, g, b/n, a);} template <typename N> [[nodiscard]] constexpr auto div_a(const N &n) const {return vec4<decltype(x/n)>(r, g, b, a/n);}
-            [[nodiscard]] constexpr vec2<member_type> to_vec2() const {return {x, y};}
-            [[nodiscard]] constexpr vec3<member_type> to_vec3() const {return {x, y, z};}
+            [[nodiscard]] constexpr vec2<type> to_vec2() const {return {x, y};}
+            [[nodiscard]] constexpr vec3<type> to_vec3() const {return {x, y, z};}
             [[nodiscard]] constexpr auto len_sqr() const {return x*x + y*y + z*z + w*w;}
             [[nodiscard]] constexpr auto len() const {return std::sqrt(len_sqr());}
             [[nodiscard]] constexpr auto norm() const -> vec4<decltype(type{}/len())> {if (auto l = len(); l != 0) return *this / l; else return vec(0);}
             template <typename TT> [[nodiscard]] constexpr auto dot(const vec4<TT> &o) const {return x * o.x + y * o.y + z * o.z + w * o.w;}
-            template <typename TT> [[nodiscard]] constexpr larger_t<type,TT> mul(const vec4<TT> &m) const {return {x*m.x + y*m.y + z*m.z + w*m.w};}
-            template <typename TT> [[nodiscard]] constexpr vec2<larger_t<type,TT>> mul(const mat2x4<TT> &m) const {return {x*m.x.x + y*m.x.y + z*m.x.z + w*m.x.w, x*m.y.x + y*m.y.y + z*m.y.z + w*m.y.w};}
-            template <typename TT> [[nodiscard]] constexpr vec3<larger_t<type,TT>> mul(const mat3x4<TT> &m) const {return {x*m.x.x + y*m.x.y + z*m.x.z + w*m.x.w, x*m.y.x + y*m.y.y + z*m.y.z + w*m.y.w, x*m.z.x + y*m.z.y + z*m.z.z + w*m.z.w};}
-            template <typename TT> [[nodiscard]] constexpr vec4<larger_t<type,TT>> mul(const mat4x4<TT> &m) const {return {x*m.x.x + y*m.x.y + z*m.x.z + w*m.x.w, x*m.y.x + y*m.y.y + z*m.y.z + w*m.y.w, x*m.z.x + y*m.z.y + z*m.z.z + w*m.z.w, x*m.w.x + y*m.w.y + z*m.w.z + w*m.w.w};}
         };
         //} Vectors
         
         //{ Matrices
-        template <typename T> struct vec<2,vec<2,T>> // mat2x2
+        template <typename T> struct mat<2,2,T> // mat2x2
         {
             static_assert(!std::is_const_v<T> && !std::is_volatile_v<T>, "The base type must have no cv-qualifiers.");
             static_assert(!std::is_reference_v<T>, "The base type must not be a reference.");
@@ -480,77 +464,74 @@ namespace Math
             static constexpr bool is_floating_point = std::is_floating_point_v<type>;
             union {member_type x, r;};
             union {member_type y, g;};
-            constexpr vec() = default;
-            constexpr vec(member_type x, member_type y) : x(x), y(y) {}
-            explicit constexpr vec(type obj) : x(obj,0), y(0,obj) {}
-            explicit constexpr vec(vec2<type> obj) : x(obj.x,0), y(0,obj.y) {}
-            constexpr vec(type sx, type sy) : x(sx,0), y(0,sy) {}
-            constexpr vec(type xx, type yx, type xy, type yy) : x(xx,xy), y(yx,yy) {}
-            template <typename TT> constexpr vec(const mat2x2<TT> &obj) : x(obj.x), y(obj.y) {}
-            [[nodiscard]] static constexpr vec fill(type obj) {return vec(obj, obj, obj, obj);}
+            constexpr mat() : mat(1) {}
+            constexpr mat(const member_type &x, const member_type &y) : x(x), y(y) {}
+            explicit constexpr mat(type obj) : x(obj,0), y(0,obj) {}
+            explicit constexpr mat(vec2<type> obj) : x(obj.x,0), y(0,obj.y) {}
+            constexpr mat(type sx, type sy) : x(sx,0), y(0,sy) {}
+            constexpr mat(type xx, type yx, type xy, type yy) : x(xx,xy), y(yx,yy) {}
+            template <typename TT> constexpr mat(const mat2x2<TT> &obj) : x(obj.x), y(obj.y) {}
+            [[nodiscard]] static constexpr mat fill(type obj) {return mat(obj, obj, obj, obj);}
             template <typename TT> [[nodiscard]] constexpr mat2x2<TT> to() const {return mat2x2<TT>(TT(x.x), TT(y.x), TT(x.y), TT(y.y));}
             [[nodiscard]] constexpr member_type &operator[](int i) {return *(member_type *)((char *)this + sizeof(member_type)*i);}
             [[nodiscard]] constexpr const member_type &operator[](int i) const {return *(member_type *)((char *)this + sizeof(member_type)*i);}
             [[nodiscard]] type *as_array() {return &x.x;};
             [[nodiscard]] const type *as_array() const {return &x.x;};
-            [[nodiscard]] explicit constexpr operator bool() const {return this->any(); static_assert(!std::is_same_v<type, bool>, "Use .none(), .any(), or .all() for vectors/matrices of bool.");}
-            [[nodiscard]] constexpr bool none() const {return !this->any();}
-            [[nodiscard]] constexpr bool any() const {return x.x || x.y || y.x || y.y;}
-            [[nodiscard]] constexpr bool all() const {return x.x && x.y && y.x && y.y;}
-            [[nodiscard]] constexpr type min() const {return std::min({x.x,x.y,y.x,y.y});}
-            [[nodiscard]] constexpr type max() const {return std::max({x.x,x.y,y.x,y.y});}
-            [[nodiscard]] constexpr vec3<member_type> to_vec3(member_type nz) const {return {x, y, nz};}
-            [[nodiscard]] constexpr vec4<member_type> to_vec4(member_type nz, member_type nw) const {return {x, y, nz, nw};}
-            [[nodiscard]] constexpr vec3<member_type> to_vec3() const {return to_vec3({});}
-            [[nodiscard]] constexpr vec4<member_type> to_vec4() const {return to_vec4({}, {});}
+            [[nodiscard]] constexpr mat3x2<type> to_vec3(const member_type &nz) const {return {x, y, nz};}
+            [[nodiscard]] constexpr mat4x2<type> to_vec4(const member_type &nz, const member_type &nw) const {return {x, y, nz, nw};}
+            [[nodiscard]] constexpr mat3x2<type> to_vec3() const {return to_vec3({});}
+            [[nodiscard]] constexpr mat4x2<type> to_vec4() const {return to_vec4({}, {});}
             [[nodiscard]] constexpr mat3x2<type> to_mat3x2() const {return {x.x,y.x,0,x.y,y.y,0};}
             [[nodiscard]] constexpr mat4x2<type> to_mat4x2() const {return {x.x,y.x,0,0,x.y,y.y,0,0};}
             [[nodiscard]] constexpr mat2x3<type> to_mat2x3() const {return {x.x,y.x,x.y,y.y,0,0};}
             [[nodiscard]] constexpr mat3x3<type> to_mat3x3() const {return {x.x,y.x,0,x.y,y.y,0,0,0,1};}
-            [[nodiscard]] constexpr mat3<type> to_mat3() const {return to_mat3x3();}
+            [[nodiscard]] constexpr mat3x3<type> to_mat3() const {return to_mat3x3();}
             [[nodiscard]] constexpr mat4x3<type> to_mat4x3() const {return {x.x,y.x,0,0,x.y,y.y,0,0,0,0,1,0};}
             [[nodiscard]] constexpr mat2x4<type> to_mat2x4() const {return {x.x,y.x,x.y,y.y,0,0,0,0};}
             [[nodiscard]] constexpr mat3x4<type> to_mat3x4() const {return {x.x,y.x,0,x.y,y.y,0,0,0,1,0,0,0};}
             [[nodiscard]] constexpr mat4x4<type> to_mat4x4() const {return {x.x,y.x,0,0,x.y,y.y,0,0,0,0,1,0,0,0,0,1};}
-            [[nodiscard]] constexpr mat4<type> to_mat4() const {return to_mat4x4();}
+            [[nodiscard]] constexpr mat4x4<type> to_mat4() const {return to_mat4x4();}
             template <typename TT> [[nodiscard]] constexpr vec2<larger_t<type,TT>> mul(const vec2<TT> &m) const {return {x.x*m.x + y.x*m.y, x.y*m.x + y.y*m.y};}
             template <typename TT> [[nodiscard]] constexpr mat2x2<larger_t<type,TT>> mul(const mat2x2<TT> &m) const {return {x.x*m.x.x + y.x*m.x.y, x.x*m.y.x + y.x*m.y.y, x.y*m.x.x + y.y*m.x.y, x.y*m.y.x + y.y*m.y.y};}
             template <typename TT> [[nodiscard]] constexpr mat3x2<larger_t<type,TT>> mul(const mat3x2<TT> &m) const {return {x.x*m.x.x + y.x*m.x.y, x.x*m.y.x + y.x*m.y.y, x.x*m.z.x + y.x*m.z.y, x.y*m.x.x + y.y*m.x.y, x.y*m.y.x + y.y*m.y.y, x.y*m.z.x + y.y*m.z.y};}
             template <typename TT> [[nodiscard]] constexpr mat4x2<larger_t<type,TT>> mul(const mat4x2<TT> &m) const {return {x.x*m.x.x + y.x*m.x.y, x.x*m.y.x + y.x*m.y.y, x.x*m.z.x + y.x*m.z.y, x.x*m.w.x + y.x*m.w.y, x.y*m.x.x + y.y*m.x.y, x.y*m.y.x + y.y*m.y.y, x.y*m.z.x + y.y*m.z.y, x.y*m.w.x + y.y*m.w.y};}
-            inline static constexpr vec identity = vec(1);
             [[nodiscard]] constexpr mat2x2<T> transpose() const {return {x.x,x.y,y.x,y.y};}
-            [[nodiscard]] constexpr vec inverse()
+            [[nodiscard]] constexpr mat inverse()
             {
-                vec ret{};
+                static_assert(is_floating_point, "This function only makes sense for floating-point matrices.");
+                
+                mat ret{};
                 
                 ret.x.x =  y.y;
                 ret.y.x = -y.x;
                 
                 type d = x.x * ret.x.x + x.y * ret.y.x;
-                if (d == 0) return identity;
-                
-                ret.x.y = -x.y;
-                ret.y.y =  x.x;
-                
+                if (d == 0) return {};
                 d = 1 / d;
-                return ret * d;
+                ret.x.x *= d;
+                ret.y.x *= d;
+                
+                ret.x.y = (-x.y) * d;
+                ret.y.y = ( x.x) * d;
+                
+                return ret;
             }
-            [[nodiscard]] static constexpr vec scale(vec2<type> v)
+            [[nodiscard]] static constexpr mat scale(vec2<type> v)
             {
-                return {v.x, 0,
-                        0, v.y};
+                return { v.x , 0   ,
+                         0   , v.y };
             }
-            [[nodiscard]] static constexpr vec rotate(type angle)
+            [[nodiscard]] static constexpr mat rotate(type angle)
             {
                 static_assert(is_floating_point, "This function only makes sense for floating-point matrices.");
                 type c = std::cos(angle);
                 type s = std::sin(angle);
-                return {c, -s,
-                        s,  c};
+                return { c, -s ,
+                         s, c  };
             }
         };
         
-        template <typename T> struct vec<2,vec<3,T>> // mat2x3
+        template <typename T> struct mat<2,3,T> // mat2x3
         {
             static_assert(!std::is_const_v<T> && !std::is_volatile_v<T>, "The base type must have no cv-qualifiers.");
             static_assert(!std::is_reference_v<T>, "The base type must not be a reference.");
@@ -560,51 +541,42 @@ namespace Math
             static constexpr bool is_floating_point = std::is_floating_point_v<type>;
             union {member_type x, r;};
             union {member_type y, g;};
-            constexpr vec() = default;
-            constexpr vec(member_type x, member_type y) : x(x), y(y) {}
-            explicit constexpr vec(type obj) : x(obj,0,0), y(0,obj,0) {}
-            explicit constexpr vec(vec2<type> obj) : x(obj.x,0,0), y(0,obj.y,0) {}
-            constexpr vec(type sx, type sy) : x(sx,0,0), y(0,sy,0) {}
-            constexpr vec(type xx, type yx, type xy, type yy, type xz, type yz) : x(xx,xy,xz), y(yx,yy,yz) {}
-            template <typename TT> constexpr vec(const mat2x3<TT> &obj) : x(obj.x), y(obj.y) {}
-            [[nodiscard]] static constexpr vec fill(type obj) {return vec(obj, obj, obj, obj, obj, obj);}
+            constexpr mat() : mat(1) {}
+            constexpr mat(const member_type &x, const member_type &y) : x(x), y(y) {}
+            explicit constexpr mat(type obj) : x(obj,0,0), y(0,obj,0) {}
+            explicit constexpr mat(vec2<type> obj) : x(obj.x,0,0), y(0,obj.y,0) {}
+            constexpr mat(type sx, type sy) : x(sx,0,0), y(0,sy,0) {}
+            constexpr mat(type xx, type yx, type xy, type yy, type xz, type yz) : x(xx,xy,xz), y(yx,yy,yz) {}
+            template <typename TT> constexpr mat(const mat2x3<TT> &obj) : x(obj.x), y(obj.y) {}
+            [[nodiscard]] static constexpr mat fill(type obj) {return mat(obj, obj, obj, obj, obj, obj);}
             template <typename TT> [[nodiscard]] constexpr mat2x3<TT> to() const {return mat2x3<TT>(TT(x.x), TT(y.x), TT(x.y), TT(y.y), TT(x.z), TT(y.z));}
             [[nodiscard]] constexpr member_type &operator[](int i) {return *(member_type *)((char *)this + sizeof(member_type)*i);}
             [[nodiscard]] constexpr const member_type &operator[](int i) const {return *(member_type *)((char *)this + sizeof(member_type)*i);}
             [[nodiscard]] type *as_array() {return &x.x;};
             [[nodiscard]] const type *as_array() const {return &x.x;};
-            [[nodiscard]] explicit constexpr operator bool() const {return this->any(); static_assert(!std::is_same_v<type, bool>, "Use .none(), .any(), or .all() for vectors/matrices of bool.");}
-            [[nodiscard]] constexpr bool none() const {return !this->any();}
-            [[nodiscard]] constexpr bool any() const {return x.x || x.y || x.z || y.x || y.y || y.z;}
-            [[nodiscard]] constexpr bool all() const {return x.x && x.y && x.z && y.x && y.y && y.z;}
-            [[nodiscard]] constexpr type min() const {return std::min({x.x,x.y,x.z,y.x,y.y,y.z});}
-            [[nodiscard]] constexpr type max() const {return std::max({x.x,x.y,x.z,y.x,y.y,y.z});}
-            [[nodiscard]] constexpr vec3<member_type> to_vec3(member_type nz) const {return {x, y, nz};}
-            [[nodiscard]] constexpr vec4<member_type> to_vec4(member_type nz, member_type nw) const {return {x, y, nz, nw};}
-            [[nodiscard]] constexpr vec3<member_type> to_vec3() const {return to_vec3({});}
-            [[nodiscard]] constexpr vec4<member_type> to_vec4() const {return to_vec4({}, {});}
+            [[nodiscard]] constexpr mat3x3<type> to_vec3(const member_type &nz) const {return {x, y, nz};}
+            [[nodiscard]] constexpr mat4x3<type> to_vec4(const member_type &nz, const member_type &nw) const {return {x, y, nz, nw};}
+            [[nodiscard]] constexpr mat3x3<type> to_vec3() const {return to_vec3({});}
+            [[nodiscard]] constexpr mat4x3<type> to_vec4() const {return to_vec4({}, {});}
             [[nodiscard]] constexpr mat2x2<type> to_mat2x2() const {return {x.x,y.x,x.y,y.y};}
-            [[nodiscard]] constexpr mat2<type> to_mat2() const {return to_mat2x2();}
+            [[nodiscard]] constexpr mat2x2<type> to_mat2() const {return to_mat2x2();}
             [[nodiscard]] constexpr mat3x2<type> to_mat3x2() const {return {x.x,y.x,0,x.y,y.y,0};}
             [[nodiscard]] constexpr mat4x2<type> to_mat4x2() const {return {x.x,y.x,0,0,x.y,y.y,0,0};}
             [[nodiscard]] constexpr mat3x3<type> to_mat3x3() const {return {x.x,y.x,0,x.y,y.y,0,x.z,y.z,1};}
-            [[nodiscard]] constexpr mat3<type> to_mat3() const {return to_mat3x3();}
+            [[nodiscard]] constexpr mat3x3<type> to_mat3() const {return to_mat3x3();}
             [[nodiscard]] constexpr mat4x3<type> to_mat4x3() const {return {x.x,y.x,0,0,x.y,y.y,0,0,x.z,y.z,1,0};}
             [[nodiscard]] constexpr mat2x4<type> to_mat2x4() const {return {x.x,y.x,x.y,y.y,x.z,y.z,0,0};}
             [[nodiscard]] constexpr mat3x4<type> to_mat3x4() const {return {x.x,y.x,0,x.y,y.y,0,x.z,y.z,1,0,0,0};}
             [[nodiscard]] constexpr mat4x4<type> to_mat4x4() const {return {x.x,y.x,0,0,x.y,y.y,0,0,x.z,y.z,1,0,0,0,0,1};}
-            [[nodiscard]] constexpr mat4<type> to_mat4() const {return to_mat4x4();}
+            [[nodiscard]] constexpr mat4x4<type> to_mat4() const {return to_mat4x4();}
             template <typename TT> [[nodiscard]] constexpr vec3<larger_t<type,TT>> mul(const vec2<TT> &m) const {return {x.x*m.x + y.x*m.y, x.y*m.x + y.y*m.y, x.z*m.x + y.z*m.y};}
             template <typename TT> [[nodiscard]] constexpr mat2x3<larger_t<type,TT>> mul(const mat2x2<TT> &m) const {return {x.x*m.x.x + y.x*m.x.y, x.x*m.y.x + y.x*m.y.y, x.y*m.x.x + y.y*m.x.y, x.y*m.y.x + y.y*m.y.y, x.z*m.x.x + y.z*m.x.y, x.z*m.y.x + y.z*m.y.y};}
             template <typename TT> [[nodiscard]] constexpr mat3x3<larger_t<type,TT>> mul(const mat3x2<TT> &m) const {return {x.x*m.x.x + y.x*m.x.y, x.x*m.y.x + y.x*m.y.y, x.x*m.z.x + y.x*m.z.y, x.y*m.x.x + y.y*m.x.y, x.y*m.y.x + y.y*m.y.y, x.y*m.z.x + y.y*m.z.y, x.z*m.x.x + y.z*m.x.y, x.z*m.y.x + y.z*m.y.y, x.z*m.z.x + y.z*m.z.y};}
             template <typename TT> [[nodiscard]] constexpr mat4x3<larger_t<type,TT>> mul(const mat4x2<TT> &m) const {return {x.x*m.x.x + y.x*m.x.y, x.x*m.y.x + y.x*m.y.y, x.x*m.z.x + y.x*m.z.y, x.x*m.w.x + y.x*m.w.y, x.y*m.x.x + y.y*m.x.y, x.y*m.y.x + y.y*m.y.y, x.y*m.z.x + y.y*m.z.y, x.y*m.w.x + y.y*m.w.y, x.z*m.x.x + y.z*m.x.y, x.z*m.y.x + y.z*m.y.y, x.z*m.z.x + y.z*m.z.y, x.z*m.w.x + y.z*m.w.y};}
-            inline static constexpr vec identity = vec(1);
             [[nodiscard]] constexpr mat3x2<T> transpose() const {return {x.x,x.y,x.z,y.x,y.y,y.z};}
-            [[nodiscard]] static constexpr vec scale(vec2<type> v) {return mat2x2<T>::scale(v).to_mat2x3();}
-            [[nodiscard]] static constexpr vec rotate(type angle) {return mat2x2<T>::rotate(angle).to_mat2x3();}
         };
         
-        template <typename T> struct vec<2,vec<4,T>> // mat2x4
+        template <typename T> struct mat<2,4,T> // mat2x4
         {
             static_assert(!std::is_const_v<T> && !std::is_volatile_v<T>, "The base type must have no cv-qualifiers.");
             static_assert(!std::is_reference_v<T>, "The base type must not be a reference.");
@@ -614,49 +586,42 @@ namespace Math
             static constexpr bool is_floating_point = std::is_floating_point_v<type>;
             union {member_type x, r;};
             union {member_type y, g;};
-            constexpr vec() = default;
-            constexpr vec(member_type x, member_type y) : x(x), y(y) {}
-            explicit constexpr vec(type obj) : x(obj,0,0,0), y(0,obj,0,0) {}
-            explicit constexpr vec(vec2<type> obj) : x(obj.x,0,0,0), y(0,obj.y,0,0) {}
-            constexpr vec(type sx, type sy) : x(sx,0,0,0), y(0,sy,0,0) {}
-            constexpr vec(type xx, type yx, type xy, type yy, type xz, type yz, type xw, type yw) : x(xx,xy,xz,xw), y(yx,yy,yz,yw) {}
-            template <typename TT> constexpr vec(const mat2x4<TT> &obj) : x(obj.x), y(obj.y) {}
-            [[nodiscard]] static constexpr vec fill(type obj) {return vec(obj, obj, obj, obj, obj, obj, obj, obj);}
+            constexpr mat() : mat(1) {}
+            constexpr mat(const member_type &x, const member_type &y) : x(x), y(y) {}
+            explicit constexpr mat(type obj) : x(obj,0,0,0), y(0,obj,0,0) {}
+            explicit constexpr mat(vec2<type> obj) : x(obj.x,0,0,0), y(0,obj.y,0,0) {}
+            constexpr mat(type sx, type sy) : x(sx,0,0,0), y(0,sy,0,0) {}
+            constexpr mat(type xx, type yx, type xy, type yy, type xz, type yz, type xw, type yw) : x(xx,xy,xz,xw), y(yx,yy,yz,yw) {}
+            template <typename TT> constexpr mat(const mat2x4<TT> &obj) : x(obj.x), y(obj.y) {}
+            [[nodiscard]] static constexpr mat fill(type obj) {return mat(obj, obj, obj, obj, obj, obj, obj, obj);}
             template <typename TT> [[nodiscard]] constexpr mat2x4<TT> to() const {return mat2x4<TT>(TT(x.x), TT(y.x), TT(x.y), TT(y.y), TT(x.z), TT(y.z), TT(x.w), TT(y.w));}
             [[nodiscard]] constexpr member_type &operator[](int i) {return *(member_type *)((char *)this + sizeof(member_type)*i);}
             [[nodiscard]] constexpr const member_type &operator[](int i) const {return *(member_type *)((char *)this + sizeof(member_type)*i);}
             [[nodiscard]] type *as_array() {return &x.x;};
             [[nodiscard]] const type *as_array() const {return &x.x;};
-            [[nodiscard]] explicit constexpr operator bool() const {return this->any(); static_assert(!std::is_same_v<type, bool>, "Use .none(), .any(), or .all() for vectors/matrices of bool.");}
-            [[nodiscard]] constexpr bool none() const {return !this->any();}
-            [[nodiscard]] constexpr bool any() const {return x.x || x.y || x.z || x.w || y.x || y.y || y.z || y.w;}
-            [[nodiscard]] constexpr bool all() const {return x.x && x.y && x.z && x.w && y.x && y.y && y.z && y.w;}
-            [[nodiscard]] constexpr type min() const {return std::min({x.x,x.y,x.z,x.w,y.x,y.y,y.z,y.w});}
-            [[nodiscard]] constexpr type max() const {return std::max({x.x,x.y,x.z,x.w,y.x,y.y,y.z,y.w});}
-            [[nodiscard]] constexpr vec3<member_type> to_vec3(member_type nz) const {return {x, y, nz};}
-            [[nodiscard]] constexpr vec4<member_type> to_vec4(member_type nz, member_type nw) const {return {x, y, nz, nw};}
-            [[nodiscard]] constexpr vec3<member_type> to_vec3() const {return to_vec3({});}
-            [[nodiscard]] constexpr vec4<member_type> to_vec4() const {return to_vec4({}, {});}
+            [[nodiscard]] constexpr mat3x4<type> to_vec3(const member_type &nz) const {return {x, y, nz};}
+            [[nodiscard]] constexpr mat4x4<type> to_vec4(const member_type &nz, const member_type &nw) const {return {x, y, nz, nw};}
+            [[nodiscard]] constexpr mat3x4<type> to_vec3() const {return to_vec3({});}
+            [[nodiscard]] constexpr mat4x4<type> to_vec4() const {return to_vec4({}, {});}
             [[nodiscard]] constexpr mat2x2<type> to_mat2x2() const {return {x.x,y.x,x.y,y.y};}
-            [[nodiscard]] constexpr mat2<type> to_mat2() const {return to_mat2x2();}
+            [[nodiscard]] constexpr mat2x2<type> to_mat2() const {return to_mat2x2();}
             [[nodiscard]] constexpr mat3x2<type> to_mat3x2() const {return {x.x,y.x,0,x.y,y.y,0};}
             [[nodiscard]] constexpr mat4x2<type> to_mat4x2() const {return {x.x,y.x,0,0,x.y,y.y,0,0};}
             [[nodiscard]] constexpr mat2x3<type> to_mat2x3() const {return {x.x,y.x,x.y,y.y,x.z,y.z};}
             [[nodiscard]] constexpr mat3x3<type> to_mat3x3() const {return {x.x,y.x,0,x.y,y.y,0,x.z,y.z,1};}
-            [[nodiscard]] constexpr mat3<type> to_mat3() const {return to_mat3x3();}
+            [[nodiscard]] constexpr mat3x3<type> to_mat3() const {return to_mat3x3();}
             [[nodiscard]] constexpr mat4x3<type> to_mat4x3() const {return {x.x,y.x,0,0,x.y,y.y,0,0,x.z,y.z,1,0};}
             [[nodiscard]] constexpr mat3x4<type> to_mat3x4() const {return {x.x,y.x,0,x.y,y.y,0,x.z,y.z,1,x.w,y.w,0};}
             [[nodiscard]] constexpr mat4x4<type> to_mat4x4() const {return {x.x,y.x,0,0,x.y,y.y,0,0,x.z,y.z,1,0,x.w,y.w,0,1};}
-            [[nodiscard]] constexpr mat4<type> to_mat4() const {return to_mat4x4();}
+            [[nodiscard]] constexpr mat4x4<type> to_mat4() const {return to_mat4x4();}
             template <typename TT> [[nodiscard]] constexpr vec4<larger_t<type,TT>> mul(const vec2<TT> &m) const {return {x.x*m.x + y.x*m.y, x.y*m.x + y.y*m.y, x.z*m.x + y.z*m.y, x.w*m.x + y.w*m.y};}
             template <typename TT> [[nodiscard]] constexpr mat2x4<larger_t<type,TT>> mul(const mat2x2<TT> &m) const {return {x.x*m.x.x + y.x*m.x.y, x.x*m.y.x + y.x*m.y.y, x.y*m.x.x + y.y*m.x.y, x.y*m.y.x + y.y*m.y.y, x.z*m.x.x + y.z*m.x.y, x.z*m.y.x + y.z*m.y.y, x.w*m.x.x + y.w*m.x.y, x.w*m.y.x + y.w*m.y.y};}
             template <typename TT> [[nodiscard]] constexpr mat3x4<larger_t<type,TT>> mul(const mat3x2<TT> &m) const {return {x.x*m.x.x + y.x*m.x.y, x.x*m.y.x + y.x*m.y.y, x.x*m.z.x + y.x*m.z.y, x.y*m.x.x + y.y*m.x.y, x.y*m.y.x + y.y*m.y.y, x.y*m.z.x + y.y*m.z.y, x.z*m.x.x + y.z*m.x.y, x.z*m.y.x + y.z*m.y.y, x.z*m.z.x + y.z*m.z.y, x.w*m.x.x + y.w*m.x.y, x.w*m.y.x + y.w*m.y.y, x.w*m.z.x + y.w*m.z.y};}
             template <typename TT> [[nodiscard]] constexpr mat4x4<larger_t<type,TT>> mul(const mat4x2<TT> &m) const {return {x.x*m.x.x + y.x*m.x.y, x.x*m.y.x + y.x*m.y.y, x.x*m.z.x + y.x*m.z.y, x.x*m.w.x + y.x*m.w.y, x.y*m.x.x + y.y*m.x.y, x.y*m.y.x + y.y*m.y.y, x.y*m.z.x + y.y*m.z.y, x.y*m.w.x + y.y*m.w.y, x.z*m.x.x + y.z*m.x.y, x.z*m.y.x + y.z*m.y.y, x.z*m.z.x + y.z*m.z.y, x.z*m.w.x + y.z*m.w.y, x.w*m.x.x + y.w*m.x.y, x.w*m.y.x + y.w*m.y.y, x.w*m.z.x + y.w*m.z.y, x.w*m.w.x + y.w*m.w.y};}
-            inline static constexpr vec identity = vec(1);
             [[nodiscard]] constexpr mat4x2<T> transpose() const {return {x.x,x.y,x.z,x.w,y.x,y.y,y.z,y.w};}
         };
         
-        template <typename T> struct vec<3,vec<2,T>> // mat3x2
+        template <typename T> struct mat<3,2,T> // mat3x2
         {
             static_assert(!std::is_const_v<T> && !std::is_volatile_v<T>, "The base type must have no cv-qualifiers.");
             static_assert(!std::is_reference_v<T>, "The base type must not be a reference.");
@@ -667,61 +632,41 @@ namespace Math
             union {member_type x, r;};
             union {member_type y, g;};
             union {member_type z, b;};
-            constexpr vec() = default;
-            constexpr vec(member_type x, member_type y, member_type z) : x(x), y(y), z(z) {}
-            explicit constexpr vec(type obj) : x(obj,0), y(0,obj), z(0,0) {}
-            explicit constexpr vec(vec2<type> obj) : x(obj.x,0), y(0,obj.y), z(0,0) {}
-            constexpr vec(type sx, type sy) : x(sx,0), y(0,sy), z(0,0) {}
-            constexpr vec(type xx, type yx, type zx, type xy, type yy, type zy) : x(xx,xy), y(yx,yy), z(zx,zy) {}
-            template <typename TT> constexpr vec(const mat3x2<TT> &obj) : x(obj.x), y(obj.y), z(obj.z) {}
-            [[nodiscard]] static constexpr vec fill(type obj) {return vec(obj, obj, obj, obj, obj, obj);}
+            constexpr mat() : mat(1) {}
+            constexpr mat(const member_type &x, const member_type &y, const member_type &z) : x(x), y(y), z(z) {}
+            explicit constexpr mat(type obj) : x(obj,0), y(0,obj), z(0,0) {}
+            explicit constexpr mat(vec2<type> obj) : x(obj.x,0), y(0,obj.y), z(0,0) {}
+            constexpr mat(type sx, type sy) : x(sx,0), y(0,sy), z(0,0) {}
+            constexpr mat(type xx, type yx, type zx, type xy, type yy, type zy) : x(xx,xy), y(yx,yy), z(zx,zy) {}
+            template <typename TT> constexpr mat(const mat3x2<TT> &obj) : x(obj.x), y(obj.y), z(obj.z) {}
+            [[nodiscard]] static constexpr mat fill(type obj) {return mat(obj, obj, obj, obj, obj, obj);}
             template <typename TT> [[nodiscard]] constexpr mat3x2<TT> to() const {return mat3x2<TT>(TT(x.x), TT(y.x), TT(z.x), TT(x.y), TT(y.y), TT(z.y));}
             [[nodiscard]] constexpr member_type &operator[](int i) {return *(member_type *)((char *)this + sizeof(member_type)*i);}
             [[nodiscard]] constexpr const member_type &operator[](int i) const {return *(member_type *)((char *)this + sizeof(member_type)*i);}
             [[nodiscard]] type *as_array() {return &x.x;};
             [[nodiscard]] const type *as_array() const {return &x.x;};
-            [[nodiscard]] explicit constexpr operator bool() const {return this->any(); static_assert(!std::is_same_v<type, bool>, "Use .none(), .any(), or .all() for vectors/matrices of bool.");}
-            [[nodiscard]] constexpr bool none() const {return !this->any();}
-            [[nodiscard]] constexpr bool any() const {return x.x || x.y || y.x || y.y || z.x || z.y;}
-            [[nodiscard]] constexpr bool all() const {return x.x && x.y && y.x && y.y && z.x && z.y;}
-            [[nodiscard]] constexpr type min() const {return std::min({x.x,x.y,y.x,y.y,z.x,z.y});}
-            [[nodiscard]] constexpr type max() const {return std::max({x.x,x.y,y.x,y.y,z.x,z.y});}
-            [[nodiscard]] constexpr vec2<member_type> to_vec2() const {return {x, y};}
-            [[nodiscard]] constexpr vec4<member_type> to_vec4(member_type nw) const {return {x, y, z, nw};}
-            [[nodiscard]] constexpr vec4<member_type> to_vec4() const {return to_vec4({});}
+            [[nodiscard]] constexpr mat2x2<type> to_vec2() const {return {x, y};}
+            [[nodiscard]] constexpr mat4x2<type> to_vec4(const member_type &nw) const {return {x, y, z, nw};}
+            [[nodiscard]] constexpr mat4x2<type> to_vec4() const {return to_vec4({});}
             [[nodiscard]] constexpr mat2x2<type> to_mat2x2() const {return {x.x,y.x,x.y,y.y};}
-            [[nodiscard]] constexpr mat2<type> to_mat2() const {return to_mat2x2();}
+            [[nodiscard]] constexpr mat2x2<type> to_mat2() const {return to_mat2x2();}
             [[nodiscard]] constexpr mat4x2<type> to_mat4x2() const {return {x.x,y.x,z.x,0,x.y,y.y,z.y,0};}
             [[nodiscard]] constexpr mat2x3<type> to_mat2x3() const {return {x.x,y.x,x.y,y.y,0,0};}
             [[nodiscard]] constexpr mat3x3<type> to_mat3x3() const {return {x.x,y.x,z.x,x.y,y.y,z.y,0,0,1};}
-            [[nodiscard]] constexpr mat3<type> to_mat3() const {return to_mat3x3();}
+            [[nodiscard]] constexpr mat3x3<type> to_mat3() const {return to_mat3x3();}
             [[nodiscard]] constexpr mat4x3<type> to_mat4x3() const {return {x.x,y.x,z.x,0,x.y,y.y,z.y,0,0,0,1,0};}
             [[nodiscard]] constexpr mat2x4<type> to_mat2x4() const {return {x.x,y.x,x.y,y.y,0,0,0,0};}
             [[nodiscard]] constexpr mat3x4<type> to_mat3x4() const {return {x.x,y.x,z.x,x.y,y.y,z.y,0,0,1,0,0,0};}
             [[nodiscard]] constexpr mat4x4<type> to_mat4x4() const {return {x.x,y.x,z.x,0,x.y,y.y,z.y,0,0,0,1,0,0,0,0,1};}
-            [[nodiscard]] constexpr mat4<type> to_mat4() const {return to_mat4x4();}
+            [[nodiscard]] constexpr mat4x4<type> to_mat4() const {return to_mat4x4();}
             template <typename TT> [[nodiscard]] constexpr vec2<larger_t<type,TT>> mul(const vec3<TT> &m) const {return {x.x*m.x + y.x*m.y + z.x*m.z, x.y*m.x + y.y*m.y + z.y*m.z};}
             template <typename TT> [[nodiscard]] constexpr mat2x2<larger_t<type,TT>> mul(const mat2x3<TT> &m) const {return {x.x*m.x.x + y.x*m.x.y + z.x*m.x.z, x.x*m.y.x + y.x*m.y.y + z.x*m.y.z, x.y*m.x.x + y.y*m.x.y + z.y*m.x.z, x.y*m.y.x + y.y*m.y.y + z.y*m.y.z};}
             template <typename TT> [[nodiscard]] constexpr mat3x2<larger_t<type,TT>> mul(const mat3x3<TT> &m) const {return {x.x*m.x.x + y.x*m.x.y + z.x*m.x.z, x.x*m.y.x + y.x*m.y.y + z.x*m.y.z, x.x*m.z.x + y.x*m.z.y + z.x*m.z.z, x.y*m.x.x + y.y*m.x.y + z.y*m.x.z, x.y*m.y.x + y.y*m.y.y + z.y*m.y.z, x.y*m.z.x + y.y*m.z.y + z.y*m.z.z};}
             template <typename TT> [[nodiscard]] constexpr mat4x2<larger_t<type,TT>> mul(const mat4x3<TT> &m) const {return {x.x*m.x.x + y.x*m.x.y + z.x*m.x.z, x.x*m.y.x + y.x*m.y.y + z.x*m.y.z, x.x*m.z.x + y.x*m.z.y + z.x*m.z.z, x.x*m.w.x + y.x*m.w.y + z.x*m.w.z, x.y*m.x.x + y.y*m.x.y + z.y*m.x.z, x.y*m.y.x + y.y*m.y.y + z.y*m.y.z, x.y*m.z.x + y.y*m.z.y + z.y*m.z.z, x.y*m.w.x + y.y*m.w.y + z.y*m.w.z};}
-            inline static constexpr vec identity = vec(1);
             [[nodiscard]] constexpr mat2x3<T> transpose() const {return {x.x,x.y,y.x,y.y,z.x,z.y};}
-            [[nodiscard]] static constexpr vec scale(vec2<type> v) {return mat2x2<T>::scale(v).to_mat3x2();}
-            [[nodiscard]] static constexpr vec ortho(vec2<type> min, vec2<type> max)
-            {
-                static_assert(is_floating_point, "This function only makes sense for floating-point matrices.");
-                return {2 / (max.x - min.x), 0, (min.x + max.x) / (min.x - max.x),
-                        0, 2 / (max.y - min.y), (min.y + max.y) / (min.y - max.y)};
-            }
-            [[nodiscard]] static constexpr vec translate(vec2<type> v)
-            {
-                return {1, 0, v.x,
-                        0, 1, v.y};
-            }
-            [[nodiscard]] static constexpr vec rotate(type angle) {return mat2x2<T>::rotate(angle).to_mat3x2();}
         };
         
-        template <typename T> struct vec<3,vec<3,T>> // mat3x3
+        template <typename T> struct mat<3,3,T> // mat3x3
         {
             static_assert(!std::is_const_v<T> && !std::is_volatile_v<T>, "The base type must have no cv-qualifiers.");
             static_assert(!std::is_reference_v<T>, "The base type must not be a reference.");
@@ -733,30 +678,24 @@ namespace Math
             union {member_type x, r;};
             union {member_type y, g;};
             union {member_type z, b;};
-            constexpr vec() = default;
-            constexpr vec(member_type x, member_type y, member_type z) : x(x), y(y), z(z) {}
-            explicit constexpr vec(type obj) : x(obj,0,0), y(0,obj,0), z(0,0,obj) {}
-            explicit constexpr vec(vec3<type> obj) : x(obj.x,0,0), y(0,obj.y,0), z(0,0,obj.z) {}
-            constexpr vec(type sx, type sy, type sz) : x(sx,0,0), y(0,sy,0), z(0,0,sz) {}
-            constexpr vec(type xx, type yx, type zx, type xy, type yy, type zy, type xz, type yz, type zz) : x(xx,xy,xz), y(yx,yy,yz), z(zx,zy,zz) {}
-            template <typename TT> constexpr vec(const mat3x3<TT> &obj) : x(obj.x), y(obj.y), z(obj.z) {}
-            [[nodiscard]] static constexpr vec fill(type obj) {return vec(obj, obj, obj, obj, obj, obj, obj, obj, obj);}
+            constexpr mat() : mat(1) {}
+            constexpr mat(const member_type &x, const member_type &y, const member_type &z) : x(x), y(y), z(z) {}
+            explicit constexpr mat(type obj) : x(obj,0,0), y(0,obj,0), z(0,0,obj) {}
+            explicit constexpr mat(vec3<type> obj) : x(obj.x,0,0), y(0,obj.y,0), z(0,0,obj.z) {}
+            constexpr mat(type sx, type sy, type sz) : x(sx,0,0), y(0,sy,0), z(0,0,sz) {}
+            constexpr mat(type xx, type yx, type zx, type xy, type yy, type zy, type xz, type yz, type zz) : x(xx,xy,xz), y(yx,yy,yz), z(zx,zy,zz) {}
+            template <typename TT> constexpr mat(const mat3x3<TT> &obj) : x(obj.x), y(obj.y), z(obj.z) {}
+            [[nodiscard]] static constexpr mat fill(type obj) {return mat(obj, obj, obj, obj, obj, obj, obj, obj, obj);}
             template <typename TT> [[nodiscard]] constexpr mat3x3<TT> to() const {return mat3x3<TT>(TT(x.x), TT(y.x), TT(z.x), TT(x.y), TT(y.y), TT(z.y), TT(x.z), TT(y.z), TT(z.z));}
             [[nodiscard]] constexpr member_type &operator[](int i) {return *(member_type *)((char *)this + sizeof(member_type)*i);}
             [[nodiscard]] constexpr const member_type &operator[](int i) const {return *(member_type *)((char *)this + sizeof(member_type)*i);}
             [[nodiscard]] type *as_array() {return &x.x;};
             [[nodiscard]] const type *as_array() const {return &x.x;};
-            [[nodiscard]] explicit constexpr operator bool() const {return this->any(); static_assert(!std::is_same_v<type, bool>, "Use .none(), .any(), or .all() for vectors/matrices of bool.");}
-            [[nodiscard]] constexpr bool none() const {return !this->any();}
-            [[nodiscard]] constexpr bool any() const {return x.x || x.y || x.z || y.x || y.y || y.z || z.x || z.y || z.z;}
-            [[nodiscard]] constexpr bool all() const {return x.x && x.y && x.z && y.x && y.y && y.z && z.x && z.y && z.z;}
-            [[nodiscard]] constexpr type min() const {return std::min({x.x,x.y,x.z,y.x,y.y,y.z,z.x,z.y,z.z});}
-            [[nodiscard]] constexpr type max() const {return std::max({x.x,x.y,x.z,y.x,y.y,y.z,z.x,z.y,z.z});}
-            [[nodiscard]] constexpr vec2<member_type> to_vec2() const {return {x, y};}
-            [[nodiscard]] constexpr vec4<member_type> to_vec4(member_type nw) const {return {x, y, z, nw};}
-            [[nodiscard]] constexpr vec4<member_type> to_vec4() const {return to_vec4({});}
+            [[nodiscard]] constexpr mat2x3<type> to_vec2() const {return {x, y};}
+            [[nodiscard]] constexpr mat4x3<type> to_vec4(const member_type &nw) const {return {x, y, z, nw};}
+            [[nodiscard]] constexpr mat4x3<type> to_vec4() const {return to_vec4({});}
             [[nodiscard]] constexpr mat2x2<type> to_mat2x2() const {return {x.x,y.x,x.y,y.y};}
-            [[nodiscard]] constexpr mat2<type> to_mat2() const {return to_mat2x2();}
+            [[nodiscard]] constexpr mat2x2<type> to_mat2() const {return to_mat2x2();}
             [[nodiscard]] constexpr mat3x2<type> to_mat3x2() const {return {x.x,y.x,z.x,x.y,y.y,z.y};}
             [[nodiscard]] constexpr mat4x2<type> to_mat4x2() const {return {x.x,y.x,z.x,0,x.y,y.y,z.y,0};}
             [[nodiscard]] constexpr mat2x3<type> to_mat2x3() const {return {x.x,y.x,x.y,y.y,x.z,y.z};}
@@ -764,60 +703,75 @@ namespace Math
             [[nodiscard]] constexpr mat2x4<type> to_mat2x4() const {return {x.x,y.x,x.y,y.y,x.z,y.z,0,0};}
             [[nodiscard]] constexpr mat3x4<type> to_mat3x4() const {return {x.x,y.x,z.x,x.y,y.y,z.y,x.z,y.z,z.z,0,0,0};}
             [[nodiscard]] constexpr mat4x4<type> to_mat4x4() const {return {x.x,y.x,z.x,0,x.y,y.y,z.y,0,x.z,y.z,z.z,0,0,0,0,1};}
-            [[nodiscard]] constexpr mat4<type> to_mat4() const {return to_mat4x4();}
+            [[nodiscard]] constexpr mat4x4<type> to_mat4() const {return to_mat4x4();}
             template <typename TT> [[nodiscard]] constexpr vec3<larger_t<type,TT>> mul(const vec3<TT> &m) const {return {x.x*m.x + y.x*m.y + z.x*m.z, x.y*m.x + y.y*m.y + z.y*m.z, x.z*m.x + y.z*m.y + z.z*m.z};}
             template <typename TT> [[nodiscard]] constexpr mat2x3<larger_t<type,TT>> mul(const mat2x3<TT> &m) const {return {x.x*m.x.x + y.x*m.x.y + z.x*m.x.z, x.x*m.y.x + y.x*m.y.y + z.x*m.y.z, x.y*m.x.x + y.y*m.x.y + z.y*m.x.z, x.y*m.y.x + y.y*m.y.y + z.y*m.y.z, x.z*m.x.x + y.z*m.x.y + z.z*m.x.z, x.z*m.y.x + y.z*m.y.y + z.z*m.y.z};}
             template <typename TT> [[nodiscard]] constexpr mat3x3<larger_t<type,TT>> mul(const mat3x3<TT> &m) const {return {x.x*m.x.x + y.x*m.x.y + z.x*m.x.z, x.x*m.y.x + y.x*m.y.y + z.x*m.y.z, x.x*m.z.x + y.x*m.z.y + z.x*m.z.z, x.y*m.x.x + y.y*m.x.y + z.y*m.x.z, x.y*m.y.x + y.y*m.y.y + z.y*m.y.z, x.y*m.z.x + y.y*m.z.y + z.y*m.z.z, x.z*m.x.x + y.z*m.x.y + z.z*m.x.z, x.z*m.y.x + y.z*m.y.y + z.z*m.y.z, x.z*m.z.x + y.z*m.z.y + z.z*m.z.z};}
             template <typename TT> [[nodiscard]] constexpr mat4x3<larger_t<type,TT>> mul(const mat4x3<TT> &m) const {return {x.x*m.x.x + y.x*m.x.y + z.x*m.x.z, x.x*m.y.x + y.x*m.y.y + z.x*m.y.z, x.x*m.z.x + y.x*m.z.y + z.x*m.z.z, x.x*m.w.x + y.x*m.w.y + z.x*m.w.z, x.y*m.x.x + y.y*m.x.y + z.y*m.x.z, x.y*m.y.x + y.y*m.y.y + z.y*m.y.z, x.y*m.z.x + y.y*m.z.y + z.y*m.z.z, x.y*m.w.x + y.y*m.w.y + z.y*m.w.z, x.z*m.x.x + y.z*m.x.y + z.z*m.x.z, x.z*m.y.x + y.z*m.y.y + z.z*m.y.z, x.z*m.z.x + y.z*m.z.y + z.z*m.z.z, x.z*m.w.x + y.z*m.w.y + z.z*m.w.z};}
-            inline static constexpr vec identity = vec(1);
             [[nodiscard]] constexpr mat3x3<T> transpose() const {return {x.x,x.y,x.z,y.x,y.y,y.z,z.x,z.y,z.z};}
-            [[nodiscard]] constexpr vec inverse() const
+            [[nodiscard]] constexpr mat inverse() const
             {
-                vec ret{};
+                static_assert(is_floating_point, "This function only makes sense for floating-point matrices.");
+                
+                mat ret{};
                 
                 ret.x.x =  y.y * z.z - z.y * y.z;
                 ret.y.x = -y.x * z.z + z.x * y.z;
                 ret.z.x =  y.x * z.y - z.x * y.y;
                 
                 type d = x.x * ret.x.x + x.y * ret.y.x + x.z * ret.z.x;
-                if (d == 0) return identity;
-                
-                ret.x.y = -x.y * z.z + z.y * x.z;
-                ret.y.y =  x.x * z.z - z.x * x.z;
-                ret.z.y = -x.x * z.y + z.x * x.y;
-                ret.x.z =  x.y * y.z - y.y * x.z;
-                ret.y.z = -x.x * y.z + y.x * x.z;
-                ret.z.z =  x.x * y.y - y.x * x.y;
-                
+                if (d == 0) return {};
                 d = 1 / d;
-                return ret * d;
+                ret.x.x *= d;
+                ret.y.x *= d;
+                ret.z.x *= d;
+                
+                ret.x.y = (-x.y * z.z + z.y * x.z) * d;
+                ret.y.y = ( x.x * z.z - z.x * x.z) * d;
+                ret.z.y = (-x.x * z.y + z.x * x.y) * d;
+                ret.x.z = ( x.y * y.z - y.y * x.z) * d;
+                ret.y.z = (-x.x * y.z + y.x * x.z) * d;
+                ret.z.z = ( x.x * y.y - y.x * x.y) * d;
+                
+                return ret;
             }
-            [[nodiscard]] static constexpr vec scale(vec2<type> v) {return mat2x2<T>::scale(v).to_mat3x3();}
-            [[nodiscard]] static constexpr vec scale(vec3<type> v)
+            [[nodiscard]] static constexpr mat scale(vec2<type> v) {return mat2<T>::scale(v).to_mat3();}
+            [[nodiscard]] static constexpr mat scale(vec3<type> v)
             {
-                return {v.x, 0, 0,
-                        0, v.y, 0,
-                        0, 0, v.z};
+                return { v.x , 0   , 0   ,
+                         0   , v.y , 0   ,
+                         0   , 0   , v.z };
             }
-            [[nodiscard]] static constexpr vec ortho(vec2<type> min, vec2<type> max) {return mat3x2<T>::ortho(min, max).to_mat3x3();}
-            [[nodiscard]] static constexpr vec translate(vec2<type> v) {return mat3x2<T>::translate(v).to_mat3x3();}
-            [[nodiscard]] static constexpr vec rotate(type angle) {return mat2x2<T>::rotate(angle).to_mat3x3();}
-            [[nodiscard]] static constexpr vec rotate_with_normalized_axis(vec3<type> axis, type angle)
+            [[nodiscard]] static constexpr mat ortho(vec2<type> min, vec2<type> max)
+            {
+                static_assert(is_floating_point, "This function only makes sense for floating-point matrices.");
+                return { 2 / (max.x - min.x) , 0                   , (min.x + max.x) / (min.x - max.x) ,
+                         0                   , 2 / (max.y - min.y) , (min.y + max.y) / (min.y - max.y) ,
+                         0                   , 0                   , 1                                 };
+            }
+            [[nodiscard]] static constexpr mat translate(vec2<type> v)
+            {
+                return { 1, 0, v.x ,
+                         0, 1, v.y ,
+                         0, 0, 1   };
+            }
+            [[nodiscard]] static constexpr mat rotate(type angle) {return mat2<T>::rotate(angle).to_mat3();}
+            [[nodiscard]] static constexpr mat rotate_with_normalized_axis(vec3<type> axis, type angle)
             {
                 type c = std::cos(angle);
                 type s = std::sin(angle);
-                return {axis.x * axis.x * (1 - c) + c, axis.x * axis.y * (1 - c) - axis.z * s, axis.x * axis.z * (1 - c) + axis.y * s,
-                        axis.y * axis.x * (1 - c) + axis.z * s, axis.y * axis.y * (1 - c) + c, axis.y * axis.z * (1 - c) - axis.x * s,
-                        axis.x * axis.z * (1 - c) - axis.y * s, axis.y * axis.z * (1 - c) + axis.x * s, axis.z * axis.z * (1 - c) + c};
+                return { axis.x * axis.x * (1 - c) + c          , axis.x * axis.y * (1 - c) - axis.z * s , axis.x * axis.z * (1 - c) + axis.y * s,
+                         axis.y * axis.x * (1 - c) + axis.z * s , axis.y * axis.y * (1 - c) + c          , axis.y * axis.z * (1 - c) - axis.x * s,
+                         axis.x * axis.z * (1 - c) - axis.y * s , axis.y * axis.z * (1 - c) + axis.x * s , axis.z * axis.z * (1 - c) + c         };
             }
-            [[nodiscard]] static constexpr vec rotate(vec3<type> axis, type angle)
+            [[nodiscard]] static constexpr mat rotate(vec3<type> axis, type angle)
             {
                 static_assert(is_floating_point, "This function only makes sense for floating-point matrices.");
                 return rotate_with_normalized_axis(axis.norm(), angle);
             }
         };
         
-        template <typename T> struct vec<3,vec<4,T>> // mat3x4
+        template <typename T> struct mat<3,4,T> // mat3x4
         {
             static_assert(!std::is_const_v<T> && !std::is_volatile_v<T>, "The base type must have no cv-qualifiers.");
             static_assert(!std::is_reference_v<T>, "The base type must not be a reference.");
@@ -828,51 +782,41 @@ namespace Math
             union {member_type x, r;};
             union {member_type y, g;};
             union {member_type z, b;};
-            constexpr vec() = default;
-            constexpr vec(member_type x, member_type y, member_type z) : x(x), y(y), z(z) {}
-            explicit constexpr vec(type obj) : x(obj,0,0,0), y(0,obj,0,0), z(0,0,obj,0) {}
-            explicit constexpr vec(vec3<type> obj) : x(obj.x,0,0,0), y(0,obj.y,0,0), z(0,0,obj.z,0) {}
-            constexpr vec(type sx, type sy, type sz) : x(sx,0,0,0), y(0,sy,0,0), z(0,0,sz,0) {}
-            constexpr vec(type xx, type yx, type zx, type xy, type yy, type zy, type xz, type yz, type zz, type xw, type yw, type zw) : x(xx,xy,xz,xw), y(yx,yy,yz,yw), z(zx,zy,zz,zw) {}
-            template <typename TT> constexpr vec(const mat3x4<TT> &obj) : x(obj.x), y(obj.y), z(obj.z) {}
-            [[nodiscard]] static constexpr vec fill(type obj) {return vec(obj, obj, obj, obj, obj, obj, obj, obj, obj, obj, obj, obj);}
+            constexpr mat() : mat(1) {}
+            constexpr mat(const member_type &x, const member_type &y, const member_type &z) : x(x), y(y), z(z) {}
+            explicit constexpr mat(type obj) : x(obj,0,0,0), y(0,obj,0,0), z(0,0,obj,0) {}
+            explicit constexpr mat(vec3<type> obj) : x(obj.x,0,0,0), y(0,obj.y,0,0), z(0,0,obj.z,0) {}
+            constexpr mat(type sx, type sy, type sz) : x(sx,0,0,0), y(0,sy,0,0), z(0,0,sz,0) {}
+            constexpr mat(type xx, type yx, type zx, type xy, type yy, type zy, type xz, type yz, type zz, type xw, type yw, type zw) : x(xx,xy,xz,xw), y(yx,yy,yz,yw), z(zx,zy,zz,zw) {}
+            template <typename TT> constexpr mat(const mat3x4<TT> &obj) : x(obj.x), y(obj.y), z(obj.z) {}
+            [[nodiscard]] static constexpr mat fill(type obj) {return mat(obj, obj, obj, obj, obj, obj, obj, obj, obj, obj, obj, obj);}
             template <typename TT> [[nodiscard]] constexpr mat3x4<TT> to() const {return mat3x4<TT>(TT(x.x), TT(y.x), TT(z.x), TT(x.y), TT(y.y), TT(z.y), TT(x.z), TT(y.z), TT(z.z), TT(x.w), TT(y.w), TT(z.w));}
             [[nodiscard]] constexpr member_type &operator[](int i) {return *(member_type *)((char *)this + sizeof(member_type)*i);}
             [[nodiscard]] constexpr const member_type &operator[](int i) const {return *(member_type *)((char *)this + sizeof(member_type)*i);}
             [[nodiscard]] type *as_array() {return &x.x;};
             [[nodiscard]] const type *as_array() const {return &x.x;};
-            [[nodiscard]] explicit constexpr operator bool() const {return this->any(); static_assert(!std::is_same_v<type, bool>, "Use .none(), .any(), or .all() for vectors/matrices of bool.");}
-            [[nodiscard]] constexpr bool none() const {return !this->any();}
-            [[nodiscard]] constexpr bool any() const {return x.x || x.y || x.z || x.w || y.x || y.y || y.z || y.w || z.x || z.y || z.z || z.w;}
-            [[nodiscard]] constexpr bool all() const {return x.x && x.y && x.z && x.w && y.x && y.y && y.z && y.w && z.x && z.y && z.z && z.w;}
-            [[nodiscard]] constexpr type min() const {return std::min({x.x,x.y,x.z,x.w,y.x,y.y,y.z,y.w,z.x,z.y,z.z,z.w});}
-            [[nodiscard]] constexpr type max() const {return std::max({x.x,x.y,x.z,x.w,y.x,y.y,y.z,y.w,z.x,z.y,z.z,z.w});}
-            [[nodiscard]] constexpr vec2<member_type> to_vec2() const {return {x, y};}
-            [[nodiscard]] constexpr vec4<member_type> to_vec4(member_type nw) const {return {x, y, z, nw};}
-            [[nodiscard]] constexpr vec4<member_type> to_vec4() const {return to_vec4({});}
+            [[nodiscard]] constexpr mat2x4<type> to_vec2() const {return {x, y};}
+            [[nodiscard]] constexpr mat4x4<type> to_vec4(const member_type &nw) const {return {x, y, z, nw};}
+            [[nodiscard]] constexpr mat4x4<type> to_vec4() const {return to_vec4({});}
             [[nodiscard]] constexpr mat2x2<type> to_mat2x2() const {return {x.x,y.x,x.y,y.y};}
-            [[nodiscard]] constexpr mat2<type> to_mat2() const {return to_mat2x2();}
+            [[nodiscard]] constexpr mat2x2<type> to_mat2() const {return to_mat2x2();}
             [[nodiscard]] constexpr mat3x2<type> to_mat3x2() const {return {x.x,y.x,z.x,x.y,y.y,z.y};}
             [[nodiscard]] constexpr mat4x2<type> to_mat4x2() const {return {x.x,y.x,z.x,0,x.y,y.y,z.y,0};}
             [[nodiscard]] constexpr mat2x3<type> to_mat2x3() const {return {x.x,y.x,x.y,y.y,x.z,y.z};}
             [[nodiscard]] constexpr mat3x3<type> to_mat3x3() const {return {x.x,y.x,z.x,x.y,y.y,z.y,x.z,y.z,z.z};}
-            [[nodiscard]] constexpr mat3<type> to_mat3() const {return to_mat3x3();}
+            [[nodiscard]] constexpr mat3x3<type> to_mat3() const {return to_mat3x3();}
             [[nodiscard]] constexpr mat4x3<type> to_mat4x3() const {return {x.x,y.x,z.x,0,x.y,y.y,z.y,0,x.z,y.z,z.z,0};}
             [[nodiscard]] constexpr mat2x4<type> to_mat2x4() const {return {x.x,y.x,x.y,y.y,x.z,y.z,x.w,y.w};}
             [[nodiscard]] constexpr mat4x4<type> to_mat4x4() const {return {x.x,y.x,z.x,0,x.y,y.y,z.y,0,x.z,y.z,z.z,0,x.w,y.w,z.w,1};}
-            [[nodiscard]] constexpr mat4<type> to_mat4() const {return to_mat4x4();}
+            [[nodiscard]] constexpr mat4x4<type> to_mat4() const {return to_mat4x4();}
             template <typename TT> [[nodiscard]] constexpr vec4<larger_t<type,TT>> mul(const vec3<TT> &m) const {return {x.x*m.x + y.x*m.y + z.x*m.z, x.y*m.x + y.y*m.y + z.y*m.z, x.z*m.x + y.z*m.y + z.z*m.z, x.w*m.x + y.w*m.y + z.w*m.z};}
             template <typename TT> [[nodiscard]] constexpr mat2x4<larger_t<type,TT>> mul(const mat2x3<TT> &m) const {return {x.x*m.x.x + y.x*m.x.y + z.x*m.x.z, x.x*m.y.x + y.x*m.y.y + z.x*m.y.z, x.y*m.x.x + y.y*m.x.y + z.y*m.x.z, x.y*m.y.x + y.y*m.y.y + z.y*m.y.z, x.z*m.x.x + y.z*m.x.y + z.z*m.x.z, x.z*m.y.x + y.z*m.y.y + z.z*m.y.z, x.w*m.x.x + y.w*m.x.y + z.w*m.x.z, x.w*m.y.x + y.w*m.y.y + z.w*m.y.z};}
             template <typename TT> [[nodiscard]] constexpr mat3x4<larger_t<type,TT>> mul(const mat3x3<TT> &m) const {return {x.x*m.x.x + y.x*m.x.y + z.x*m.x.z, x.x*m.y.x + y.x*m.y.y + z.x*m.y.z, x.x*m.z.x + y.x*m.z.y + z.x*m.z.z, x.y*m.x.x + y.y*m.x.y + z.y*m.x.z, x.y*m.y.x + y.y*m.y.y + z.y*m.y.z, x.y*m.z.x + y.y*m.z.y + z.y*m.z.z, x.z*m.x.x + y.z*m.x.y + z.z*m.x.z, x.z*m.y.x + y.z*m.y.y + z.z*m.y.z, x.z*m.z.x + y.z*m.z.y + z.z*m.z.z, x.w*m.x.x + y.w*m.x.y + z.w*m.x.z, x.w*m.y.x + y.w*m.y.y + z.w*m.y.z, x.w*m.z.x + y.w*m.z.y + z.w*m.z.z};}
             template <typename TT> [[nodiscard]] constexpr mat4x4<larger_t<type,TT>> mul(const mat4x3<TT> &m) const {return {x.x*m.x.x + y.x*m.x.y + z.x*m.x.z, x.x*m.y.x + y.x*m.y.y + z.x*m.y.z, x.x*m.z.x + y.x*m.z.y + z.x*m.z.z, x.x*m.w.x + y.x*m.w.y + z.x*m.w.z, x.y*m.x.x + y.y*m.x.y + z.y*m.x.z, x.y*m.y.x + y.y*m.y.y + z.y*m.y.z, x.y*m.z.x + y.y*m.z.y + z.y*m.z.z, x.y*m.w.x + y.y*m.w.y + z.y*m.w.z, x.z*m.x.x + y.z*m.x.y + z.z*m.x.z, x.z*m.y.x + y.z*m.y.y + z.z*m.y.z, x.z*m.z.x + y.z*m.z.y + z.z*m.z.z, x.z*m.w.x + y.z*m.w.y + z.z*m.w.z, x.w*m.x.x + y.w*m.x.y + z.w*m.x.z, x.w*m.y.x + y.w*m.y.y + z.w*m.y.z, x.w*m.z.x + y.w*m.z.y + z.w*m.z.z, x.w*m.w.x + y.w*m.w.y + z.w*m.w.z};}
-            inline static constexpr vec identity = vec(1);
             [[nodiscard]] constexpr mat4x3<T> transpose() const {return {x.x,x.y,x.z,x.w,y.x,y.y,y.z,y.w,z.x,z.y,z.z,z.w};}
-            [[nodiscard]] static constexpr vec scale(vec3<type> v) {return mat3x3<T>::scale(v).to_mat3x4();}
-            [[nodiscard]] static constexpr vec rotate_with_normalized_axis(vec3<type> axis, type angle) {return mat3x3<T>::rotate_with_normalized_axis(axis, angle).to_mat3x4();}
-            [[nodiscard]] static constexpr vec rotate(vec3<type> axis, type angle) {return mat3x3<T>::rotate(axis, angle).to_mat3x4();}
         };
         
-        template <typename T> struct vec<4,vec<2,T>> // mat4x2
+        template <typename T> struct mat<4,2,T> // mat4x2
         {
             static_assert(!std::is_const_v<T> && !std::is_volatile_v<T>, "The base type must have no cv-qualifiers.");
             static_assert(!std::is_reference_v<T>, "The base type must not be a reference.");
@@ -884,47 +828,40 @@ namespace Math
             union {member_type y, g;};
             union {member_type z, b;};
             union {member_type w, a;};
-            constexpr vec() = default;
-            constexpr vec(member_type x, member_type y, member_type z, member_type w) : x(x), y(y), z(z), w(w) {}
-            explicit constexpr vec(type obj) : x(obj,0), y(0,obj), z(0,0), w(0,0) {}
-            explicit constexpr vec(vec2<type> obj) : x(obj.x,0), y(0,obj.y), z(0,0), w(0,0) {}
-            constexpr vec(type sx, type sy) : x(sx,0), y(0,sy), z(0,0), w(0,0) {}
-            constexpr vec(type xx, type yx, type zx, type wx, type xy, type yy, type zy, type wy) : x(xx,xy), y(yx,yy), z(zx,zy), w(wx,wy) {}
-            template <typename TT> constexpr vec(const mat4x2<TT> &obj) : x(obj.x), y(obj.y), z(obj.z), w(obj.w) {}
-            [[nodiscard]] static constexpr vec fill(type obj) {return vec(obj, obj, obj, obj, obj, obj, obj, obj);}
+            constexpr mat() : mat(1) {}
+            constexpr mat(const member_type &x, const member_type &y, const member_type &z, const member_type &w) : x(x), y(y), z(z), w(w) {}
+            explicit constexpr mat(type obj) : x(obj,0), y(0,obj), z(0,0), w(0,0) {}
+            explicit constexpr mat(vec2<type> obj) : x(obj.x,0), y(0,obj.y), z(0,0), w(0,0) {}
+            constexpr mat(type sx, type sy) : x(sx,0), y(0,sy), z(0,0), w(0,0) {}
+            constexpr mat(type xx, type yx, type zx, type wx, type xy, type yy, type zy, type wy) : x(xx,xy), y(yx,yy), z(zx,zy), w(wx,wy) {}
+            template <typename TT> constexpr mat(const mat4x2<TT> &obj) : x(obj.x), y(obj.y), z(obj.z), w(obj.w) {}
+            [[nodiscard]] static constexpr mat fill(type obj) {return mat(obj, obj, obj, obj, obj, obj, obj, obj);}
             template <typename TT> [[nodiscard]] constexpr mat4x2<TT> to() const {return mat4x2<TT>(TT(x.x), TT(y.x), TT(z.x), TT(w.x), TT(x.y), TT(y.y), TT(z.y), TT(w.y));}
             [[nodiscard]] constexpr member_type &operator[](int i) {return *(member_type *)((char *)this + sizeof(member_type)*i);}
             [[nodiscard]] constexpr const member_type &operator[](int i) const {return *(member_type *)((char *)this + sizeof(member_type)*i);}
             [[nodiscard]] type *as_array() {return &x.x;};
             [[nodiscard]] const type *as_array() const {return &x.x;};
-            [[nodiscard]] explicit constexpr operator bool() const {return this->any(); static_assert(!std::is_same_v<type, bool>, "Use .none(), .any(), or .all() for vectors/matrices of bool.");}
-            [[nodiscard]] constexpr bool none() const {return !this->any();}
-            [[nodiscard]] constexpr bool any() const {return x.x || x.y || y.x || y.y || z.x || z.y || w.x || w.y;}
-            [[nodiscard]] constexpr bool all() const {return x.x && x.y && y.x && y.y && z.x && z.y && w.x && w.y;}
-            [[nodiscard]] constexpr type min() const {return std::min({x.x,x.y,y.x,y.y,z.x,z.y,w.x,w.y});}
-            [[nodiscard]] constexpr type max() const {return std::max({x.x,x.y,y.x,y.y,z.x,z.y,w.x,w.y});}
-            [[nodiscard]] constexpr vec2<member_type> to_vec2() const {return {x, y};}
-            [[nodiscard]] constexpr vec3<member_type> to_vec3() const {return {x, y, z};}
+            [[nodiscard]] constexpr mat2x2<type> to_vec2() const {return {x, y};}
+            [[nodiscard]] constexpr mat3x2<type> to_vec3() const {return {x, y, z};}
             [[nodiscard]] constexpr mat2x2<type> to_mat2x2() const {return {x.x,y.x,x.y,y.y};}
-            [[nodiscard]] constexpr mat2<type> to_mat2() const {return to_mat2x2();}
+            [[nodiscard]] constexpr mat2x2<type> to_mat2() const {return to_mat2x2();}
             [[nodiscard]] constexpr mat3x2<type> to_mat3x2() const {return {x.x,y.x,z.x,x.y,y.y,z.y};}
             [[nodiscard]] constexpr mat2x3<type> to_mat2x3() const {return {x.x,y.x,x.y,y.y,0,0};}
             [[nodiscard]] constexpr mat3x3<type> to_mat3x3() const {return {x.x,y.x,z.x,x.y,y.y,z.y,0,0,1};}
-            [[nodiscard]] constexpr mat3<type> to_mat3() const {return to_mat3x3();}
+            [[nodiscard]] constexpr mat3x3<type> to_mat3() const {return to_mat3x3();}
             [[nodiscard]] constexpr mat4x3<type> to_mat4x3() const {return {x.x,y.x,z.x,w.x,x.y,y.y,z.y,w.y,0,0,1,0};}
             [[nodiscard]] constexpr mat2x4<type> to_mat2x4() const {return {x.x,y.x,x.y,y.y,0,0,0,0};}
             [[nodiscard]] constexpr mat3x4<type> to_mat3x4() const {return {x.x,y.x,z.x,x.y,y.y,z.y,0,0,1,0,0,0};}
             [[nodiscard]] constexpr mat4x4<type> to_mat4x4() const {return {x.x,y.x,z.x,w.x,x.y,y.y,z.y,w.y,0,0,1,0,0,0,0,1};}
-            [[nodiscard]] constexpr mat4<type> to_mat4() const {return to_mat4x4();}
+            [[nodiscard]] constexpr mat4x4<type> to_mat4() const {return to_mat4x4();}
             template <typename TT> [[nodiscard]] constexpr vec2<larger_t<type,TT>> mul(const vec4<TT> &m) const {return {x.x*m.x + y.x*m.y + z.x*m.z + w.x*m.w, x.y*m.x + y.y*m.y + z.y*m.z + w.y*m.w};}
             template <typename TT> [[nodiscard]] constexpr mat2x2<larger_t<type,TT>> mul(const mat2x4<TT> &m) const {return {x.x*m.x.x + y.x*m.x.y + z.x*m.x.z + w.x*m.x.w, x.x*m.y.x + y.x*m.y.y + z.x*m.y.z + w.x*m.y.w, x.y*m.x.x + y.y*m.x.y + z.y*m.x.z + w.y*m.x.w, x.y*m.y.x + y.y*m.y.y + z.y*m.y.z + w.y*m.y.w};}
             template <typename TT> [[nodiscard]] constexpr mat3x2<larger_t<type,TT>> mul(const mat3x4<TT> &m) const {return {x.x*m.x.x + y.x*m.x.y + z.x*m.x.z + w.x*m.x.w, x.x*m.y.x + y.x*m.y.y + z.x*m.y.z + w.x*m.y.w, x.x*m.z.x + y.x*m.z.y + z.x*m.z.z + w.x*m.z.w, x.y*m.x.x + y.y*m.x.y + z.y*m.x.z + w.y*m.x.w, x.y*m.y.x + y.y*m.y.y + z.y*m.y.z + w.y*m.y.w, x.y*m.z.x + y.y*m.z.y + z.y*m.z.z + w.y*m.z.w};}
             template <typename TT> [[nodiscard]] constexpr mat4x2<larger_t<type,TT>> mul(const mat4x4<TT> &m) const {return {x.x*m.x.x + y.x*m.x.y + z.x*m.x.z + w.x*m.x.w, x.x*m.y.x + y.x*m.y.y + z.x*m.y.z + w.x*m.y.w, x.x*m.z.x + y.x*m.z.y + z.x*m.z.z + w.x*m.z.w, x.x*m.w.x + y.x*m.w.y + z.x*m.w.z + w.x*m.w.w, x.y*m.x.x + y.y*m.x.y + z.y*m.x.z + w.y*m.x.w, x.y*m.y.x + y.y*m.y.y + z.y*m.y.z + w.y*m.y.w, x.y*m.z.x + y.y*m.z.y + z.y*m.z.z + w.y*m.z.w, x.y*m.w.x + y.y*m.w.y + z.y*m.w.z + w.y*m.w.w};}
-            inline static constexpr vec identity = vec(1);
             [[nodiscard]] constexpr mat2x4<T> transpose() const {return {x.x,x.y,y.x,y.y,z.x,z.y,w.x,w.y};}
         };
         
-        template <typename T> struct vec<4,vec<3,T>> // mat4x3
+        template <typename T> struct mat<4,3,T> // mat4x3
         {
             static_assert(!std::is_const_v<T> && !std::is_volatile_v<T>, "The base type must have no cv-qualifiers.");
             static_assert(!std::is_reference_v<T>, "The base type must not be a reference.");
@@ -936,73 +873,40 @@ namespace Math
             union {member_type y, g;};
             union {member_type z, b;};
             union {member_type w, a;};
-            constexpr vec() = default;
-            constexpr vec(member_type x, member_type y, member_type z, member_type w) : x(x), y(y), z(z), w(w) {}
-            explicit constexpr vec(type obj) : x(obj,0,0), y(0,obj,0), z(0,0,obj), w(0,0,0) {}
-            explicit constexpr vec(vec3<type> obj) : x(obj.x,0,0), y(0,obj.y,0), z(0,0,obj.z), w(0,0,0) {}
-            constexpr vec(type sx, type sy, type sz) : x(sx,0,0), y(0,sy,0), z(0,0,sz), w(0,0,0) {}
-            constexpr vec(type xx, type yx, type zx, type wx, type xy, type yy, type zy, type wy, type xz, type yz, type zz, type wz) : x(xx,xy,xz), y(yx,yy,yz), z(zx,zy,zz), w(wx,wy,wz) {}
-            template <typename TT> constexpr vec(const mat4x3<TT> &obj) : x(obj.x), y(obj.y), z(obj.z), w(obj.w) {}
-            [[nodiscard]] static constexpr vec fill(type obj) {return vec(obj, obj, obj, obj, obj, obj, obj, obj, obj, obj, obj, obj);}
+            constexpr mat() : mat(1) {}
+            constexpr mat(const member_type &x, const member_type &y, const member_type &z, const member_type &w) : x(x), y(y), z(z), w(w) {}
+            explicit constexpr mat(type obj) : x(obj,0,0), y(0,obj,0), z(0,0,obj), w(0,0,0) {}
+            explicit constexpr mat(vec3<type> obj) : x(obj.x,0,0), y(0,obj.y,0), z(0,0,obj.z), w(0,0,0) {}
+            constexpr mat(type sx, type sy, type sz) : x(sx,0,0), y(0,sy,0), z(0,0,sz), w(0,0,0) {}
+            constexpr mat(type xx, type yx, type zx, type wx, type xy, type yy, type zy, type wy, type xz, type yz, type zz, type wz) : x(xx,xy,xz), y(yx,yy,yz), z(zx,zy,zz), w(wx,wy,wz) {}
+            template <typename TT> constexpr mat(const mat4x3<TT> &obj) : x(obj.x), y(obj.y), z(obj.z), w(obj.w) {}
+            [[nodiscard]] static constexpr mat fill(type obj) {return mat(obj, obj, obj, obj, obj, obj, obj, obj, obj, obj, obj, obj);}
             template <typename TT> [[nodiscard]] constexpr mat4x3<TT> to() const {return mat4x3<TT>(TT(x.x), TT(y.x), TT(z.x), TT(w.x), TT(x.y), TT(y.y), TT(z.y), TT(w.y), TT(x.z), TT(y.z), TT(z.z), TT(w.z));}
             [[nodiscard]] constexpr member_type &operator[](int i) {return *(member_type *)((char *)this + sizeof(member_type)*i);}
             [[nodiscard]] constexpr const member_type &operator[](int i) const {return *(member_type *)((char *)this + sizeof(member_type)*i);}
             [[nodiscard]] type *as_array() {return &x.x;};
             [[nodiscard]] const type *as_array() const {return &x.x;};
-            [[nodiscard]] explicit constexpr operator bool() const {return this->any(); static_assert(!std::is_same_v<type, bool>, "Use .none(), .any(), or .all() for vectors/matrices of bool.");}
-            [[nodiscard]] constexpr bool none() const {return !this->any();}
-            [[nodiscard]] constexpr bool any() const {return x.x || x.y || x.z || y.x || y.y || y.z || z.x || z.y || z.z || w.x || w.y || w.z;}
-            [[nodiscard]] constexpr bool all() const {return x.x && x.y && x.z && y.x && y.y && y.z && z.x && z.y && z.z && w.x && w.y && w.z;}
-            [[nodiscard]] constexpr type min() const {return std::min({x.x,x.y,x.z,y.x,y.y,y.z,z.x,z.y,z.z,w.x,w.y,w.z});}
-            [[nodiscard]] constexpr type max() const {return std::max({x.x,x.y,x.z,y.x,y.y,y.z,z.x,z.y,z.z,w.x,w.y,w.z});}
-            [[nodiscard]] constexpr vec2<member_type> to_vec2() const {return {x, y};}
-            [[nodiscard]] constexpr vec3<member_type> to_vec3() const {return {x, y, z};}
+            [[nodiscard]] constexpr mat2x3<type> to_vec2() const {return {x, y};}
+            [[nodiscard]] constexpr mat3x3<type> to_vec3() const {return {x, y, z};}
             [[nodiscard]] constexpr mat2x2<type> to_mat2x2() const {return {x.x,y.x,x.y,y.y};}
-            [[nodiscard]] constexpr mat2<type> to_mat2() const {return to_mat2x2();}
+            [[nodiscard]] constexpr mat2x2<type> to_mat2() const {return to_mat2x2();}
             [[nodiscard]] constexpr mat3x2<type> to_mat3x2() const {return {x.x,y.x,z.x,x.y,y.y,z.y};}
             [[nodiscard]] constexpr mat4x2<type> to_mat4x2() const {return {x.x,y.x,z.x,w.x,x.y,y.y,z.y,w.y};}
             [[nodiscard]] constexpr mat2x3<type> to_mat2x3() const {return {x.x,y.x,x.y,y.y,x.z,y.z};}
             [[nodiscard]] constexpr mat3x3<type> to_mat3x3() const {return {x.x,y.x,z.x,x.y,y.y,z.y,x.z,y.z,z.z};}
-            [[nodiscard]] constexpr mat3<type> to_mat3() const {return to_mat3x3();}
+            [[nodiscard]] constexpr mat3x3<type> to_mat3() const {return to_mat3x3();}
             [[nodiscard]] constexpr mat2x4<type> to_mat2x4() const {return {x.x,y.x,x.y,y.y,x.z,y.z,0,0};}
             [[nodiscard]] constexpr mat3x4<type> to_mat3x4() const {return {x.x,y.x,z.x,x.y,y.y,z.y,x.z,y.z,z.z,0,0,0};}
             [[nodiscard]] constexpr mat4x4<type> to_mat4x4() const {return {x.x,y.x,z.x,w.x,x.y,y.y,z.y,w.y,x.z,y.z,z.z,w.z,0,0,0,1};}
-            [[nodiscard]] constexpr mat4<type> to_mat4() const {return to_mat4x4();}
+            [[nodiscard]] constexpr mat4x4<type> to_mat4() const {return to_mat4x4();}
             template <typename TT> [[nodiscard]] constexpr vec3<larger_t<type,TT>> mul(const vec4<TT> &m) const {return {x.x*m.x + y.x*m.y + z.x*m.z + w.x*m.w, x.y*m.x + y.y*m.y + z.y*m.z + w.y*m.w, x.z*m.x + y.z*m.y + z.z*m.z + w.z*m.w};}
             template <typename TT> [[nodiscard]] constexpr mat2x3<larger_t<type,TT>> mul(const mat2x4<TT> &m) const {return {x.x*m.x.x + y.x*m.x.y + z.x*m.x.z + w.x*m.x.w, x.x*m.y.x + y.x*m.y.y + z.x*m.y.z + w.x*m.y.w, x.y*m.x.x + y.y*m.x.y + z.y*m.x.z + w.y*m.x.w, x.y*m.y.x + y.y*m.y.y + z.y*m.y.z + w.y*m.y.w, x.z*m.x.x + y.z*m.x.y + z.z*m.x.z + w.z*m.x.w, x.z*m.y.x + y.z*m.y.y + z.z*m.y.z + w.z*m.y.w};}
             template <typename TT> [[nodiscard]] constexpr mat3x3<larger_t<type,TT>> mul(const mat3x4<TT> &m) const {return {x.x*m.x.x + y.x*m.x.y + z.x*m.x.z + w.x*m.x.w, x.x*m.y.x + y.x*m.y.y + z.x*m.y.z + w.x*m.y.w, x.x*m.z.x + y.x*m.z.y + z.x*m.z.z + w.x*m.z.w, x.y*m.x.x + y.y*m.x.y + z.y*m.x.z + w.y*m.x.w, x.y*m.y.x + y.y*m.y.y + z.y*m.y.z + w.y*m.y.w, x.y*m.z.x + y.y*m.z.y + z.y*m.z.z + w.y*m.z.w, x.z*m.x.x + y.z*m.x.y + z.z*m.x.z + w.z*m.x.w, x.z*m.y.x + y.z*m.y.y + z.z*m.y.z + w.z*m.y.w, x.z*m.z.x + y.z*m.z.y + z.z*m.z.z + w.z*m.z.w};}
             template <typename TT> [[nodiscard]] constexpr mat4x3<larger_t<type,TT>> mul(const mat4x4<TT> &m) const {return {x.x*m.x.x + y.x*m.x.y + z.x*m.x.z + w.x*m.x.w, x.x*m.y.x + y.x*m.y.y + z.x*m.y.z + w.x*m.y.w, x.x*m.z.x + y.x*m.z.y + z.x*m.z.z + w.x*m.z.w, x.x*m.w.x + y.x*m.w.y + z.x*m.w.z + w.x*m.w.w, x.y*m.x.x + y.y*m.x.y + z.y*m.x.z + w.y*m.x.w, x.y*m.y.x + y.y*m.y.y + z.y*m.y.z + w.y*m.y.w, x.y*m.z.x + y.y*m.z.y + z.y*m.z.z + w.y*m.z.w, x.y*m.w.x + y.y*m.w.y + z.y*m.w.z + w.y*m.w.w, x.z*m.x.x + y.z*m.x.y + z.z*m.x.z + w.z*m.x.w, x.z*m.y.x + y.z*m.y.y + z.z*m.y.z + w.z*m.y.w, x.z*m.z.x + y.z*m.z.y + z.z*m.z.z + w.z*m.z.w, x.z*m.w.x + y.z*m.w.y + z.z*m.w.z + w.z*m.w.w};}
-            inline static constexpr vec identity = vec(1);
             [[nodiscard]] constexpr mat3x4<T> transpose() const {return {x.x,x.y,x.z,y.x,y.y,y.z,z.x,z.y,z.z,w.x,w.y,w.z};}
-            [[nodiscard]] static constexpr vec scale(vec3<type> v) {return mat3x3<T>::scale(v).to_mat4x3();}
-            [[nodiscard]] static constexpr vec ortho(vec2<type> min, vec2<type> max, type near, type far)
-            {
-                static_assert(is_floating_point, "This function only makes sense for floating-point matrices.");
-                return {2 / (max.x - min.x), 0, 0, (min.x + max.x) / (min.x - max.x),
-                        0, 2 / (max.y - min.y), 0, (min.y + max.y) / (min.y - max.y),
-                        0, 0, 2 / (near - far), (near + far) / (near - far)};
-            }
-            [[nodiscard]] static constexpr vec look_at(vec3<type> src, vec3<type> dst, vec3<type> local_up)
-            {
-                static_assert(is_floating_point, "This function only makes sense for floating-point matrices.");
-                vec3<type> v3 = (src-dst).norm();
-                vec3<type> v1 = local_up.cross(v3).norm();
-                vec3<type> v2 = v3.cross(v1);
-                return {v1.x, v1.y, v1.z, -src.x*v1.x - src.y*v1.y - src.z*v1.z,
-                        v2.x, v2.y, v2.z, -src.x*v2.x - src.y*v2.y - src.z*v2.z,
-                        v3.x, v3.y, v3.z, -src.x*v3.x - src.y*v3.y - src.z*v3.z};
-            }
-            [[nodiscard]] static constexpr vec translate(vec3<type> v)
-            {
-                return {1, 0, 0, v.x,
-                        0, 1, 0, v.y,
-                        0, 0, 1, v.z};
-            }
-            [[nodiscard]] static constexpr vec rotate_with_normalized_axis(vec3<type> axis, type angle) {return mat3x3<T>::rotate_with_normalized_axis(axis, angle).to_mat4x3();}
-            [[nodiscard]] static constexpr vec rotate(vec3<type> axis, type angle) {return mat3x3<T>::rotate(axis, angle).to_mat4x3();}
         };
         
-        template <typename T> struct vec<4,vec<4,T>> // mat4x4
+        template <typename T> struct mat<4,4,T> // mat4x4
         {
             static_assert(!std::is_const_v<T> && !std::is_volatile_v<T>, "The base type must have no cv-qualifiers.");
             static_assert(!std::is_reference_v<T>, "The base type must not be a reference.");
@@ -1015,34 +919,28 @@ namespace Math
             union {member_type y, g;};
             union {member_type z, b;};
             union {member_type w, a;};
-            constexpr vec() = default;
-            constexpr vec(member_type x, member_type y, member_type z, member_type w) : x(x), y(y), z(z), w(w) {}
-            explicit constexpr vec(type obj) : x(obj,0,0,0), y(0,obj,0,0), z(0,0,obj,0), w(0,0,0,obj) {}
-            explicit constexpr vec(vec4<type> obj) : x(obj.x,0,0,0), y(0,obj.y,0,0), z(0,0,obj.z,0), w(0,0,0,obj.w) {}
-            constexpr vec(type sx, type sy, type sz, type sw) : x(sx,0,0,0), y(0,sy,0,0), z(0,0,sz,0), w(0,0,0,sw) {}
-            constexpr vec(type xx, type yx, type zx, type wx, type xy, type yy, type zy, type wy, type xz, type yz, type zz, type wz, type xw, type yw, type zw, type ww) : x(xx,xy,xz,xw), y(yx,yy,yz,yw), z(zx,zy,zz,zw), w(wx,wy,wz,ww) {}
-            template <typename TT> constexpr vec(const mat4x4<TT> &obj) : x(obj.x), y(obj.y), z(obj.z), w(obj.w) {}
-            [[nodiscard]] static constexpr vec fill(type obj) {return vec(obj, obj, obj, obj, obj, obj, obj, obj, obj, obj, obj, obj, obj, obj, obj, obj);}
+            constexpr mat() : mat(1) {}
+            constexpr mat(const member_type &x, const member_type &y, const member_type &z, const member_type &w) : x(x), y(y), z(z), w(w) {}
+            explicit constexpr mat(type obj) : x(obj,0,0,0), y(0,obj,0,0), z(0,0,obj,0), w(0,0,0,obj) {}
+            explicit constexpr mat(vec4<type> obj) : x(obj.x,0,0,0), y(0,obj.y,0,0), z(0,0,obj.z,0), w(0,0,0,obj.w) {}
+            constexpr mat(type sx, type sy, type sz, type sw) : x(sx,0,0,0), y(0,sy,0,0), z(0,0,sz,0), w(0,0,0,sw) {}
+            constexpr mat(type xx, type yx, type zx, type wx, type xy, type yy, type zy, type wy, type xz, type yz, type zz, type wz, type xw, type yw, type zw, type ww) : x(xx,xy,xz,xw), y(yx,yy,yz,yw), z(zx,zy,zz,zw), w(wx,wy,wz,ww) {}
+            template <typename TT> constexpr mat(const mat4x4<TT> &obj) : x(obj.x), y(obj.y), z(obj.z), w(obj.w) {}
+            [[nodiscard]] static constexpr mat fill(type obj) {return mat(obj, obj, obj, obj, obj, obj, obj, obj, obj, obj, obj, obj, obj, obj, obj, obj);}
             template <typename TT> [[nodiscard]] constexpr mat4x4<TT> to() const {return mat4x4<TT>(TT(x.x), TT(y.x), TT(z.x), TT(w.x), TT(x.y), TT(y.y), TT(z.y), TT(w.y), TT(x.z), TT(y.z), TT(z.z), TT(w.z), TT(x.w), TT(y.w), TT(z.w), TT(w.w));}
             [[nodiscard]] constexpr member_type &operator[](int i) {return *(member_type *)((char *)this + sizeof(member_type)*i);}
             [[nodiscard]] constexpr const member_type &operator[](int i) const {return *(member_type *)((char *)this + sizeof(member_type)*i);}
             [[nodiscard]] type *as_array() {return &x.x;};
             [[nodiscard]] const type *as_array() const {return &x.x;};
-            [[nodiscard]] explicit constexpr operator bool() const {return this->any(); static_assert(!std::is_same_v<type, bool>, "Use .none(), .any(), or .all() for vectors/matrices of bool.");}
-            [[nodiscard]] constexpr bool none() const {return !this->any();}
-            [[nodiscard]] constexpr bool any() const {return x.x || x.y || x.z || x.w || y.x || y.y || y.z || y.w || z.x || z.y || z.z || z.w || w.x || w.y || w.z || w.w;}
-            [[nodiscard]] constexpr bool all() const {return x.x && x.y && x.z && x.w && y.x && y.y && y.z && y.w && z.x && z.y && z.z && z.w && w.x && w.y && w.z && w.w;}
-            [[nodiscard]] constexpr type min() const {return std::min({x.x,x.y,x.z,x.w,y.x,y.y,y.z,y.w,z.x,z.y,z.z,z.w,w.x,w.y,w.z,w.w});}
-            [[nodiscard]] constexpr type max() const {return std::max({x.x,x.y,x.z,x.w,y.x,y.y,y.z,y.w,z.x,z.y,z.z,z.w,w.x,w.y,w.z,w.w});}
-            [[nodiscard]] constexpr vec2<member_type> to_vec2() const {return {x, y};}
-            [[nodiscard]] constexpr vec3<member_type> to_vec3() const {return {x, y, z};}
+            [[nodiscard]] constexpr mat2x4<type> to_vec2() const {return {x, y};}
+            [[nodiscard]] constexpr mat3x4<type> to_vec3() const {return {x, y, z};}
             [[nodiscard]] constexpr mat2x2<type> to_mat2x2() const {return {x.x,y.x,x.y,y.y};}
-            [[nodiscard]] constexpr mat2<type> to_mat2() const {return to_mat2x2();}
+            [[nodiscard]] constexpr mat2x2<type> to_mat2() const {return to_mat2x2();}
             [[nodiscard]] constexpr mat3x2<type> to_mat3x2() const {return {x.x,y.x,z.x,x.y,y.y,z.y};}
             [[nodiscard]] constexpr mat4x2<type> to_mat4x2() const {return {x.x,y.x,z.x,w.x,x.y,y.y,z.y,w.y};}
             [[nodiscard]] constexpr mat2x3<type> to_mat2x3() const {return {x.x,y.x,x.y,y.y,x.z,y.z};}
             [[nodiscard]] constexpr mat3x3<type> to_mat3x3() const {return {x.x,y.x,z.x,x.y,y.y,z.y,x.z,y.z,z.z};}
-            [[nodiscard]] constexpr mat3<type> to_mat3() const {return to_mat3x3();}
+            [[nodiscard]] constexpr mat3x3<type> to_mat3() const {return to_mat3x3();}
             [[nodiscard]] constexpr mat4x3<type> to_mat4x3() const {return {x.x,y.x,z.x,w.x,x.y,y.y,z.y,w.y,x.z,y.z,z.z,w.z};}
             [[nodiscard]] constexpr mat2x4<type> to_mat2x4() const {return {x.x,y.x,x.y,y.y,x.z,y.z,x.w,y.w};}
             [[nodiscard]] constexpr mat3x4<type> to_mat3x4() const {return {x.x,y.x,z.x,x.y,y.y,z.y,x.z,y.z,z.z,x.w,y.w,z.w};}
@@ -1050,11 +948,12 @@ namespace Math
             template <typename TT> [[nodiscard]] constexpr mat2x4<larger_t<type,TT>> mul(const mat2x4<TT> &m) const {return {x.x*m.x.x + y.x*m.x.y + z.x*m.x.z + w.x*m.x.w, x.x*m.y.x + y.x*m.y.y + z.x*m.y.z + w.x*m.y.w, x.y*m.x.x + y.y*m.x.y + z.y*m.x.z + w.y*m.x.w, x.y*m.y.x + y.y*m.y.y + z.y*m.y.z + w.y*m.y.w, x.z*m.x.x + y.z*m.x.y + z.z*m.x.z + w.z*m.x.w, x.z*m.y.x + y.z*m.y.y + z.z*m.y.z + w.z*m.y.w, x.w*m.x.x + y.w*m.x.y + z.w*m.x.z + w.w*m.x.w, x.w*m.y.x + y.w*m.y.y + z.w*m.y.z + w.w*m.y.w};}
             template <typename TT> [[nodiscard]] constexpr mat3x4<larger_t<type,TT>> mul(const mat3x4<TT> &m) const {return {x.x*m.x.x + y.x*m.x.y + z.x*m.x.z + w.x*m.x.w, x.x*m.y.x + y.x*m.y.y + z.x*m.y.z + w.x*m.y.w, x.x*m.z.x + y.x*m.z.y + z.x*m.z.z + w.x*m.z.w, x.y*m.x.x + y.y*m.x.y + z.y*m.x.z + w.y*m.x.w, x.y*m.y.x + y.y*m.y.y + z.y*m.y.z + w.y*m.y.w, x.y*m.z.x + y.y*m.z.y + z.y*m.z.z + w.y*m.z.w, x.z*m.x.x + y.z*m.x.y + z.z*m.x.z + w.z*m.x.w, x.z*m.y.x + y.z*m.y.y + z.z*m.y.z + w.z*m.y.w, x.z*m.z.x + y.z*m.z.y + z.z*m.z.z + w.z*m.z.w, x.w*m.x.x + y.w*m.x.y + z.w*m.x.z + w.w*m.x.w, x.w*m.y.x + y.w*m.y.y + z.w*m.y.z + w.w*m.y.w, x.w*m.z.x + y.w*m.z.y + z.w*m.z.z + w.w*m.z.w};}
             template <typename TT> [[nodiscard]] constexpr mat4x4<larger_t<type,TT>> mul(const mat4x4<TT> &m) const {return {x.x*m.x.x + y.x*m.x.y + z.x*m.x.z + w.x*m.x.w, x.x*m.y.x + y.x*m.y.y + z.x*m.y.z + w.x*m.y.w, x.x*m.z.x + y.x*m.z.y + z.x*m.z.z + w.x*m.z.w, x.x*m.w.x + y.x*m.w.y + z.x*m.w.z + w.x*m.w.w, x.y*m.x.x + y.y*m.x.y + z.y*m.x.z + w.y*m.x.w, x.y*m.y.x + y.y*m.y.y + z.y*m.y.z + w.y*m.y.w, x.y*m.z.x + y.y*m.z.y + z.y*m.z.z + w.y*m.z.w, x.y*m.w.x + y.y*m.w.y + z.y*m.w.z + w.y*m.w.w, x.z*m.x.x + y.z*m.x.y + z.z*m.x.z + w.z*m.x.w, x.z*m.y.x + y.z*m.y.y + z.z*m.y.z + w.z*m.y.w, x.z*m.z.x + y.z*m.z.y + z.z*m.z.z + w.z*m.z.w, x.z*m.w.x + y.z*m.w.y + z.z*m.w.z + w.z*m.w.w, x.w*m.x.x + y.w*m.x.y + z.w*m.x.z + w.w*m.x.w, x.w*m.y.x + y.w*m.y.y + z.w*m.y.z + w.w*m.y.w, x.w*m.z.x + y.w*m.z.y + z.w*m.z.z + w.w*m.z.w, x.w*m.w.x + y.w*m.w.y + z.w*m.w.z + w.w*m.w.w};}
-            inline static constexpr vec identity = vec(1);
             [[nodiscard]] constexpr mat4x4<T> transpose() const {return {x.x,x.y,x.z,x.w,y.x,y.y,y.z,y.w,z.x,z.y,z.z,z.w,w.x,w.y,w.z,w.w};}
-            [[nodiscard]] constexpr vec inverse() const
+            [[nodiscard]] constexpr mat inverse() const
             {
-                vec ret;
+                static_assert(is_floating_point, "This function only makes sense for floating-point matrices.");
+                
+                mat ret;
                 
                 ret.x.x =  y.y * z.z * w.w - y.y * z.w * w.z - z.y * y.z * w.w + z.y * y.w * w.z + w.y * y.z * z.w - w.y * y.w * z.z;
                 ret.y.x = -y.x * z.z * w.w + y.x * z.w * w.z + z.x * y.z * w.w - z.x * y.w * w.z - w.x * y.z * z.w + w.x * y.w * z.z;
@@ -1062,38 +961,65 @@ namespace Math
                 ret.w.x = -y.x * z.y * w.z + y.x * z.z * w.y + z.x * y.y * w.z - z.x * y.z * w.y - w.x * y.y * z.z + w.x * y.z * z.y;
                 
                 type d = x.x * ret.x.x + x.y * ret.y.x + x.z * ret.z.x + x.w * ret.w.x;
-                if (d == 0) return identity;
-                
-                ret.x.y = -x.y * z.z * w.w + x.y * z.w * w.z + z.y * x.z * w.w - z.y * x.w * w.z - w.y * x.z * z.w + w.y * x.w * z.z;
-                ret.y.y =  x.x * z.z * w.w - x.x * z.w * w.z - z.x * x.z * w.w + z.x * x.w * w.z + w.x * x.z * z.w - w.x * x.w * z.z;
-                ret.z.y = -x.x * z.y * w.w + x.x * z.w * w.y + z.x * x.y * w.w - z.x * x.w * w.y - w.x * x.y * z.w + w.x * x.w * z.y;
-                ret.w.y =  x.x * z.y * w.z - x.x * z.z * w.y - z.x * x.y * w.z + z.x * x.z * w.y + w.x * x.y * z.z - w.x * x.z * z.y;
-                ret.x.z =  x.y * y.z * w.w - x.y * y.w * w.z - y.y * x.z * w.w + y.y * x.w * w.z + w.y * x.z * y.w - w.y * x.w * y.z;
-                ret.y.z = -x.x * y.z * w.w + x.x * y.w * w.z + y.x * x.z * w.w - y.x * x.w * w.z - w.x * x.z * y.w + w.x * x.w * y.z;
-                ret.z.z =  x.x * y.y * w.w - x.x * y.w * w.y - y.x * x.y * w.w + y.x * x.w * w.y + w.x * x.y * y.w - w.x * x.w * y.y;
-                ret.w.z = -x.x * y.y * w.z + x.x * y.z * w.y + y.x * x.y * w.z - y.x * x.z * w.y - w.x * x.y * y.z + w.x * x.z * y.y;
-                ret.x.w = -x.y * y.z * z.w + x.y * y.w * z.z + y.y * x.z * z.w - y.y * x.w * z.z - z.y * x.z * y.w + z.y * x.w * y.z;
-                ret.y.w =  x.x * y.z * z.w - x.x * y.w * z.z - y.x * x.z * z.w + y.x * x.w * z.z + z.x * x.z * y.w - z.x * x.w * y.z;
-                ret.z.w = -x.x * y.y * z.w + x.x * y.w * z.y + y.x * x.y * z.w - y.x * x.w * z.y - z.x * x.y * y.w + z.x * x.w * y.y;
-                ret.w.w =  x.x * y.y * z.z - x.x * y.z * z.y - y.x * x.y * z.z + y.x * x.z * z.y + z.x * x.y * y.z - z.x * x.z * y.y;
-                
+                if (d == 0) return {};
                 d = 1 / d;
-                return ret * d;
+                ret.x.x *= d;
+                ret.y.x *= d;
+                ret.z.x *= d;
+                ret.w.x *= d;
+                
+                ret.x.y = (-x.y * z.z * w.w + x.y * z.w * w.z + z.y * x.z * w.w - z.y * x.w * w.z - w.y * x.z * z.w + w.y * x.w * z.z) * d;
+                ret.y.y = ( x.x * z.z * w.w - x.x * z.w * w.z - z.x * x.z * w.w + z.x * x.w * w.z + w.x * x.z * z.w - w.x * x.w * z.z) * d;
+                ret.z.y = (-x.x * z.y * w.w + x.x * z.w * w.y + z.x * x.y * w.w - z.x * x.w * w.y - w.x * x.y * z.w + w.x * x.w * z.y) * d;
+                ret.w.y = ( x.x * z.y * w.z - x.x * z.z * w.y - z.x * x.y * w.z + z.x * x.z * w.y + w.x * x.y * z.z - w.x * x.z * z.y) * d;
+                ret.x.z = ( x.y * y.z * w.w - x.y * y.w * w.z - y.y * x.z * w.w + y.y * x.w * w.z + w.y * x.z * y.w - w.y * x.w * y.z) * d;
+                ret.y.z = (-x.x * y.z * w.w + x.x * y.w * w.z + y.x * x.z * w.w - y.x * x.w * w.z - w.x * x.z * y.w + w.x * x.w * y.z) * d;
+                ret.z.z = ( x.x * y.y * w.w - x.x * y.w * w.y - y.x * x.y * w.w + y.x * x.w * w.y + w.x * x.y * y.w - w.x * x.w * y.y) * d;
+                ret.w.z = (-x.x * y.y * w.z + x.x * y.z * w.y + y.x * x.y * w.z - y.x * x.z * w.y - w.x * x.y * y.z + w.x * x.z * y.y) * d;
+                ret.x.w = (-x.y * y.z * z.w + x.y * y.w * z.z + y.y * x.z * z.w - y.y * x.w * z.z - z.y * x.z * y.w + z.y * x.w * y.z) * d;
+                ret.y.w = ( x.x * y.z * z.w - x.x * y.w * z.z - y.x * x.z * z.w + y.x * x.w * z.z + z.x * x.z * y.w - z.x * x.w * y.z) * d;
+                ret.z.w = (-x.x * y.y * z.w + x.x * y.w * z.y + y.x * x.y * z.w - y.x * x.w * z.y - z.x * x.y * y.w + z.x * x.w * y.y) * d;
+                ret.w.w = ( x.x * y.y * z.z - x.x * y.z * z.y - y.x * x.y * z.z + y.x * x.z * z.y + z.x * x.y * y.z - z.x * x.z * y.y) * d;
+                
+                return ret;
             }
-            [[nodiscard]] static constexpr vec scale(vec3<type> v) {return mat3x3<T>::scale(v).to_mat4x4();}
-            [[nodiscard]] static constexpr vec ortho(vec2<type> min, vec2<type> max, type near, type far) {return mat4x3<T>::ortho(min, max, near, far).to_mat4x4();}
-            [[nodiscard]] static constexpr vec look_at(vec3<type> src, vec3<type> dst, vec3<type> local_up) {return mat4x3<T>::look_at(src, dst, local_up).to_mat4x4();}
-            [[nodiscard]] static constexpr vec translate(vec3<type> v) {return mat4x3<T>::translate(v).to_mat4x4();}
-            [[nodiscard]] static constexpr vec rotate_with_normalized_axis(vec3<type> axis, type angle) {return mat3x3<T>::rotate_with_normalized_axis(axis, angle).to_mat4x4();}
-            [[nodiscard]] static constexpr vec rotate(vec3<type> axis, type angle) {return mat3x3<T>::rotate(axis, angle).to_mat4x4();}
-            [[nodiscard]] static constexpr vec perspective(type wh_aspect, type y_fov, type near, type far)
+            [[nodiscard]] static constexpr mat scale(vec3<type> v) {return mat3<T>::scale(v).to_mat4();}
+            [[nodiscard]] static constexpr mat ortho(vec2<type> min, vec2<type> max, type near, type far)
             {
                 static_assert(is_floating_point, "This function only makes sense for floating-point matrices.");
-                y_fov = (T)1 / std::tan(y_fov / 2);
-                return {y_fov / wh_aspect , 0     , 0                           , 0                             ,
-                        0                 , y_fov , 0                           , 0                             ,
-                        0                 , 0     , (near + far) / (near - far) , 2 * near * far / (near - far) ,
-                        0                 , 0     , -1                          , 0                             };
+                return { 2 / (max.x - min.x) , 0                   , 0                , (min.x + max.x) / (min.x - max.x) ,
+                         0                   , 2 / (max.y - min.y) , 0                , (min.y + max.y) / (min.y - max.y) ,
+                         0                   , 0                   , 2 / (near - far) , (near + far) / (near - far)       ,
+                         0                   , 0                   , 0                , 1                                 };
+            }
+            [[nodiscard]] static constexpr mat look_at(vec3<type> src, vec3<type> dst, vec3<type> local_up)
+            {
+                static_assert(is_floating_point, "This function only makes sense for floating-point matrices.");
+                vec3<type> v3 = (src-dst).norm();
+                vec3<type> v1 = local_up.cross(v3).norm();
+                vec3<type> v2 = v3.cross(v1);
+                return { v1.x , v1.y , v1.z , -src.x*v1.x-src.y*v1.y-src.z*v1.z ,
+                         v2.x , v2.y , v2.z , -src.x*v2.x-src.y*v2.y-src.z*v2.z ,
+                         v3.x , v3.y , v3.z , -src.x*v3.x-src.y*v3.y-src.z*v3.z ,
+                         0    , 0    , 0    , 1                                 };
+            }
+            [[nodiscard]] static constexpr mat translate(vec3<type> v)
+            {
+                return { 1 , 0 , 0 , v.x ,
+                         0 , 1 , 0 , v.y ,
+                         0 , 0 , 1 , v.z ,
+                         0 , 0 , 0 , 1   };
+            }
+            [[nodiscard]] static constexpr mat rotate_with_normalized_axis(vec3<type> axis, type angle) {return mat3<T>::rotate_with_normalized_axis(axis, angle).to_mat4();}
+            [[nodiscard]] static constexpr mat rotate(vec3<type> axis, type angle) {return mat3<T>::rotate(axis, angle).to_mat4();}
+            [[nodiscard]] static constexpr mat perspective(type wh_aspect, type y_fov, type near, type far)
+            {
+                static_assert(is_floating_point, "This function only makes sense for floating-point matrices.");
+                y_fov = type(1) / std::tan(y_fov / 2);
+                return { y_fov / wh_aspect , 0     , 0                           , 0                             ,
+                         0                 , y_fov , 0                           , 0                             ,
+                         0                 , 0     , (near + far) / (near - far) , 2 * near * far / (near - far) ,
+                         0                 , 0     , -1                          , 0                             };
             }
         };
         //} Matrices
@@ -1429,6 +1355,27 @@ namespace Math
         template <typename T> inline constexpr op_expr_type_mul<T> operator/(T &&param, op_type_mul) {return {std::forward<T>(param)};}
         template <typename T> inline constexpr op_expr_type_dot<T> operator/(T &&param, op_type_dot) {return {std::forward<T>(param)};}
         template <typename T> inline constexpr op_expr_type_cross<T> operator/(T &&param, op_type_cross) {return {std::forward<T>(param)};}
+    }
+    
+    inline namespace Misc
+    {
+        template <typename T> [[nodiscard]] constexpr T pi() {return T(3.14159265358979323846l);}
+        constexpr float       f_pi  = pi<float>();
+        constexpr double      d_pi  = pi<double>();
+        constexpr long double ld_pi = pi<long double>();
+        
+        template <typename T> [[nodiscard]] constexpr auto to_rad(T in)
+        {
+            using fp_t = floating_point_t<T>;
+            return in * pi<fp_t>() / fp_t(180);
+        }
+        template <typename T> [[nodiscard]] constexpr auto to_deg(T in)
+        {
+            using fp_t = floating_point_t<T>;
+            return in * fp_t(180) / pi<fp_t>();
+        }
+        
+        
     }
     namespace Common
     {

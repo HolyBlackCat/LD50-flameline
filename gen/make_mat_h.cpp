@@ -173,7 +173,7 @@ int main()
             { // Main templates
                 output(1+R"(
                     template <int D, typename T> struct vec;
-                    template <int W, int H, typename T> using mat = vec<W, vec<H, T>>;
+                    template <int W, int H, typename T> struct mat;
                 )");
             }
 
@@ -237,35 +237,34 @@ int main()
                     static constexpr bool
                     $   is_scalar     = 1,
                     $   is_vec        = 0,
-                    $   is_mat        = 0,
-                    $   is_vec_or_mat = 0;
+                    $   is_mat        = 0;
                 };
                 template <int D, typename T> struct properties<vec<D,T>>
                 {
                     static constexpr bool
                     $   is_scalar     = 0,
                     $   is_vec        = 1,
-                    $   is_mat        = 0,
-                    $   is_vec_or_mat = 1;
+                    $   is_mat        = 0;
                 };
-                template <int W, int H, typename T> struct properties<vec<W,vec<H,T>>>
+                template <int W, int H, typename T> struct properties<mat<W,H,T>>
                 {
                     static constexpr bool
                     $   is_scalar     = 0,
                     $   is_vec        = 0,
-                    $   is_mat        = 1,
-                    $   is_vec_or_mat = 1;
+                    $   is_mat        = 1;
                 };
 
                 template <typename T> struct base_impl {using type = T;};
-                template <int D, typename T> struct base_impl<vec<D,T>> {using type = typename base_impl<T>::type;};
+                template <int D, typename T> struct base_impl<vec<D,T>> {using type = T;};
                 template <typename T> using base_t = typename base_impl<T>::type;
 
-                template <typename T, typename TT> struct change_base_impl {using type = base_t<TT>;};
-                template <int D, typename T, typename TT> struct change_base_impl<vec<D,T>,TT> {using type = vec<D, typename change_base_impl<T, TT>::type>;};
-                template <typename T, typename TT> using change_base_t = typename change_base_impl<T,TT>::type;
+                template <typename A, typename B> struct change_base_impl {using type = B;};
+                template <int D, typename A, typename B> struct change_base_impl<vec<D,A>,B> {using type = vec<D, B>;};
+                template <typename A> struct change_base_impl<A, void> {using type = void;};
+                template <int D, typename A> struct change_base_impl<vec<D,A>, void> {using type = void;};
+                template <typename A, typename B> using change_base_t = typename change_base_impl<A,B>::type;
 
-                template <typename A, typename B> inline constexpr bool same_size_v = std::is_same_v<A, change_base_t<B,A>>;
+                template <typename A, typename B> inline constexpr bool same_size_v = std::is_same_v<A, change_base_t<B,base_t<A>>>;
 
                 template <typename T> struct floating_point_impl {using type = std::conditional_t<std::is_floating_point_v<base_t<T>>, T, change_base_t<T, double>>;};
                 template <typename T> using floating_point_t = typename floating_point_impl<T>::type;
@@ -1005,13 +1004,241 @@ int main()
 
             decorative_section("Vectors", [&]
             {
-                for (int d = 2; d <= 4; d++)
+                for (int w = 2; w <= 4; w++)
                 {
-                    if (d != 2)
+                    if (w != 2)
                         next_line();
 
-                    section_sc(make_str("template <typename T> struct vec<", d, ",T> // vec", d), [&]{
-                        Make(d, 1);
+                    section_sc(make_str("template <typename T> struct vec<",w,",T> // vec",w), [&]
+                    {
+                        auto Fields = [&](std::string fold_op, std::string pre = "", std::string post = "") -> std::string
+                        {
+                            std::string ret;
+                            for (int i = 0; i < w; i++)
+                            {
+                                if (i != 0)
+                                    ret += fold_op;
+                                ret += pre + data::fields[i] + post;
+                            }
+                            return ret;
+                        };
+
+                        { // Static assertions
+                            output("static_assert(!std::is_const_v<T> && !std::is_volatile_v<T>, \"The base type must have no cv-qualifiers.\");\n");
+                            output("static_assert(!std::is_reference_v<T>, \"The base type must not be a reference.\");\n");
+                        }
+
+                        { // Aliases
+                            output("using type = T;\n");
+                        }
+
+                        { // Properties
+                            output("static constexpr int size = ",w,";\n");
+                            output("static constexpr bool is_floating_point = std::is_floating_point_v<type>;\n");
+                        }
+
+                        { // Members
+                            for (int i = 0; i < w; i++)
+                            {
+                                output("union {type ");
+                                for (int j = 0; j < data::fields_alt_count; j++)
+                                {
+                                    if (j != 0)
+                                        output(", ");
+                                    output(data::fields_alt[j][i]);
+                                }
+                                output(";};\n");
+                            }
+                        }
+
+                        { // Constructors
+                            // Default
+                            output("constexpr vec() = default;\n");
+
+                            // Element-wise
+                            output("constexpr vec(",Fields(", ","type "),") : ");
+                            for (int i = 0; i < w; i++)
+                            {
+                                if (i != 0)
+                                    output(", ");
+                                output(data::fields[i],"(",data::fields[i],")");
+                            }
+                            output(" {}\n");
+
+                            // Fill with a single value
+                            output("explicit constexpr vec(type obj) : ",Fields(", ","", "(obj)")," {}\n");
+
+                            // Converting
+                            output("template <typename TT> constexpr vec(const vec",w,"<TT> &obj) : ");
+                            for (int i = 0; i < w; i++)
+                            {
+                                if (i != 0)
+                                    output(", ");
+                                output(data::fields[i],"(obj.",data::fields[i],")");
+                            }
+                            output(" {}\n");
+                        }
+
+                        { // Fill
+                            output("[[nodiscard]] static constexpr vec fill(type obj) {return vec(");
+                            for (int i = 0; i < w; i++)
+                            {
+                                if (i != 0)
+                                    output(", ");
+                                output("obj");
+                            }
+                            output(");}\n");
+                        }
+
+                        { // Convert to type
+                            output("template <typename TT> [[nodiscard]] constexpr vec",w,"<TT> to() const {return vec",w,"<TT>(",Fields(", ", "TT(", ")"),");}\n");
+                        }
+
+                        { // Member access
+                            // Operator []
+                            output("[[nodiscard]] constexpr type &operator[](int i) {return *(type *)((char *)this + sizeof(type)*i);}\n");
+                            output("[[nodiscard]] constexpr const type &operator[](int i) const {return *(type *)((char *)this + sizeof(type)*i);}\n");
+
+                            // As array
+                            output("[[nodiscard]] type *as_array() {return &x;};\n");
+                            output("[[nodiscard]] const type *as_array() const {return &x;};\n");
+                        }
+
+                        { // Boolean
+                            // Convert to bool
+                            output("[[nodiscard]] explicit constexpr operator bool() const {return this->any(); static_assert(!std::is_same_v<type, bool>, \"Use .none(), .any(), or .all() for vectors/matrices of bool.\");}\n");
+
+                            // None of
+                            output("[[nodiscard]] constexpr bool none() const {return !this->any();}\n");
+
+                            // Any of
+                            output("[[nodiscard]] constexpr bool any() const {return ",Fields(" || "),";}\n");
+
+                            // All of
+                            output("[[nodiscard]] constexpr bool all() const {return ",Fields(" && "),";}\n");
+                        }
+
+                        { // Apply operators
+                            // Sum
+                            output("[[nodiscard]] constexpr auto sum() const {return ",Fields(" + "),";}\n");
+
+                            // Product
+                            output("[[nodiscard]] constexpr auto prod() const {return ",Fields(" * "),";}\n");
+
+                            // Ratio
+                            if (w == 2)
+                                output("[[nodiscard]] constexpr auto ratio() const {return ", Fields(" / ","floating_point_t<type>(",")"), ";}\n");
+
+                            // Min
+                            output("[[nodiscard]] constexpr type min() const {return std::min({", Fields(","), "});}\n");
+                            // Max
+                            output("[[nodiscard]] constexpr type max() const {return std::max({", Fields(","), "});}\n");
+                        }
+
+                        { // Copy with modified members
+                            struct Operator
+                            {
+                                std::string name, str;
+                            };
+                            const Operator operators[]{{"set",""},{"add","+"},{"sub","-"},{"mul","*"},{"div","/"}};
+
+                            for (const auto &op : operators)
+                            for (int i = 0; i < data::fields_alt_count; i++)
+                            {
+                                for (int j = 0; j < w; j++)
+                                {
+                                    bool op_set = op.str == "";
+                                    output(" template <typename N> [[nodiscard]] constexpr ",(op_set ? "vec" : "auto")," ",op.name,"_",data::fields_alt[i][j],"(const N &n) const {return ",
+                                           (op_set ? "vec" : make_str("vec",w,"<decltype(x",op.str,"n)>")),"(");
+                                    for (int k = 0; k < w; k++)
+                                    {
+                                        if (k != 0)
+                                            output(", ");
+                                        if (k == j)
+                                            output(op_set ? "n" : data::fields_alt[i][k] + op.str + "n");
+                                        else
+                                            output(data::fields_alt[i][k]);
+                                    }
+                                    output(");}");
+                                }
+                                next_line();
+                            }
+                        }
+
+                        { // Resize
+                            for (int i = 2; i <= 4; i++)
+                            {
+                                if (i == w)
+                                    continue;
+                                output("[[nodiscard]] constexpr vec",i,"<type> to_vec",i,"(");
+                                for (int j = w; j < i; j++)
+                                {
+                                    if (j != w)
+                                        output(", ");
+                                    output("type n",data::fields[j]);
+                                }
+                                output(") const {return {");
+                                for (int j = 0; j < i; j++)
+                                {
+                                    if (j != 0)
+                                        output(", ");
+                                    if (j >= w)
+                                        output("n");
+                                    output(data::fields[j]);
+                                }
+                                output("};}\n");
+                            }
+                            for (int i = w+1; i <= 4; i++)
+                            {
+                                output("[[nodiscard]] constexpr vec",i,"<type> to_vec",i,"() const {return to_vec",i,"(");
+                                for (int j = w; j < i; j++)
+                                {
+                                    if (j != w)
+                                        output(", ");
+                                    output("01"[j == 3]);
+                                }
+                                output(");}\n");
+                            }
+                        }
+
+                        { // Length and normalization
+                            // Squared length
+                            output("[[nodiscard]] constexpr auto len_sqr() const {return ");
+                            for (int i = 0; i < w; i++)
+                            {
+                                if (i != 0)
+                                    output(" + ");
+                                output(data::fields[i],"*",data::fields[i]);
+                            }
+                            output(";}\n");
+
+                            // Length
+                            output("[[nodiscard]] constexpr auto len() const {return std::sqrt(len_sqr());}\n");
+
+                            // Normalize
+                            output("[[nodiscard]] constexpr auto norm() const -> vec",w,"<decltype(type{}/len())> {if (auto l = len(); l != 0) return *this / l; else return vec(0);}\n");
+                        }
+
+                        { // Dot and cross products
+                            // Dot product
+                            output("template <typename TT> [[nodiscard]] constexpr auto dot(const vec",w,"<TT> &o) const {return ");
+                            for (int i = 0; i < w; i++)
+                            {
+                                if (i != 0)
+                                    output(" + ");
+                                output(data::fields[i]," * o.",data::fields[i]);
+                            }
+                            output(";}\n");
+
+                            // Cross product
+                            if (w == 3)
+                                output("template <typename TT> [[nodiscard]] constexpr auto cross(const vec3<TT> &o) const -> vec3<decltype(x * o.x - x * o.x)> {return {y * o.z - z * o.y, z * o.x - x * o.z, x * o.y - y * o.x};}\n");
+
+                            // Cross product z component
+                            if (w == 2)
+                                output("template <typename TT> [[nodiscard]] constexpr auto cross(const vec2<TT> &o) const {return x * o.y - y * o.x;}\n");
+                        }
+
                     });
                 }
             });
@@ -1026,8 +1253,500 @@ int main()
                     if (w != 2 || h != 2)
                         next_line();
 
-                    section_sc(make_str("template <typename T> struct vec<", w, ",vec<", h, ",T>> // mat", w, "x", h), [&]{
-                        Make(w, h);
+                    section_sc(make_str("template <typename T> struct mat<",w,",",h,",T> // mat", w, "x", h), [&]
+                    {
+                        auto LargeFields = [&](std::string fold_op, std::string pre = "", std::string post = "") -> std::string
+                        {
+                            std::string ret;
+                            for (int i = 0; i < w; i++)
+                            {
+                                if (i != 0)
+                                    ret += fold_op;
+                                ret += pre + data::fields[i] + post;
+                            }
+                            return ret;
+                        };
+                        auto SmallFields = [&](std::string fold_op, std::string pre = "", std::string post = "", std::string mid = ".") -> std::string
+                        {
+                            std::string ret;
+                            for (int y = 0; y < h; y++)
+                            for (int x = 0; x < w; x++)
+                            {
+                                if (x != 0 || y != 0)
+                                    ret += fold_op;
+                                ret += pre + data::fields[x] + mid + data::fields[y] + post;
+                            }
+                            return ret;
+                        };
+
+                        { // Static assertions
+                            output("static_assert(!std::is_const_v<T> && !std::is_volatile_v<T>, \"The base type must have no cv-qualifiers.\");\n");
+                            output("static_assert(!std::is_reference_v<T>, \"The base type must not be a reference.\");\n");
+                        }
+
+                        { // Aliases
+                            output("using type = T;\n");
+                            output("using member_type = vec", h,"<T>;\n");
+                        }
+
+                        { // Properties
+                            output("static constexpr int width = ",w,", height = ",h,";\n");
+                            if (w == h)
+                                output("static constexpr int size = ",w,";\n");
+
+                            output("static constexpr bool is_floating_point = std::is_floating_point_v<type>;\n");
+                        }
+
+                        { // Members
+                            for (int i = 0; i < w; i++)
+                            {
+                                output("union {member_type ");
+                                for (int j = 0; j < data::fields_alt_count; j++)
+                                {
+                                    if (j != 0)
+                                        output(", ");
+                                    output(data::fields_alt[j][i]);
+                                }
+                                output(";};\n");
+                            }
+                        }
+
+                        { // Constructors
+                            // Default
+                            output("constexpr mat() : mat(1) {}\n");
+
+                            // Element-wise
+                            output("constexpr mat(",LargeFields(", ","const member_type &"),") : ");
+                            for (int i = 0; i < w; i++)
+                            {
+                                if (i != 0)
+                                    output(", ");
+                                output(data::fields[i],"(",data::fields[i],")");
+                            }
+                            output(" {}\n");
+
+                            // Uniform scale
+                            output("explicit constexpr mat(type obj) : ");
+                            for (int x = 0; x < w; x++)
+                            {
+                                if (x != 0)
+                                    output(", ");
+                                output(data::fields[x],"(");
+                                for (int y = 0; y < h; y++)
+                                {
+                                    if (y != 0)
+                                        output(",");
+                                    output(x == y ? "obj" : "0");
+                                }
+                                output(")");
+                            }
+                            output(" {}\n");
+
+                            // Non-uniform scale
+                            output("explicit constexpr mat(vec",std::min(w,h),"<type> obj) : ");
+                            for (int x = 0; x < w; x++)
+                            {
+                                if (x != 0)
+                                    output(", ");
+                                output(data::fields[x],"(");
+                                for (int y = 0; y < h; y++)
+                                {
+                                    if (y != 0)
+                                        output(",");
+                                    output(x == y ? make_str("obj.",data::fields[x]) : "0");
+                                }
+                                output(")");
+                            }
+                            output(" {}\n");
+
+                            // Non-uniform scale with scalar parameters
+                            output("constexpr mat(");
+                            for (int i = 0; i < std::min(w,h); i++)
+                            {
+                                if (i != 0)
+                                    output(", ");
+                                output("type s",data::fields[i]);
+                            }
+                            output(") : ");
+                            for (int x = 0; x < w; x++)
+                            {
+                                if (x != 0)
+                                    output(", ");
+                                output(data::fields[x],"(");
+                                for (int y = 0; y < h; y++)
+                                {
+                                    if (y != 0)
+                                        output(",");
+                                    output(x == y ? make_str("s",data::fields[x]) : "0");
+                                }
+                                output(")");
+                            }
+                            output(" {}\n");
+
+                            // Matrix element-wise
+                            output("constexpr mat(",SmallFields(", ","type ","",""),") : ");
+                            for (int x = 0; x < w; x++)
+                            {
+                                if (x != 0)
+                                    output(", ");
+                                output(data::fields[x],"(");
+                                for (int y = 0; y < h; y++)
+                                {
+                                    if (y != 0)
+                                        output(",");
+                                    output(data::fields[x],data::fields[y]);
+                                }
+                                output(")");
+                            }
+                            output(" {}\n");
+
+                            // Converting
+                            output("template <typename TT> constexpr mat(const mat",w,"x",h,"<TT> &obj) : ");
+                            for (int i = 0; i < w; i++)
+                            {
+                                if (i != 0)
+                                    output(", ");
+                                output(data::fields[i],"(obj.",data::fields[i],")");
+                            }
+                            output(" {}\n");
+                        }
+
+                        { // Fill
+                            output("[[nodiscard]] static constexpr mat fill(type obj) {return mat(");
+                            for (int i = 0; i < w*h; i++)
+                            {
+                                if (i != 0)
+                                    output(", ");
+                                output("obj");
+                            }
+                            output(");}\n");
+                        }
+
+                        { // Convert to type
+                            output("template <typename TT> [[nodiscard]] constexpr mat",w,"x",h,"<TT> to() const {return mat",w,"x",h,"<TT>(",SmallFields(", ","TT(",")"),");}\n");
+                        }
+
+                        { // Member access
+                            // Operator []
+                            output("[[nodiscard]] constexpr member_type &operator[](int i) {return *(member_type *)((char *)this + sizeof(member_type)*i);}\n");
+                            output("[[nodiscard]] constexpr const member_type &operator[](int i) const {return *(member_type *)((char *)this + sizeof(member_type)*i);}\n");
+
+                            // As array
+                            output("[[nodiscard]] type *as_array() {return &x.x;};\n");
+                            output("[[nodiscard]] const type *as_array() const {return &x.x;};\n");
+                        }
+
+                        { // Resize
+                            // One-dimensional
+                            for (int i = 2; i <= 4; i++)
+                            {
+                                if (i == w)
+                                    continue;
+                                output("[[nodiscard]] constexpr mat",i,"x",h,"<type> to_vec",i,"(");
+                                for (int j = w; j < i; j++)
+                                {
+                                    if (j != w)
+                                        output(", ");
+                                    output("const member_type &n",data::fields[j]);
+                                }
+                                output(") const {return {");
+                                for (int j = 0; j < i; j++)
+                                {
+                                    if (j != 0)
+                                        output(", ");
+                                    if (j >= w)
+                                        output("n");
+                                    output(data::fields[j]);
+                                }
+                                output("};}\n");
+                            }
+                            for (int i = w+1; i <= 4; i++)
+                            {
+                                output("[[nodiscard]] constexpr mat",i,"x",h,"<type> to_vec",i,"() const {return to_vec",i,"(");
+                                for (int j = w; j < i; j++)
+                                {
+                                    if (j != w)
+                                        output(", ");
+                                    output("{}");
+                                }
+                                output(");}\n");
+                            }
+
+                            // Two-dimensional
+                            for (int hhh = 2; hhh <= 4; hhh++)
+                            {
+                                for (int www = 2; www <= 4; www++)
+                                {
+                                    if (www == w && hhh == h)
+                                        continue;
+                                    output("[[nodiscard]] constexpr mat",www,"x",hhh,"<type> to_mat",www,"x",hhh,"() const {return {");
+                                    for (int hh = 0; hh < hhh; hh++)
+                                    {
+                                        for (int ww = 0; ww < www; ww++)
+                                        {
+                                            if (ww != 0 || hh != 0)
+                                                output(",");
+                                            if (ww < w && hh < h)
+                                                output(data::fields[ww],".",data::fields[hh]);
+                                            else
+                                                output("01"[ww == hh]);
+                                        }
+                                    }
+                                    output("};}\n");
+                                    if (www == hhh)
+                                        output("[[nodiscard]] constexpr mat",www,"x",hhh,"<type> to_mat",www,"() const {return to_mat",www,"x",www,"();}\n");
+                                }
+                            }
+                        }
+
+                        { // Matrix multiplication
+                            auto Matrix = [&](int x, int y, std::string t) -> std::string
+                            {
+                                if (x == 1 && y == 1)
+                                    return t;
+                                if (x == 1)
+                                    return make_str("vec",y,"<",t,">");
+                                if (y == 1)
+                                    return make_str("vec",x,"<",t,">");
+                                return make_str("mat",x,"x",y,"<",t,">");
+                            };
+                            auto Field = [&](int x, int y, int w, int h) -> std::string
+                            {
+                                if (w == 1 && h == 1)
+                                    return "";
+                                if (w == 1)
+                                    return data::fields[y];
+                                if (h == 1)
+                                    return data::fields[x];
+                                return make_str(data::fields[x], ".", data::fields[y]);
+                            };
+
+                            for (int i = 1; i <= 4; i++)
+                            {
+                                output("template <typename TT> [[nodiscard]] constexpr ",Matrix(i,h,"larger_t<type,TT>")," mul(const ",Matrix(i,w,"TT")," &m) const {return {");
+                                for (int y = 0; y < h; y++)
+                                for (int x = 0; x < i; x++)
+                                {
+                                    if (y != 0 || x != 0)
+                                        output(", ");
+                                    for (int j = 0; j < w; j++)
+                                    {
+                                        if (j != 0)
+                                            output(" + ");
+                                        output(Field(j,y,w,h),"*m.",Field(x,j,i,w));
+                                    }
+                                }
+                                output("};}\n");
+                            }
+                        }
+
+                        { // Transpose
+                            output("[[nodiscard]] constexpr mat",h,"x",w,"<T> transpose() const {return {");
+                            for (int x = 0; x < w; x++)
+                            for (int y = 0; y < h; y++)
+                            {
+                                if (x != 0 || y != 0)
+                                    output(",");
+                                output(data::fields[x],".",data::fields[y]);
+                            }
+                            output("};}\n");
+                        }
+
+                        { // Inverse
+                            if (w == h)
+                            {
+                                // NOTE: `ret{}` is used instead of `ret`, because otherwise those functions wouldn't be constexpr due to an uninitialized variable.
+
+                                switch (w)
+                                {
+                                  case 2:
+                                    output(1+R"(
+                                        [[nodiscard]] constexpr mat inverse()
+                                        {
+                                            static_assert(is_floating_point, "This function only makes sense for floating-point matrices.");
+
+                                            mat ret{};
+
+                                            ret.x.x =  y.y;
+                                            ret.y.x = -y.x;
+
+                                            type d = x.x * ret.x.x + x.y * ret.y.x;
+                                            if (d == 0) return {};
+                                            d = 1 / d;
+                                            ret.x.x *= d;
+                                            ret.y.x *= d;
+
+                                            ret.x.y = (-x.y) * d;
+                                            ret.y.y = ( x.x) * d;
+
+                                            return ret;
+                                        }
+                                    )");
+                                    break;
+                                  case 3:
+                                    output(1+R"(
+                                        [[nodiscard]] constexpr mat inverse() const
+                                        {
+                                            static_assert(is_floating_point, "This function only makes sense for floating-point matrices.");
+
+                                            mat ret{};
+
+                                            ret.x.x =  y.y * z.z - z.y * y.z;
+                                            ret.y.x = -y.x * z.z + z.x * y.z;
+                                            ret.z.x =  y.x * z.y - z.x * y.y;
+
+                                            type d = x.x * ret.x.x + x.y * ret.y.x + x.z * ret.z.x;
+                                            if (d == 0) return {};
+                                            d = 1 / d;
+                                            ret.x.x *= d;
+                                            ret.y.x *= d;
+                                            ret.z.x *= d;
+
+                                            ret.x.y = (-x.y * z.z + z.y * x.z) * d;
+                                            ret.y.y = ( x.x * z.z - z.x * x.z) * d;
+                                            ret.z.y = (-x.x * z.y + z.x * x.y) * d;
+                                            ret.x.z = ( x.y * y.z - y.y * x.z) * d;
+                                            ret.y.z = (-x.x * y.z + y.x * x.z) * d;
+                                            ret.z.z = ( x.x * y.y - y.x * x.y) * d;
+
+                                            return ret;
+                                        }
+                                    )");
+                                    break;
+                                  case 4:
+                                    output(1+R"(
+                                        [[nodiscard]] constexpr mat inverse() const
+                                        {
+                                            static_assert(is_floating_point, "This function only makes sense for floating-point matrices.");
+
+                                            mat ret;
+
+                                            ret.x.x =  y.y * z.z * w.w - y.y * z.w * w.z - z.y * y.z * w.w + z.y * y.w * w.z + w.y * y.z * z.w - w.y * y.w * z.z;
+                                            ret.y.x = -y.x * z.z * w.w + y.x * z.w * w.z + z.x * y.z * w.w - z.x * y.w * w.z - w.x * y.z * z.w + w.x * y.w * z.z;
+                                            ret.z.x =  y.x * z.y * w.w - y.x * z.w * w.y - z.x * y.y * w.w + z.x * y.w * w.y + w.x * y.y * z.w - w.x * y.w * z.y;
+                                            ret.w.x = -y.x * z.y * w.z + y.x * z.z * w.y + z.x * y.y * w.z - z.x * y.z * w.y - w.x * y.y * z.z + w.x * y.z * z.y;
+
+                                            type d = x.x * ret.x.x + x.y * ret.y.x + x.z * ret.z.x + x.w * ret.w.x;
+                                            if (d == 0) return {};
+                                            d = 1 / d;
+                                            ret.x.x *= d;
+                                            ret.y.x *= d;
+                                            ret.z.x *= d;
+                                            ret.w.x *= d;
+
+                                            ret.x.y = (-x.y * z.z * w.w + x.y * z.w * w.z + z.y * x.z * w.w - z.y * x.w * w.z - w.y * x.z * z.w + w.y * x.w * z.z) * d;
+                                            ret.y.y = ( x.x * z.z * w.w - x.x * z.w * w.z - z.x * x.z * w.w + z.x * x.w * w.z + w.x * x.z * z.w - w.x * x.w * z.z) * d;
+                                            ret.z.y = (-x.x * z.y * w.w + x.x * z.w * w.y + z.x * x.y * w.w - z.x * x.w * w.y - w.x * x.y * z.w + w.x * x.w * z.y) * d;
+                                            ret.w.y = ( x.x * z.y * w.z - x.x * z.z * w.y - z.x * x.y * w.z + z.x * x.z * w.y + w.x * x.y * z.z - w.x * x.z * z.y) * d;
+                                            ret.x.z = ( x.y * y.z * w.w - x.y * y.w * w.z - y.y * x.z * w.w + y.y * x.w * w.z + w.y * x.z * y.w - w.y * x.w * y.z) * d;
+                                            ret.y.z = (-x.x * y.z * w.w + x.x * y.w * w.z + y.x * x.z * w.w - y.x * x.w * w.z - w.x * x.z * y.w + w.x * x.w * y.z) * d;
+                                            ret.z.z = ( x.x * y.y * w.w - x.x * y.w * w.y - y.x * x.y * w.w + y.x * x.w * w.y + w.x * x.y * y.w - w.x * x.w * y.y) * d;
+                                            ret.w.z = (-x.x * y.y * w.z + x.x * y.z * w.y + y.x * x.y * w.z - y.x * x.z * w.y - w.x * x.y * y.z + w.x * x.z * y.y) * d;
+                                            ret.x.w = (-x.y * y.z * z.w + x.y * y.w * z.z + y.y * x.z * z.w - y.y * x.w * z.z - z.y * x.z * y.w + z.y * x.w * y.z) * d;
+                                            ret.y.w = ( x.x * y.z * z.w - x.x * y.w * z.z - y.x * x.z * z.w + y.x * x.w * z.z + z.x * x.z * y.w - z.x * x.w * y.z) * d;
+                                            ret.z.w = (-x.x * y.y * z.w + x.x * y.w * z.y + y.x * x.y * z.w - y.x * x.w * z.y - z.x * x.y * y.w + z.x * x.w * y.y) * d;
+                                            ret.w.w = ( x.x * y.y * z.z - x.x * y.z * z.y - y.x * x.y * z.z + y.x * x.z * z.y + z.x * x.y * y.z - z.x * x.z * y.y) * d;
+
+                                            return ret;
+                                        }
+                                    )");
+                                    break;
+                                }
+                            }
+                        }
+
+                        { // Matrix presets
+                            auto MakePreset = [&](int min_sz, int max_sz, std::string name, std::string params, std::string param_names, std::string body, bool float_only = 1)
+                            {
+                                if (w != h)
+                                    return;
+
+                                if (w == min_sz)
+                                {
+                                    output("[[nodiscard]] static constexpr mat ",name,"(",params,")\n{\n");
+                                    if (float_only)
+                                        output("static_assert(is_floating_point, \"This function only makes sense for floating-point matrices.\");\n");
+                                    output(body,"}\n");
+                                }
+                                else if (w >= min_sz && w <= max_sz)
+                                {
+                                    output("[[nodiscard]] static constexpr mat ",name,"(",params,") {return mat",min_sz,"<T>::",name,"(",param_names,").to_mat",w,"();}\n");
+                                }
+                            };
+
+                            MakePreset(2, 3, "scale", "vec2<type> v", "v", 1+R"(
+                                return { v.x , 0   ,
+                                    $    0   , v.y };
+                            )", 0);
+
+                            MakePreset(3, 4, "scale", "vec3<type> v", "v", 1+R"(
+                                return { v.x , 0   , 0   ,
+                                    $    0   , v.y , 0   ,
+                                    $    0   , 0   , v.z };
+                            )", 0);
+
+                            MakePreset(3, 3, "ortho", "vec2<type> min, vec2<type> max", "min, max", 1+R"(
+                                return { 2 / (max.x - min.x) , 0                   , (min.x + max.x) / (min.x - max.x) ,
+                                    $    0                   , 2 / (max.y - min.y) , (min.y + max.y) / (min.y - max.y) ,
+                                    $    0                   , 0                   , 1                                 };
+                            )");
+
+                            MakePreset(4, 4, "ortho", "vec2<type> min, vec2<type> max, type near, type far", "min, max, near, far", 1+R"(
+                                return { 2 / (max.x - min.x) , 0                   , 0                , (min.x + max.x) / (min.x - max.x) ,
+                                    $    0                   , 2 / (max.y - min.y) , 0                , (min.y + max.y) / (min.y - max.y) ,
+                                    $    0                   , 0                   , 2 / (near - far) , (near + far) / (near - far)       ,
+                                    $    0                   , 0                   , 0                , 1                                 };
+                            )");
+
+                            MakePreset(4, 4, "look_at", "vec3<type> src, vec3<type> dst, vec3<type> local_up", "src, dst, local_up", 1+R"(
+                                vec3<type> v3 = (src-dst).norm();
+                                vec3<type> v1 = local_up.cross(v3).norm();
+                                vec3<type> v2 = v3.cross(v1);
+                                return { v1.x , v1.y , v1.z , -src.x*v1.x-src.y*v1.y-src.z*v1.z ,
+                                    $    v2.x , v2.y , v2.z , -src.x*v2.x-src.y*v2.y-src.z*v2.z ,
+                                    $    v3.x , v3.y , v3.z , -src.x*v3.x-src.y*v3.y-src.z*v3.z ,
+                                    $    0    , 0    , 0    , 1                                 };
+                            )");
+
+                            MakePreset(3, 3, "translate", "vec2<type> v", "v", 1+R"(
+                                return { 1, 0, v.x ,
+                                    $    0, 1, v.y ,
+                                    $    0, 0, 1   };
+                            )", 0);
+
+                            MakePreset(4, 4, "translate", "vec3<type> v", "v", 1+R"(
+                                return { 1 , 0 , 0 , v.x ,
+                                    $    0 , 1 , 0 , v.y ,
+                                    $    0 , 0 , 1 , v.z ,
+                                    $    0 , 0 , 0 , 1   };
+                            )", 0);
+
+                            MakePreset(2, 3, "rotate", "type angle", "angle", 1+R"(
+                                type c = std::cos(angle);
+                                type s = std::sin(angle);
+                                return { c, -s ,
+                                    $    s, c  };
+                            )");
+
+                            MakePreset(3, 4, "rotate_with_normalized_axis", "vec3<type> axis, type angle", "axis, angle", 1+R"(
+                                type c = std::cos(angle);
+                                type s = std::sin(angle);
+                                return { axis.x * axis.x * (1 - c) + c          , axis.x * axis.y * (1 - c) - axis.z * s , axis.x * axis.z * (1 - c) + axis.y * s,
+                                    $    axis.y * axis.x * (1 - c) + axis.z * s , axis.y * axis.y * (1 - c) + c          , axis.y * axis.z * (1 - c) - axis.x * s,
+                                    $    axis.x * axis.z * (1 - c) - axis.y * s , axis.y * axis.z * (1 - c) + axis.x * s , axis.z * axis.z * (1 - c) + c         };
+                            )", 0);
+                            MakePreset(3, 4, "rotate", "vec3<type> axis, type angle", "axis, angle", 1+R"(
+                                return rotate_with_normalized_axis(axis.norm(), angle);
+                            )");
+
+                            MakePreset(4, 4, "perspective", "type wh_aspect, type y_fov, type near, type far", "wh_aspect, y_fov, near, far", 1+R"(
+                                y_fov = type(1) / std::tan(y_fov / 2);
+                                return { y_fov / wh_aspect , 0     , 0                           , 0                             ,
+                                    $    0                 , y_fov , 0                           , 0                             ,
+                                    $    0                 , 0     , (near + far) / (near - far) , 2 * near * far / (near - far) ,
+                                    $    0                 , 0     , -1                          , 0                             };
+                            )");
+                        }
                     });
                 }
             });
