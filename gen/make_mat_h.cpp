@@ -160,6 +160,7 @@ int main()
             #include <cstdint>
             #include <istream>
             #include <ostream>
+            #include <tuple>
             #include <type_traits>
             #include <utility>
         )");
@@ -255,6 +256,7 @@ int main()
                 template <typename T> using floating_point_t = std::conditional_t<std::is_floating_point_v<vec_base_t<T>>, T, change_vec_base_t<T, double>>;
 
                 template <typename A, typename B> inline constexpr int compare_types_v =
+                $   (!is_scalar_v<A> && !is_vector_v<A>) || (!is_scalar_v<B> && !is_vector_v<B>) ? 0 :
                 $   std::is_floating_point_v<vec_base_t<A>> < std::is_floating_point_v<vec_base_t<B>> ? -1 :
                 $   std::is_floating_point_v<vec_base_t<A>> > std::is_floating_point_v<vec_base_t<B>> ?  1 :
                 $   sizeof(vec_base_t<A>)                   < sizeof(vec_base_t<B>)                   ? -1 :
@@ -518,6 +520,10 @@ int main()
                                 output("template <typename TT> [[nodiscard]] constexpr auto cross(const vec2<TT> &o) const {return x * o.y - y * o.x;}\n");
                         }
 
+                        { // Tie
+                            output("[[nodiscard]] constexpr auto tie() {return std::tie(",Fields(","),");}\n");
+                            output("[[nodiscard]] constexpr auto tie() const {return std::tie(",Fields(","),");}\n");
+                        }
                     });
                 }
             });
@@ -592,7 +598,15 @@ int main()
 
                         { // Constructors
                             // Default
-                            output("constexpr mat() : mat(1) {}\n");
+                            output("constexpr mat() : mat(");
+                            for (int y = 0; y < h; y++)
+                            for (int x = 0; x < w; x++)
+                            {
+                                if (x || y)
+                                    output(",");
+                                output("01"[x == y]);
+                            }
+                            output(") {}\n");
 
                             // Element-wise
                             output("constexpr mat(",LargeFields(", ","const member_type &"),") : ");
@@ -601,64 +615,6 @@ int main()
                                 if (i != 0)
                                     output(", ");
                                 output(data::fields[i],"(",data::fields[i],")");
-                            }
-                            output(" {}\n");
-
-                            // Uniform scale
-                            output("explicit constexpr mat(type obj) : ");
-                            for (int x = 0; x < w; x++)
-                            {
-                                if (x != 0)
-                                    output(", ");
-                                output(data::fields[x],"(");
-                                for (int y = 0; y < h; y++)
-                                {
-                                    if (y != 0)
-                                        output(",");
-                                    output(x == y ? "obj" : "0");
-                                }
-                                output(")");
-                            }
-                            output(" {}\n");
-
-                            // Non-uniform scale
-                            output("explicit constexpr mat(vec",std::min(w,h),"<type> obj) : ");
-                            for (int x = 0; x < w; x++)
-                            {
-                                if (x != 0)
-                                    output(", ");
-                                output(data::fields[x],"(");
-                                for (int y = 0; y < h; y++)
-                                {
-                                    if (y != 0)
-                                        output(",");
-                                    output(x == y ? make_str("obj.",data::fields[x]) : "0");
-                                }
-                                output(")");
-                            }
-                            output(" {}\n");
-
-                            // Non-uniform scale with scalar parameters
-                            output("constexpr mat(");
-                            for (int i = 0; i < std::min(w,h); i++)
-                            {
-                                if (i != 0)
-                                    output(", ");
-                                output("type s",data::fields[i]);
-                            }
-                            output(") : ");
-                            for (int x = 0; x < w; x++)
-                            {
-                                if (x != 0)
-                                    output(", ");
-                                output(data::fields[x],"(");
-                                for (int y = 0; y < h; y++)
-                                {
-                                    if (y != 0)
-                                        output(",");
-                                    output(x == y ? make_str("s",data::fields[x]) : "0");
-                                }
-                                output(")");
                             }
                             output(" {}\n");
 
@@ -688,17 +644,6 @@ int main()
                                 output(data::fields[i],"(obj.",data::fields[i],")");
                             }
                             output(" {}\n");
-                        }
-
-                        { // Fill
-                            output("[[nodiscard]] static constexpr mat fill(type obj) {return mat(");
-                            for (int i = 0; i < w*h; i++)
-                            {
-                                if (i != 0)
-                                    output(", ");
-                                output("obj");
-                            }
-                            output(");}\n");
                         }
 
                         { // Convert to type
@@ -1145,6 +1090,7 @@ int main()
                     output(
                     R"( template <typename A, typename B, int D, typename T> std::basic_ostream<A,B> &operator<<(std::basic_ostream<A,B> &s, const vec<D,T> &v)
                         {
+                            s.width(0);
                             s << '[';
                             for (int i = 0; i < D; i++)
                             {
@@ -1155,8 +1101,9 @@ int main()
                             s << ']';
                             return s;
                         }
-                        template <typename A, typename B, int W, int H, typename T> std::basic_ostream<A,B> &operator<<(std::basic_ostream<A,B> &s, const vec<W,vec<H,T>> &v)
+                        template <typename A, typename B, int W, int H, typename T> std::basic_ostream<A,B> &operator<<(std::basic_ostream<A,B> &s, const mat<W,H,T> &v)
                         {
+                            s.width(0);
                             s << '[';
                             for (int y = 0; y < H; y++)
                             {
@@ -1174,12 +1121,14 @@ int main()
                         }
                         template <typename A, typename B, int D, typename T> std::basic_istream<A,B> &operator>>(std::basic_istream<A,B> &s, vec<D,T> &v)
                         {
+                            s.width(0);
                             for (int i = 0; i < D; i++)
                             $   s >> v[i];
                             return s;
                         }
-                        template <typename A, typename B, int W, int H, typename T> std::basic_istream<A,B> &operator>>(std::basic_istream<A,B> &s, vec<W,vec<H,T>> &v)
+                        template <typename A, typename B, int W, int H, typename T> std::basic_istream<A,B> &operator>>(std::basic_istream<A,B> &s, mat<W,H,T> &v)
                         {
+                            s.width(0);
                             for (int y = 0; y < H; y++)
                             for (int x = 0; x < W; x++)
                             $   s >> v[x][y];
@@ -1249,7 +1198,7 @@ int main()
 
         next_line();
 
-        section("namespace Common", []
+        section("namespace Export", []
         {
             output(1+R"(
                 using namespace Vector;
@@ -1260,7 +1209,38 @@ int main()
 
     next_line();
 
-    output("using namespace Math::Common;\n");
+    section("namespace std", []
+    {
+        output(1+R"(
+            template <int D, typename T> struct less<Math::vec<D,T>>
+            {
+                using result_type = bool;
+                using first_argument_type = Math::vec<D,T>;
+                using second_argument_type = Math::vec<D,T>;
+                constexpr bool operator()(const Math::vec<D,T> &a, const Math::vec<D,T> &b) const
+                {
+                    return a.tie() < b.tie();
+                }
+            };
+
+            template <int D, typename T> struct hash<Math::vec<D,T>>
+            {
+                using result_type = std::size_t;
+                using argument_type = Math::vec<D,T>;
+                std::size_t operator()(const Math::vec<D,T> &v) const
+                {
+                    std::size_t ret = std::hash<decltype(v.x)>{}(v.x);
+                    for (int i = 1; i < D; i++)
+                    $   ret ^= std::hash<decltype(v.x)>{}(v[i]) + 0x9e3779b9 + (ret << 6) + (ret >> 2); // From Boost.
+                    return ret;
+                }
+            };
+        )");
+    });
+
+    next_line();
+
+    output("using namespace Math::Export;\n");
 
     next_line();
 

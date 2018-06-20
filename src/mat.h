@@ -12,6 +12,7 @@
 #include <cstdint>
 #include <istream>
 #include <ostream>
+#include <tuple>
 #include <type_traits>
 #include <utility>
 
@@ -237,6 +238,7 @@ namespace Math
         template <typename T> using floating_point_t = std::conditional_t<std::is_floating_point_v<vec_base_t<T>>, T, change_vec_base_t<T, double>>;
         
         template <typename A, typename B> inline constexpr int compare_types_v =
+            (!is_scalar_v<A> && !is_vector_v<A>) || (!is_scalar_v<B> && !is_vector_v<B>) ? 0 :
             std::is_floating_point_v<vec_base_t<A>> < std::is_floating_point_v<vec_base_t<B>> ? -1 :
             std::is_floating_point_v<vec_base_t<A>> > std::is_floating_point_v<vec_base_t<B>> ?  1 :
             sizeof(vec_base_t<A>)                   < sizeof(vec_base_t<B>)                   ? -1 :
@@ -318,6 +320,8 @@ namespace Math
             [[nodiscard]] constexpr auto norm() const -> vec2<decltype(type{}/len())> {if (auto l = len(); l != 0) return *this / l; else return vec(0);}
             template <typename TT> [[nodiscard]] constexpr auto dot(const vec2<TT> &o) const {return x * o.x + y * o.y;}
             template <typename TT> [[nodiscard]] constexpr auto cross(const vec2<TT> &o) const {return x * o.y - y * o.x;}
+            [[nodiscard]] constexpr auto tie() {return std::tie(x,y);}
+            [[nodiscard]] constexpr auto tie() const {return std::tie(x,y);}
         };
         
         template <typename T> struct vec<3,T> // vec3
@@ -365,6 +369,8 @@ namespace Math
             [[nodiscard]] constexpr auto norm() const -> vec3<decltype(type{}/len())> {if (auto l = len(); l != 0) return *this / l; else return vec(0);}
             template <typename TT> [[nodiscard]] constexpr auto dot(const vec3<TT> &o) const {return x * o.x + y * o.y + z * o.z;}
             template <typename TT> [[nodiscard]] constexpr auto cross(const vec3<TT> &o) const -> vec3<decltype(x * o.x - x * o.x)> {return {y * o.z - z * o.y, z * o.x - x * o.z, x * o.y - y * o.x};}
+            [[nodiscard]] constexpr auto tie() {return std::tie(x,y,z);}
+            [[nodiscard]] constexpr auto tie() const {return std::tie(x,y,z);}
         };
         
         template <typename T> struct vec<4,T> // vec4
@@ -411,6 +417,8 @@ namespace Math
             [[nodiscard]] constexpr auto len() const {return std::sqrt(len_sqr());}
             [[nodiscard]] constexpr auto norm() const -> vec4<decltype(type{}/len())> {if (auto l = len(); l != 0) return *this / l; else return vec(0);}
             template <typename TT> [[nodiscard]] constexpr auto dot(const vec4<TT> &o) const {return x * o.x + y * o.y + z * o.z + w * o.w;}
+            [[nodiscard]] constexpr auto tie() {return std::tie(x,y,z,w);}
+            [[nodiscard]] constexpr auto tie() const {return std::tie(x,y,z,w);}
         };
         //} Vectors
         
@@ -426,14 +434,10 @@ namespace Math
             static constexpr bool is_floating_point = std::is_floating_point_v<type>;
             union {member_type x, r;};
             union {member_type y, g;};
-            constexpr mat() : mat(1) {}
+            constexpr mat() : mat(1,0,0,1) {}
             constexpr mat(const member_type &x, const member_type &y) : x(x), y(y) {}
-            explicit constexpr mat(type obj) : x(obj,0), y(0,obj) {}
-            explicit constexpr mat(vec2<type> obj) : x(obj.x,0), y(0,obj.y) {}
-            constexpr mat(type sx, type sy) : x(sx,0), y(0,sy) {}
             constexpr mat(type xx, type yx, type xy, type yy) : x(xx,xy), y(yx,yy) {}
             template <typename TT> constexpr mat(const mat2x2<TT> &obj) : x(obj.x), y(obj.y) {}
-            [[nodiscard]] static constexpr mat fill(type obj) {return mat(obj, obj, obj, obj);}
             template <typename TT> [[nodiscard]] constexpr mat2x2<TT> to() const {return mat2x2<TT>(TT(x.x), TT(y.x), TT(x.y), TT(y.y));}
             [[nodiscard]] constexpr member_type &operator[](int i) {return *(member_type *)((char *)this + sizeof(member_type)*i);}
             [[nodiscard]] constexpr const member_type &operator[](int i) const {return *(member_type *)((char *)this + sizeof(member_type)*i);}
@@ -503,14 +507,10 @@ namespace Math
             static constexpr bool is_floating_point = std::is_floating_point_v<type>;
             union {member_type x, r;};
             union {member_type y, g;};
-            constexpr mat() : mat(1) {}
+            constexpr mat() : mat(1,0,0,1,0,0) {}
             constexpr mat(const member_type &x, const member_type &y) : x(x), y(y) {}
-            explicit constexpr mat(type obj) : x(obj,0,0), y(0,obj,0) {}
-            explicit constexpr mat(vec2<type> obj) : x(obj.x,0,0), y(0,obj.y,0) {}
-            constexpr mat(type sx, type sy) : x(sx,0,0), y(0,sy,0) {}
             constexpr mat(type xx, type yx, type xy, type yy, type xz, type yz) : x(xx,xy,xz), y(yx,yy,yz) {}
             template <typename TT> constexpr mat(const mat2x3<TT> &obj) : x(obj.x), y(obj.y) {}
-            [[nodiscard]] static constexpr mat fill(type obj) {return mat(obj, obj, obj, obj, obj, obj);}
             template <typename TT> [[nodiscard]] constexpr mat2x3<TT> to() const {return mat2x3<TT>(TT(x.x), TT(y.x), TT(x.y), TT(y.y), TT(x.z), TT(y.z));}
             [[nodiscard]] constexpr member_type &operator[](int i) {return *(member_type *)((char *)this + sizeof(member_type)*i);}
             [[nodiscard]] constexpr const member_type &operator[](int i) const {return *(member_type *)((char *)this + sizeof(member_type)*i);}
@@ -548,14 +548,10 @@ namespace Math
             static constexpr bool is_floating_point = std::is_floating_point_v<type>;
             union {member_type x, r;};
             union {member_type y, g;};
-            constexpr mat() : mat(1) {}
+            constexpr mat() : mat(1,0,0,1,0,0,0,0) {}
             constexpr mat(const member_type &x, const member_type &y) : x(x), y(y) {}
-            explicit constexpr mat(type obj) : x(obj,0,0,0), y(0,obj,0,0) {}
-            explicit constexpr mat(vec2<type> obj) : x(obj.x,0,0,0), y(0,obj.y,0,0) {}
-            constexpr mat(type sx, type sy) : x(sx,0,0,0), y(0,sy,0,0) {}
             constexpr mat(type xx, type yx, type xy, type yy, type xz, type yz, type xw, type yw) : x(xx,xy,xz,xw), y(yx,yy,yz,yw) {}
             template <typename TT> constexpr mat(const mat2x4<TT> &obj) : x(obj.x), y(obj.y) {}
-            [[nodiscard]] static constexpr mat fill(type obj) {return mat(obj, obj, obj, obj, obj, obj, obj, obj);}
             template <typename TT> [[nodiscard]] constexpr mat2x4<TT> to() const {return mat2x4<TT>(TT(x.x), TT(y.x), TT(x.y), TT(y.y), TT(x.z), TT(y.z), TT(x.w), TT(y.w));}
             [[nodiscard]] constexpr member_type &operator[](int i) {return *(member_type *)((char *)this + sizeof(member_type)*i);}
             [[nodiscard]] constexpr const member_type &operator[](int i) const {return *(member_type *)((char *)this + sizeof(member_type)*i);}
@@ -594,14 +590,10 @@ namespace Math
             union {member_type x, r;};
             union {member_type y, g;};
             union {member_type z, b;};
-            constexpr mat() : mat(1) {}
+            constexpr mat() : mat(1,0,0,0,1,0) {}
             constexpr mat(const member_type &x, const member_type &y, const member_type &z) : x(x), y(y), z(z) {}
-            explicit constexpr mat(type obj) : x(obj,0), y(0,obj), z(0,0) {}
-            explicit constexpr mat(vec2<type> obj) : x(obj.x,0), y(0,obj.y), z(0,0) {}
-            constexpr mat(type sx, type sy) : x(sx,0), y(0,sy), z(0,0) {}
             constexpr mat(type xx, type yx, type zx, type xy, type yy, type zy) : x(xx,xy), y(yx,yy), z(zx,zy) {}
             template <typename TT> constexpr mat(const mat3x2<TT> &obj) : x(obj.x), y(obj.y), z(obj.z) {}
-            [[nodiscard]] static constexpr mat fill(type obj) {return mat(obj, obj, obj, obj, obj, obj);}
             template <typename TT> [[nodiscard]] constexpr mat3x2<TT> to() const {return mat3x2<TT>(TT(x.x), TT(y.x), TT(z.x), TT(x.y), TT(y.y), TT(z.y));}
             [[nodiscard]] constexpr member_type &operator[](int i) {return *(member_type *)((char *)this + sizeof(member_type)*i);}
             [[nodiscard]] constexpr const member_type &operator[](int i) const {return *(member_type *)((char *)this + sizeof(member_type)*i);}
@@ -640,14 +632,10 @@ namespace Math
             union {member_type x, r;};
             union {member_type y, g;};
             union {member_type z, b;};
-            constexpr mat() : mat(1) {}
+            constexpr mat() : mat(1,0,0,0,1,0,0,0,1) {}
             constexpr mat(const member_type &x, const member_type &y, const member_type &z) : x(x), y(y), z(z) {}
-            explicit constexpr mat(type obj) : x(obj,0,0), y(0,obj,0), z(0,0,obj) {}
-            explicit constexpr mat(vec3<type> obj) : x(obj.x,0,0), y(0,obj.y,0), z(0,0,obj.z) {}
-            constexpr mat(type sx, type sy, type sz) : x(sx,0,0), y(0,sy,0), z(0,0,sz) {}
             constexpr mat(type xx, type yx, type zx, type xy, type yy, type zy, type xz, type yz, type zz) : x(xx,xy,xz), y(yx,yy,yz), z(zx,zy,zz) {}
             template <typename TT> constexpr mat(const mat3x3<TT> &obj) : x(obj.x), y(obj.y), z(obj.z) {}
-            [[nodiscard]] static constexpr mat fill(type obj) {return mat(obj, obj, obj, obj, obj, obj, obj, obj, obj);}
             template <typename TT> [[nodiscard]] constexpr mat3x3<TT> to() const {return mat3x3<TT>(TT(x.x), TT(y.x), TT(z.x), TT(x.y), TT(y.y), TT(z.y), TT(x.z), TT(y.z), TT(z.z));}
             [[nodiscard]] constexpr member_type &operator[](int i) {return *(member_type *)((char *)this + sizeof(member_type)*i);}
             [[nodiscard]] constexpr const member_type &operator[](int i) const {return *(member_type *)((char *)this + sizeof(member_type)*i);}
@@ -744,14 +732,10 @@ namespace Math
             union {member_type x, r;};
             union {member_type y, g;};
             union {member_type z, b;};
-            constexpr mat() : mat(1) {}
+            constexpr mat() : mat(1,0,0,0,1,0,0,0,1,0,0,0) {}
             constexpr mat(const member_type &x, const member_type &y, const member_type &z) : x(x), y(y), z(z) {}
-            explicit constexpr mat(type obj) : x(obj,0,0,0), y(0,obj,0,0), z(0,0,obj,0) {}
-            explicit constexpr mat(vec3<type> obj) : x(obj.x,0,0,0), y(0,obj.y,0,0), z(0,0,obj.z,0) {}
-            constexpr mat(type sx, type sy, type sz) : x(sx,0,0,0), y(0,sy,0,0), z(0,0,sz,0) {}
             constexpr mat(type xx, type yx, type zx, type xy, type yy, type zy, type xz, type yz, type zz, type xw, type yw, type zw) : x(xx,xy,xz,xw), y(yx,yy,yz,yw), z(zx,zy,zz,zw) {}
             template <typename TT> constexpr mat(const mat3x4<TT> &obj) : x(obj.x), y(obj.y), z(obj.z) {}
-            [[nodiscard]] static constexpr mat fill(type obj) {return mat(obj, obj, obj, obj, obj, obj, obj, obj, obj, obj, obj, obj);}
             template <typename TT> [[nodiscard]] constexpr mat3x4<TT> to() const {return mat3x4<TT>(TT(x.x), TT(y.x), TT(z.x), TT(x.y), TT(y.y), TT(z.y), TT(x.z), TT(y.z), TT(z.z), TT(x.w), TT(y.w), TT(z.w));}
             [[nodiscard]] constexpr member_type &operator[](int i) {return *(member_type *)((char *)this + sizeof(member_type)*i);}
             [[nodiscard]] constexpr const member_type &operator[](int i) const {return *(member_type *)((char *)this + sizeof(member_type)*i);}
@@ -790,14 +774,10 @@ namespace Math
             union {member_type y, g;};
             union {member_type z, b;};
             union {member_type w, a;};
-            constexpr mat() : mat(1) {}
+            constexpr mat() : mat(1,0,0,0,0,1,0,0) {}
             constexpr mat(const member_type &x, const member_type &y, const member_type &z, const member_type &w) : x(x), y(y), z(z), w(w) {}
-            explicit constexpr mat(type obj) : x(obj,0), y(0,obj), z(0,0), w(0,0) {}
-            explicit constexpr mat(vec2<type> obj) : x(obj.x,0), y(0,obj.y), z(0,0), w(0,0) {}
-            constexpr mat(type sx, type sy) : x(sx,0), y(0,sy), z(0,0), w(0,0) {}
             constexpr mat(type xx, type yx, type zx, type wx, type xy, type yy, type zy, type wy) : x(xx,xy), y(yx,yy), z(zx,zy), w(wx,wy) {}
             template <typename TT> constexpr mat(const mat4x2<TT> &obj) : x(obj.x), y(obj.y), z(obj.z), w(obj.w) {}
-            [[nodiscard]] static constexpr mat fill(type obj) {return mat(obj, obj, obj, obj, obj, obj, obj, obj);}
             template <typename TT> [[nodiscard]] constexpr mat4x2<TT> to() const {return mat4x2<TT>(TT(x.x), TT(y.x), TT(z.x), TT(w.x), TT(x.y), TT(y.y), TT(z.y), TT(w.y));}
             [[nodiscard]] constexpr member_type &operator[](int i) {return *(member_type *)((char *)this + sizeof(member_type)*i);}
             [[nodiscard]] constexpr const member_type &operator[](int i) const {return *(member_type *)((char *)this + sizeof(member_type)*i);}
@@ -835,14 +815,10 @@ namespace Math
             union {member_type y, g;};
             union {member_type z, b;};
             union {member_type w, a;};
-            constexpr mat() : mat(1) {}
+            constexpr mat() : mat(1,0,0,0,0,1,0,0,0,0,1,0) {}
             constexpr mat(const member_type &x, const member_type &y, const member_type &z, const member_type &w) : x(x), y(y), z(z), w(w) {}
-            explicit constexpr mat(type obj) : x(obj,0,0), y(0,obj,0), z(0,0,obj), w(0,0,0) {}
-            explicit constexpr mat(vec3<type> obj) : x(obj.x,0,0), y(0,obj.y,0), z(0,0,obj.z), w(0,0,0) {}
-            constexpr mat(type sx, type sy, type sz) : x(sx,0,0), y(0,sy,0), z(0,0,sz), w(0,0,0) {}
             constexpr mat(type xx, type yx, type zx, type wx, type xy, type yy, type zy, type wy, type xz, type yz, type zz, type wz) : x(xx,xy,xz), y(yx,yy,yz), z(zx,zy,zz), w(wx,wy,wz) {}
             template <typename TT> constexpr mat(const mat4x3<TT> &obj) : x(obj.x), y(obj.y), z(obj.z), w(obj.w) {}
-            [[nodiscard]] static constexpr mat fill(type obj) {return mat(obj, obj, obj, obj, obj, obj, obj, obj, obj, obj, obj, obj);}
             template <typename TT> [[nodiscard]] constexpr mat4x3<TT> to() const {return mat4x3<TT>(TT(x.x), TT(y.x), TT(z.x), TT(w.x), TT(x.y), TT(y.y), TT(z.y), TT(w.y), TT(x.z), TT(y.z), TT(z.z), TT(w.z));}
             [[nodiscard]] constexpr member_type &operator[](int i) {return *(member_type *)((char *)this + sizeof(member_type)*i);}
             [[nodiscard]] constexpr const member_type &operator[](int i) const {return *(member_type *)((char *)this + sizeof(member_type)*i);}
@@ -881,14 +857,10 @@ namespace Math
             union {member_type y, g;};
             union {member_type z, b;};
             union {member_type w, a;};
-            constexpr mat() : mat(1) {}
+            constexpr mat() : mat(1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1) {}
             constexpr mat(const member_type &x, const member_type &y, const member_type &z, const member_type &w) : x(x), y(y), z(z), w(w) {}
-            explicit constexpr mat(type obj) : x(obj,0,0,0), y(0,obj,0,0), z(0,0,obj,0), w(0,0,0,obj) {}
-            explicit constexpr mat(vec4<type> obj) : x(obj.x,0,0,0), y(0,obj.y,0,0), z(0,0,obj.z,0), w(0,0,0,obj.w) {}
-            constexpr mat(type sx, type sy, type sz, type sw) : x(sx,0,0,0), y(0,sy,0,0), z(0,0,sz,0), w(0,0,0,sw) {}
             constexpr mat(type xx, type yx, type zx, type wx, type xy, type yy, type zy, type wy, type xz, type yz, type zz, type wz, type xw, type yw, type zw, type ww) : x(xx,xy,xz,xw), y(yx,yy,yz,yw), z(zx,zy,zz,zw), w(wx,wy,wz,ww) {}
             template <typename TT> constexpr mat(const mat4x4<TT> &obj) : x(obj.x), y(obj.y), z(obj.z), w(obj.w) {}
-            [[nodiscard]] static constexpr mat fill(type obj) {return mat(obj, obj, obj, obj, obj, obj, obj, obj, obj, obj, obj, obj, obj, obj, obj, obj);}
             template <typename TT> [[nodiscard]] constexpr mat4x4<TT> to() const {return mat4x4<TT>(TT(x.x), TT(y.x), TT(z.x), TT(w.x), TT(x.y), TT(y.y), TT(z.y), TT(w.y), TT(x.z), TT(y.z), TT(z.z), TT(w.z), TT(x.w), TT(y.w), TT(z.w), TT(w.w));}
             [[nodiscard]] constexpr member_type &operator[](int i) {return *(member_type *)((char *)this + sizeof(member_type)*i);}
             [[nodiscard]] constexpr const member_type &operator[](int i) const {return *(member_type *)((char *)this + sizeof(member_type)*i);}
@@ -1245,6 +1217,7 @@ namespace Math
         //{  input/output
         template <typename A, typename B, int D, typename T> std::basic_ostream<A,B> &operator<<(std::basic_ostream<A,B> &s, const vec<D,T> &v)
         {
+            s.width(0);
             s << '[';
             for (int i = 0; i < D; i++)
             {
@@ -1255,8 +1228,9 @@ namespace Math
             s << ']';
             return s;
         }
-        template <typename A, typename B, int W, int H, typename T> std::basic_ostream<A,B> &operator<<(std::basic_ostream<A,B> &s, const vec<W,vec<H,T>> &v)
+        template <typename A, typename B, int W, int H, typename T> std::basic_ostream<A,B> &operator<<(std::basic_ostream<A,B> &s, const mat<W,H,T> &v)
         {
+            s.width(0);
             s << '[';
             for (int y = 0; y < H; y++)
             {
@@ -1274,12 +1248,14 @@ namespace Math
         }
         template <typename A, typename B, int D, typename T> std::basic_istream<A,B> &operator>>(std::basic_istream<A,B> &s, vec<D,T> &v)
         {
+            s.width(0);
             for (int i = 0; i < D; i++)
                 s >> v[i];
             return s;
         }
-        template <typename A, typename B, int W, int H, typename T> std::basic_istream<A,B> &operator>>(std::basic_istream<A,B> &s, vec<W,vec<H,T>> &v)
+        template <typename A, typename B, int W, int H, typename T> std::basic_istream<A,B> &operator>>(std::basic_istream<A,B> &s, mat<W,H,T> &v)
         {
+            s.width(0);
             for (int y = 0; y < H; y++)
             for (int x = 0; x < W; x++)
                 s >> v[x][y];
@@ -1340,13 +1316,40 @@ namespace Math
         
     }
     
-    namespace Common
+    namespace Export
     {
         using namespace Vector;
         using namespace Operators;
     }
 }
 
-using namespace Math::Common;
+namespace std
+{
+    template <int D, typename T> struct less<Math::vec<D,T>>
+    {
+        using result_type = bool;
+        using first_argument_type = Math::vec<D,T>;
+        using second_argument_type = Math::vec<D,T>;
+        constexpr bool operator()(const Math::vec<D,T> &a, const Math::vec<D,T> &b) const
+        {
+            return a.tie() < b.tie();
+        }
+    };
+    
+    template <int D, typename T> struct hash<Math::vec<D,T>>
+    {
+        using result_type = std::size_t;
+        using argument_type = Math::vec<D,T>;
+        std::size_t operator()(const Math::vec<D,T> &v) const
+        {
+            std::size_t ret = std::hash<decltype(v.x)>{}(v.x);
+            for (int i = 1; i < D; i++)
+                ret ^= std::hash<decltype(v.x)>{}(v[i]) + 0x9e3779b9 + (ret << 6) + (ret >> 2); // From Boost.
+            return ret;
+        }
+    };
+}
+
+using namespace Math::Export;
 
 #endif
