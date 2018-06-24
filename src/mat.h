@@ -216,11 +216,13 @@ namespace Math
     inline namespace Utility
     {
         template <typename T> struct is_vector_impl : std::false_type {};
-        template <int D, typename T> struct is_vector_impl<vec<D,T>> : std::true_type {};
+        template <int D, typename T> struct is_vector_impl<      vec<D,T>> : std::true_type {};
+        template <int D, typename T> struct is_vector_impl<const vec<D,T>> : std::true_type {};
         template <typename T> inline constexpr bool is_vector_v = is_vector_impl<T>::value;
         
         template <typename T> struct is_matrix_impl : std::false_type {};
         template <int W, int H, typename T> struct is_matrix_impl<mat<W,H,T>> : std::true_type {};
+        template <int W, int H, typename T> struct is_matrix_impl<const mat<W,H,T>> : std::true_type {};
         template <typename T> inline constexpr bool is_matrix_v = is_matrix_impl<T>::value;
         
         template <typename T> inline constexpr bool is_scalar_v = !is_vector_v<T> && !is_matrix_v<T>;
@@ -230,7 +232,8 @@ namespace Math
         template <typename T> using vec_base_t = typename std::conditional_t<is_vector_v<T>, T, std::enable_if<1,T>>::type;
         
         template <typename T> struct vec_size_impl : std::integral_constant<int, 1> {};
-        template <int D, typename T> struct vec_size_impl<vec<D,T>> : std::integral_constant<int, D> {};
+        template <int D, typename T> struct vec_size_impl<      vec<D,T>> : std::integral_constant<int, D> {};
+        template <int D, typename T> struct vec_size_impl<const vec<D,T>> : std::integral_constant<int, D> {};
         template <typename T> inline constexpr int vec_size_v = vec_size_impl<T>::value;
         
         template <typename A, typename B> using change_vec_base_t = std::conditional_t<is_vector_v<A>, vec<vec_size_v<A>, B>, B>;
@@ -254,7 +257,8 @@ namespace Math
         {using type = std::conditional_t<DA != DB || std::is_void_v<typename larger_impl<A,B>::type>, void, change_vec_base_t<vec<DA,A>, typename larger_impl<A,B>::type>>;};
         
         // Void on failure
-        template <typename ...P> using opt_larger_t = typename larger_impl<P...>::type; // void on failure
+        template <typename ...P> struct opt_larger_impl {using type = typename larger_impl<std::remove_const_t<P>...>::type;};
+        template <typename ...P> using opt_larger_t = typename opt_larger_impl<P...>::type; // void on failure
         
         template <typename ...P> inline constexpr bool have_larger_type_v = !std::is_void_v<opt_larger_t<P...>>;
         
@@ -322,6 +326,8 @@ namespace Math
             template <typename TT> [[nodiscard]] constexpr auto cross(const vec2<TT> &o) const {return x * o.y - y * o.x;}
             [[nodiscard]] constexpr auto tie() {return std::tie(x,y);}
             [[nodiscard]] constexpr auto tie() const {return std::tie(x,y);}
+            template <int I> [[nodiscard]] constexpr auto &get() {return std::get<I>(tie());}
+            template <int I> [[nodiscard]] constexpr auto &get() const {return std::get<I>(tie());}
         };
         
         template <typename T> struct vec<3,T> // vec3
@@ -371,6 +377,8 @@ namespace Math
             template <typename TT> [[nodiscard]] constexpr auto cross(const vec3<TT> &o) const -> vec3<decltype(x * o.x - x * o.x)> {return {y * o.z - z * o.y, z * o.x - x * o.z, x * o.y - y * o.x};}
             [[nodiscard]] constexpr auto tie() {return std::tie(x,y,z);}
             [[nodiscard]] constexpr auto tie() const {return std::tie(x,y,z);}
+            template <int I> [[nodiscard]] constexpr auto &get() {return std::get<I>(tie());}
+            template <int I> [[nodiscard]] constexpr auto &get() const {return std::get<I>(tie());}
         };
         
         template <typename T> struct vec<4,T> // vec4
@@ -419,6 +427,8 @@ namespace Math
             template <typename TT> [[nodiscard]] constexpr auto dot(const vec4<TT> &o) const {return x * o.x + y * o.y + z * o.z + w * o.w;}
             [[nodiscard]] constexpr auto tie() {return std::tie(x,y,z,w);}
             [[nodiscard]] constexpr auto tie() const {return std::tie(x,y,z,w);}
+            template <int I> [[nodiscard]] constexpr auto &get() {return std::get<I>(tie());}
+            template <int I> [[nodiscard]] constexpr auto &get() const {return std::get<I>(tie());}
         };
         //} Vectors
         
@@ -1295,8 +1305,58 @@ namespace Math
         template <typename T> inline constexpr op_expr_type_cross<T> operator/(T &&param, op_type_cross) {return {std::forward<T>(param)};}
     }
     
+    inline namespace Utility
+    {
+        template <int I, typename T> constexpr auto &get_vec_element(T &&vec)
+        {
+            // Returns a non-const reference only if the parameter is a non-const lvalue; otherwise returns a const reference.
+            static_assert(I >= 0 && I < 4);
+            constexpr bool not_const = std::is_reference_v<T> && !std::is_const_v<std::remove_reference_t<T>>;
+            if constexpr (!is_vector_v<std::remove_reference_t<T>>)
+                return std::conditional_t<not_const, T &, const T &>(vec);
+            else
+                return std::conditional_t<not_const, vec_base_t<std::remove_reference_t<T>> &, const vec_base_t<std::remove_reference_t<T>> &>(vec.template get<I>());
+        }
+        
+        template <int D, typename F> constexpr void cexpr_for(F &&func)
+        {
+            static_assert(D >= 1 && D <= 4);
+            func(std::integral_constant<int,0>{});
+            if constexpr (D > 1) func(std::integral_constant<int,1>{});
+            if constexpr (D > 2) func(std::integral_constant<int,2>{});
+            if constexpr (D > 3) func(std::integral_constant<int,3>{});
+        }
+    }
+    
     inline namespace Misc
     {
+        template <typename F, typename ...P> constexpr auto apply_elementwise(F &&func, P &&... params)
+        {
+            using larger_type = opt_larger_t<change_vec_base_t<std::remove_reference_t<P>, int>...>;
+            static_assert(!std::is_void_v<larger_type>, "Parameter size mismatch.");
+            constexpr int size = vec_size_v<larger_type>;
+            
+            using ret_type = decltype(std::declval<F>()(get_vec_element<0>(std::declval<P>())...));
+            
+            if constexpr (std::is_void_v<ret_type>)
+            {
+                cexpr_for<size>([&](auto index)
+                {
+                    func(get_vec_element<index.value>(params)...); // No forwarding to prevent moving.
+                });
+                return void();
+            }
+            else
+            {
+                std::conditional_t<size != 1, vec<size, ret_type>, ret_type> ret{};
+                cexpr_for<size>([&](auto index)
+                {
+                    get_vec_element<index.value>(ret) = func(get_vec_element<index.value>(params)...); // No forwarding to prevent moving.
+                });
+                return ret;
+            }
+        }
+        
         template <typename T> [[nodiscard]] constexpr T pi() {return T(3.14159265358979323846l);}
         constexpr float       f_pi  = pi<float>();
         constexpr double      d_pi  = pi<double>();
@@ -1313,7 +1373,15 @@ namespace Math
             return in * fp_t(180) / pi<fp_t>();
         }
         
-        
+        template <typename A, typename B> [[nodiscard]] constexpr A ipow(A a, B b)
+        {
+            // Works with vectors as well.
+            static_assert(std::is_integral_v<B>, "Power must be integral.");
+            A ret = 1;
+            while (b-- > 0)
+            ret *= a;
+            return ret;
+        }
     }
     
     namespace Export

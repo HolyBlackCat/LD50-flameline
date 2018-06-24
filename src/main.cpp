@@ -10,7 +10,8 @@ template <typename T> struct S;
 
 int main(int, char **)
 {
-    std::unordered_map<fvec3, int> m;
-    m[{1,2,3}] = 4;
-    std::cout << m[{1,2,3}];
+    const int a = 10;
+    ivec3 b(1,2,3);
+    Math::apply_elementwise([](int &x, int y){x += y;}, b, a);
+    std::cout << b;
 }
