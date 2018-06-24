@@ -213,12 +213,14 @@ namespace Math
         using u64mat2 = u64mat2x2; using u64mat3 = u64mat3x3; using u64mat4 = u64mat4x4;
     }
     
-    inline namespace Utility
+    inline namespace Utility // Templates
     {
         template <typename T> struct is_vector_impl : std::false_type {};
         template <int D, typename T> struct is_vector_impl<      vec<D,T>> : std::true_type {};
         template <int D, typename T> struct is_vector_impl<const vec<D,T>> : std::true_type {};
         template <typename T> inline constexpr bool is_vector_v = is_vector_impl<T>::value;
+        
+        template <typename ...P> inline constexpr bool no_vectors_v = !(is_vector_v<P> || ...);
         
         template <typename T> struct is_matrix_impl : std::false_type {};
         template <int W, int H, typename T> struct is_matrix_impl<mat<W,H,T>> : std::true_type {};
@@ -275,7 +277,7 @@ namespace Math
         template <typename ...P> using larger_t = typename hard_larger_impl<P...>::type;
     }
     
-    inline namespace Vector
+    inline namespace Vector // Definitions
     {
         //{ Vectors
         template <typename T> struct vec<2,T> // vec2
@@ -430,6 +432,8 @@ namespace Math
             template <int I> [[nodiscard]] constexpr auto &get() {return std::get<I>(tie());}
             template <int I> [[nodiscard]] constexpr auto &get() const {return std::get<I>(tie());}
         };
+        
+        template <typename ...P, typename = std::enable_if_t<sizeof...(P) >= 2 && sizeof...(P) <= 4>> vec(P...) -> vec<sizeof...(P), larger_t<P...>>;
         //} Vectors
         
         //{ Matrices
@@ -966,6 +970,10 @@ namespace Math
                          0                 , 0     , -1                          , 0                             };
             }
         };
+        
+        template <typename ...P, std::enable_if_t<sizeof...(P) == 4, bool> = true> mat(P...) -> mat<2, 2, larger_t<P...>>;
+        template <typename ...P, std::enable_if_t<sizeof...(P) == 9, bool> = true> mat(P...) -> mat<3, 3, larger_t<P...>>;
+        template <typename ...P, std::enable_if_t<sizeof...(P) == 16, bool> = true> mat(P...) -> mat<4, 4, larger_t<P...>>;
         //} Matrices
         
         //{ Operators
@@ -1275,7 +1283,7 @@ namespace Math
         //} Operators
     }
     
-    inline namespace Operators
+    inline namespace CustomOperators
     {
         inline constexpr struct op_type_mul {} mul;
         inline constexpr struct op_type_dot {} dot;
@@ -1305,7 +1313,7 @@ namespace Math
         template <typename T> inline constexpr op_expr_type_cross<T> operator/(T &&param, op_type_cross) {return {std::forward<T>(param)};}
     }
     
-    inline namespace Utility
+    inline namespace Utility // Member access
     {
         template <int I, typename T> constexpr auto &get_vec_element(T &&vec)
         {
@@ -1373,21 +1381,180 @@ namespace Math
             return in * fp_t(180) / pi<fp_t>();
         }
         
+        template <typename T> [[nodiscard]] constexpr change_vec_base_t<T,int> sign(T val)
+        {
+            // Works with scalars and vectors.
+            return (val > 0) - (val < 0);
+        }
+        
+        template <typename A, typename B, typename C> [[nodiscard]] constexpr A clamp(A val, B min, C max)
+        {
+            static_assert(no_vectors_v<B,C> || is_vector_v<A>, "If `min` and/or `max` are vectors, `val` has to be a vector as well.");
+            
+            if constexpr (no_vectors_v<A,B,C>)
+            {
+                if (val > max) return max;
+                if (val < min) return min;
+                return val;
+            }
+            else
+            {
+                return apply_elementwise(clamp<vec_base_t<A>, vec_base_t<B>, vec_base_t<C>>, val, min, max);
+            }
+        }
+        
+        template <typename A, typename B, typename C> constexpr void clamp_var(A &var, B min, C max)
+        {
+            var = clamp(var, min, max);
+        }
+        
+        template <typename A> [[nodiscard]] constexpr A clamp(A val) {return clamp(val, 0, 1);}
+        template <typename A> constexpr void clamp_var(A &var) {clamp_var(var, 0, 1);}
+        
+        template <typename I = int, typename F> [[nodiscard]] change_vec_base_t<F,I> iround(F x)
+        {
+            static_assert(std::is_floating_point_v<vec_base_t<F>>, "Argument must be floating-point.");
+            static_assert(std::is_integral_v<I> && std::is_signed_v<I>, "Template argument must be integral and signed.");
+            
+            if constexpr(no_vectors_v<F>)
+            {
+                if constexpr (sizeof (I) <= sizeof (long))
+                    return std::lround(x);
+                else
+                    return std::llround(x);
+            }
+            else
+            {
+                return apply_elementwise(iround<I, vec_base_t<F>>, x);
+            }
+        }
+        
+        template <typename T> [[nodiscard]] T round(T x)
+        {
+            static_assert(std::is_floating_point_v<vec_base_t<T>>, "Argument must be floating-point.");
+            
+            if constexpr (no_vectors_v<T>)
+                return std::round(x);
+            else
+                return apply_elementwise(round<vec_base_t<T>>, x);
+        }
+        
+        template <typename T> [[nodiscard]] T floor(T x)
+        {
+            static_assert(std::is_floating_point_v<vec_base_t<T>>, "Argument must be floating-point.");
+            
+            if constexpr (no_vectors_v<T>)
+                return std::floor(x);
+            else
+                return apply_elementwise(floor<vec_base_t<T>>, x);
+        }
+        
+        template <typename T> [[nodiscard]] T ceil(T x)
+        {
+            static_assert(std::is_floating_point_v<vec_base_t<T>>, "Argument must be floating-point.");
+            
+            if constexpr (no_vectors_v<T>)
+                return std::ceil(x);
+            else
+                return apply_elementwise(ceil<vec_base_t<T>>, x);
+        }
+        
+        template <typename T> [[nodiscard]] T trunc(T x)
+        {
+            static_assert(std::is_floating_point_v<vec_base_t<T>>, "Argument must be floating-point.");
+            
+            if constexpr (no_vectors_v<T>)
+                return std::trunc(x);
+            else
+                return apply_elementwise(trunc<vec_base_t<T>>, x);
+        }
+        
+        template <typename T> [[nodiscard]] T frac(T x)
+        {
+            static_assert(std::is_floating_point_v<vec_base_t<T>>, "Argument must be floating-point.");
+            
+            if constexpr (no_vectors_v<T>)
+                return std::modf(x, 0);
+            else
+                return apply_elementwise(frac<vec_base_t<T>>, x);
+        }
+        
+        template <typename A, typename B> [[nodiscard]] constexpr A div_ex(A a, B b)
+        {
+            static_assert(no_vectors_v<B> || is_vector_v<A>, "If `b` is a vector, `a` has to be a vector as well.");
+            static_assert(std::is_integral_v<vec_base_t<A>> && std::is_integral_v<vec_base_t<B>>, "Parameters must be integral.");
+            
+            if constexpr (no_vectors_v<A,B>)
+            {
+                if (a >= 0)
+                    return a / b;
+                else
+                    return (a + 1) / b - sign(b);
+            }
+            else
+            {
+                return apply_elementwise(div_ex<vec_base_t<A>, vec_base_t<B>>, a, b);
+            }
+        }
+        
+        template <typename A, typename B> [[nodiscard]] constexpr A mod_ex(A a, B b)
+        {
+            static_assert(no_vectors_v<B> || is_vector_v<A>, "If `b` is a vector, `a` has to be a vector as well.");
+            static_assert(std::is_integral_v<vec_base_t<A>> && std::is_integral_v<vec_base_t<B>>, "Parameters must be integral.");
+            
+            if constexpr (no_vectors_v<A,B>)
+            {
+                if (a >= 0)
+                    return a % b;
+                else
+                    return abs(b) - 1 + (a + 1) % b;
+            }
+            else
+            {
+                return apply_elementwise(mod_ex<vec_base_t<A>, vec_base_t<B>>, a, b);
+            }
+        }
+        
         template <typename A, typename B> [[nodiscard]] constexpr A ipow(A a, B b)
         {
-            // Works with vectors as well.
+            // A can be a scalar or a vector. B has to be a scalar.
             static_assert(std::is_integral_v<B>, "Power must be integral.");
             A ret = 1;
             while (b-- > 0)
-            ret *= a;
+                ret *= a;
             return ret;
+        }
+        
+        template <typename A, typename B> [[nodiscard]] constexpr larger_t<floating_point_t<A>,floating_point_t<B>> pow(A a, B b)
+        {
+            if constexpr (no_vectors_v<A,B>)
+                return std::pow(a, b);
+            else
+                return apply_elementwise(pow<vec_base_t<A>, vec_base_t<B>>, a, b);
+        }
+        
+        template <typename ...P> constexpr larger_t<P...> min(P ... params)
+        {
+            if constexpr (no_vectors_v<P...>)
+                return std::min({larger_t<P...>(params)...});
+            else
+                return apply_elementwise(min<vec_base_t<P>...>, params...);
+        }
+        
+        template <typename ...P> constexpr larger_t<P...> max(P ... params)
+        {
+            if constexpr (no_vectors_v<P...>)
+                return std::max({larger_t<P...>(params)...});
+            else
+                return apply_elementwise(max<vec_base_t<P>...>, params...);
         }
     }
     
     namespace Export
     {
         using namespace Vector;
-        using namespace Operators;
+        using namespace CustomOperators;
+        using namespace Misc;
     }
 }
 
