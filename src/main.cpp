@@ -1,14 +1,12 @@
 #include <iostream>
-#include <unordered_map>
+#include <vector>
 
 #include "mat.h"
-
-using namespace Math;
 
 template <typename T> struct S;
 
 
 int main(int, char **)
 {
-
+    std::cout << abs(vec(-1,2));
 }

@@ -199,7 +199,7 @@ int main()
             }
             next_line();
 
-            { // For specific types
+            { // Size-generic
                 for (int i = 0; i < data::type_list_len; i++)
                 {
                     const auto &type = data::type_list[i];
@@ -367,7 +367,7 @@ int main()
                             output("explicit constexpr vec(type obj) : ",Fields(", ","", "(obj)")," {}\n");
 
                             // Converting
-                            output("template <typename TT> constexpr vec(const vec",w,"<TT> &obj) : ");
+                            output("template <typename TT> constexpr vec(vec",w,"<TT> obj) : ");
                             for (int i = 0; i < w; i++)
                             {
                                 if (i != 0)
@@ -407,10 +407,10 @@ int main()
 
                         { // Apply operators
                             // Sum
-                            output("[[nodiscard]] constexpr auto sum() const {return ",Fields(" + "),";}\n");
+                            output("[[nodiscard]] constexpr auto sum() const {return ", Fields(" + "), ";}\n");
 
                             // Product
-                            output("[[nodiscard]] constexpr auto prod() const {return ",Fields(" * "),";}\n");
+                            output("[[nodiscard]] constexpr auto prod() const {return ", Fields(" * "), ";}\n");
 
                             // Ratio
                             if (w == 2)
@@ -420,6 +420,9 @@ int main()
                             output("[[nodiscard]] constexpr type min() const {return std::min({", Fields(","), "});}\n");
                             // Max
                             output("[[nodiscard]] constexpr type max() const {return std::max({", Fields(","), "});}\n");
+
+                            // Abs
+                            output("[[nodiscard]] constexpr vec abs() const {return vec(", Fields(", ", "std::abs(", ")"), ");}\n");
                         }
 
                         { // Copy with modified members
@@ -435,7 +438,7 @@ int main()
                                 for (int j = 0; j < w; j++)
                                 {
                                     bool op_set = op.str == "";
-                                    output(" template <typename N> [[nodiscard]] constexpr ",(op_set ? "vec" : "auto")," ",op.name,"_",data::fields_alt[i][j],"(const N &n) const {return ",
+                                    output(" template <typename N> [[nodiscard]] constexpr ",(op_set ? "vec" : "auto")," ",op.name,"_",data::fields_alt[i][j],"(N n) const {return ",
                                            (op_set ? "vec" : make_str("vec",w,"<decltype(x",op.str,"n)>")),"(");
                                     for (int k = 0; k < w; k++)
                                     {
@@ -506,6 +509,20 @@ int main()
                             output("[[nodiscard]] constexpr auto norm() const -> vec",w,"<decltype(type{}/len())> {if (auto l = len(); l != 0) return *this / l; else return vec(0);}\n");
                         }
 
+                        { // Angles and directions
+                            if (w == 2)
+                            {
+                                // Construct from angle
+                                output("template <typename TT> [[nodiscard]] static constexpr vec dir(TT angle, type len = 1) {return vec(std::cos(angle) * len, std::sin(angle) * len); static_assert(is_floating_point, \"The vector must be floating-point.\");}\n");
+
+                                // Get angle
+                                output("template <typename TT = double> [[nodiscard]] constexpr T angle() const {return std::atan2(TT(y), TT(x));}\n"); // Note that atan2 is well-defined even when applied to (0,0).
+
+                                // Rotate by 90 degree increments
+                                output("[[nodiscard]] constexpr vec rot90(int steps = 1) const {switch (steps & 3) {default: return *this; case 1: return {-y,x}; case 2: return -*this; case 3: return {y,-x};}}\n");
+                            }
+                        }
+
                         { // Dot and cross products
                             // Dot product
                             output("template <typename TT> [[nodiscard]] constexpr auto dot(const vec",w,"<TT> &o) const {return ");
@@ -524,6 +541,9 @@ int main()
                             // Cross product z component
                             if (w == 2)
                                 output("template <typename TT> [[nodiscard]] constexpr auto cross(const vec2<TT> &o) const {return x * o.y - y * o.x;}\n");
+
+                            // Delta (aka inverse minus)
+                            output("template <typename TT> [[nodiscard]] constexpr auto delta(vec",w,"<TT> v) const {return v - *this;}\n");
                         }
 
                         { // Tie
@@ -1275,7 +1295,7 @@ int main()
 
                 template <typename T> [[nodiscard]] constexpr change_vec_base_t<T,int> sign(T val)
                 {
-                    // Works with scalars and vectors.
+                    // Works on scalars and vectors.
                     return (val > 0) - (val < 0);
                 }
 
@@ -1319,6 +1339,14 @@ int main()
                     {
                         return apply_elementwise(iround<I, vec_base_t<F>>, x);
                     }
+                }
+
+                template <typename T> [[nodiscard]] T abs(T x)
+                {
+                    if constexpr (no_vectors_v<T>)
+                    $   return std::abs(x);
+                    else
+                    $   return apply_elementwise(abs<vec_base_t<T>>, x);
                 }
 
                 template <typename T> [[nodiscard]] T round(T x)
@@ -1374,7 +1402,7 @@ int main()
                 template <typename A, typename B> [[nodiscard]] constexpr A div_ex(A a, B b)
                 {
                     static_assert(no_vectors_v<B> || is_vector_v<A>, "If `b` is a vector, `a` has to be a vector as well.");
-                    static_assert(std::is_integral_v<vec_base_t<A>> && std::is_integral_v<vec_base_t<B>>, "Parameters must be integral.");
+                    static_assert(std::is_integral_v<vec_base_t<A>> && std::is_integral_v<vec_base_t<B>>, "Arguments must be integral.");
 
                     if constexpr (no_vectors_v<A,B>)
                     {
@@ -1392,7 +1420,7 @@ int main()
                 template <typename A, typename B> [[nodiscard]] constexpr A mod_ex(A a, B b)
                 {
                     static_assert(no_vectors_v<B> || is_vector_v<A>, "If `b` is a vector, `a` has to be a vector as well.");
-                    static_assert(std::is_integral_v<vec_base_t<A>> && std::is_integral_v<vec_base_t<B>>, "Parameters must be integral.");
+                    static_assert(std::is_integral_v<vec_base_t<A>> && std::is_integral_v<vec_base_t<B>>, "Arguments must be integral.");
 
                     if constexpr (no_vectors_v<A,B>)
                     {
@@ -1409,7 +1437,7 @@ int main()
 
                 template <typename A, typename B> [[nodiscard]] constexpr A ipow(A a, B b)
                 {
-                    // A can be a scalar or a vector. B has to be a scalar.
+                    // `A` can be a scalar or a vector. `B` has to be scalar.
                     static_assert(std::is_integral_v<B>, "Power must be integral.");
                     A ret = 1;
                     while (b-- > 0)
@@ -1417,12 +1445,19 @@ int main()
                     return ret;
                 }
 
-                template <typename A, typename B> [[nodiscard]] constexpr larger_t<floating_point_t<A>,floating_point_t<B>> pow(A a, B b)
+                template <typename A, typename B> [[nodiscard]] constexpr floating_point_t<larger_t<A,B>> pow(A a, B b)
                 {
                     if constexpr (no_vectors_v<A,B>)
                     $   return std::pow(a, b);
                     else
                     $   return apply_elementwise(pow<vec_base_t<A>, vec_base_t<B>>, a, b);
+                }
+
+                template <typename T> [[nodiscard]] constexpr T smoothstep(T x)
+                {
+                    // Works on scalars and vectors.
+                    static_assert(std::is_floating_point_v<vec_base_t<T>>, "Argument must be floating-point.");
+                    return (3 - 2*x) * x*x;
                 }
 
                 template <typename ...P> constexpr larger_t<P...> min(P ... params)
@@ -1451,6 +1486,26 @@ int main()
                 using namespace Vector;
                 using namespace CustomOperators;
                 using namespace Misc;
+
+                using std::int8_t;
+                using std::uint8_t;
+                using std::int16_t;
+                using std::uint16_t;
+                using std::int32_t;
+                using std::uint32_t;
+                using std::int64_t;
+                using std::uint64_t;
+                using std::size_t;
+                using std::ptrdiff_t;
+
+                using std::sqrt;
+                using std::cos;
+                using std::sin;
+                using std::tan;
+                using std::acos;
+                using std::asin;
+                using std::atan;
+                using std::atan2;
             )");
         });
     });

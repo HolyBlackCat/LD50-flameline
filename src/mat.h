@@ -292,7 +292,7 @@ namespace Math
             constexpr vec() = default;
             constexpr vec(type x, type y) : x(x), y(y) {}
             explicit constexpr vec(type obj) : x(obj), y(obj) {}
-            template <typename TT> constexpr vec(const vec2<TT> &obj) : x(obj.x), y(obj.y) {}
+            template <typename TT> constexpr vec(vec2<TT> obj) : x(obj.x), y(obj.y) {}
             template <typename TT> [[nodiscard]] constexpr vec2<TT> to() const {return vec2<TT>(TT(x), TT(y));}
             [[nodiscard]] constexpr type &operator[](int i) {return *(type *)((char *)this + sizeof(type)*i);}
             [[nodiscard]] constexpr const type &operator[](int i) const {return *(type *)((char *)this + sizeof(type)*i);}
@@ -307,16 +307,17 @@ namespace Math
             [[nodiscard]] constexpr auto ratio() const {return floating_point_t<type>(x) / floating_point_t<type>(y);}
             [[nodiscard]] constexpr type min() const {return std::min({x,y});}
             [[nodiscard]] constexpr type max() const {return std::max({x,y});}
-            template <typename N> [[nodiscard]] constexpr vec set_x(const N &n) const {return vec(n, y);} template <typename N> [[nodiscard]] constexpr vec set_y(const N &n) const {return vec(x, n);}
-            template <typename N> [[nodiscard]] constexpr vec set_r(const N &n) const {return vec(n, g);} template <typename N> [[nodiscard]] constexpr vec set_g(const N &n) const {return vec(r, n);}
-            template <typename N> [[nodiscard]] constexpr auto add_x(const N &n) const {return vec2<decltype(x+n)>(x+n, y);} template <typename N> [[nodiscard]] constexpr auto add_y(const N &n) const {return vec2<decltype(x+n)>(x, y+n);}
-            template <typename N> [[nodiscard]] constexpr auto add_r(const N &n) const {return vec2<decltype(x+n)>(r+n, g);} template <typename N> [[nodiscard]] constexpr auto add_g(const N &n) const {return vec2<decltype(x+n)>(r, g+n);}
-            template <typename N> [[nodiscard]] constexpr auto sub_x(const N &n) const {return vec2<decltype(x-n)>(x-n, y);} template <typename N> [[nodiscard]] constexpr auto sub_y(const N &n) const {return vec2<decltype(x-n)>(x, y-n);}
-            template <typename N> [[nodiscard]] constexpr auto sub_r(const N &n) const {return vec2<decltype(x-n)>(r-n, g);} template <typename N> [[nodiscard]] constexpr auto sub_g(const N &n) const {return vec2<decltype(x-n)>(r, g-n);}
-            template <typename N> [[nodiscard]] constexpr auto mul_x(const N &n) const {return vec2<decltype(x*n)>(x*n, y);} template <typename N> [[nodiscard]] constexpr auto mul_y(const N &n) const {return vec2<decltype(x*n)>(x, y*n);}
-            template <typename N> [[nodiscard]] constexpr auto mul_r(const N &n) const {return vec2<decltype(x*n)>(r*n, g);} template <typename N> [[nodiscard]] constexpr auto mul_g(const N &n) const {return vec2<decltype(x*n)>(r, g*n);}
-            template <typename N> [[nodiscard]] constexpr auto div_x(const N &n) const {return vec2<decltype(x/n)>(x/n, y);} template <typename N> [[nodiscard]] constexpr auto div_y(const N &n) const {return vec2<decltype(x/n)>(x, y/n);}
-            template <typename N> [[nodiscard]] constexpr auto div_r(const N &n) const {return vec2<decltype(x/n)>(r/n, g);} template <typename N> [[nodiscard]] constexpr auto div_g(const N &n) const {return vec2<decltype(x/n)>(r, g/n);}
+            [[nodiscard]] constexpr vec abs() const {return vec(std::abs(x), std::abs(y));}
+            template <typename N> [[nodiscard]] constexpr vec set_x(N n) const {return vec(n, y);} template <typename N> [[nodiscard]] constexpr vec set_y(N n) const {return vec(x, n);}
+            template <typename N> [[nodiscard]] constexpr vec set_r(N n) const {return vec(n, g);} template <typename N> [[nodiscard]] constexpr vec set_g(N n) const {return vec(r, n);}
+            template <typename N> [[nodiscard]] constexpr auto add_x(N n) const {return vec2<decltype(x+n)>(x+n, y);} template <typename N> [[nodiscard]] constexpr auto add_y(N n) const {return vec2<decltype(x+n)>(x, y+n);}
+            template <typename N> [[nodiscard]] constexpr auto add_r(N n) const {return vec2<decltype(x+n)>(r+n, g);} template <typename N> [[nodiscard]] constexpr auto add_g(N n) const {return vec2<decltype(x+n)>(r, g+n);}
+            template <typename N> [[nodiscard]] constexpr auto sub_x(N n) const {return vec2<decltype(x-n)>(x-n, y);} template <typename N> [[nodiscard]] constexpr auto sub_y(N n) const {return vec2<decltype(x-n)>(x, y-n);}
+            template <typename N> [[nodiscard]] constexpr auto sub_r(N n) const {return vec2<decltype(x-n)>(r-n, g);} template <typename N> [[nodiscard]] constexpr auto sub_g(N n) const {return vec2<decltype(x-n)>(r, g-n);}
+            template <typename N> [[nodiscard]] constexpr auto mul_x(N n) const {return vec2<decltype(x*n)>(x*n, y);} template <typename N> [[nodiscard]] constexpr auto mul_y(N n) const {return vec2<decltype(x*n)>(x, y*n);}
+            template <typename N> [[nodiscard]] constexpr auto mul_r(N n) const {return vec2<decltype(x*n)>(r*n, g);} template <typename N> [[nodiscard]] constexpr auto mul_g(N n) const {return vec2<decltype(x*n)>(r, g*n);}
+            template <typename N> [[nodiscard]] constexpr auto div_x(N n) const {return vec2<decltype(x/n)>(x/n, y);} template <typename N> [[nodiscard]] constexpr auto div_y(N n) const {return vec2<decltype(x/n)>(x, y/n);}
+            template <typename N> [[nodiscard]] constexpr auto div_r(N n) const {return vec2<decltype(x/n)>(r/n, g);} template <typename N> [[nodiscard]] constexpr auto div_g(N n) const {return vec2<decltype(x/n)>(r, g/n);}
             [[nodiscard]] constexpr vec3<type> to_vec3(type nz) const {return {x, y, nz};}
             [[nodiscard]] constexpr vec4<type> to_vec4(type nz, type nw) const {return {x, y, nz, nw};}
             [[nodiscard]] constexpr vec3<type> to_vec3() const {return to_vec3(0);}
@@ -324,8 +325,12 @@ namespace Math
             [[nodiscard]] constexpr auto len_sqr() const {return x*x + y*y;}
             [[nodiscard]] constexpr auto len() const {return std::sqrt(len_sqr());}
             [[nodiscard]] constexpr auto norm() const -> vec2<decltype(type{}/len())> {if (auto l = len(); l != 0) return *this / l; else return vec(0);}
+            template <typename TT> [[nodiscard]] static constexpr vec dir(TT angle, type len = 1) {return vec(std::cos(angle) * len, std::sin(angle) * len); static_assert(is_floating_point, "The vector must be floating-point.");}
+            template <typename TT = double> [[nodiscard]] constexpr T angle() const {return std::atan2(TT(y), TT(x));}
+            [[nodiscard]] constexpr vec rot90(int steps = 1) const {switch (steps & 3) {default: return *this; case 1: return {-y,x}; case 2: return -*this; case 3: return {y,-x};}}
             template <typename TT> [[nodiscard]] constexpr auto dot(const vec2<TT> &o) const {return x * o.x + y * o.y;}
             template <typename TT> [[nodiscard]] constexpr auto cross(const vec2<TT> &o) const {return x * o.y - y * o.x;}
+            template <typename TT> [[nodiscard]] constexpr auto delta(vec2<TT> v) const {return v - *this;}
             [[nodiscard]] constexpr auto tie() {return std::tie(x,y);}
             [[nodiscard]] constexpr auto tie() const {return std::tie(x,y);}
             template <int I> [[nodiscard]] constexpr auto &get() {return std::get<I>(tie());}
@@ -345,7 +350,7 @@ namespace Math
             constexpr vec() = default;
             constexpr vec(type x, type y, type z) : x(x), y(y), z(z) {}
             explicit constexpr vec(type obj) : x(obj), y(obj), z(obj) {}
-            template <typename TT> constexpr vec(const vec3<TT> &obj) : x(obj.x), y(obj.y), z(obj.z) {}
+            template <typename TT> constexpr vec(vec3<TT> obj) : x(obj.x), y(obj.y), z(obj.z) {}
             template <typename TT> [[nodiscard]] constexpr vec3<TT> to() const {return vec3<TT>(TT(x), TT(y), TT(z));}
             [[nodiscard]] constexpr type &operator[](int i) {return *(type *)((char *)this + sizeof(type)*i);}
             [[nodiscard]] constexpr const type &operator[](int i) const {return *(type *)((char *)this + sizeof(type)*i);}
@@ -359,16 +364,17 @@ namespace Math
             [[nodiscard]] constexpr auto prod() const {return x * y * z;}
             [[nodiscard]] constexpr type min() const {return std::min({x,y,z});}
             [[nodiscard]] constexpr type max() const {return std::max({x,y,z});}
-            template <typename N> [[nodiscard]] constexpr vec set_x(const N &n) const {return vec(n, y, z);} template <typename N> [[nodiscard]] constexpr vec set_y(const N &n) const {return vec(x, n, z);} template <typename N> [[nodiscard]] constexpr vec set_z(const N &n) const {return vec(x, y, n);}
-            template <typename N> [[nodiscard]] constexpr vec set_r(const N &n) const {return vec(n, g, b);} template <typename N> [[nodiscard]] constexpr vec set_g(const N &n) const {return vec(r, n, b);} template <typename N> [[nodiscard]] constexpr vec set_b(const N &n) const {return vec(r, g, n);}
-            template <typename N> [[nodiscard]] constexpr auto add_x(const N &n) const {return vec3<decltype(x+n)>(x+n, y, z);} template <typename N> [[nodiscard]] constexpr auto add_y(const N &n) const {return vec3<decltype(x+n)>(x, y+n, z);} template <typename N> [[nodiscard]] constexpr auto add_z(const N &n) const {return vec3<decltype(x+n)>(x, y, z+n);}
-            template <typename N> [[nodiscard]] constexpr auto add_r(const N &n) const {return vec3<decltype(x+n)>(r+n, g, b);} template <typename N> [[nodiscard]] constexpr auto add_g(const N &n) const {return vec3<decltype(x+n)>(r, g+n, b);} template <typename N> [[nodiscard]] constexpr auto add_b(const N &n) const {return vec3<decltype(x+n)>(r, g, b+n);}
-            template <typename N> [[nodiscard]] constexpr auto sub_x(const N &n) const {return vec3<decltype(x-n)>(x-n, y, z);} template <typename N> [[nodiscard]] constexpr auto sub_y(const N &n) const {return vec3<decltype(x-n)>(x, y-n, z);} template <typename N> [[nodiscard]] constexpr auto sub_z(const N &n) const {return vec3<decltype(x-n)>(x, y, z-n);}
-            template <typename N> [[nodiscard]] constexpr auto sub_r(const N &n) const {return vec3<decltype(x-n)>(r-n, g, b);} template <typename N> [[nodiscard]] constexpr auto sub_g(const N &n) const {return vec3<decltype(x-n)>(r, g-n, b);} template <typename N> [[nodiscard]] constexpr auto sub_b(const N &n) const {return vec3<decltype(x-n)>(r, g, b-n);}
-            template <typename N> [[nodiscard]] constexpr auto mul_x(const N &n) const {return vec3<decltype(x*n)>(x*n, y, z);} template <typename N> [[nodiscard]] constexpr auto mul_y(const N &n) const {return vec3<decltype(x*n)>(x, y*n, z);} template <typename N> [[nodiscard]] constexpr auto mul_z(const N &n) const {return vec3<decltype(x*n)>(x, y, z*n);}
-            template <typename N> [[nodiscard]] constexpr auto mul_r(const N &n) const {return vec3<decltype(x*n)>(r*n, g, b);} template <typename N> [[nodiscard]] constexpr auto mul_g(const N &n) const {return vec3<decltype(x*n)>(r, g*n, b);} template <typename N> [[nodiscard]] constexpr auto mul_b(const N &n) const {return vec3<decltype(x*n)>(r, g, b*n);}
-            template <typename N> [[nodiscard]] constexpr auto div_x(const N &n) const {return vec3<decltype(x/n)>(x/n, y, z);} template <typename N> [[nodiscard]] constexpr auto div_y(const N &n) const {return vec3<decltype(x/n)>(x, y/n, z);} template <typename N> [[nodiscard]] constexpr auto div_z(const N &n) const {return vec3<decltype(x/n)>(x, y, z/n);}
-            template <typename N> [[nodiscard]] constexpr auto div_r(const N &n) const {return vec3<decltype(x/n)>(r/n, g, b);} template <typename N> [[nodiscard]] constexpr auto div_g(const N &n) const {return vec3<decltype(x/n)>(r, g/n, b);} template <typename N> [[nodiscard]] constexpr auto div_b(const N &n) const {return vec3<decltype(x/n)>(r, g, b/n);}
+            [[nodiscard]] constexpr vec abs() const {return vec(std::abs(x), std::abs(y), std::abs(z));}
+            template <typename N> [[nodiscard]] constexpr vec set_x(N n) const {return vec(n, y, z);} template <typename N> [[nodiscard]] constexpr vec set_y(N n) const {return vec(x, n, z);} template <typename N> [[nodiscard]] constexpr vec set_z(N n) const {return vec(x, y, n);}
+            template <typename N> [[nodiscard]] constexpr vec set_r(N n) const {return vec(n, g, b);} template <typename N> [[nodiscard]] constexpr vec set_g(N n) const {return vec(r, n, b);} template <typename N> [[nodiscard]] constexpr vec set_b(N n) const {return vec(r, g, n);}
+            template <typename N> [[nodiscard]] constexpr auto add_x(N n) const {return vec3<decltype(x+n)>(x+n, y, z);} template <typename N> [[nodiscard]] constexpr auto add_y(N n) const {return vec3<decltype(x+n)>(x, y+n, z);} template <typename N> [[nodiscard]] constexpr auto add_z(N n) const {return vec3<decltype(x+n)>(x, y, z+n);}
+            template <typename N> [[nodiscard]] constexpr auto add_r(N n) const {return vec3<decltype(x+n)>(r+n, g, b);} template <typename N> [[nodiscard]] constexpr auto add_g(N n) const {return vec3<decltype(x+n)>(r, g+n, b);} template <typename N> [[nodiscard]] constexpr auto add_b(N n) const {return vec3<decltype(x+n)>(r, g, b+n);}
+            template <typename N> [[nodiscard]] constexpr auto sub_x(N n) const {return vec3<decltype(x-n)>(x-n, y, z);} template <typename N> [[nodiscard]] constexpr auto sub_y(N n) const {return vec3<decltype(x-n)>(x, y-n, z);} template <typename N> [[nodiscard]] constexpr auto sub_z(N n) const {return vec3<decltype(x-n)>(x, y, z-n);}
+            template <typename N> [[nodiscard]] constexpr auto sub_r(N n) const {return vec3<decltype(x-n)>(r-n, g, b);} template <typename N> [[nodiscard]] constexpr auto sub_g(N n) const {return vec3<decltype(x-n)>(r, g-n, b);} template <typename N> [[nodiscard]] constexpr auto sub_b(N n) const {return vec3<decltype(x-n)>(r, g, b-n);}
+            template <typename N> [[nodiscard]] constexpr auto mul_x(N n) const {return vec3<decltype(x*n)>(x*n, y, z);} template <typename N> [[nodiscard]] constexpr auto mul_y(N n) const {return vec3<decltype(x*n)>(x, y*n, z);} template <typename N> [[nodiscard]] constexpr auto mul_z(N n) const {return vec3<decltype(x*n)>(x, y, z*n);}
+            template <typename N> [[nodiscard]] constexpr auto mul_r(N n) const {return vec3<decltype(x*n)>(r*n, g, b);} template <typename N> [[nodiscard]] constexpr auto mul_g(N n) const {return vec3<decltype(x*n)>(r, g*n, b);} template <typename N> [[nodiscard]] constexpr auto mul_b(N n) const {return vec3<decltype(x*n)>(r, g, b*n);}
+            template <typename N> [[nodiscard]] constexpr auto div_x(N n) const {return vec3<decltype(x/n)>(x/n, y, z);} template <typename N> [[nodiscard]] constexpr auto div_y(N n) const {return vec3<decltype(x/n)>(x, y/n, z);} template <typename N> [[nodiscard]] constexpr auto div_z(N n) const {return vec3<decltype(x/n)>(x, y, z/n);}
+            template <typename N> [[nodiscard]] constexpr auto div_r(N n) const {return vec3<decltype(x/n)>(r/n, g, b);} template <typename N> [[nodiscard]] constexpr auto div_g(N n) const {return vec3<decltype(x/n)>(r, g/n, b);} template <typename N> [[nodiscard]] constexpr auto div_b(N n) const {return vec3<decltype(x/n)>(r, g, b/n);}
             [[nodiscard]] constexpr vec2<type> to_vec2() const {return {x, y};}
             [[nodiscard]] constexpr vec4<type> to_vec4(type nw) const {return {x, y, z, nw};}
             [[nodiscard]] constexpr vec4<type> to_vec4() const {return to_vec4(1);}
@@ -377,6 +383,7 @@ namespace Math
             [[nodiscard]] constexpr auto norm() const -> vec3<decltype(type{}/len())> {if (auto l = len(); l != 0) return *this / l; else return vec(0);}
             template <typename TT> [[nodiscard]] constexpr auto dot(const vec3<TT> &o) const {return x * o.x + y * o.y + z * o.z;}
             template <typename TT> [[nodiscard]] constexpr auto cross(const vec3<TT> &o) const -> vec3<decltype(x * o.x - x * o.x)> {return {y * o.z - z * o.y, z * o.x - x * o.z, x * o.y - y * o.x};}
+            template <typename TT> [[nodiscard]] constexpr auto delta(vec3<TT> v) const {return v - *this;}
             [[nodiscard]] constexpr auto tie() {return std::tie(x,y,z);}
             [[nodiscard]] constexpr auto tie() const {return std::tie(x,y,z);}
             template <int I> [[nodiscard]] constexpr auto &get() {return std::get<I>(tie());}
@@ -397,7 +404,7 @@ namespace Math
             constexpr vec() = default;
             constexpr vec(type x, type y, type z, type w) : x(x), y(y), z(z), w(w) {}
             explicit constexpr vec(type obj) : x(obj), y(obj), z(obj), w(obj) {}
-            template <typename TT> constexpr vec(const vec4<TT> &obj) : x(obj.x), y(obj.y), z(obj.z), w(obj.w) {}
+            template <typename TT> constexpr vec(vec4<TT> obj) : x(obj.x), y(obj.y), z(obj.z), w(obj.w) {}
             template <typename TT> [[nodiscard]] constexpr vec4<TT> to() const {return vec4<TT>(TT(x), TT(y), TT(z), TT(w));}
             [[nodiscard]] constexpr type &operator[](int i) {return *(type *)((char *)this + sizeof(type)*i);}
             [[nodiscard]] constexpr const type &operator[](int i) const {return *(type *)((char *)this + sizeof(type)*i);}
@@ -411,22 +418,24 @@ namespace Math
             [[nodiscard]] constexpr auto prod() const {return x * y * z * w;}
             [[nodiscard]] constexpr type min() const {return std::min({x,y,z,w});}
             [[nodiscard]] constexpr type max() const {return std::max({x,y,z,w});}
-            template <typename N> [[nodiscard]] constexpr vec set_x(const N &n) const {return vec(n, y, z, w);} template <typename N> [[nodiscard]] constexpr vec set_y(const N &n) const {return vec(x, n, z, w);} template <typename N> [[nodiscard]] constexpr vec set_z(const N &n) const {return vec(x, y, n, w);} template <typename N> [[nodiscard]] constexpr vec set_w(const N &n) const {return vec(x, y, z, n);}
-            template <typename N> [[nodiscard]] constexpr vec set_r(const N &n) const {return vec(n, g, b, a);} template <typename N> [[nodiscard]] constexpr vec set_g(const N &n) const {return vec(r, n, b, a);} template <typename N> [[nodiscard]] constexpr vec set_b(const N &n) const {return vec(r, g, n, a);} template <typename N> [[nodiscard]] constexpr vec set_a(const N &n) const {return vec(r, g, b, n);}
-            template <typename N> [[nodiscard]] constexpr auto add_x(const N &n) const {return vec4<decltype(x+n)>(x+n, y, z, w);} template <typename N> [[nodiscard]] constexpr auto add_y(const N &n) const {return vec4<decltype(x+n)>(x, y+n, z, w);} template <typename N> [[nodiscard]] constexpr auto add_z(const N &n) const {return vec4<decltype(x+n)>(x, y, z+n, w);} template <typename N> [[nodiscard]] constexpr auto add_w(const N &n) const {return vec4<decltype(x+n)>(x, y, z, w+n);}
-            template <typename N> [[nodiscard]] constexpr auto add_r(const N &n) const {return vec4<decltype(x+n)>(r+n, g, b, a);} template <typename N> [[nodiscard]] constexpr auto add_g(const N &n) const {return vec4<decltype(x+n)>(r, g+n, b, a);} template <typename N> [[nodiscard]] constexpr auto add_b(const N &n) const {return vec4<decltype(x+n)>(r, g, b+n, a);} template <typename N> [[nodiscard]] constexpr auto add_a(const N &n) const {return vec4<decltype(x+n)>(r, g, b, a+n);}
-            template <typename N> [[nodiscard]] constexpr auto sub_x(const N &n) const {return vec4<decltype(x-n)>(x-n, y, z, w);} template <typename N> [[nodiscard]] constexpr auto sub_y(const N &n) const {return vec4<decltype(x-n)>(x, y-n, z, w);} template <typename N> [[nodiscard]] constexpr auto sub_z(const N &n) const {return vec4<decltype(x-n)>(x, y, z-n, w);} template <typename N> [[nodiscard]] constexpr auto sub_w(const N &n) const {return vec4<decltype(x-n)>(x, y, z, w-n);}
-            template <typename N> [[nodiscard]] constexpr auto sub_r(const N &n) const {return vec4<decltype(x-n)>(r-n, g, b, a);} template <typename N> [[nodiscard]] constexpr auto sub_g(const N &n) const {return vec4<decltype(x-n)>(r, g-n, b, a);} template <typename N> [[nodiscard]] constexpr auto sub_b(const N &n) const {return vec4<decltype(x-n)>(r, g, b-n, a);} template <typename N> [[nodiscard]] constexpr auto sub_a(const N &n) const {return vec4<decltype(x-n)>(r, g, b, a-n);}
-            template <typename N> [[nodiscard]] constexpr auto mul_x(const N &n) const {return vec4<decltype(x*n)>(x*n, y, z, w);} template <typename N> [[nodiscard]] constexpr auto mul_y(const N &n) const {return vec4<decltype(x*n)>(x, y*n, z, w);} template <typename N> [[nodiscard]] constexpr auto mul_z(const N &n) const {return vec4<decltype(x*n)>(x, y, z*n, w);} template <typename N> [[nodiscard]] constexpr auto mul_w(const N &n) const {return vec4<decltype(x*n)>(x, y, z, w*n);}
-            template <typename N> [[nodiscard]] constexpr auto mul_r(const N &n) const {return vec4<decltype(x*n)>(r*n, g, b, a);} template <typename N> [[nodiscard]] constexpr auto mul_g(const N &n) const {return vec4<decltype(x*n)>(r, g*n, b, a);} template <typename N> [[nodiscard]] constexpr auto mul_b(const N &n) const {return vec4<decltype(x*n)>(r, g, b*n, a);} template <typename N> [[nodiscard]] constexpr auto mul_a(const N &n) const {return vec4<decltype(x*n)>(r, g, b, a*n);}
-            template <typename N> [[nodiscard]] constexpr auto div_x(const N &n) const {return vec4<decltype(x/n)>(x/n, y, z, w);} template <typename N> [[nodiscard]] constexpr auto div_y(const N &n) const {return vec4<decltype(x/n)>(x, y/n, z, w);} template <typename N> [[nodiscard]] constexpr auto div_z(const N &n) const {return vec4<decltype(x/n)>(x, y, z/n, w);} template <typename N> [[nodiscard]] constexpr auto div_w(const N &n) const {return vec4<decltype(x/n)>(x, y, z, w/n);}
-            template <typename N> [[nodiscard]] constexpr auto div_r(const N &n) const {return vec4<decltype(x/n)>(r/n, g, b, a);} template <typename N> [[nodiscard]] constexpr auto div_g(const N &n) const {return vec4<decltype(x/n)>(r, g/n, b, a);} template <typename N> [[nodiscard]] constexpr auto div_b(const N &n) const {return vec4<decltype(x/n)>(r, g, b/n, a);} template <typename N> [[nodiscard]] constexpr auto div_a(const N &n) const {return vec4<decltype(x/n)>(r, g, b, a/n);}
+            [[nodiscard]] constexpr vec abs() const {return vec(std::abs(x), std::abs(y), std::abs(z), std::abs(w));}
+            template <typename N> [[nodiscard]] constexpr vec set_x(N n) const {return vec(n, y, z, w);} template <typename N> [[nodiscard]] constexpr vec set_y(N n) const {return vec(x, n, z, w);} template <typename N> [[nodiscard]] constexpr vec set_z(N n) const {return vec(x, y, n, w);} template <typename N> [[nodiscard]] constexpr vec set_w(N n) const {return vec(x, y, z, n);}
+            template <typename N> [[nodiscard]] constexpr vec set_r(N n) const {return vec(n, g, b, a);} template <typename N> [[nodiscard]] constexpr vec set_g(N n) const {return vec(r, n, b, a);} template <typename N> [[nodiscard]] constexpr vec set_b(N n) const {return vec(r, g, n, a);} template <typename N> [[nodiscard]] constexpr vec set_a(N n) const {return vec(r, g, b, n);}
+            template <typename N> [[nodiscard]] constexpr auto add_x(N n) const {return vec4<decltype(x+n)>(x+n, y, z, w);} template <typename N> [[nodiscard]] constexpr auto add_y(N n) const {return vec4<decltype(x+n)>(x, y+n, z, w);} template <typename N> [[nodiscard]] constexpr auto add_z(N n) const {return vec4<decltype(x+n)>(x, y, z+n, w);} template <typename N> [[nodiscard]] constexpr auto add_w(N n) const {return vec4<decltype(x+n)>(x, y, z, w+n);}
+            template <typename N> [[nodiscard]] constexpr auto add_r(N n) const {return vec4<decltype(x+n)>(r+n, g, b, a);} template <typename N> [[nodiscard]] constexpr auto add_g(N n) const {return vec4<decltype(x+n)>(r, g+n, b, a);} template <typename N> [[nodiscard]] constexpr auto add_b(N n) const {return vec4<decltype(x+n)>(r, g, b+n, a);} template <typename N> [[nodiscard]] constexpr auto add_a(N n) const {return vec4<decltype(x+n)>(r, g, b, a+n);}
+            template <typename N> [[nodiscard]] constexpr auto sub_x(N n) const {return vec4<decltype(x-n)>(x-n, y, z, w);} template <typename N> [[nodiscard]] constexpr auto sub_y(N n) const {return vec4<decltype(x-n)>(x, y-n, z, w);} template <typename N> [[nodiscard]] constexpr auto sub_z(N n) const {return vec4<decltype(x-n)>(x, y, z-n, w);} template <typename N> [[nodiscard]] constexpr auto sub_w(N n) const {return vec4<decltype(x-n)>(x, y, z, w-n);}
+            template <typename N> [[nodiscard]] constexpr auto sub_r(N n) const {return vec4<decltype(x-n)>(r-n, g, b, a);} template <typename N> [[nodiscard]] constexpr auto sub_g(N n) const {return vec4<decltype(x-n)>(r, g-n, b, a);} template <typename N> [[nodiscard]] constexpr auto sub_b(N n) const {return vec4<decltype(x-n)>(r, g, b-n, a);} template <typename N> [[nodiscard]] constexpr auto sub_a(N n) const {return vec4<decltype(x-n)>(r, g, b, a-n);}
+            template <typename N> [[nodiscard]] constexpr auto mul_x(N n) const {return vec4<decltype(x*n)>(x*n, y, z, w);} template <typename N> [[nodiscard]] constexpr auto mul_y(N n) const {return vec4<decltype(x*n)>(x, y*n, z, w);} template <typename N> [[nodiscard]] constexpr auto mul_z(N n) const {return vec4<decltype(x*n)>(x, y, z*n, w);} template <typename N> [[nodiscard]] constexpr auto mul_w(N n) const {return vec4<decltype(x*n)>(x, y, z, w*n);}
+            template <typename N> [[nodiscard]] constexpr auto mul_r(N n) const {return vec4<decltype(x*n)>(r*n, g, b, a);} template <typename N> [[nodiscard]] constexpr auto mul_g(N n) const {return vec4<decltype(x*n)>(r, g*n, b, a);} template <typename N> [[nodiscard]] constexpr auto mul_b(N n) const {return vec4<decltype(x*n)>(r, g, b*n, a);} template <typename N> [[nodiscard]] constexpr auto mul_a(N n) const {return vec4<decltype(x*n)>(r, g, b, a*n);}
+            template <typename N> [[nodiscard]] constexpr auto div_x(N n) const {return vec4<decltype(x/n)>(x/n, y, z, w);} template <typename N> [[nodiscard]] constexpr auto div_y(N n) const {return vec4<decltype(x/n)>(x, y/n, z, w);} template <typename N> [[nodiscard]] constexpr auto div_z(N n) const {return vec4<decltype(x/n)>(x, y, z/n, w);} template <typename N> [[nodiscard]] constexpr auto div_w(N n) const {return vec4<decltype(x/n)>(x, y, z, w/n);}
+            template <typename N> [[nodiscard]] constexpr auto div_r(N n) const {return vec4<decltype(x/n)>(r/n, g, b, a);} template <typename N> [[nodiscard]] constexpr auto div_g(N n) const {return vec4<decltype(x/n)>(r, g/n, b, a);} template <typename N> [[nodiscard]] constexpr auto div_b(N n) const {return vec4<decltype(x/n)>(r, g, b/n, a);} template <typename N> [[nodiscard]] constexpr auto div_a(N n) const {return vec4<decltype(x/n)>(r, g, b, a/n);}
             [[nodiscard]] constexpr vec2<type> to_vec2() const {return {x, y};}
             [[nodiscard]] constexpr vec3<type> to_vec3() const {return {x, y, z};}
             [[nodiscard]] constexpr auto len_sqr() const {return x*x + y*y + z*z + w*w;}
             [[nodiscard]] constexpr auto len() const {return std::sqrt(len_sqr());}
             [[nodiscard]] constexpr auto norm() const -> vec4<decltype(type{}/len())> {if (auto l = len(); l != 0) return *this / l; else return vec(0);}
             template <typename TT> [[nodiscard]] constexpr auto dot(const vec4<TT> &o) const {return x * o.x + y * o.y + z * o.z + w * o.w;}
+            template <typename TT> [[nodiscard]] constexpr auto delta(vec4<TT> v) const {return v - *this;}
             [[nodiscard]] constexpr auto tie() {return std::tie(x,y,z,w);}
             [[nodiscard]] constexpr auto tie() const {return std::tie(x,y,z,w);}
             template <int I> [[nodiscard]] constexpr auto &get() {return std::get<I>(tie());}
@@ -1383,7 +1392,7 @@ namespace Math
         
         template <typename T> [[nodiscard]] constexpr change_vec_base_t<T,int> sign(T val)
         {
-            // Works with scalars and vectors.
+            // Works on scalars and vectors.
             return (val > 0) - (val < 0);
         }
         
@@ -1427,6 +1436,14 @@ namespace Math
             {
                 return apply_elementwise(iround<I, vec_base_t<F>>, x);
             }
+        }
+        
+        template <typename T> [[nodiscard]] T abs(T x)
+        {
+            if constexpr (no_vectors_v<T>)
+                return std::abs(x);
+            else
+                return apply_elementwise(abs<vec_base_t<T>>, x);
         }
         
         template <typename T> [[nodiscard]] T round(T x)
@@ -1482,7 +1499,7 @@ namespace Math
         template <typename A, typename B> [[nodiscard]] constexpr A div_ex(A a, B b)
         {
             static_assert(no_vectors_v<B> || is_vector_v<A>, "If `b` is a vector, `a` has to be a vector as well.");
-            static_assert(std::is_integral_v<vec_base_t<A>> && std::is_integral_v<vec_base_t<B>>, "Parameters must be integral.");
+            static_assert(std::is_integral_v<vec_base_t<A>> && std::is_integral_v<vec_base_t<B>>, "Arguments must be integral.");
             
             if constexpr (no_vectors_v<A,B>)
             {
@@ -1500,7 +1517,7 @@ namespace Math
         template <typename A, typename B> [[nodiscard]] constexpr A mod_ex(A a, B b)
         {
             static_assert(no_vectors_v<B> || is_vector_v<A>, "If `b` is a vector, `a` has to be a vector as well.");
-            static_assert(std::is_integral_v<vec_base_t<A>> && std::is_integral_v<vec_base_t<B>>, "Parameters must be integral.");
+            static_assert(std::is_integral_v<vec_base_t<A>> && std::is_integral_v<vec_base_t<B>>, "Arguments must be integral.");
             
             if constexpr (no_vectors_v<A,B>)
             {
@@ -1517,7 +1534,7 @@ namespace Math
         
         template <typename A, typename B> [[nodiscard]] constexpr A ipow(A a, B b)
         {
-            // A can be a scalar or a vector. B has to be a scalar.
+            // `A` can be a scalar or a vector. `B` has to be scalar.
             static_assert(std::is_integral_v<B>, "Power must be integral.");
             A ret = 1;
             while (b-- > 0)
@@ -1525,12 +1542,19 @@ namespace Math
             return ret;
         }
         
-        template <typename A, typename B> [[nodiscard]] constexpr larger_t<floating_point_t<A>,floating_point_t<B>> pow(A a, B b)
+        template <typename A, typename B> [[nodiscard]] constexpr floating_point_t<larger_t<A,B>> pow(A a, B b)
         {
             if constexpr (no_vectors_v<A,B>)
                 return std::pow(a, b);
             else
                 return apply_elementwise(pow<vec_base_t<A>, vec_base_t<B>>, a, b);
+        }
+        
+        template <typename T> [[nodiscard]] constexpr T smoothstep(T x)
+        {
+            // Works on scalars and vectors.
+            static_assert(std::is_floating_point_v<vec_base_t<T>>, "Argument must be floating-point.");
+            return (3 - 2*x) * x*x;
         }
         
         template <typename ...P> constexpr larger_t<P...> min(P ... params)
@@ -1555,6 +1579,26 @@ namespace Math
         using namespace Vector;
         using namespace CustomOperators;
         using namespace Misc;
+        
+        using std::int8_t;
+        using std::uint8_t;
+        using std::int16_t;
+        using std::uint16_t;
+        using std::int32_t;
+        using std::uint32_t;
+        using std::int64_t;
+        using std::uint64_t;
+        using std::size_t;
+        using std::ptrdiff_t;
+        
+        using std::sqrt;
+        using std::cos;
+        using std::sin;
+        using std::tan;
+        using std::acos;
+        using std::asin;
+        using std::atan;
+        using std::atan2;
     }
 }
 
