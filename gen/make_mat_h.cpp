@@ -759,47 +759,6 @@ int main()
                             }
                         }
 
-                        { // Matrix multiplication
-                            auto Matrix = [&](int x, int y, std::string t) -> std::string
-                            {
-                                if (x == 1 && y == 1)
-                                    return t;
-                                if (x == 1)
-                                    return make_str("vec",y,"<",t,">");
-                                if (y == 1)
-                                    return make_str("vec",x,"<",t,">");
-                                return make_str("mat",x,"x",y,"<",t,">");
-                            };
-                            auto Field = [&](int x, int y, int w, int h) -> std::string
-                            {
-                                if (w == 1 && h == 1)
-                                    return "";
-                                if (w == 1)
-                                    return data::fields[y];
-                                if (h == 1)
-                                    return data::fields[x];
-                                return make_str(data::fields[x], ".", data::fields[y]);
-                            };
-
-                            for (int i = 1; i <= 4; i++)
-                            {
-                                output("template <typename TT> [[nodiscard]] constexpr ",Matrix(i,h,"larger_t<type,TT>")," mul(const ",Matrix(i,w,"TT")," &m) const {return {");
-                                for (int y = 0; y < h; y++)
-                                for (int x = 0; x < i; x++)
-                                {
-                                    if (y != 0 || x != 0)
-                                        output(", ");
-                                    for (int j = 0; j < w; j++)
-                                    {
-                                        if (j != 0)
-                                            output(" + ");
-                                        output(Field(j,y,w,h),"*m.",Field(x,j,i,w));
-                                    }
-                                }
-                                output("};}\n");
-                            }
-                        }
-
                         { // Transpose
                             output("[[nodiscard]] constexpr mat",h,"x",w,"<T> transpose() const {return {");
                             for (int x = 0; x < w; x++)
@@ -1179,6 +1138,54 @@ int main()
                         }
                     )");
                 });
+
+                next_line();
+
+                decorative_section("matrix multiplication", [&]
+                {
+                    auto Matrix = [&](int x, int y, std::string t) -> std::string
+                    {
+                        if (x == 1 && y == 1)
+                            return t;
+                        if (x == 1)
+                            return make_str("vec",y,"<",t,">");
+                        if (y == 1)
+                            return make_str("vec",x,"<",t,">");
+                        return make_str("mat",x,"x",y,"<",t,">");
+                    };
+                    auto Field = [&](int x, int y, int w, int h) -> std::string
+                    {
+                        if (w == 1 && h == 1)
+                            return "";
+                        if (w == 1)
+                            return data::fields[y];
+                        if (h == 1)
+                            return data::fields[x];
+                        return make_str(data::fields[x], ".", data::fields[y]);
+                    };
+
+                    for (int w2 = 1; w2 <= 4; w2++)
+                    for (int h1 = 1; h1 <= 4; h1++)
+                    for (int w1h2 = 2; w1h2 <= 4; w1h2++) // Starting from 1 would generate `vec * vec` templates (outer products), which would conflict with member-wise multiplication.
+                    {
+                        if (w2 == 1 && h1 == 1) // This disables generation of `vec * vec` templates (dot products), which would conflict with member-wise multiplication.
+                            continue;
+                        output("template <typename A, typename B> [[nodiscard]] constexpr ",Matrix(w2,h1,"larger_t<A,B>")," operator*(const ",Matrix(w1h2,h1,"A")," &a, const ",Matrix(w2,w1h2,"B")," &b) {return {");
+                        for (int y = 0; y < h1; y++)
+                        for (int x = 0; x < w2; x++)
+                        {
+                            if (y != 0 || x != 0)
+                                output(", ");
+                            for (int j = 0; j < w1h2; j++)
+                            {
+                                if (j != 0)
+                                    output(" + ");
+                                output("a.",Field(j,y,w1h2,h1),"*b.",Field(x,j,w2,w1h2));
+                            }
+                        }
+                        output("};}\n");
+                    }
+                });
             });
         });
 
@@ -1188,7 +1195,7 @@ int main()
         {
             const std::string
                 symbol = "/",
-                ops[]{"mul","dot","cross"};
+                ops[]{"dot","cross"};
 
             for (auto op : ops)
                 output("inline constexpr struct op_type_",op," {} ",op,";\n");
