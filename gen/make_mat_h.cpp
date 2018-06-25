@@ -1185,6 +1185,12 @@ int main()
                         }
                         output("};}\n");
                     }
+
+                    next_line();
+
+                    // Only in those two cases return type matches the type of the first parameter.
+                    output("template <typename A, typename B, int D> constexpr vec<D,A> &operator*=(vec<D,A> &a, const mat<D,D,B> &b) {a = a * b; return a;}\n");
+                    output("template <typename A, typename B, int W, int H> constexpr mat<W,H,A> &operator*=(mat<W,H,A> &a, const mat<W,W,B> &b) {a = a * b; return a;}\n"); // `mat<W,W,B>` is not a typo!
                 });
             });
         });
