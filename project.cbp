@@ -44,6 +44,7 @@
 			<Add option="-Wextra" />
 			<Add option="-Wall" />
 			<Add option="-std=c++17" />
+			<Add option="-include src/common.h" />
 			<Add directory="lib/include" />
 		</Compiler>
 		<Linker>
@@ -71,6 +72,8 @@
 			<Option compiler="gcc" use="1" buildCommand="gen\make_mat_h.bat\ngen\touch.bat $object" />
 			<Option target="Generate code" />
 		</Unit>
+		<Unit filename="src/common.h" />
+		<Unit filename="src/errors.h" />
 		<Unit filename="src/main.cpp">
 			<Option target="Debug" />
 			<Option target="Release" />
@@ -79,6 +82,9 @@
 			<Option target="Debug" />
 			<Option target="Release" />
 		</Unit>
+		<Unit filename="src/storage.h" />
+		<Unit filename="src/strings.h" />
+		<Unit filename="src/window.h" />
 		<Extensions>
 			<code_completion />
 			<envvars />
