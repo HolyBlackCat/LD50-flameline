@@ -73,7 +73,7 @@
 			<Option target="Generate code" />
 		</Unit>
 		<Unit filename="src/common.h" />
-		<Unit filename="src/errors.h" />
+		<Unit filename="src/dynamic_storage.h" />
 		<Unit filename="src/main.cpp">
 			<Option target="Debug" />
 			<Option target="Release" />
@@ -82,9 +82,7 @@
 			<Option target="Debug" />
 			<Option target="Release" />
 		</Unit>
-		<Unit filename="src/storage.h" />
 		<Unit filename="src/strings.h" />
-		<Unit filename="src/window.h" />
 		<Extensions>
 			<code_completion />
 			<envvars />
