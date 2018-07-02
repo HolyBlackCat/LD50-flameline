@@ -67,6 +67,7 @@
 			<Add directory="lib" />
 		</Linker>
 		<Unit filename="gen/make_mat_h.cpp">
+			<Option compile="0" />
 			<Option link="0" />
 			<Option weight="100" />
 			<Option compiler="gcc" use="1" buildCommand="gen\make_mat_h.bat\ngen\touch.bat $object" />
@@ -82,6 +83,7 @@
 			<Option target="Debug" />
 			<Option target="Release" />
 		</Unit>
+		<Unit filename="src/reflection.h" />
 		<Unit filename="src/strings.h" />
 		<Extensions>
 			<code_completion />
