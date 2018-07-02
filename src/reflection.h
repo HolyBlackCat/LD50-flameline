@@ -27,7 +27,7 @@ namespace Refl
 
             constexpr bool is_alphanum(char ch)
             {
-                return (ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') || ch == '_';
+                return (ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') || (ch >= '0' && ch <= '9') || ch == '_';
             }
 
             template <int N> constexpr std::array<char,N> zero_out_delimiters(const char (&str)[N])
