@@ -43,8 +43,8 @@
 			<Add option="-pedantic-errors" />
 			<Add option="-Wextra" />
 			<Add option="-Wall" />
-			<Add option="-std=c++17" />
 			<Add option="-include src/common.h" />
+			<Add option="-std=c++2a" />
 			<Add directory="lib/include" />
 		</Compiler>
 		<Linker>
