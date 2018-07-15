@@ -43,9 +43,13 @@
 			<Add option="-pedantic-errors" />
 			<Add option="-Wextra" />
 			<Add option="-Wall" />
-			<Add option="-include src/common.h" />
+			<Add option="-include src/utils/common.h" />
 			<Add option="-std=c++2a" />
 			<Add directory="lib/include" />
+			<Add directory="src" />
+			<Add directory="src/gui" />
+			<Add directory="src/program" />
+			<Add directory="src/utils" />
 		</Compiler>
 		<Linker>
 			<Add option="-static" />
@@ -73,18 +77,19 @@
 			<Option compiler="gcc" use="1" buildCommand="gen\make_mat_h.bat\ngen\touch.bat $object" />
 			<Option target="Generate code" />
 		</Unit>
-		<Unit filename="src/common.h" />
-		<Unit filename="src/dynamic_storage.h" />
-		<Unit filename="src/main.cpp">
-			<Option target="Debug" />
-			<Option target="Release" />
-		</Unit>
-		<Unit filename="src/mat.h">
-			<Option target="Debug" />
-			<Option target="Release" />
-		</Unit>
-		<Unit filename="src/reflection.h" />
-		<Unit filename="src/strings.h" />
+		<Unit filename="src/gui/messagebox.cpp" />
+		<Unit filename="src/gui/messagebox.h" />
+		<Unit filename="src/gui/window.cpp" />
+		<Unit filename="src/gui/window.h" />
+		<Unit filename="src/main.cpp" />
+		<Unit filename="src/program/errors.h" />
+		<Unit filename="src/program/exit.h" />
+		<Unit filename="src/utils/common.h" />
+		<Unit filename="src/utils/dynamic_storage.h" />
+		<Unit filename="src/utils/handle.h" />
+		<Unit filename="src/utils/mat.h" />
+		<Unit filename="src/utils/reflection.h" />
+		<Unit filename="src/utils/strings.h" />
 		<Extensions>
 			<code_completion />
 			<envvars />
