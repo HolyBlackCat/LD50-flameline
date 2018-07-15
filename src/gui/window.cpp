@@ -65,10 +65,48 @@ namespace GUI
         return ret;
     }
 
-    Window::Window(std::string name, ivec2 size, const Settings &settings)
+    void Window::Destroy()
+    {
+        // At this point `handle` and `context` should both be zero or non-zero at the same time.
+        if (handle)
+        {
+            SDL_GL_DeleteContext(context);
+            SDL_DestroyWindow(handle);
+
+            context = 0;
+            handle = 0;
+
+            instance = 0;
+        }
+    }
+
+    Window::Window(Window &&other) noexcept
+        : handle(std::exchange(other.handle, nullptr)), context(std::exchange(other.context, nullptr))
+    {
+        if (instance == &other)
+            instance = this;
+    }
+
+    Window &Window::operator=(Window &&other) noexcept
+    {
+        if (&other != this)
+        {
+            Destroy();
+
+            handle = std::exchange(other.handle, nullptr);
+            context = std::exchange(other.context, nullptr);
+
+            if (instance == &other)
+            instance = this;
+        }
+        return *this;
+    }
+
+    Window::Window(std::string name, ivec2 size, FullscreenMode new_mode, const Settings &settings)
     {
         try
         {
+            // Stop if a window already exists
             if (instance)
                 Program::Error("Attempt to create multiple windows.");
 
@@ -133,7 +171,7 @@ namespace GUI
             }
 
             // Antialiasing
-      if (settings.msaa > 1)
+            if (settings.msaa > 1)
             {
                 SDL_GL_SetAttribute(SDL_GL_MULTISAMPLEBUFFERS, 1);
                 SDL_GL_SetAttribute(SDL_GL_MULTISAMPLESAMPLES, settings.msaa);
@@ -185,15 +223,23 @@ namespace GUI
                 have_display_mode = !SDL_GetDesktopDisplayMode(settings.display, &display_mode);
             }
             if (have_display_mode)
-                SDL_SetWindowDisplayMode(*handle, &display_mode); // If we have an appropriate mode, set it. This function can fail, but there is nothing we can do anyway.
+                SDL_SetWindowDisplayMode(handle, &display_mode); // If we have an appropriate mode, set it. This function can fail, but there is nothing we can do anyway.
 
             // Create the context
-            context = SDL_GL_CreateContext(*handle);
+            context = SDL_GL_CreateContext(handle);
             if (!context)
-                Program::Error("Unable to create an OpenGL context.");
+                if (!handle)
+                Program::Error("Unable to create an OpenGL context with following properties:\n",
+                               settings.GetSummary(), "\n"
+                               OnPC("If you have several video cards, change your video driver settings\n"
+                                    "to make it use the best available video card for this application."
+                                    "If it didn't help, try updating your video card driver.\n"
+                                    "If it didn't help as well, your video card is probably too old to run this application.")
+                               );
 
+            // Set the minimal size
             if (settings.min_size)
-                SDL_SetWindowMinimumSize(*handle, settings.min_size.x, settings.min_size.y);
+                SDL_SetWindowMinimumSize(handle, settings.min_size.x, settings.min_size.y);
 
             // Set vsync mode
             vsync = settings.vsync_mode;
@@ -231,40 +277,39 @@ namespace GUI
                 break;
             }
 
+            // Save resizability flag
+            resizable = settings.resizable;
+
+            // Save an instance pointer
             instance = this;
+
+            // Set fullscreen mode
+            if (new_mode != windowed)
+                SetMode(new_mode); // This sets `mode`.
         }
         catch (std::exception &e)
         {
-            if (context)
-                SDL_GL_DeleteContext(*context);
-            if (handle)
-                SDL_DestroyWindow(*handle);
+            Destroy();
         }
     }
 
     Window::~Window()
     {
-        if (handle)
-        {
-            SDL_GL_DeleteContext(*context);
-            SDL_DestroyWindow(*handle);
-
-            instance = 0;
-        }
+        Destroy();
     }
 
     SDL_Window *Window::Handle()
     {
         if (!instance)
             return 0;
-        return *instance->handle;
+        return instance->handle;
     }
 
     SDL_GLContext Window::Context()
     {
         if (!instance)
             return 0;
-        return *instance->context;
+        return instance->context;
     }
 
     Window::VSync Window::VSyncMode()
@@ -272,5 +317,56 @@ namespace GUI
         if (!instance)
             return VSync::unspecified;
         return instance->vsync;
+    }
+
+    bool Window::Resizable()
+    {
+        if (!instance)
+            return 0;
+        return instance->resizable;
+    }
+
+    void Window::SetMode(FullscreenMode new_mode)
+    {
+        if (!instance)
+            return;
+
+        if (new_mode == borderless_fullscreen && instance->resizable == 0)
+            new_mode = fullscreen; // Borderless fullscreen would force a window resize even if it's not normally resiable. So we use a normal fullscreen mode instead.
+
+        int mode_value;
+        switch (new_mode)
+        {
+          case windowed:
+            mode_value = 0;
+            break;
+          case fullscreen:
+            mode_value = SDL_WINDOW_FULLSCREEN;
+            break;
+          case borderless_fullscreen:
+            mode_value = SDL_WINDOW_FULLSCREEN_DESKTOP;
+            break;
+        }
+
+        if (SDL_SetWindowFullscreen(instance->handle, mode_value))
+            return; // We silently ignore a failure.
+
+        instance->mode = new_mode;
+    }
+
+    Window::FullscreenMode Window::Mode()
+    {
+        if (!instance)
+            return windowed;
+
+        return instance->mode;
+    }
+
+    void Window::Swap()
+    {
+        if (!instance)
+            return;
+
+        SDL_GL_SwapWindow(instance->handle);
     }
 }

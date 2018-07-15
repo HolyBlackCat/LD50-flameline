@@ -3,10 +3,10 @@
 
 #include <exception>
 #include <string>
+#include <utility>
 
 #include <SDL2/SDL.h>
 
-#include "handle.h"
 #include "mat.h"
 
 namespace GUI
@@ -15,13 +15,12 @@ namespace GUI
     {
         // Only one instance can exist at a time.
       public:
+        enum FullscreenMode {windowed, fullscreen, borderless_fullscreen};
         enum class VSync {enabled, disabled, adaptive, unspecified};
-        enum class FullscreenMode {};
 
         enum class Profile {core, compatibility, es, any_profile};
         enum class Position {centered, undefined, custom};
         enum YesOrNo {yes, no, dont_care};
-
 
         struct Settings
         {
@@ -131,22 +130,36 @@ namespace GUI
         };
 
       private:
-        Handle<SDL_Window *> handle;
-        Handle<SDL_GLContext> context;
+        SDL_Window *handle = 0;
+        SDL_GLContext context = 0;
 
         VSync vsync = VSync::unspecified;
+        bool resizable = 0;
+        FullscreenMode mode = FullscreenMode::windowed;
 
         inline static Window *instance = 0;
 
+        void Destroy();
+
       public:
         Window() {}
-        Window(std::string name, ivec2 size, const Settings &settings = {});
+        Window(Window &&other) noexcept;
+        Window &operator=(Window &&other) noexcept;
+
+        Window(std::string name, ivec2 size, FullscreenMode mode = windowed, const Settings &settings = {});
+
         ~Window();
 
         static SDL_Window *Handle();
         static SDL_GLContext Context();
 
         static VSync VSyncMode();
+        static bool Resizable();
+
+        static void SetMode(FullscreenMode new_mode); // If the window is not resizable, then `borderless_fullscreen` (which requires a window resize) acts as `fullscreen`.
+        static FullscreenMode Mode();
+
+        static void Swap();
     };
 }
 

@@ -12,6 +12,7 @@
 				<Option object_output="obj/" />
 				<Option type="1" />
 				<Option compiler="gcc" />
+				<Option use_console_runner="0" />
 				<Compiler>
 					<Add option="-D_GLIBCXX_DEBUG" />
 					<Add option="-g" />
@@ -32,9 +33,9 @@
 				</Linker>
 			</Target>
 			<Target title="Generate code">
-				<Option output="bin/imp-re" prefix_auto="1" extension_auto="1" />
-				<Option working_dir="bin/" />
-				<Option object_output="obj/" />
+				<Option output=".exe" prefix_auto="1" extension_auto="1" />
+				<Option working_dir="" />
+				<Option object_output="Z:/Projects/C++/imp-re/.objs" />
 				<Option type="0" />
 				<Option compiler="gcc" />
 			</Target>
@@ -71,25 +72,60 @@
 			<Add directory="lib" />
 		</Linker>
 		<Unit filename="gen/make_mat_h.cpp">
-			<Option compile="0" />
 			<Option link="0" />
 			<Option weight="100" />
 			<Option compiler="gcc" use="1" buildCommand="gen\make_mat_h.bat\ngen\touch.bat $object" />
 			<Option target="Generate code" />
 		</Unit>
-		<Unit filename="src/gui/messagebox.cpp" />
-		<Unit filename="src/gui/messagebox.h" />
-		<Unit filename="src/gui/window.cpp" />
-		<Unit filename="src/gui/window.h" />
-		<Unit filename="src/main.cpp" />
-		<Unit filename="src/program/errors.h" />
-		<Unit filename="src/program/exit.h" />
-		<Unit filename="src/utils/common.h" />
-		<Unit filename="src/utils/dynamic_storage.h" />
-		<Unit filename="src/utils/handle.h" />
-		<Unit filename="src/utils/mat.h" />
-		<Unit filename="src/utils/reflection.h" />
-		<Unit filename="src/utils/strings.h" />
+		<Unit filename="lib/glfl.cpp" />
+		<Unit filename="src/gui/messagebox.cpp">
+			<Option target="Debug" />
+			<Option target="Release" />
+		</Unit>
+		<Unit filename="src/gui/messagebox.h">
+			<Option target="Debug" />
+			<Option target="Release" />
+		</Unit>
+		<Unit filename="src/gui/window.cpp">
+			<Option target="Debug" />
+			<Option target="Release" />
+		</Unit>
+		<Unit filename="src/gui/window.h">
+			<Option target="Debug" />
+			<Option target="Release" />
+		</Unit>
+		<Unit filename="src/main.cpp">
+			<Option target="Debug" />
+			<Option target="Release" />
+		</Unit>
+		<Unit filename="src/program/errors.h">
+			<Option target="Debug" />
+			<Option target="Release" />
+		</Unit>
+		<Unit filename="src/program/exit.h">
+			<Option target="Debug" />
+			<Option target="Release" />
+		</Unit>
+		<Unit filename="src/utils/common.h">
+			<Option target="Debug" />
+			<Option target="Release" />
+		</Unit>
+		<Unit filename="src/utils/dynamic_storage.h">
+			<Option target="Debug" />
+			<Option target="Release" />
+		</Unit>
+		<Unit filename="src/utils/mat.h">
+			<Option target="Debug" />
+			<Option target="Release" />
+		</Unit>
+		<Unit filename="src/utils/reflection.h">
+			<Option target="Debug" />
+			<Option target="Release" />
+		</Unit>
+		<Unit filename="src/utils/strings.h">
+			<Option target="Debug" />
+			<Option target="Release" />
+		</Unit>
 		<Extensions>
 			<code_completion />
 			<envvars />
