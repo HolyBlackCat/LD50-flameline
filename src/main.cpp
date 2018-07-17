@@ -15,15 +15,10 @@
 
 #define main SDL_main
 
+GUI::Window win("Alpha", vec(800, 600), win.windowed);
+
 int main(int, char**)
 {
-    GUI::Window win("Alpha", vec(800, 600), win.windowed);
-    GUI::Window b;
-    b = std::move(win);
-
-    glfl::set_function_loader(SDL_GL_GetProcAddress);
-    glfl::load_gl(3,3);
-
     while (1)
     {
         SDL_Event e;

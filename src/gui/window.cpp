@@ -2,11 +2,13 @@
 
 #include <string>
 
+#include <GLFL/glfl.h>
+
 #include "errors.h"
 #include "strings.h"
 
 
-// Advise video drivers to use the best available video card for the application.
+// Export some variables to advise video drivers to use the best available video card for the application.
 OnPC
 (
     extern "C"
@@ -81,7 +83,7 @@ namespace GUI
     }
 
     Window::Window(Window &&other) noexcept
-        : handle(std::exchange(other.handle, nullptr)), context(std::exchange(other.context, nullptr))
+        : handle(std::exchange(other.handle, nullptr)), context(std::exchange(other.context, nullptr)), size(other.size), vsync(other.vsync), resizable(other.resizable), mode(other.mode)
     {
         if (instance == &other)
             instance = this;
@@ -96,8 +98,13 @@ namespace GUI
             handle = std::exchange(other.handle, nullptr);
             context = std::exchange(other.context, nullptr);
 
+            size = other.size;
+            vsync = other.vsync;
+            resizable = other.resizable;
+            mode = other.mode;
+
             if (instance == &other)
-            instance = this;
+                instance = this;
         }
         return *this;
     }
@@ -286,6 +293,16 @@ namespace GUI
             // Set fullscreen mode
             if (new_mode != windowed)
                 SetMode(new_mode); // This sets `mode`.
+
+            // Get current window size
+            SDL_GetWindowSize(handle, &size.x, &size.y);
+
+            // Load OpenGL functions
+            glfl::set_function_loader(SDL_GL_GetProcAddress);
+            if (settings.gl_profile != Profile::es)
+                glfl::load_gl(settings.gl_major, settings.gl_minor);
+            else
+                glfl::load_gles(settings.gl_major, settings.gl_minor);
         }
         catch (std::exception &e)
         {
@@ -296,6 +313,13 @@ namespace GUI
     Window::~Window()
     {
         Destroy();
+    }
+
+    ivec2 Window::Size()
+    {
+        if (!instance)
+            return ivec2(0);
+        return instance->size;
     }
 
     SDL_Window *Window::Handle()

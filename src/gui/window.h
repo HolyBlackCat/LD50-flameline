@@ -133,6 +133,8 @@ namespace GUI
         SDL_Window *handle = 0;
         SDL_GLContext context = 0;
 
+        // When adding variables here, don't forget to add them to move constructor/assignment.
+        ivec2 size = ivec2(0);
         VSync vsync = VSync::unspecified;
         bool resizable = 0;
         FullscreenMode mode = FullscreenMode::windowed;
@@ -149,6 +151,8 @@ namespace GUI
         Window(std::string name, ivec2 size, FullscreenMode mode = windowed, const Settings &settings = {});
 
         ~Window();
+
+        static ivec2 Size();
 
         static SDL_Window *Handle();
         static SDL_GLContext Context();
