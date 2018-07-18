@@ -1,9 +1,8 @@
 #ifndef WINDOW_H_INCLUDED
 #define WINDOW_H_INCLUDED
 
-#include <exception>
+#include <memory>
 #include <string>
-#include <utility>
 
 #include <SDL2/SDL.h>
 
@@ -130,27 +129,19 @@ namespace GUI
         };
 
       private:
-        SDL_Window *handle = 0;
-        SDL_GLContext context = 0;
-
-        // When adding variables here, don't forget to add them to move constructor/assignment.
-        ivec2 size = ivec2(0);
-        VSync vsync = VSync::unspecified;
-        bool resizable = 0;
-        FullscreenMode mode = FullscreenMode::windowed;
+        struct Data;
+        std::unique_ptr<Data> data;
 
         inline static Window *instance = 0;
 
-        void Destroy();
-
       public:
-        Window() {}
+        Window();
         Window(Window &&other) noexcept;
         Window &operator=(Window &&other) noexcept;
+        ~Window();
 
         Window(std::string name, ivec2 size, FullscreenMode mode = windowed, const Settings &settings = {});
 
-        ~Window();
 
         static ivec2 Size();
 
