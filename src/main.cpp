@@ -1,3 +1,4 @@
+#include <iomanip>
 #include <iostream>
 #include <vector>
 
@@ -15,16 +16,21 @@
 
 #define main SDL_main
 
-GUI::Window win("Alpha", vec(800, 600), win.windowed);
+GUI::Window win("Alpha", vec(800, 600), win.windowed, GUI::Window::Settings().Resizable());
 
 int main(int, char**)
 {
     while (1)
     {
-        SDL_Event e;
-        while (SDL_PollEvent(&e))
-            if (e.type == SDL_QUIT)
-                Program::Exit();
+        win.Tick();
+
+        if (win.Resized())
+        {
+            std::cout << "Resized\n";
+            glViewport(0, 0, win.Size().x, win.Size().y);
+        }
+        if (win.ExitRequested())
+            return 0;
 
         glClear(GL_COLOR_BUFFER_BIT);
 

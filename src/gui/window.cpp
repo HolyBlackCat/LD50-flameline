@@ -2,6 +2,7 @@
 
 #include <string>
 #include <utility>
+#include <vector>
 
 #include <GLFL/glfl.h>
 
@@ -78,6 +79,20 @@ namespace GUI
         bool resizable = 0;
         FullscreenMode mode = FullscreenMode::windowed;
 
+        uint64_t tick_counter = 1, frame_counter = 1;
+
+        uint64_t resize_time = 0;
+        uint64_t exit_request_time = 0;
+
+        std::string text_input;
+
+        ivec2 mouse_pos = ivec2(0);
+        ivec2 mouse_delta = ivec2(0);
+
+        bool keyboard_focus = 0, mouse_focus = 0;
+
+        std::vector<Input> input_times = std::vector<Input>(Inputs::IndexCount);
+
         Data(const Data &) = delete;
         Data &operator=(const Data &) = delete;
 
@@ -103,6 +118,7 @@ namespace GUI
                 switch (settings.position)
                 {
                   case Position::custom:
+                  default:
                     pos = settings.coords;
                     break;
                   case Position::centered:
@@ -261,7 +277,7 @@ namespace GUI
 
                 // Set fullscreen mode
                 if (new_mode != windowed)
-                    SetMode(new_mode); // This sets `mode`.
+                    Instance().SetMode(new_mode); // This sets `mode`.
 
                 // Get current window size
                 SDL_GetWindowSize(handle, &size.x, &size.y);
@@ -317,53 +333,48 @@ namespace GUI
         instance = this;
     }
 
-    ivec2 Window::Size()
+    Window &Window::Instance() // This will throw if there is no window.
     {
         if (!instance)
-            return ivec2(0);
-        return instance->data->size;
+            Program::Error("Attempt to use a window before it was created.");
+        return *instance;
     }
 
-    SDL_Window *Window::Handle()
+    SDL_Window *Window::Handle() const
     {
-        if (!instance)
-            return 0;
-        return instance->data->handle;
+        return data->handle;
     }
 
-    SDL_GLContext Window::Context()
+    SDL_GLContext Window::Context() const
     {
-        if (!instance)
-            return 0;
-        return instance->data->context;
+        return data->context;
     }
 
-    Window::VSync Window::VSyncMode()
+    ivec2 Window::Size() const
     {
-        if (!instance)
-            return VSync::unspecified;
-        return instance->data->vsync;
+        return data->size;
     }
 
-    bool Window::Resizable()
+    Window::VSync Window::VSyncMode() const
     {
-        if (!instance)
-            return 0;
-        return instance->data->resizable;
+        return data->vsync;
+    }
+
+    bool Window::Resizable() const
+    {
+        return data->resizable;
     }
 
     void Window::SetMode(FullscreenMode new_mode)
     {
-        if (!instance)
-            return;
-
-        if (new_mode == borderless_fullscreen && instance->data->resizable == 0)
+        if (new_mode == borderless_fullscreen && data->resizable == 0)
             new_mode = fullscreen; // Borderless fullscreen would force a window resize even if it's not normally resiable. So we use a normal fullscreen mode instead.
 
         int mode_value;
         switch (new_mode)
         {
           case windowed:
+          default:
             mode_value = 0;
             break;
           case fullscreen:
@@ -374,25 +385,198 @@ namespace GUI
             break;
         }
 
-        if (SDL_SetWindowFullscreen(instance->data->handle, mode_value))
+        if (SDL_SetWindowFullscreen(data->handle, mode_value))
             return; // We silently ignore a failure.
 
-        instance->data->mode = new_mode;
+        data->mode = new_mode;
     }
 
-    Window::FullscreenMode Window::Mode()
+    Window::FullscreenMode Window::Mode() const
     {
-        if (!instance)
-            return windowed;
+        return data->mode;
+    }
 
-        return instance->data->mode;
+    void Window::Tick()
+    {
+        data->tick_counter++;
+
+        data->text_input.clear();
+        data->mouse_delta = ivec2(0);
+
+        SDL_Event event;
+        while (SDL_PollEvent(&event))
+        {
+            switch (event.type)
+            {
+              case SDL_QUIT:
+                data->exit_request_time = data->tick_counter;
+                break;
+
+                { // Inputs
+                    int index;
+
+                  case SDL_KEYDOWN:
+                    index = event.key.keysym.scancode;
+                    if (index < Inputs::BeginKeys || index >= Inputs::EndKeys || index == 0)
+                        break;
+                    data->input_times[Inputs::BeginKeys + index].repeat = data->tick_counter;
+                    if (event.key.repeat)
+                        break;
+                    data->input_times[Inputs::BeginKeys + index].press = data->tick_counter;
+                    break;
+                  case SDL_KEYUP:
+                    index = event.key.keysym.scancode;
+                    if (index < Inputs::BeginKeys || index >= Inputs::EndKeys || index == 0)
+                        break;
+                    if (event.key.repeat) // We don't care about repeated releases.
+                        break;
+                    data->input_times[Inputs::BeginKeys + index].release = data->tick_counter;
+                    break;
+
+                  case SDL_MOUSEBUTTONDOWN:
+                    index = event.button.button;
+                    if (index == 0)
+                        break;
+                    index--;
+                    if (index >= Inputs::EndMouseButtons - Inputs::BeginMouseButtons)
+                        break;
+                    data->input_times[Inputs::BeginMouseButtons + index].press = data->tick_counter;
+                    data->input_times[Inputs::BeginMouseButtons + index].repeat = data->tick_counter;
+                    break;
+                  case SDL_MOUSEBUTTONUP:
+                    index = event.button.button;
+                    if (index == 0)
+                        break;
+                    index--;
+                    if (index >= Inputs::EndMouseButtons - Inputs::BeginMouseButtons)
+                        break;
+                    data->input_times[Inputs::BeginMouseButtons + index].release = data->tick_counter;
+                    break;
+
+                  case SDL_MOUSEWHEEL:
+                    if (event.wheel.y > 0)
+                    {
+                        data->input_times[Inputs::mouse_wheel_up].press = data->tick_counter;
+                        data->input_times[Inputs::mouse_wheel_up].release = data->tick_counter;
+                        data->input_times[Inputs::mouse_wheel_up].repeat = data->tick_counter;
+                    }
+                    else if (event.wheel.y < 0)
+                    {
+                        data->input_times[Inputs::mouse_wheel_down].press = data->tick_counter;
+                        data->input_times[Inputs::mouse_wheel_down].release = data->tick_counter;
+                        data->input_times[Inputs::mouse_wheel_down].repeat = data->tick_counter;
+                    }
+                    if (event.wheel.x < 0)
+                    {
+                        data->input_times[Inputs::mouse_wheel_left].press = data->tick_counter;
+                        data->input_times[Inputs::mouse_wheel_left].release = data->tick_counter;
+                        data->input_times[Inputs::mouse_wheel_left].repeat = data->tick_counter;
+                    }
+                    else if (event.wheel.x > 0)
+                    {
+                        data->input_times[Inputs::mouse_wheel_right].press = data->tick_counter;
+                        data->input_times[Inputs::mouse_wheel_right].release = data->tick_counter;
+                        data->input_times[Inputs::mouse_wheel_right].repeat = data->tick_counter;
+                    }
+                    break;
+                }
+
+              case SDL_MOUSEMOTION:
+                data->mouse_pos = ivec2(event.motion.x, event.motion.y);
+                data->mouse_delta += ivec2(event.motion.xrel, event.motion.yrel);
+                break;
+
+              case SDL_WINDOWEVENT:
+                switch (event.window.event)
+                {
+                  case SDL_WINDOWEVENT_CLOSE:
+                    data->exit_request_time = data->tick_counter;
+                    break;
+                  case SDL_WINDOWEVENT_RESIZED:
+                    if (data->tick_counter == 1)
+                        break;
+                    data->resize_time = data->tick_counter;
+                    SDL_GetWindowSize(data->handle, &data->size.x, &data->size.y);
+                    break;
+                }
+                break;
+
+              case SDL_TEXTINPUT:
+                data->text_input += event.text.text;
+                break;
+            }
+        }
+
+        data->keyboard_focus = SDL_GetKeyboardFocus() == data->handle;
+        data->mouse_focus = SDL_GetMouseFocus() == data->handle;
     }
 
     void Window::Swap()
     {
-        if (!instance)
-            return;
+        data->frame_counter++;
+        SDL_GL_SwapWindow(data->handle);
+    }
 
-        SDL_GL_SwapWindow(instance->data->handle);
+    uint64_t Window::Ticks() const
+    {
+        return data->tick_counter;
+    }
+
+    uint64_t Window::Frames() const
+    {
+        return data->frame_counter;
+    }
+
+    bool Window::ExitRequested() const
+    {
+        return data->exit_request_time == data->tick_counter;
+    }
+
+    bool Window::Resized() const
+    {
+        return instance->data->resize_time == instance->data->tick_counter;
+    }
+
+    bool Window::HasKeyboardFocus() const
+    {
+        return data->keyboard_focus;
+    }
+
+    bool Window::HasMouseFocus() const
+    {
+        return data->mouse_focus;
+    }
+
+    std::string Window::TextInput() const
+    {
+        return data->text_input;
+    }
+
+    Window::Input Window::InputTimes(Inputs::Enum index) const
+    {
+        if (index <= 0 || index >= Inputs::IndexCount)
+            return {};
+
+        return data->input_times[index];
+    }
+
+    ivec2 Window::MousePos() const
+    {
+        return data->mouse_pos;
+    }
+
+    ivec2 Window::MousePosDelta() const
+    {
+        return data->mouse_delta;
+    }
+
+    void Window::HideCursor(bool hide)
+    {
+        SDL_ShowCursor(!hide);
+    }
+
+    void Window::RelativeMouseMode(bool relative)
+    {
+        SDL_SetRelativeMouseMode(SDL_bool(relative));
     }
 }

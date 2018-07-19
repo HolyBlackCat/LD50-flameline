@@ -28,6 +28,6 @@ namespace GUI
             break;
         }
 
-        SDL_ShowSimpleMessageBox(type_value, title.c_str(), message.c_str(), Window::Handle());
+        SDL_ShowSimpleMessageBox(type_value, title.c_str(), message.c_str(), Window::Instance().Handle());
     }
 }
