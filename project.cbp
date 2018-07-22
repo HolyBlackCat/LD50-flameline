@@ -25,10 +25,12 @@
 				<Option type="0" />
 				<Option compiler="gcc" />
 				<Compiler>
+					<Add option="-flto" />
 					<Add option="-O3" />
 					<Add option="-DNDEBUG" />
 				</Compiler>
 				<Linker>
+					<Add option="-flto" />
 					<Add option="-s" />
 				</Linker>
 			</Target>
@@ -68,6 +70,7 @@
 			<Add library="shell32" />
 			<Add library="version" />
 			<Add library="uuid" />
+			<Add library="z" />
 			<Add directory="lib" />
 		</Linker>
 		<Unit filename="gen/make_mat_h.cpp">
@@ -85,6 +88,8 @@
 		<Unit filename="src/main.cpp" />
 		<Unit filename="src/program/errors.h" />
 		<Unit filename="src/program/exit.h" />
+		<Unit filename="src/utils/archive.cpp" />
+		<Unit filename="src/utils/archive.h" />
 		<Unit filename="src/utils/common.h" />
 		<Unit filename="src/utils/dynamic_storage.h" />
 		<Unit filename="src/utils/mat.h" />

@@ -177,7 +177,7 @@ namespace Interface
         {
             ivec2 coords = ivec2(0);
             ivec2 min_size = ivec2(0);
-            bool resizable = 0;
+            bool fixed_size = 0;
 
             int display = 0;
             Position position = Position::undefined;
@@ -201,9 +201,9 @@ namespace Interface
                 min_size = sz;
                 return *this;
             }
-            ref Resizable(bool r = 1)
+            ref FixedSize(bool f = 1)
             {
-                resizable = r;
+                fixed_size = f;
                 return *this;
             }
             ref Display(int n)

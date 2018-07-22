@@ -190,7 +190,7 @@ namespace Interface
 
                 // Window flags (resizability)
                 uint32_t window_flags = SDL_WINDOW_OPENGL;
-                if (settings.resizable)
+                if (!settings.fixed_size)
                     window_flags |= SDL_WINDOW_RESIZABLE;
 
                 // Create the window
@@ -207,13 +207,13 @@ namespace Interface
                 // Get an appropriate display mode for fullscreen.
                 SDL_DisplayMode display_mode{};
                 bool have_display_mode = 0;
-                if (!settings.resizable) // If window is not resizable, get a display mode closest to it's resolution
+                if (settings.fixed_size) // If window is not resizable, get a display mode closest to it's resolution
                 {
                     display_mode.w = new_size.x;
                     display_mode.h = new_size.y;
                     have_display_mode = bool(SDL_GetClosestDisplayMode(settings.display, &display_mode, &display_mode));
                 }
-                if (settings.resizable) // If the window is resizable, or if a closest mode couldn't be obtained, try using the desktop mode.
+                if (!settings.fixed_size) // If the window is resizable, or if a closest mode couldn't be obtained, try using the desktop mode.
                 {
                     have_display_mode = !SDL_GetDesktopDisplayMode(settings.display, &display_mode);
                 }
@@ -273,7 +273,7 @@ namespace Interface
                 }
 
                 // Save resizability flag
-                resizable = settings.resizable;
+                resizable = !settings.fixed_size;
 
                 // Set fullscreen mode
                 if (new_mode != windowed)

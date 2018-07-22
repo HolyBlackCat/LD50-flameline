@@ -10,6 +10,7 @@
 #include "window.h"
 #include "errors.h"
 #include "exit.h"
+#include "archive.h"
 #include "dynamic_storage.h"
 #include "mat.h"
 #include "reflection.h"
@@ -17,11 +18,22 @@
 
 #define main SDL_main
 
-Interface::Window win("Alpha", vec(800, 600), win.windowed, Interface::Window::Settings().Resizable());
+Interface::Window win("Alpha", vec(800, 600));
 
 int main(int, char**)
 {
     Interface::Button b;
+
+    std::string x = "Alpha, beta, gamma!";
+    std::cout << "[" << x << "]\n";
+    std::string y;
+    y.resize(Archive::MaxCompressedSize((uint8_t*)&*x.begin(), (uint8_t*)&*x.end()));
+    y.resize(Archive::Compress((uint8_t*)&*x.begin(), (uint8_t*)&*x.end(), (uint8_t*)&*y.begin(), (uint8_t*)&*y.end()) - (uint8_t*)&*y.begin());
+    std::cout << "[" << y << "]\n";
+    std::string z;
+    z.resize(Archive::UncompressedSize((uint8_t*)&*y.begin(), (uint8_t*)&*y.end()));
+    Archive::Uncompress((uint8_t*)&*y.begin(), (uint8_t*)&*y.end(), (uint8_t*)&*z.begin());
+    std::cout << "[" << z << "]\n";
 
     while (1)
     {
@@ -58,9 +70,9 @@ int main(int, char**)
                 std::cout << "Assigned " << b.Name() << "\n";
         }
 
-        SDL_Delay(200);
-
         win.SwapBuffers();
+
+        SDL_Delay(200);
     }
 
     return 0;
