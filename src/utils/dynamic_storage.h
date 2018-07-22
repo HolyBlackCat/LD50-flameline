@@ -162,7 +162,7 @@ namespace DynamicStorage
         [[nodiscard]]       T *operator->()       {return *ptr;}
         [[nodiscard]] const T *operator->() const {return *ptr;}
 
-        FunctionsBase &functions() const {return *funcs;}
+        [[nodiscard]] FunctionsBase &functions() const {return *funcs;}
     };
 
 }

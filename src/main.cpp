@@ -55,7 +55,7 @@ int main(int, char**)
         else
         {
             if (b.AssignKey())
-                std::cout << "Assigned\n";
+                std::cout << "Assigned " << b.Name() << "\n";
         }
 
         SDL_Delay(200);

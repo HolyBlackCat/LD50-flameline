@@ -102,6 +102,7 @@ namespace Interface
             f11 = SDL_SCANCODE_F11,
             f12 = SDL_SCANCODE_F12,
 
+            application  = SDL_SCANCODE_APPLICATION,
             menu         = SDL_SCANCODE_MENU,
             escape       = SDL_SCANCODE_ESCAPE,
             enter        = SDL_SCANCODE_RETURN,

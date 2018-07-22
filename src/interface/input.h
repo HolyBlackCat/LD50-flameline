@@ -59,9 +59,68 @@ namespace Interface
         [[nodiscard]] bool down    () const {Update(); return is_down;}
         [[nodiscard]] bool up      () const {Update(); return !is_down;}
 
-        explicit operator bool() const {return index != Inputs::None;}
+        [[nodiscard]] explicit operator bool() const {return index != Inputs::None;}
 
-        Inputs::Enum Index() const {return index;}
+        [[nodiscard]] Inputs::Enum Index() const
+        {
+            return index;
+        }
+
+        [[nodiscard]] std::string Name() const // Returns a layout-dependent name, which
+        {
+            if (index == Inputs::None)
+            {
+                return "None";
+            }
+            else if (index >= Inputs::BeginKeys && index < Inputs::EndKeys)
+            {
+                const char *ret;
+
+                if (SDL_Keycode keycode = SDL_GetKeyFromScancode(SDL_Scancode(index)))
+                    ret = SDL_GetKeyName(keycode);
+                else
+                    ret = SDL_GetScancodeName(SDL_Scancode(index));
+
+                if (*ret) // We don't need to check for null pointers, since above functions never return those.
+                    return ret;
+                else
+                    return "Unknown " + std::to_string(index);
+            }
+            else if (index >= Inputs::BeginMouseButtons && index < Inputs::EndMouseButtons)
+            {
+                switch (index)
+                {
+                  case Inputs::mouse_left:
+                    return "Left Mouse Button";
+                  case Inputs::mouse_middle:
+                    return "Middle Mouse Button";
+                  case Inputs::mouse_right:
+                    return "Right Mouse Button";
+                  case Inputs::mouse_x1:
+                    return "X1 Mouse Button";
+                  case Inputs::mouse_x2:
+                    return "X2 Mouse Button";
+                  default:
+                    return "Mouse Button " + std::to_string(index - Inputs::mouse_left + 1);
+                }
+            }
+            else
+            {
+                switch (index)
+                {
+                  case Inputs::mouse_wheel_up:
+                    return "Mouse Wheel Up";
+                  case Inputs::mouse_wheel_down:
+                    return "Mouse Wheel Down";
+                  case Inputs::mouse_wheel_left:
+                    return "Mouse Wheel Left";
+                  case Inputs::mouse_wheel_right:
+                    return "Mouse Wheel Right";
+                  default:
+                    return "Invalid " + std::to_string(index);
+                }
+            }
+        }
 
         bool AssignKey()
         {
