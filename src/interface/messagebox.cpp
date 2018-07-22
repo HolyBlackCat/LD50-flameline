@@ -4,7 +4,7 @@
 
 #include "window.h"
 
-namespace GUI
+namespace Interface
 {
     void MessageBox(std::string title, std::string message)
     {

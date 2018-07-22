@@ -20,7 +20,7 @@ OnPC
     }
 )
 
-namespace GUI
+namespace Interface
 {
     std::string Window::Settings::GetSummary() const // Returns a short readable summary of window settings. Settings that can't cause a window creation error aren't included.
     {
@@ -396,7 +396,7 @@ namespace GUI
         return data->mode;
     }
 
-    void Window::Tick()
+    void Window::ProcessEvents()
     {
         data->tick_counter++;
 
@@ -511,7 +511,7 @@ namespace GUI
         data->mouse_focus = SDL_GetMouseFocus() == data->handle;
     }
 
-    void Window::Swap()
+    void Window::SwapBuffers()
     {
         data->frame_counter++;
         SDL_GL_SwapWindow(data->handle);

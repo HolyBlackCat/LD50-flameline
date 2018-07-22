@@ -16,7 +16,7 @@ namespace Program
             Exit(1);
         first = 0;
 
-        GUI::MessageBox(GUI::MessageBoxType::error, "Error", message.c_str());
+        Interface::MessageBox(Interface::MessageBoxType::error, "Error", message.c_str());
         Exit(1);
     }
 

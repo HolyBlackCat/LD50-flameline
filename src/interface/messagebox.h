@@ -3,7 +3,7 @@
 
 #include <string>
 
-namespace GUI
+namespace Interface
 {
     enum class MessageBoxType {info, warning, error};
 

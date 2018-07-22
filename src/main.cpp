@@ -5,6 +5,7 @@
 #include <SDL2/SDL.h>
 #include <GLFL/glfl.h>
 
+#include "input.h"
 #include "messagebox.h"
 #include "window.h"
 #include "errors.h"
@@ -16,13 +17,15 @@
 
 #define main SDL_main
 
-GUI::Window win("Alpha", vec(800, 600), win.windowed, GUI::Window::Settings().Resizable());
+Interface::Window win("Alpha", vec(800, 600), win.windowed, Interface::Window::Settings().Resizable());
 
 int main(int, char**)
 {
+    Interface::Button b;
+
     while (1)
     {
-        win.Tick();
+        win.ProcessEvents();
 
         if (win.Resized())
         {
@@ -41,7 +44,23 @@ int main(int, char**)
         glVertex2f(0,-0.5);
         glEnd();
 
-        win.Swap();
+        if (b)
+        {
+            std::cout << " v" << b.pressed()
+                      << " _" << b.down()
+                      << " ^" << b.released()
+                      << " ~" << b.up()
+                      << " :" << b.repeated() << '\n';
+        }
+        else
+        {
+            if (b.AssignKey())
+                std::cout << "Assigned\n";
+        }
+
+        SDL_Delay(200);
+
+        win.SwapBuffers();
     }
 
     return 0;

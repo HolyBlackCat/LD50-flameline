@@ -8,7 +8,7 @@
 
 #include "mat.h"
 
-namespace GUI
+namespace Interface
 {
     namespace Inputs
     {
@@ -306,8 +306,8 @@ namespace GUI
         void SetMode(FullscreenMode new_mode); // If the window is not resizable, then `borderless_fullscreen` (which requires a window resize) acts as `fullscreen`.
         FullscreenMode Mode() const;
 
-        void Tick();
-        void Swap();
+        void ProcessEvents();
+        void SwapBuffers();
 
         // Those counters start from 1.
         uint64_t Ticks() const;
