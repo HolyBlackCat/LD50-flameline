@@ -1,6 +1,7 @@
 #ifndef STRINGS_H_INCLUDED
 #define STRINGS_H_INCLUDED
 
+#include <iomanip>
 #include <string>
 #include <sstream>
 

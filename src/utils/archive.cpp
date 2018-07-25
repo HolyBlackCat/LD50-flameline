@@ -1,5 +1,7 @@
 #include "archive.h"
 
+#include <type_traits>
+
 #include <zlib.h>
 
 #include "errors.h"
@@ -33,6 +35,7 @@ namespace Archive
 
 
     using size_type = uint32_t;
+    static_assert(std::is_unsigned_v<size_type> && sizeof(size_type) >= sizeof(std::size_t), "`size_type` must be an unsigned type not smaller than `std::size_t`.");
 
     [[nodiscard]] std::size_t MaxCompressedSize(const uint8_t *src_begin, const uint8_t *src_end)
     {
@@ -45,8 +48,12 @@ namespace Archive
             Program::Error("Compression failure.");
 
         std::size_t size = src_end - src_begin;
+        if (size > std::numeric_limits<size_type>::max())
+            Program::Error("Compression failure.");
+
         for (std::size_t i = 0; i < sizeof(size_type); i++)
             dst_begin[i] = (size >> (i * 8)) & 0xff;
+
         return Raw::Compress(src_begin, src_end, dst_begin + sizeof(size_type), dst_end);
     }
 
@@ -54,9 +61,11 @@ namespace Archive
     {
         if (src_end - src_begin < std::ptrdiff_t(sizeof(size_type)))
             Program::Error("Decompression failure.");
+
         std::size_t size = 0;
         for (std::size_t i = 0; i < sizeof(size_type); i++)
             size |= (size_type(src_begin[i]) << (i * 8));
+
         return size;
     }
 

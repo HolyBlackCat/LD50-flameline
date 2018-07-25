@@ -13,6 +13,7 @@
 #include "archive.h"
 #include "dynamic_storage.h"
 #include "mat.h"
+#include "memory_file.h"
 #include "reflection.h"
 #include "strings.h"
 
@@ -23,17 +24,6 @@ Interface::Window win("Alpha", vec(800, 600));
 int main(int, char**)
 {
     Interface::Button b;
-
-    std::string x = "Alpha, beta, gamma!";
-    std::cout << "[" << x << "]\n";
-    std::string y;
-    y.resize(Archive::MaxCompressedSize((uint8_t*)&*x.begin(), (uint8_t*)&*x.end()));
-    y.resize(Archive::Compress((uint8_t*)&*x.begin(), (uint8_t*)&*x.end(), (uint8_t*)&*y.begin(), (uint8_t*)&*y.end()) - (uint8_t*)&*y.begin());
-    std::cout << "[" << y << "]\n";
-    std::string z;
-    z.resize(Archive::UncompressedSize((uint8_t*)&*y.begin(), (uint8_t*)&*y.end()));
-    Archive::Uncompress((uint8_t*)&*y.begin(), (uint8_t*)&*y.end(), (uint8_t*)&*z.begin());
-    std::cout << "[" << z << "]\n";
 
     while (1)
     {
