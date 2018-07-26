@@ -14,11 +14,13 @@
 #include "dynamic_storage.h"
 #include "mat.h"
 #include "memory_file.h"
+#include "parachute.h"
 #include "reflection.h"
 #include "strings.h"
 
 #define main SDL_main
 
+Program::Parachute error_parachute;
 Interface::Window win("Alpha", vec(800, 600));
 
 int main(int, char**)

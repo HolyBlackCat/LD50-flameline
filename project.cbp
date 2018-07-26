@@ -82,6 +82,7 @@
 		<Unit filename="src/main.cpp" />
 		<Unit filename="src/program/errors.h" />
 		<Unit filename="src/program/exit.h" />
+		<Unit filename="src/program/parachute.h" />
 		<Unit filename="src/utils/archive.cpp" />
 		<Unit filename="src/utils/archive.h" />
 		<Unit filename="src/utils/common.h" />
