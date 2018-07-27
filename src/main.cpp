@@ -8,13 +8,14 @@
 #include "input.h"
 #include "messagebox.h"
 #include "window.h"
+#include "cleanup_barrier.h"
 #include "errors.h"
 #include "exit.h"
+#include "parachute.h"
 #include "archive.h"
 #include "dynamic_storage.h"
 #include "mat.h"
 #include "memory_file.h"
-#include "parachute.h"
 #include "reflection.h"
 #include "strings.h"
 
@@ -22,6 +23,7 @@
 
 Program::Parachute error_parachute;
 Interface::Window win("Alpha", vec(800, 600));
+Program::CleanupBarrier cleanup_barrier;
 
 int main(int, char**)
 {

@@ -5,6 +5,11 @@
 
 namespace Program
 {
+    [[noreturn]] inline void ImmediateExit(int code = 0)
+    {
+        std::_Exit(code);
+    }
+
     [[noreturn]] inline void Exit(int code = 0)
     {
         static bool first = 1;
@@ -15,7 +20,7 @@ namespace Program
         }
         else // This might be called from some destructor.
         {
-            std::_Exit(code);
+            ImmediateExit(code);
         }
     }
 }
