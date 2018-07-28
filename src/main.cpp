@@ -5,6 +5,7 @@
 #include <SDL2/SDL.h>
 #include <GLFL/glfl.h>
 
+#include "image.h"
 #include "input.h"
 #include "messagebox.h"
 #include "window.h"
@@ -22,6 +23,7 @@
 
 Program::Parachute error_parachute;
 Interface::Window win("Alpha", vec(800, 600));
+Graphics::Image img("test.png");
 
 int main(int, char**)
 {

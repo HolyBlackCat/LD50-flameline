@@ -34,6 +34,14 @@ namespace Program
     {
         Error(Str(params...));
     }
+
+    #ifdef NDEBUG
+    #  define DebugAssert(text, ...) do {} while (0)
+    #  define DebugAssertNameless(...) do {} while (0)
+    #else
+    #  define DebugAssert(text, ...) do {bool(__VA_ARGS__) || (::Program::HardError("Assertion failed: ", text), 0);} while (0)
+    #  define DebugAssertNameless(...) do {bool(__VA_ARGS__) || (::Program::HardError("Assertion failed.\nExpression: " #__VA_ARGS__), 0);} while (0)
+    #endif
 }
 
 #endif

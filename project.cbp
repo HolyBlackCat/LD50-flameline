@@ -43,6 +43,7 @@
 			<Add option="-std=c++2a" />
 			<Add directory="lib/include" />
 			<Add directory="src" />
+			<Add directory="src/graphics" />
 			<Add directory="src/interface" />
 			<Add directory="src/program" />
 			<Add directory="src/utils" />
@@ -63,8 +64,12 @@
 			<Option target="&lt;{~None~}&gt;" />
 		</Unit>
 		<Unit filename="lib/glfl.cpp">
-			<Option compiler="gcc" use="1" buildCommand="$compiler $includes -c $file -o $object -O3" />
+			<Option compiler="gcc" use="1" buildCommand="$compiler $options $includes -c $file -o $object -g0 -O3" />
 		</Unit>
+		<Unit filename="lib/implementation.cpp">
+			<Option compiler="gcc" use="1" buildCommand="$compiler $options $includes -c $file -o $object -g0 -O3" />
+		</Unit>
+		<Unit filename="src/graphics/image.h" />
 		<Unit filename="src/interface/input.h" />
 		<Unit filename="src/interface/messagebox.cpp" />
 		<Unit filename="src/interface/messagebox.h" />

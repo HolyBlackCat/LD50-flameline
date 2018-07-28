@@ -167,6 +167,35 @@ class MemoryFile
 
         return ret;
     }
+
+
+    static void Save(std::string file_name, const uint8_t *begin, const uint8_t *end) // Throws on failure.
+    {
+        FILE *file = 0;
+        try
+        {
+            file = std::fopen(file_name.c_str(), "wb");
+            if (!file)
+                Program::Error("Unable to open file for writing: ", name);
+            if (!std::fwrite(begin, end - begin, 1, file))
+                Program::Error("Unable to write to file: ", name);
+            std::fclose(file);
+            file = 0;
+        }
+        catch (...)
+        {
+            std::fclose(file);
+            throw;
+        }
+    }
+
+    static void SaveCompressed(std::string file_name, const uint8_t *begin, const uint8_t *end) // Throws on failure.
+    {
+        auto buffer_size = Archive::MaxCompressedSize(begin, end);
+        auto buffer = std::make_unique<uint8_t[]>(buffer_size);
+        auto compressed_end = Archive::Compress(begin, end, buffer.get(), buffer.get() + buffer_size);
+        Save(file_name, buffer.get(), compressed_end);
+    }
 };
 
 #endif

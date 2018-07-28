@@ -286,7 +286,7 @@ namespace Interface
                 else
                     glfl::load_gles(settings.gl_major, settings.gl_minor);
             }
-            catch (std::exception &e)
+            catch (...)
             {
                 if (context)
                     SDL_GL_DeleteContext(context);
@@ -294,6 +294,7 @@ namespace Interface
                     SDL_DestroyWindow(handle);
                 if (sdl_initialized)
                     SDL_Quit();
+                throw;
             }
         }
 
