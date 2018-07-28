@@ -98,6 +98,7 @@ namespace Interface
 
         Data(std::string name, ivec2 new_size, FullscreenMode new_mode, const Settings &settings)
         {
+            bool sdl_initialized = 0;
             try
             {
                 // Stop if a window already exists
@@ -105,13 +106,9 @@ namespace Interface
                     Program::Error("Attempt to create multiple windows.");
 
                 // Initialize SDL
-                static bool sdl_initialized = 0;
-                if (!sdl_initialized)
-                {
-                    if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_EVENTS))
-                        Program::Error(Str("Unable to initialize SDL.\nMessage: ", SDL_GetError()));
-                    sdl_initialized = 1;
-                }
+                if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_EVENTS))
+                    Program::Error(Str("Unable to initialize SDL.\nMessage: ", SDL_GetError()));
+                sdl_initialized = 1;
 
                 // Position
                 ivec2 pos;
@@ -295,6 +292,8 @@ namespace Interface
                     SDL_GL_DeleteContext(context);
                 if (handle)
                     SDL_DestroyWindow(handle);
+                if (sdl_initialized)
+                    SDL_Quit();
             }
         }
 
@@ -302,6 +301,7 @@ namespace Interface
         {
             SDL_GL_DeleteContext(context);
             SDL_DestroyWindow(handle);
+            SDL_Quit();
         }
     };
 

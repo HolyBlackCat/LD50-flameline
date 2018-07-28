@@ -68,12 +68,15 @@
 			<Add directory="lib" />
 		</Linker>
 		<Unit filename="gen/make_mat_h.cpp">
+			<Option compile="0" />
 			<Option link="0" />
 			<Option weight="100" />
 			<Option compiler="gcc" use="1" buildCommand="gen\make_mat_h.bat\ngen\touch.bat $object" />
 			<Option target="&lt;{~None~}&gt;" />
 		</Unit>
-		<Unit filename="lib/glfl.cpp" />
+		<Unit filename="lib/glfl.cpp">
+			<Option compiler="gcc" use="1" buildCommand="$compiler $includes -c $file -o $object -O3" />
+		</Unit>
 		<Unit filename="src/interface/input.h" />
 		<Unit filename="src/interface/messagebox.cpp" />
 		<Unit filename="src/interface/messagebox.h" />
