@@ -51,19 +51,7 @@
 			<Add option="-static" />
 			<Add library="mingw32" />
 			<Add library="SDL2main" />
-			<Add library="SDL2" />
-			<Add library="m" />
-			<Add library="dinput" />
-			<Add library="dxerr8" />
-			<Add library="user32" />
-			<Add library="gdi32" />
-			<Add library="winmm" />
-			<Add library="imm32" />
-			<Add library="ole32" />
-			<Add library="oleaut32" />
-			<Add library="shell32" />
-			<Add library="version" />
-			<Add library="uuid" />
+			<Add library="SDL2.dll" />
 			<Add library="z" />
 			<Add directory="lib" />
 		</Linker>
