@@ -7,6 +7,7 @@
 #include <GLFL/glfl.h>
 
 #include "errors.h"
+#include "finally.h"
 #include "strings.h"
 
 
@@ -98,204 +99,192 @@ namespace Interface
 
         Data(std::string name, ivec2 new_size, FullscreenMode new_mode, const Settings &settings)
         {
-            bool sdl_initialized = 0;
-            try
+            // Stop if a window already exists
+            if (instance)
+                Program::Error("Attempt to create multiple windows.");
+
+            // Initialize SDL
+            if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_EVENTS))
+                Program::Error(Str("Unable to initialize SDL.\nMessage: ", SDL_GetError()));
+            FINALLY_ON_THROW( SDL_Quit(); )
+
+            // Position
+            ivec2 pos;
+            switch (settings.position)
             {
-                // Stop if a window already exists
-                if (instance)
-                    Program::Error("Attempt to create multiple windows.");
+              case Position::custom:
+              default:
+                pos = settings.coords;
+                break;
+              case Position::centered:
+                pos = ivec2(SDL_WINDOWPOS_CENTERED_DISPLAY(settings.display));
+                break;
+              case Position::undefined:
+                pos = ivec2(SDL_WINDOWPOS_UNDEFINED_DISPLAY(settings.display));
+                break;
+            }
 
-                // Initialize SDL
-                if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_EVENTS))
-                    Program::Error(Str("Unable to initialize SDL.\nMessage: ", SDL_GetError()));
-                sdl_initialized = 1;
+            // GL version
+            if (settings.gl_major || settings.gl_minor)
+            {
+                SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, settings.gl_major);
+                SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, settings.gl_minor);
+            }
 
-                // Position
-                ivec2 pos;
-                switch (settings.position)
-                {
-                  case Position::custom:
-                  default:
-                    pos = settings.coords;
-                    break;
-                  case Position::centered:
-                    pos = ivec2(SDL_WINDOWPOS_CENTERED_DISPLAY(settings.display));
-                    break;
-                  case Position::undefined:
-                    pos = ivec2(SDL_WINDOWPOS_UNDEFINED_DISPLAY(settings.display));
-                    break;
-                }
+            // GL profile
+            switch (settings.gl_profile)
+            {
+              case Profile::core:
+                SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE);
+                break;
+              case Profile::compatibility:
+                SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_COMPATIBILITY);
+                break;
+              case Profile::es:
+                SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_ES);
+                break;
+              default:
+                break;
+            }
 
-                // GL version
-                if (settings.gl_major || settings.gl_minor)
-                {
-                    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, settings.gl_major);
-                    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, settings.gl_minor);
-                }
+            // Hardware acceleration
+            switch (settings.hardware_acceleration)
+            {
+              case yes:
+                SDL_GL_SetAttribute(SDL_GL_ACCELERATED_VISUAL, 1);
+                break;
+              case no:
+                SDL_GL_SetAttribute(SDL_GL_ACCELERATED_VISUAL, 0);
+                break;
+              default:
+                break;
+            }
 
-                // GL profile
-                switch (settings.gl_profile)
-                {
-                  case Profile::core:
-                    SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE);
-                    break;
-                  case Profile::compatibility:
-                    SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_COMPATIBILITY);
-                    break;
-                  case Profile::es:
-                    SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_ES);
-                    break;
-                  default:
-                    break;
-                }
+            // Antialiasing
+            if (settings.msaa > 1)
+            {
+                SDL_GL_SetAttribute(SDL_GL_MULTISAMPLEBUFFERS, 1);
+                SDL_GL_SetAttribute(SDL_GL_MULTISAMPLESAMPLES, settings.msaa);
+            }
 
-                // Hardware acceleration
-                switch (settings.hardware_acceleration)
-                {
-                  case yes:
-                    SDL_GL_SetAttribute(SDL_GL_ACCELERATED_VISUAL, 1);
-                    break;
-                  case no:
-                    SDL_GL_SetAttribute(SDL_GL_ACCELERATED_VISUAL, 0);
-                    break;
-                  default:
-                    break;
-                }
+            // Bit depth
+            if (settings.color_bits.r) SDL_GL_SetAttribute(SDL_GL_RED_SIZE    , settings.color_bits.r);
+            if (settings.color_bits.g) SDL_GL_SetAttribute(SDL_GL_GREEN_SIZE  , settings.color_bits.g);
+            if (settings.color_bits.b) SDL_GL_SetAttribute(SDL_GL_BLUE_SIZE   , settings.color_bits.b);
+            if (settings.color_bits.a) SDL_GL_SetAttribute(SDL_GL_ALPHA_SIZE  , settings.color_bits.a);
+            if (settings.depth_bits  ) SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE  , settings.depth_bits  );
+            if (settings.stencil_bits) SDL_GL_SetAttribute(SDL_GL_STENCIL_SIZE, settings.stencil_bits);
 
-                // Antialiasing
-                if (settings.msaa > 1)
-                {
-                    SDL_GL_SetAttribute(SDL_GL_MULTISAMPLEBUFFERS, 1);
-                    SDL_GL_SetAttribute(SDL_GL_MULTISAMPLESAMPLES, settings.msaa);
-                }
+            // Context flags (debug-ness and forward compatibility)
+            uint32_t context_flags = 0;
+            if (settings.gl_debug)
+                context_flags |= SDL_GL_CONTEXT_DEBUG_FLAG;
+            if (settings.forward_compatibility)
+                context_flags |= SDL_GL_CONTEXT_FORWARD_COMPATIBLE_FLAG;
+            SDL_GL_SetAttribute(SDL_GL_CONTEXT_FLAGS, context_flags);
 
-                // Bit depth
-                if (settings.color_bits.r) SDL_GL_SetAttribute(SDL_GL_RED_SIZE    , settings.color_bits.r);
-                if (settings.color_bits.g) SDL_GL_SetAttribute(SDL_GL_GREEN_SIZE  , settings.color_bits.g);
-                if (settings.color_bits.b) SDL_GL_SetAttribute(SDL_GL_BLUE_SIZE   , settings.color_bits.b);
-                if (settings.color_bits.a) SDL_GL_SetAttribute(SDL_GL_ALPHA_SIZE  , settings.color_bits.a);
-                if (settings.depth_bits  ) SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE  , settings.depth_bits  );
-                if (settings.stencil_bits) SDL_GL_SetAttribute(SDL_GL_STENCIL_SIZE, settings.stencil_bits);
+            // Window flags (resizability)
+            uint32_t window_flags = SDL_WINDOW_OPENGL;
+            if (!settings.fixed_size)
+                window_flags |= SDL_WINDOW_RESIZABLE;
 
-                // Context flags (debug-ness and forward compatibility)
-                uint32_t context_flags = 0;
-                if (settings.gl_debug)
-                    context_flags |= SDL_GL_CONTEXT_DEBUG_FLAG;
-                if (settings.forward_compatibility)
-                    context_flags |= SDL_GL_CONTEXT_FORWARD_COMPATIBLE_FLAG;
-                SDL_GL_SetAttribute(SDL_GL_CONTEXT_FLAGS, context_flags);
+            // Create the window
+            handle = SDL_CreateWindow(name.c_str(), pos.x, pos.y, new_size.x, new_size.y, window_flags);
+            if (!handle)
+                Program::Error("Unable to create a window with following properties:\n",
+                               settings.GetSummary(), "\n"
+                               OnPC("If you have several video cards, change your video driver settings\n"
+                                    "to make it use the best available video card for this application."
+                                    "If it didn't help, try updating your video card driver.\n"
+                                    "If it didn't help as well, your video card is probably too old to run this application.")
+                               );
+            FINALLY_ON_THROW( SDL_DestroyWindow(handle); )
 
-                // Window flags (resizability)
-                uint32_t window_flags = SDL_WINDOW_OPENGL;
-                if (!settings.fixed_size)
-                    window_flags |= SDL_WINDOW_RESIZABLE;
+            // Get an appropriate display mode for fullscreen.
+            SDL_DisplayMode display_mode{};
+            bool have_display_mode = 0;
+            if (settings.fixed_size) // If window is not resizable, get a display mode closest to it's resolution
+            {
+                display_mode.w = new_size.x;
+                display_mode.h = new_size.y;
+                have_display_mode = bool(SDL_GetClosestDisplayMode(settings.display, &display_mode, &display_mode));
+            }
+            if (!settings.fixed_size) // If the window is resizable, or if a closest mode couldn't be obtained, try using the desktop mode.
+            {
+                have_display_mode = !SDL_GetDesktopDisplayMode(settings.display, &display_mode);
+            }
+            if (have_display_mode)
+                SDL_SetWindowDisplayMode(handle, &display_mode); // If we have an appropriate mode, set it. This function can fail, but there is nothing we can do anyway.
 
-                // Create the window
-                handle = SDL_CreateWindow(name.c_str(), pos.x, pos.y, new_size.x, new_size.y, window_flags);
+            // Create the context
+            context = SDL_GL_CreateContext(handle);
+            if (!context)
                 if (!handle)
-                    Program::Error("Unable to create a window with following properties:\n",
-                                   settings.GetSummary(), "\n"
-                                   OnPC("If you have several video cards, change your video driver settings\n"
-                                        "to make it use the best available video card for this application."
-                                        "If it didn't help, try updating your video card driver.\n"
-                                        "If it didn't help as well, your video card is probably too old to run this application.")
-                                   );
+                Program::Error("Unable to create an OpenGL context with following properties:\n",
+                               settings.GetSummary(), "\n"
+                               OnPC("If you have several video cards, change your video driver settings\n"
+                                    "to make it use the best available video card for this application."
+                                    "If it didn't help, try updating your video card driver.\n"
+                                    "If it didn't help as well, your video card is probably too old to run this application.")
+                               );
+            FINALLY_ON_THROW( SDL_GL_DeleteContext(context); )
 
-                // Get an appropriate display mode for fullscreen.
-                SDL_DisplayMode display_mode{};
-                bool have_display_mode = 0;
-                if (settings.fixed_size) // If window is not resizable, get a display mode closest to it's resolution
+            // Set the minimal size
+            if (settings.min_size)
+                SDL_SetWindowMinimumSize(handle, settings.min_size.x, settings.min_size.y);
+
+            // Set vsync mode
+            vsync = settings.vsync_mode;
+            switch (vsync)
+            {
+              case VSync::disabled:
+                if (SDL_GL_SetSwapInterval(0))
                 {
-                    display_mode.w = new_size.x;
-                    display_mode.h = new_size.y;
-                    have_display_mode = bool(SDL_GetClosestDisplayMode(settings.display, &display_mode, &display_mode));
+                    vsync = VSync::enabled;
+                    if (SDL_GL_SetSwapInterval(1))
+                        vsync = VSync::unspecified;
                 }
-                if (!settings.fixed_size) // If the window is resizable, or if a closest mode couldn't be obtained, try using the desktop mode.
+                break;
+              case VSync::enabled:
+                if (SDL_GL_SetSwapInterval(1))
                 {
-                    have_display_mode = !SDL_GetDesktopDisplayMode(settings.display, &display_mode);
-                }
-                if (have_display_mode)
-                    SDL_SetWindowDisplayMode(handle, &display_mode); // If we have an appropriate mode, set it. This function can fail, but there is nothing we can do anyway.
-
-                // Create the context
-                context = SDL_GL_CreateContext(handle);
-                if (!context)
-                    if (!handle)
-                    Program::Error("Unable to create an OpenGL context with following properties:\n",
-                                   settings.GetSummary(), "\n"
-                                   OnPC("If you have several video cards, change your video driver settings\n"
-                                        "to make it use the best available video card for this application."
-                                        "If it didn't help, try updating your video card driver.\n"
-                                        "If it didn't help as well, your video card is probably too old to run this application.")
-                                   );
-
-                // Set the minimal size
-                if (settings.min_size)
-                    SDL_SetWindowMinimumSize(handle, settings.min_size.x, settings.min_size.y);
-
-                // Set vsync mode
-                vsync = settings.vsync_mode;
-                switch (vsync)
-                {
-                  case VSync::disabled:
+                    vsync = VSync::disabled;
                     if (SDL_GL_SetSwapInterval(0))
-                    {
-                        vsync = VSync::enabled;
-                        if (SDL_GL_SetSwapInterval(1))
-                            vsync = VSync::unspecified;
-                    }
-                    break;
-                  case VSync::enabled:
+                        vsync = VSync::unspecified;
+                }
+                break;
+              case VSync::adaptive:
+                if (SDL_GL_SetSwapInterval(-1))
+                {
+                    vsync = VSync::enabled;
                     if (SDL_GL_SetSwapInterval(1))
                     {
                         vsync = VSync::disabled;
                         if (SDL_GL_SetSwapInterval(0))
                             vsync = VSync::unspecified;
                     }
-                    break;
-                  case VSync::adaptive:
-                    if (SDL_GL_SetSwapInterval(-1))
-                    {
-                        vsync = VSync::enabled;
-                        if (SDL_GL_SetSwapInterval(1))
-                        {
-                            vsync = VSync::disabled;
-                            if (SDL_GL_SetSwapInterval(0))
-                                vsync = VSync::unspecified;
-                        }
-                    }
-                    break;
-                  case VSync::unspecified:
-                    break;
                 }
-
-                // Save resizability flag
-                resizable = !settings.fixed_size;
-
-                // Set fullscreen mode
-                if (new_mode != windowed)
-                    Instance().SetMode(new_mode); // This sets `mode`.
-
-                // Get current window size
-                SDL_GetWindowSize(handle, &size.x, &size.y);
-
-                // Load OpenGL functions
-                glfl::set_function_loader(SDL_GL_GetProcAddress);
-                if (settings.gl_profile != Profile::es)
-                    glfl::load_gl(settings.gl_major, settings.gl_minor);
-                else
-                    glfl::load_gles(settings.gl_major, settings.gl_minor);
+                break;
+              case VSync::unspecified:
+                break;
             }
-            catch (...)
-            {
-                if (context)
-                    SDL_GL_DeleteContext(context);
-                if (handle)
-                    SDL_DestroyWindow(handle);
-                if (sdl_initialized)
-                    SDL_Quit();
-                throw;
-            }
+
+            // Save resizability flag
+            resizable = !settings.fixed_size;
+
+            // Set fullscreen mode
+            if (new_mode != windowed)
+                Instance().SetMode(new_mode); // This sets `mode`.
+
+            // Get current window size
+            SDL_GetWindowSize(handle, &size.x, &size.y);
+
+            // Load OpenGL functions
+            glfl::set_function_loader(SDL_GL_GetProcAddress);
+            if (settings.gl_profile != Profile::es)
+                glfl::load_gl(settings.gl_major, settings.gl_minor);
+            else
+                glfl::load_gles(settings.gl_major, settings.gl_minor);
         }
 
         ~Data()

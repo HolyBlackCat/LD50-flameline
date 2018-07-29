@@ -70,37 +70,25 @@ class MemoryFile
         MemoryFile ret;
         ret.ref = std::make_shared<Data>();
 
-        FILE *file = 0;
-        try
-        {
-            file = std::fopen(file_name.c_str(), "rb");
-            if (!file)
-                Program::Error("Unable to open file `", file_name, "`.");
+        FILE *file = std::fopen(file_name.c_str(), "rb");
+        if (!file)
+            Program::Error("Unable to open file `", file_name, "`.");
+        FINALLY( std::fclose(file); )
 
-            std::fseek(file, 0, SEEK_END);
-            auto size = std::ftell(file);
-            std::fseek(file, 0, SEEK_SET);
+        std::fseek(file, 0, SEEK_END);
+        auto size = std::ftell(file);
+        std::fseek(file, 0, SEEK_SET);
 
-            if (std::ferror(file) || size == EOF)
-                Program::Error("Unable to get size of file `", file_name, "`.");
+        if (std::ferror(file) || size == EOF)
+            Program::Error("Unable to get size of file `", file_name, "`.");
 
-            ret.ref->storage = std::make_unique<uint8_t[]>(size);
-            if (!std::fread(ret.ref->storage.get(), size, 1, file))
-                Program::Error("Unable to read from file `", file_name, "`.");
+        ret.ref->storage = std::make_unique<uint8_t[]>(size);
+        if (!std::fread(ret.ref->storage.get(), size, 1, file))
+            Program::Error("Unable to read from file `", file_name, "`.");
 
-            std::fclose(file);
-            file = 0;
-
-            ret.ref->begin = ret.ref->storage.get();
-            ret.ref->end = ret.ref->begin + size;
-            ret.ref->name = file_name;
-        }
-        catch (...)
-        {
-            if (file)
-                std::fclose(file);
-            throw;
-        }
+        ret.ref->begin = ret.ref->storage.get();
+        ret.ref->end = ret.ref->begin + size;
+        ret.ref->name = file_name;
 
         return ret;
     }
@@ -171,22 +159,12 @@ class MemoryFile
 
     static void Save(std::string file_name, const uint8_t *begin, const uint8_t *end) // Throws on failure.
     {
-        FILE *file = 0;
-        try
-        {
-            file = std::fopen(file_name.c_str(), "wb");
-            if (!file)
-                Program::Error("Unable to open file for writing: ", name);
-            if (!std::fwrite(begin, end - begin, 1, file))
-                Program::Error("Unable to write to file: ", name);
-            std::fclose(file);
-            file = 0;
-        }
-        catch (...)
-        {
-            std::fclose(file);
-            throw;
-        }
+        FILE *file = std::fopen(file_name.c_str(), "wb");
+        if (!file)
+            Program::Error("Unable to open file for writing: ", name);
+        FINALLY( std::fclose(file); )
+        if (!std::fwrite(begin, end - begin, 1, file))
+            Program::Error("Unable to write to file: ", name);
     }
 
     static void SaveCompressed(std::string file_name, const uint8_t *begin, const uint8_t *end) // Throws on failure.

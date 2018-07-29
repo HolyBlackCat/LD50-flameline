@@ -14,6 +14,8 @@
 #include "parachute.h"
 #include "archive.h"
 #include "dynamic_storage.h"
+#include "finally.h"
+#include "macro.h"
 #include "mat.h"
 #include "memory_file.h"
 #include "reflection.h"

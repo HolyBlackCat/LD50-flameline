@@ -83,6 +83,8 @@
 		<Unit filename="src/utils/archive.h" />
 		<Unit filename="src/utils/common.h" />
 		<Unit filename="src/utils/dynamic_storage.h" />
+		<Unit filename="src/utils/finally.h" />
+		<Unit filename="src/utils/macro.h" />
 		<Unit filename="src/utils/mat.h" />
 		<Unit filename="src/utils/memory_file.h" />
 		<Unit filename="src/utils/reflection.h" />

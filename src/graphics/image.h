@@ -5,6 +5,7 @@
 #include <utility>
 
 #include "errors.h"
+#include "finally.h"
 #include "mat.h"
 #include "memory_file.h"
 
@@ -30,23 +31,12 @@ namespace Graphics
         Image(MemoryFile file, FlipMode flip_mode = no_flip) // Throws on failure.
         {
             stbi_set_flip_vertically_on_load(flip_mode == flip_y);
-            uint8_t *bytes = 0;
-            try
-            {
-                ivec2 img_size;
-                bytes = stbi_load_from_memory(file.data(), file.size(), &img_size.x, &img_size.y, 0, 4);
-                if (!bytes)
-                    Program::Error("Unable to parse image: ", file.name());
-                *this = Image(img_size, bytes);
-                stbi_image_free(bytes);
-                bytes = 0;
-            }
-            catch (...)
-            {
-                if (bytes)
-                    stbi_image_free(bytes);
-                throw;
-            }
+            ivec2 img_size;
+            uint8_t *bytes = stbi_load_from_memory(file.data(), file.size(), &img_size.x, &img_size.y, 0, 4);
+            if (!bytes)
+                Program::Error("Unable to parse image: ", file.name());
+            FINALLY( stbi_image_free(bytes); )
+            *this = Image(img_size, bytes);
         }
 
         Image(const Image &other) : size(other.size), data(other.data) {}
