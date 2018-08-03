@@ -56,12 +56,15 @@
 			<Add library="z" />
 			<Add directory="lib" />
 		</Linker>
+		<Unit filename="gen/make_macro_h.cpp">
+			<Option compile="0" />
+			<Option link="0" />
+		</Unit>
 		<Unit filename="gen/make_mat_h.cpp">
 			<Option compile="0" />
 			<Option link="0" />
 			<Option weight="100" />
 			<Option compiler="gcc" use="1" buildCommand="gen\make_mat_h.bat\ngen\touch.bat $object" />
-			<Option target="&lt;{~None~}&gt;" />
 		</Unit>
 		<Unit filename="lib/glfl.cpp">
 			<Option compiler="gcc" use="1" buildCommand="$compiler $options $includes -c $file -o $object -g0 -O3" />

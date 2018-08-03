@@ -1,8 +1,8 @@
 cd gen >NUL 2>NUL
 
-set CODE=make_mat_h.cpp
-set EXECUTABLE=make_mat_h.exe
-set OUTPUT=mat.h
+set CODE=make_macro_h.cpp
+set EXECUTABLE=make_macro_h.exe
+set OUTPUT=macro.h
 set DESTINATION=src/utils
 
 g++ %CODE% -o %EXECUTABLE% -std=c++17 -Wall -Wextra -pedantic-errors
