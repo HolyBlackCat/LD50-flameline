@@ -6,9 +6,9 @@
 
 #include <GLFL/glfl.h>
 
-#include "errors.h"
-#include "finally.h"
-#include "strings.h"
+#include "program/errors.h"
+#include "utils/finally.h"
+#include "utils/strings.h"
 
 
 // Export some variables to advise video drivers to use the best available video card for the application.

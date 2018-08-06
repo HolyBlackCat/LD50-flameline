@@ -4,7 +4,7 @@
 
 #include <zlib.h>
 
-#include "errors.h"
+#include "program/errors.h"
 
 namespace Archive
 {

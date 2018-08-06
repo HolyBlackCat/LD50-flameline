@@ -8,8 +8,8 @@
 #include <string>
 
 #include "archive.h"
-#include "errors.h"
 #include "strings.h"
+#include "program/errors.h"
 
 class MemoryFile
 {

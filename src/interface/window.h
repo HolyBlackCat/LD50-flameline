@@ -1,12 +1,12 @@
-#ifndef WINDOW_H_INCLUDED
-#define WINDOW_H_INCLUDED
+#ifndef INTERFACE_WINDOW_H_INCLUDED
+#define INTERFACE_WINDOW_H_INCLUDED
 
 #include <memory>
 #include <string>
 
 #include <SDL2/SDL.h>
 
-#include "mat.h"
+#include "utils/mat.h"
 
 namespace Interface
 {

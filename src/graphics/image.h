@@ -1,13 +1,13 @@
-#ifndef GRAPHICS_H_INCLUDED
-#define GRAPHICS_H_INCLUDED
+#ifndef GRAPHICS_IMAGE_H_INCLUDED
+#define GRAPHICS_IMAGE_H_INCLUDED
 
 #include <vector>
 #include <utility>
 
-#include "errors.h"
-#include "finally.h"
-#include "mat.h"
-#include "memory_file.h"
+#include "program/errors.h"
+#include "utils/finally.h"
+#include "utils/mat.h"
+#include "utils/memory_file.h"
 
 #include <stb_image.h>
 #include <stb_image_write.h>

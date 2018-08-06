@@ -5,30 +5,58 @@
 #include <SDL2/SDL.h>
 #include <GLFL/glfl.h>
 
-#include "image.h"
-#include "input.h"
-#include "messagebox.h"
-#include "window.h"
-#include "errors.h"
-#include "exit.h"
-#include "parachute.h"
-#include "archive.h"
-#include "dynamic_storage.h"
-#include "finally.h"
-#include "macro.h"
-#include "mat.h"
-#include "memory_file.h"
-#include "reflection.h"
-#include "strings.h"
+#include "graphics/image.h"
+#include "interface/input.h"
+#include "interface/messagebox.h"
+#include "interface/window.h"
+#include "program/errors.h"
+#include "program/exit.h"
+#include "program/parachute.h"
+#include "utils/archive.h"
+#include "utils/dynamic_storage.h"
+#include "utils/finally.h"
+#include "utils/macro.h"
+#include "utils/mat.h"
+#include "utils/memory_file.h"
+#include "reflection/interface.h"
+#include "reflection/macro.h"
+#include "utils/strings.h"
 
 #define main SDL_main
+
+#include <unordered_set>
 
 Program::Parachute error_parachute;
 Interface::Window win("Alpha", vec(800, 600));
 Graphics::Image img("test.png");
 
+struct A
+{
+    Reflect(A)
+    (
+        (int)(x,y),
+        (float)(z)(=42),
+        (optional)(float)(w)(),
+    )
+};
+
 int main(int, char**)
 {
+    A a;
+    a.x = 1;
+    a.y = 2;
+    a.z = 3;
+    a.w = 4;
+    auto refl = Refl::Structure(a);
+    Meta::cexpr_for<refl.field_count()>([&](auto index){
+
+        if (refl.field_category(index.value) == Refl::FieldCategory::optional)
+            std::cout << "(opt) ";
+        std::cout << refl.field_name(index.value) << "  =  " << refl.field<index.value>() << '\n';
+    });
+
+    //std::cout << .field_name(2) << '\n';
+
     Interface::Button b;
 
     while (1)

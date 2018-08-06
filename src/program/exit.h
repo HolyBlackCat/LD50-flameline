@@ -1,5 +1,5 @@
-#ifndef EXIT_H_INCLUDED
-#define EXIT_H_INCLUDED
+#ifndef PROGRAM_EXIT_H_INCLUDED
+#define PROGRAM_EXIT_H_INCLUDED
 
 #include <cstdlib>
 

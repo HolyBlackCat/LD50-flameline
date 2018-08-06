@@ -1,5 +1,5 @@
-#ifndef ARCHIVE_H_INCLUDED
-#define ARCHIVE_H_INCLUDED
+#ifndef UTILS_ARCHIVE_H_INCLUDED
+#define UTILS_ARCHIVE_H_INCLUDED
 
 #include <cstdint>
 #include <cstddef>

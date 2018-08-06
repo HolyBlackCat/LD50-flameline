@@ -1,5 +1,5 @@
-#ifndef PARACHUTE_H_INCLUDED
-#define PARACHUTE_H_INCLUDED
+#ifndef PROGRAM_PARACHUTE_H_INCLUDED
+#define PROGRAM_PARACHUTE_H_INCLUDED
 
 #include <csignal>
 #include <exception>

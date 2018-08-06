@@ -1,5 +1,5 @@
-#ifndef INPUT_H_INCLUDED
-#define INPUT_H_INCLUDED
+#ifndef INTERFACE_INPUT_H_INCLUDED
+#define INTERFACE_INPUT_H_INCLUDED
 
 #include <initializer_list>
 #include <vector>

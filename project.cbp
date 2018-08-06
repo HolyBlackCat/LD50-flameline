@@ -39,14 +39,10 @@
 			<Add option="-pedantic-errors" />
 			<Add option="-Wextra" />
 			<Add option="-Wall" />
-			<Add option="-include src/utils/common.h" />
 			<Add option="-std=c++2a" />
+			<Add option="-include src/utils/_common.h" />
 			<Add directory="lib/include" />
 			<Add directory="src" />
-			<Add directory="src/graphics" />
-			<Add directory="src/interface" />
-			<Add directory="src/program" />
-			<Add directory="src/utils" />
 		</Compiler>
 		<Linker>
 			<Add option="-static" />
@@ -82,15 +78,17 @@
 		<Unit filename="src/program/errors.h" />
 		<Unit filename="src/program/exit.h" />
 		<Unit filename="src/program/parachute.h" />
+		<Unit filename="src/reflection/interface.h" />
+		<Unit filename="src/reflection/macro.h" />
+		<Unit filename="src/utils/_common.h" />
 		<Unit filename="src/utils/archive.cpp" />
 		<Unit filename="src/utils/archive.h" />
-		<Unit filename="src/utils/common.h" />
 		<Unit filename="src/utils/dynamic_storage.h" />
 		<Unit filename="src/utils/finally.h" />
 		<Unit filename="src/utils/macro.h" />
 		<Unit filename="src/utils/mat.h" />
 		<Unit filename="src/utils/memory_file.h" />
-		<Unit filename="src/utils/reflection.h" />
+		<Unit filename="src/utils/meta.h" />
 		<Unit filename="src/utils/strings.h" />
 		<Extensions>
 			<code_completion />

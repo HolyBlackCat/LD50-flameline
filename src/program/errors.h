@@ -1,11 +1,11 @@
-#ifndef ERRORS_H_INCLUDED
-#define ERRORS_H_INCLUDED
+#ifndef PROGRAM_ERRORS_H_INCLUDED
+#define PROGRAM_ERRORS_H_INCLUDED
 
 #include <string>
 
 #include "exit.h"
-#include "messagebox.h"
-#include "strings.h"
+#include "interface/messagebox.h"
+#include "utils/strings.h"
 
 namespace Program
 {
