@@ -78,8 +78,10 @@
 		<Unit filename="src/program/errors.h" />
 		<Unit filename="src/program/exit.h" />
 		<Unit filename="src/program/parachute.h" />
+		<Unit filename="src/reflection/containers_std.h" />
 		<Unit filename="src/reflection/interface.h" />
-		<Unit filename="src/reflection/macro.h" />
+		<Unit filename="src/reflection/primitives_arithmetic.h" />
+		<Unit filename="src/reflection/structures_macro.h" />
 		<Unit filename="src/utils/_common.h" />
 		<Unit filename="src/utils/archive.cpp" />
 		<Unit filename="src/utils/archive.h" />

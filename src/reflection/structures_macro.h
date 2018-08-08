@@ -1,8 +1,10 @@
-#ifndef REFLECTION_MACRO_H_INCLUDED
-#define REFLECTION_MACRO_H_INCLUDED
+#ifndef REFLECTION_STRUCTURES_MACRO_H_INCLUDED
+#define REFLECTION_STRUCTURES_MACRO_H_INCLUDED
 
 #include <array>
+#include <string>
 #include <tuple>
+#include <type_traits>
 
 #include "interface.h"
 #include "utils/macro.h"

@@ -19,7 +19,9 @@
 #include "utils/mat.h"
 #include "utils/memory_file.h"
 #include "reflection/interface.h"
-#include "reflection/macro.h"
+#include "reflection/containers_std.h"
+#include "reflection/primitives_arithmetic.h"
+#include "reflection/structures_macro.h"
 #include "utils/strings.h"
 
 #define main SDL_main
@@ -40,20 +42,25 @@ struct A
     )
 };
 
+struct B
+{
+    Reflect(B)
+    (
+        (A)(a),
+        (std::vector<float>)(alpha)(={1.1,2.2,3.3}),
+    )
+};
+
 int main(int, char**)
 {
-    A a;
-    a.x = 1;
-    a.y = 2;
-    a.z = 3;
-    a.w = 4;
-    auto refl = Refl::Structure(a);
-    Meta::cexpr_for<refl.field_count()>([&](auto index){
+    B obj;
+    obj.a.x = 1;
+    obj.a.y = 2;
+    obj.a.z = 3.3;
+    obj.a.w = 4.4;
+    auto refl = Refl::Interface(obj);
+    std::cout << refl.to_string() << '\n';
 
-        if (refl.field_category(index.value) == Refl::FieldCategory::optional)
-            std::cout << "(opt) ";
-        std::cout << refl.field_name(index.value) << "  =  " << refl.field<index.value>() << '\n';
-    });
 
     //std::cout << .field_name(2) << '\n';
 
