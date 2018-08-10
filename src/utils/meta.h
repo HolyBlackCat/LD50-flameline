@@ -6,6 +6,9 @@
 
 namespace Meta
 {
+    template <typename T> struct tag {using type = T;};
+
+
     namespace impl
     {
         template <typename DummyVoid, template <typename...> typename A, typename ...B> struct is_detected : std::false_type {};

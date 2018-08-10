@@ -80,6 +80,20 @@ namespace Refl
                                                       Custom::Container<type_no_cvref>>>;
 
       public:
+        template <int I> static constexpr auto field_type_helper() // Should be private, but it refuses to work otherwise.
+        {
+            if constexpr (!is_structure)
+            {
+                return Meta::tag<void>{};
+            }
+            else
+            {
+                static_assert(I >= 0 && I < field_count(), "Field index is out of range.");
+                return Meta::tag<std::remove_reference_t<decltype(impl::template field<I>(*(type_no_cvref *)0))>>{};
+            }
+        }
+
+
         constexpr Interface() {};
         constexpr Interface(type_no_ref &ref) : ptr((type_no_cvref *)&ref) {}
         constexpr Interface(type_no_ref &&ref) : ptr((type_no_cvref *)&ref) {}
@@ -137,7 +151,7 @@ namespace Refl
                 return ret;
             }
         }
-        template <typename F> constexpr void for_each_field(F &&func) const // Func receives indices as `std::integral_constant<int,i>`.
+        template <typename F> static constexpr void for_each_field(F &&func) // Func receives indices as `std::integral_constant<int,i>`.
         {
             static_assert(is_structure);
             Meta::cexpr_for<field_count()>(std::forward<F>(func));
@@ -149,6 +163,7 @@ namespace Refl
             static_assert(is_structure);
             return impl::field_count;
         }
+        template <int I> using field_type = typename decltype(field_type_helper<I>())::type;
         template <int I> constexpr decltype(auto) field_value() const
         {
             static_assert(is_structure);

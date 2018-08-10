@@ -6,6 +6,7 @@
 #include <GLFL/glfl.h>
 
 #include "graphics/image.h"
+#include "graphics/shader.h"
 #include "interface/input.h"
 #include "interface/messagebox.h"
 #include "interface/window.h"
@@ -18,10 +19,7 @@
 #include "utils/macro.h"
 #include "utils/mat.h"
 #include "utils/memory_file.h"
-#include "reflection/interface.h"
-#include "reflection/containers_std.h"
-#include "reflection/primitives_arithmetic.h"
-#include "reflection/structures_macro.h"
+#include "reflection/complete.h"
 #include "utils/strings.h"
 
 #define main SDL_main
@@ -31,6 +29,41 @@
 Program::Parachute error_parachute;
 Interface::Window win("Alpha", vec(800, 600));
 Graphics::Image img("test.png");
+
+struct Attribs
+{
+    Reflect(Attribs)
+    (
+        (fvec2)(pos),
+        (fvec3)(color),
+    )
+};
+
+struct Uniforms
+{
+    Reflect(Uniforms)
+    (
+        (Graphics::Shader::Uniform<fmat4>)(matrix),
+    )
+};
+
+Uniforms uni;
+
+Graphics::Shader::Program shader_main("Main", {}, {}, Meta::tag<Attribs>{}, uni, R"(
+
+varying vec3 v_color;
+
+void main()
+{
+    v_color = a_color;
+    gl_Position = u_matrix * vec4(a_pos, 0, 1);
+})", R"(
+varying vec3 v_color;
+
+void main()
+{
+    gl_FragColor = vec4(v_color, 1);
+})");
 
 struct A
 {
@@ -53,16 +86,13 @@ struct B
 
 int main(int, char**)
 {
-    B obj;
-    obj.a.x = 1;
-    obj.a.y = 2;
-    obj.a.z = 3.3;
-    obj.a.w = 4.4;
-    auto refl = Refl::Interface(obj);
-    std::cout << refl.to_string() << '\n';
-
-
-    //std::cout << .field_name(2) << '\n';
+//    B obj;
+//    obj.a.x = 1;
+//    obj.a.y = 2;
+//    obj.a.z = 3.3;
+//    obj.a.w = 4.4;
+//    auto refl = Refl::Interface(obj);
+//    std::cout << refl.to_string() << '\n';
 
     Interface::Button b;
 

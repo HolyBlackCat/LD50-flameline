@@ -16,6 +16,8 @@ namespace Graphics
 {
     class Image
     {
+        // Note that moved-from instance is left in an invalid (yet destructable) state.
+
         ivec2 size = ivec2(0);
         std::vector<u8vec4> data;
 
@@ -37,23 +39,6 @@ namespace Graphics
                 Program::Error("Unable to parse image: ", file.name());
             FINALLY( stbi_image_free(bytes); )
             *this = Image(img_size, bytes);
-        }
-
-        Image(const Image &other) : size(other.size), data(other.data) {}
-        Image &operator=(const Image &other)
-        {
-            size = other.size;
-            data = other.data;
-            return *this;
-        }
-        Image(Image &&other) : size(std::exchange(other.size, ivec2(0))), data(std::move(other.data)) {}
-        Image &operator=(Image &&other)
-        {
-            if (&other == this)
-                return *this;
-            size = std::exchange(other.size, ivec2(0));
-            data = std::move(other.data);
-            return *this;
         }
 
         explicit operator bool() const {return data.size() > 0;}

@@ -69,6 +69,8 @@
 			<Option compiler="gcc" use="1" buildCommand="$compiler $options $includes -c $file -o $object -g0 -O3" />
 		</Unit>
 		<Unit filename="src/graphics/image.h" />
+		<Unit filename="src/graphics/shader.h" />
+		<Unit filename="src/graphics/texture.h" />
 		<Unit filename="src/interface/input.h" />
 		<Unit filename="src/interface/messagebox.cpp" />
 		<Unit filename="src/interface/messagebox.h" />
@@ -78,6 +80,7 @@
 		<Unit filename="src/program/errors.h" />
 		<Unit filename="src/program/exit.h" />
 		<Unit filename="src/program/parachute.h" />
+		<Unit filename="src/reflection/complete.h" />
 		<Unit filename="src/reflection/containers_std.h" />
 		<Unit filename="src/reflection/interface.h" />
 		<Unit filename="src/reflection/primitives_arithmetic.h" />
