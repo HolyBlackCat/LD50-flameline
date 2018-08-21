@@ -43,8 +43,9 @@ namespace Graphics
 
         explicit operator bool() const {return data.size() > 0;}
 
+        const u8vec4 *Pixels() const {return data.data();}
+        const uint8_t *Data() const {return (const uint8_t *)Pixels();}
         ivec2 Size() const {return size;}
-        const u8vec4 *Data() const {return data.data();}
 
         void Save(std::string file_name, Format format = png) // Throws on failure.
         {
