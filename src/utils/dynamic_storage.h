@@ -1,5 +1,5 @@
-#ifndef DYNAMIC_STORAGE_H_INCLUDED
-#define DYNAMIC_STORAGE_H_INCLUDED
+#ifndef UTILS_DYNAMIC_STORAGE_H_INCLUDED
+#define UTILS_DYNAMIC_STORAGE_H_INCLUDED
 
 #include <memory>
 #include <type_traits>
