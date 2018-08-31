@@ -161,10 +161,10 @@ class MemoryFile
     {
         FILE *file = std::fopen(file_name.c_str(), "wb");
         if (!file)
-            Program::Error("Unable to open file for writing: ", name);
+            Program::Error("Unable to open file for writing: ", file_name);
         FINALLY( std::fclose(file); )
         if (!std::fwrite(begin, end - begin, 1, file))
-            Program::Error("Unable to write to file: ", name);
+            Program::Error("Unable to write to file: ", file_name);
     }
 
     static void SaveCompressed(std::string file_name, const uint8_t *begin, const uint8_t *end) // Throws on failure.
