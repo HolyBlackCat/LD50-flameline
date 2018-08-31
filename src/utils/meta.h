@@ -18,7 +18,7 @@ namespace Meta
     template <template <typename...> typename A, typename ...B> inline constexpr bool is_detected = impl::is_detected<void, A, B...>::value;
 
 
-    template <int N, typename F> void cexpr_for(F &&func)
+    template <int N, typename F> constexpr void cexpr_for(F &&func)
     {
         if constexpr (N > 0)
         {
