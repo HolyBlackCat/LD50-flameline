@@ -1,6 +1,7 @@
 #ifndef PROGRAM_ERRORS_H_INCLUDED
 #define PROGRAM_ERRORS_H_INCLUDED
 
+#include <exception>
 #include <string>
 
 #include "exit.h"
