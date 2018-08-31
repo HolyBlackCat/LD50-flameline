@@ -50,7 +50,7 @@ namespace Graphics::Shader
 
             return ret;
         }
-        else if constexpr (std::is_same_v<T, Texture     >) return "sampler2D";
+        else if constexpr (std::is_same_v<T, TextureUnit >) return "sampler2D";
         else if constexpr (std::is_same_v<T, bool        >) return "bool";
         else if constexpr (std::is_same_v<T, float       >) return "float";
         else if constexpr (std::is_same_v<T, double      >) return "double";
@@ -61,18 +61,76 @@ namespace Graphics::Shader
 
     struct Config
     {
+        /* GLSL version chart
+            OpenGL    GLSL
+            2.0       110
+            2.1       120
+            3.0       130
+            3.1       140
+            3.2       150
+            3.3       330
+            4.0       400
+            4.1       410
+            4.2       420
+            4.3       430
+            4.4       440
+            4.5       450
+            4.6       460
+            ES 2      100
+
+            GLSL ES has `GL_ES` macro predefined.
+            GLSL ES lacks default precision for float inside of fragment shaders.
+        */
+
         std::string common_header = "#version 330 compatibility";
         std::string vertex_header = "/* vertex */";
         std::string fragment_header = "/* fragment */";
 
         std::string attribute = "attribute";
         std::string uniform = "uniform";
+
+        static Config Old(std::string common = "")
+        {
+            return
+            {
+                common,
+                "/* vertex */",
+                "/* fragment */",
+                "attribute",
+                "uniform",
+            };
+        }
+        static Config Compat(int ver = 320)
+        {
+            return
+            {
+                Str("#version ", ver, " compatibility"),
+                "/* vertex */",
+                "/* fragment */",
+                "attribute",
+                "uniform",
+            };
+        }
+        static Config Core(int ver = 320)
+        {
+            return
+            {
+                Str("#version ", ver),
+                "/* vertex */\n#define varying out",
+                "/* fragment */\n#define varying in\nout vec4 _gl_FragColor\n#define gl_FragColor _gl_FragColor", // A single leading underscore is allowed, I've checked.
+                "in",
+                "uniform",
+            };
+        }
     };
 
     struct Preferences
     {
-        std::string attribute_prefix = "a_";
-        std::string uniform_prefix = "u_";
+        std::string attribute_prefix;
+        std::string uniform_prefix;
+
+        Preferences() : Preferences("a_", "u_") {}
+        Preferences(std::string a, std::string u) : attribute_prefix(a), uniform_prefix(u) {}
     };
 
     struct None_t {} None; // Means no attributes or no uniforms.
@@ -81,7 +139,7 @@ namespace Graphics::Shader
 
     class Program
     {
-        template <typename T> friend class Uniform;
+        template <typename T> void AssignUniformLocation(Uniform<T> &uniform, int loc);
 
         struct Data
         {
@@ -91,6 +149,7 @@ namespace Graphics::Shader
 
         inline static GLuint binding = 0;
 
+      public:
         static void BindHandle(GLuint handle)
         {
             if (binding == handle)
@@ -127,7 +186,7 @@ namespace Graphics::Shader
             }
         }
 
-        template <typename T> static std::string AppendUniformsToSource(const std::string &source, const Config &cfg, const Preferences &pref)
+        template <typename T> static std::string AppendUniformsToSource(const std::string &source, const Config &cfg, const Preferences &pref, bool is_vertex)
         {
             if constexpr (std::is_void_v<T> || std::is_same_v<T, None_t>)
             {
@@ -141,27 +200,31 @@ namespace Graphics::Shader
                 refl::for_each_field([&](auto index)
                 {
                     constexpr int i = index.value;
-                    using field_type = typename refl::template field_type<i>::type;
-                    header += cfg.uniform;
-                    header += ' ';
-                    header += GlslTypeName<std::remove_extent_t<field_type>>();
-                    header += ' ';
-                    header += pref.uniform_prefix;
-                    header += refl::field_name(i);
-                    if constexpr (std::is_array_v<field_type>)
+                    using field_type_raw = typename refl::template field_type<i>;
+                    if ((field_type_raw::is_vertex && is_vertex) || (field_type_raw::is_fragment && !is_vertex))
                     {
-                        header += '[';
-                        header += std::to_string(std::extent_v<field_type>);
-                        header += ']';
+                        using field_type = typename field_type_raw::type;
+                        header += cfg.uniform;
+                        header += ' ';
+                        header += GlslTypeName<std::remove_extent_t<field_type>>();
+                        header += ' ';
+                        header += pref.uniform_prefix;
+                        header += refl::field_name(i);
+                        if constexpr (std::is_array_v<field_type>)
+                        {
+                            header += '[';
+                            header += std::to_string(std::extent_v<field_type>);
+                            header += ']';
+                        }
+                        header += ";\n";
                     }
-                    header += ";\n";
                 });
 
                 return header + source;
             }
         }
 
-        template <typename T> static std::vector<std::string> MakeAttributeList()
+        template <typename T> static std::vector<std::string> MakeAttributeList(const Preferences &pref)
         {
             if constexpr (std::is_void_v<T> || std::is_same_v<T, None_t>)
             {
@@ -174,40 +237,41 @@ namespace Graphics::Shader
                 using refl = Refl::Interface<T>;
                 refl::for_each_field([&](auto index)
                 {
-                    ret.push_back(refl::field_name(index.value));
+                    ret.push_back(pref.attribute_prefix + refl::field_name(index.value));
                 });
 
                 return ret;
             }
         }
 
-        template <typename T> void AssignUniformLocation(Uniform<T> &uniform, int loc);
-      public:
-        Program() {}
 
-        Program(std::string name, const Config &cfg, const std::string &vert_source, const std::string &frag_source, const std::vector<std::string> &attributes = {})
+        explicit Program(decltype(nullptr)) {}
+
+        Program(std::string name, const Config &cfg, std::string vert_source, std::string frag_source, const std::vector<std::string> &attributes = {})
         {
             data.handle = glCreateProgram();
             if (!data.handle)
                 ::Program::Error("Unable to create shader program: `", name, "`.");
             FINALLY_ON_THROW( glDeleteProgram(data.handle); )
 
-            for (std::string source : {vert_source, frag_source})
+            for (std::string *source_ptr : {&vert_source, &frag_source})
             {
-                bool is_vertex = source == vert_source.c_str();
+                bool is_vertex = source_ptr == &vert_source;
+                std::string &source = *source_ptr;
 
                 std::string header = cfg.common_header + "\n" + (is_vertex ? cfg.vertex_header : cfg.fragment_header) + "\n";
                 source = header + source;
 
-        std::cout << "\n==================\n" << source << "\n==================\n";
+                // Uncomment to dump source:
+                // std::cout << "\n==================\n" << source << "\n==================\n";
 
                 GLuint object = glCreateShader(is_vertex ? GL_VERTEX_SHADER : GL_FRAGMENT_SHADER);
                 if (!object)
                     ::Program::Error("Unable to create ", is_vertex ? "vertex" : "fragment", " shader object: `", name, "`.");
                 FINALLY( glDeleteShader(object); ) // Note that we unconditionally delete the shader. GL keeps it alive as long as it's attached to a program.
 
-                const char *source_ptr = source.c_str();
-                glShaderSource(object, 1, &source_ptr, 0);
+                const char *source_bytes = source.c_str();
+                glShaderSource(object, 1, &source_bytes, 0);
 
                 glCompileShader(object);
 
@@ -216,7 +280,7 @@ namespace Graphics::Shader
 
                 if (!status) // Compilation error
                 {
-                    GLint log_len = 1;
+                    GLint log_len = 0;
                     glGetShaderiv(object, GL_INFO_LOG_LENGTH, &log_len);
 
                     std::string log;
@@ -245,9 +309,9 @@ namespace Graphics::Shader
             GLint status;
             glGetProgramiv(data.handle, GL_LINK_STATUS, &status);
 
-            if (!status) // Compilation error
+            if (!status) // Linking error
             {
-                GLint log_len = 1;
+                GLint log_len = 0;
                 glGetProgramiv(data.handle, GL_INFO_LOG_LENGTH, &log_len);
 
                 std::string log;
@@ -267,8 +331,8 @@ namespace Graphics::Shader
 
         template <typename AttributesT, typename UniformsT>
         Program(std::string name, const Config &cfg, const Preferences &pref, Meta::tag<AttributesT>, UniformsT &uniforms, const std::string &vert_source, const std::string &frag_source)
-        : Program(name, cfg, AppendUniformsToSource<UniformsT>(AppendAttributesToSource<AttributesT>(vert_source, cfg, pref), cfg, pref),
-                  AppendUniformsToSource<UniformsT>(frag_source, cfg, pref), MakeAttributeList<AttributesT>())
+            : Program(name, cfg, AppendUniformsToSource<UniformsT>(AppendAttributesToSource<AttributesT>(vert_source, cfg, pref), cfg, pref, 1),
+                      AppendUniformsToSource<UniformsT>(frag_source, cfg, pref, 0), MakeAttributeList<AttributesT>(pref))
         {
             if constexpr (std::is_void_v<UniformsT> || std::is_same_v<UniformsT, None_t>)
             {
@@ -280,8 +344,8 @@ namespace Graphics::Shader
                 refl.for_each_field([&](auto index)
                 {
                     constexpr int i = index.value;
-                    // Note that we don't need to check the return value. Even if a uniform is not found and -1 location is returned, glUniform* silently no-op when it's used.
-                    AssignUniformLocation(refl.template field_value<i>(), glGetUniformLocation(data.handle, refl.field_name(i).c_str()));
+                    // Note that we don't need to check the return value. Even if a uniform is not found and -1 location is returned, glUniform* will silently no-op on it.
+                    AssignUniformLocation(refl.template field_value<i>(), glGetUniformLocation(data.handle, (pref.uniform_prefix + refl.field_name(i)).c_str()));
                 });
             }
         }
@@ -289,8 +353,8 @@ namespace Graphics::Shader
         ~Program()
         {
             if (Bound())
-                Unbind(); // GL doesn't auto-unbind shaders on deletion.
-            glDeleteProgram(data.handle);
+                Unbind(); // GL doesn't auto-unbind shaders on deletion, and keeps them alive as long as they're bound.
+            glDeleteProgram(data.handle); // Deleting 0 is a no-op.
         }
 
         Program(Program &&other) noexcept : data(std::exchange(other.data, {})) {}
@@ -307,7 +371,7 @@ namespace Graphics::Shader
 
         [[nodiscard]] bool Bound() const
         {
-            return data.handle == binding;
+            return data.handle && data.handle == binding;
         }
 
         GLuint Handle() const
@@ -339,23 +403,28 @@ namespace Graphics::Shader
         }
 
       public:
-        using type = T;
-        using elem_type = std::remove_extent_t<T>;
+        // Derived classes override those.
+        static constexpr bool is_vertex = 1;
+        static constexpr bool is_fragment = 1;
+
+        using type_with_extent = T;
+        using type = std::remove_extent_t<T>;
 
         inline static constexpr bool
-            is_array   = std::is_array_v<type>,
-            is_texture = std::is_same_v<elem_type, Texture>,
-            is_bool    = std::is_same_v<Math::vec_base_t<elem_type>, bool>;
+            is_array   = std::is_array_v<type_with_extent>,
+            is_texture = std::is_same_v<type, TextureUnit>,
+            is_bool    = std::is_same_v<Math::vec_base_t<type>, bool>;
 
-        inline static constexpr int array_elements = std::extent_v<std::conditional_t<is_array, type, type[1]>>;
+        inline static constexpr int array_elements = std::extent_v<std::conditional_t<is_array, type_with_extent, type_with_extent[1]>>;
 
-        using effective_elem_type = std::conditional_t<is_texture || is_bool, int, elem_type>; // Textures and bools become ints here
+        using effective_type = std::conditional_t<is_texture || is_bool, int, type>; // Textures and bools become ints here
 
-        using elem_base_type = Math::vec_base_t<effective_elem_type>; // Vectors and matrices become scalars here.
+        using base_type = typename std::conditional_t<Math::is_scalar_v<effective_type>, std::enable_if<1, effective_type>, effective_type>::type; // Vectors and matrices become scalars here.
+
 
         Uniform() {}
 
-        const elem_type &operator=(const elem_type &object) const // Binds the shader.
+        const type &operator=(const type &object) const // Binds the shader.
         {
             static_assert(!is_array, "Use .set() to set arrays.");
 
@@ -364,23 +433,25 @@ namespace Graphics::Shader
 
             Program::BindHandle(handle);
 
-            if constexpr (is_texture) glUniform1i(location, object.Slot());
-            else if constexpr (std::is_same_v<effective_elem_type, float       >) glUniform1f (location, object);
-            else if constexpr (std::is_same_v<effective_elem_type, fvec2       >) glUniform2f (location, object.x, object.y);
-            else if constexpr (std::is_same_v<effective_elem_type, fvec3       >) glUniform3f (location, object.x, object.y, object.z);
-            else if constexpr (std::is_same_v<effective_elem_type, fvec4       >) glUniform4f (location, object.x, object.y, object.z, object.w);
-            else if constexpr (std::is_same_v<effective_elem_type, int         >) glUniform1i (location, object);
-            else if constexpr (std::is_same_v<effective_elem_type, ivec2       >) glUniform2i (location, object.x, object.y);
-            else if constexpr (std::is_same_v<effective_elem_type, ivec3       >) glUniform3i (location, object.x, object.y, object.z);
-            else if constexpr (std::is_same_v<effective_elem_type, ivec4       >) glUniform4i (location, object.x, object.y, object.z, object.w);
-            else if constexpr (std::is_same_v<effective_elem_type, unsigned int>) glUniform1ui(location, object);
-            else if constexpr (std::is_same_v<effective_elem_type, uvec2       >) glUniform2ui(location, object.x, object.y);
-            else if constexpr (std::is_same_v<effective_elem_type, uvec3       >) glUniform3ui(location, object.x, object.y, object.z);
-            else if constexpr (std::is_same_v<effective_elem_type, uvec4       >) glUniform4ui(location, object.x, object.y, object.z, object.w);
+                 if constexpr (is_texture) glUniform1i(location, object.Index());
+            else if constexpr (std::is_same_v<effective_type, float       >) glUniform1f (location, object);
+            else if constexpr (std::is_same_v<effective_type, fvec2       >) glUniform2f (location, object.x, object.y);
+            else if constexpr (std::is_same_v<effective_type, fvec3       >) glUniform3f (location, object.x, object.y, object.z);
+            else if constexpr (std::is_same_v<effective_type, fvec4       >) glUniform4f (location, object.x, object.y, object.z, object.w);
+            else if constexpr (std::is_same_v<effective_type, int         >) glUniform1i (location, object);
+            else if constexpr (std::is_same_v<effective_type, ivec2       >) glUniform2i (location, object.x, object.y);
+            else if constexpr (std::is_same_v<effective_type, ivec3       >) glUniform3i (location, object.x, object.y, object.z);
+            else if constexpr (std::is_same_v<effective_type, ivec4       >) glUniform4i (location, object.x, object.y, object.z, object.w);
+            OnPC(
+            else if constexpr (std::is_same_v<effective_type, unsigned int>) glUniform1ui(location, object);
+            else if constexpr (std::is_same_v<effective_type, uvec2       >) glUniform2ui(location, object.x, object.y);
+            else if constexpr (std::is_same_v<effective_type, uvec3       >) glUniform3ui(location, object.x, object.y, object.z);
+            else if constexpr (std::is_same_v<effective_type, uvec4       >) glUniform4ui(location, object.x, object.y, object.z, object.w);
+            )
             else set_no_bind(&object, 1);
             return object;
         }
-        void set(const effective_elem_type *ptr, int count, int offset = 0) const
+        void set(const effective_type *ptr, int count, int offset = 0) const
         {
             if (!handle)
                 return;
@@ -390,34 +461,52 @@ namespace Graphics::Shader
             set_no_bind(ptr, count, offset);
         }
       private:
-        void set_no_bind(const effective_elem_type *ptr, int count, int offset = 0) const
+        void set_no_bind(const effective_type *ptr, int count, int offset = 0) const
         {
-            if (count < 0 || offset + count > array_elements)
+            if (count < 0 || offset < 0 || offset + count > array_elements)
                 ::Program::Error("Invalid shader uniform array range.");
             int l = location + offset;
-                 if constexpr (std::is_same_v<effective_elem_type, float       >) glUniform1fv (l, count, reinterpret_cast<elem_base_type *>(ptr));
-            else if constexpr (std::is_same_v<effective_elem_type, fvec2       >) glUniform2fv (l, count, reinterpret_cast<elem_base_type *>(ptr));
-            else if constexpr (std::is_same_v<effective_elem_type, fvec3       >) glUniform3fv (l, count, reinterpret_cast<elem_base_type *>(ptr));
-            else if constexpr (std::is_same_v<effective_elem_type, fvec4       >) glUniform4fv (l, count, reinterpret_cast<elem_base_type *>(ptr));
-            else if constexpr (std::is_same_v<effective_elem_type, int         >) glUniform1iv (l, count, reinterpret_cast<elem_base_type *>(ptr));
-            else if constexpr (std::is_same_v<effective_elem_type, ivec2       >) glUniform2iv (l, count, reinterpret_cast<elem_base_type *>(ptr));
-            else if constexpr (std::is_same_v<effective_elem_type, ivec3       >) glUniform3iv (l, count, reinterpret_cast<elem_base_type *>(ptr));
-            else if constexpr (std::is_same_v<effective_elem_type, ivec4       >) glUniform4iv (l, count, reinterpret_cast<elem_base_type *>(ptr));
-            else if constexpr (std::is_same_v<effective_elem_type, unsigned int>) glUniform1uiv(l, count, reinterpret_cast<elem_base_type *>(ptr));
-            else if constexpr (std::is_same_v<effective_elem_type, uvec2       >) glUniform2uiv(l, count, reinterpret_cast<elem_base_type *>(ptr));
-            else if constexpr (std::is_same_v<effective_elem_type, uvec3       >) glUniform3uiv(l, count, reinterpret_cast<elem_base_type *>(ptr));
-            else if constexpr (std::is_same_v<effective_elem_type, uvec4       >) glUniform4uiv(l, count, reinterpret_cast<elem_base_type *>(ptr));
-            else if constexpr (std::is_same_v<effective_elem_type, fmat2       >) glUniformMatrix2fv(l, count, 0, reinterpret_cast<elem_base_type *>(ptr));
-            else if constexpr (std::is_same_v<effective_elem_type, fmat3       >) glUniformMatrix3fv(l, count, 0, reinterpret_cast<elem_base_type *>(ptr));
-            else if constexpr (std::is_same_v<effective_elem_type, fmat4       >) glUniformMatrix4fv(l, count, 0, reinterpret_cast<elem_base_type *>(ptr));
-            else if constexpr (std::is_same_v<effective_elem_type, fmat3x2     >) glUniformMatrix3x2fv(l, count, 0, reinterpret_cast<elem_base_type *>(ptr));
-            else if constexpr (std::is_same_v<effective_elem_type, fmat4x2     >) glUniformMatrix4x2fv(l, count, 0, reinterpret_cast<elem_base_type *>(ptr));
-            else if constexpr (std::is_same_v<effective_elem_type, fmat2x3     >) glUniformMatrix2x3fv(l, count, 0, reinterpret_cast<elem_base_type *>(ptr));
-            else if constexpr (std::is_same_v<effective_elem_type, fmat4x3     >) glUniformMatrix4x3fv(l, count, 0, reinterpret_cast<elem_base_type *>(ptr));
-            else if constexpr (std::is_same_v<effective_elem_type, fmat2x4     >) glUniformMatrix2x4fv(l, count, 0, reinterpret_cast<elem_base_type *>(ptr));
-            else if constexpr (std::is_same_v<effective_elem_type, fmat3x4     >) glUniformMatrix3x4fv(l, count, 0, reinterpret_cast<elem_base_type *>(ptr));
-            else static_assert(std::is_void_v<effective_elem_type>, "Uniforms of this type are not supported.");
+                 if constexpr (std::is_same_v<effective_type, float       >) glUniform1fv (l, count, reinterpret_cast<const base_type *>(ptr));
+            else if constexpr (std::is_same_v<effective_type, fvec2       >) glUniform2fv (l, count, reinterpret_cast<const base_type *>(ptr));
+            else if constexpr (std::is_same_v<effective_type, fvec3       >) glUniform3fv (l, count, reinterpret_cast<const base_type *>(ptr));
+            else if constexpr (std::is_same_v<effective_type, fvec4       >) glUniform4fv (l, count, reinterpret_cast<const base_type *>(ptr));
+            else if constexpr (std::is_same_v<effective_type, int         >) glUniform1iv (l, count, reinterpret_cast<const base_type *>(ptr));
+            else if constexpr (std::is_same_v<effective_type, ivec2       >) glUniform2iv (l, count, reinterpret_cast<const base_type *>(ptr));
+            else if constexpr (std::is_same_v<effective_type, ivec3       >) glUniform3iv (l, count, reinterpret_cast<const base_type *>(ptr));
+            else if constexpr (std::is_same_v<effective_type, ivec4       >) glUniform4iv (l, count, reinterpret_cast<const base_type *>(ptr));
+            OnPC(
+            else if constexpr (std::is_same_v<effective_type, unsigned int>) glUniform1uiv(l, count, reinterpret_cast<const base_type *>(ptr));
+            else if constexpr (std::is_same_v<effective_type, uvec2       >) glUniform2uiv(l, count, reinterpret_cast<const base_type *>(ptr));
+            else if constexpr (std::is_same_v<effective_type, uvec3       >) glUniform3uiv(l, count, reinterpret_cast<const base_type *>(ptr));
+            else if constexpr (std::is_same_v<effective_type, uvec4       >) glUniform4uiv(l, count, reinterpret_cast<const base_type *>(ptr));
+            )
+            else if constexpr (std::is_same_v<effective_type, fmat2       >) glUniformMatrix2fv(l, count, 0, reinterpret_cast<const base_type *>(ptr));
+            else if constexpr (std::is_same_v<effective_type, fmat3       >) glUniformMatrix3fv(l, count, 0, reinterpret_cast<const base_type *>(ptr));
+            else if constexpr (std::is_same_v<effective_type, fmat4       >) glUniformMatrix4fv(l, count, 0, reinterpret_cast<const base_type *>(ptr));
+            OnPC(
+            else if constexpr (std::is_same_v<effective_type, fmat3x2     >) glUniformMatrix3x2fv(l, count, 0, reinterpret_cast<const base_type *>(ptr));
+            else if constexpr (std::is_same_v<effective_type, fmat4x2     >) glUniformMatrix4x2fv(l, count, 0, reinterpret_cast<const base_type *>(ptr));
+            else if constexpr (std::is_same_v<effective_type, fmat2x3     >) glUniformMatrix2x3fv(l, count, 0, reinterpret_cast<const base_type *>(ptr));
+            else if constexpr (std::is_same_v<effective_type, fmat4x3     >) glUniformMatrix4x3fv(l, count, 0, reinterpret_cast<const base_type *>(ptr));
+            else if constexpr (std::is_same_v<effective_type, fmat2x4     >) glUniformMatrix2x4fv(l, count, 0, reinterpret_cast<const base_type *>(ptr));
+            else if constexpr (std::is_same_v<effective_type, fmat3x4     >) glUniformMatrix3x4fv(l, count, 0, reinterpret_cast<const base_type *>(ptr));
+            )
+            else static_assert(std::is_void_v<effective_type>, "Uniforms of this type are not supported.");
         }
+    };
+    template <typename T> class VertUniform : public Uniform<T>
+    {
+      public:
+        static constexpr bool is_fragment = 0;
+        using Uniform<T>::Uniform;
+        using Uniform<T>::operator=;
+    };
+    template <typename T> class FragUniform : public Uniform<T>
+    {
+      public:
+        static constexpr bool is_vertex = 0;
+        using Uniform<T>::Uniform;
+        using Uniform<T>::operator=;
     };
 
     template <typename T> inline void Program::AssignUniformLocation(Uniform<T> &uniform, int loc)
