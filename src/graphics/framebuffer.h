@@ -55,7 +55,7 @@ namespace Graphics
             glGenFramebuffers(1, &data.handle);
             if (!data.handle)
                 Program::Error("Unable to create a framebuffer.");
-            // Not needed because this constructor has no code below this point: FINALLY_ON_THROW( glDeleteFramebuffers(1, &data.handle); )
+            // Not needed because since there is no code below this point: FINALLY_ON_THROW( glDeleteFramebuffers(1, &data.handle); )
         }
         FrameBuffer(Attachment att) : FrameBuffer()
         {

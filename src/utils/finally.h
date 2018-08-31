@@ -1,5 +1,5 @@
-#ifndef FINALLY_H_INCLUDED
-#define FINALLY_H_INCLUDED
+#ifndef UTILS_FINALLY_H_INCLUDED
+#define UTILS_FINALLY_H_INCLUDED
 
 #include <exception>
 #include <utility>
