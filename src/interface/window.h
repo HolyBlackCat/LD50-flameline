@@ -181,7 +181,7 @@ namespace Interface
 
             int display = 0;
             Position position = Position::undefined;
-            int gl_major = 3, gl_minor = 3; // 0,0 = don't care.
+            int gl_major = 3, gl_minor = 2; // 0,0 = don't care.
             Profile gl_profile = Profile::compatibility;
             bool gl_debug = 0;
             VSync vsync_mode = VSync::adaptive;
