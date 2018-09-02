@@ -1,5 +1,4 @@
-#ifndef REFLECTION_INTERFACE_H_INCLUDED
-#define REFLECTION_INTERFACE_H_INCLUDED
+#pragma once
 
 #include <array>
 #include <cstddef>
@@ -556,5 +555,3 @@ namespace Refl
     template <typename T> Interface(T &) -> Interface<T &>;
     template <typename T> Interface(T &&) -> Interface<T &&>;
 }
-
-#endif

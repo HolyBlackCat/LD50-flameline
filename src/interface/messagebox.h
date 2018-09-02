@@ -1,5 +1,4 @@
-#ifndef INTERFACE_MESSAGEBOX_H_INCLUDED
-#define INTERFACE_MESSAGEBOX_H_INCLUDED
+#pragma once
 
 #include <string>
 
@@ -10,5 +9,3 @@ namespace Interface
     void MessageBox(std::string title, std::string message);
     void MessageBox(MessageBoxType type, std::string title, std::string message);
 }
-
-#endif

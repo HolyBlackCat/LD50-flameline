@@ -1,5 +1,4 @@
-#ifndef UTILS_CLOCK_H_INCLUDED
-#define UTILS_CLOCK_H_INCLUDED
+#pragma once
 
 #include <cstddef>
 
@@ -27,5 +26,3 @@ namespace Clock
         return ticks / double(TicksPerSecond());
     }
 }
-
-#endif

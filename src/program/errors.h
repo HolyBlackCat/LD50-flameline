@@ -1,5 +1,4 @@
-#ifndef PROGRAM_ERRORS_H_INCLUDED
-#define PROGRAM_ERRORS_H_INCLUDED
+#pragma once
 
 #include <exception>
 #include <string>
@@ -44,5 +43,3 @@ namespace Program
     #  define DebugAssertNameless(...) do {bool(__VA_ARGS__) || (::Program::HardError("Assertion failed.\nExpression: " #__VA_ARGS__), 0);} while (0)
     #endif
 }
-
-#endif

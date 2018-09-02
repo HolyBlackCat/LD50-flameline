@@ -1,5 +1,4 @@
-#ifndef UTILS_STRINGS_H_INCLUDED
-#define UTILS_STRINGS_H_INCLUDED
+#pragma once
 
 #include <iomanip>
 #include <string>
@@ -26,5 +25,3 @@ namespace Strings
 }
 
 using Strings::Str;
-
-#endif

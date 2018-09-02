@@ -1,5 +1,4 @@
-#ifndef REFLECTION_STRUCTURES_MACRO_H_INCLUDED
-#define REFLECTION_STRUCTURES_MACRO_H_INCLUDED
+#pragma once
 
 #include <array>
 #include <string>
@@ -90,5 +89,3 @@ namespace Refl::Custom
 
     template <typename T> struct Structure<T, std::void_t<typename impl::Macro::impl<T>::interface>> : impl::Macro::impl<T>::interface {};
 }
-
-#endif

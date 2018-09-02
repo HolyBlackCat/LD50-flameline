@@ -1,5 +1,4 @@
-#ifndef UTILS_ARCHIVE_H_INCLUDED
-#define UTILS_ARCHIVE_H_INCLUDED
+#pragma once
 
 #include <cstdint>
 #include <cstddef>
@@ -20,5 +19,3 @@ namespace Archive
     [[nodiscard]] std::size_t UncompressedSize(const uint8_t *src_begin, const uint8_t *src_end); // Extracts size from decompressed data. Throws on failure.
     void Uncompress(const uint8_t *src_begin, const uint8_t *src_end, uint8_t *dst_begin); // Decompresses. Throws on failure. The buffer must have size returned by `UncompressedSize()`.
 }
-
-#endif

@@ -1,5 +1,4 @@
-#ifndef GRAPHICS_CLEAR_H_INCLUDED
-#define GRAPHICS_CLEAR_H_INCLUDED
+#pragma once
 
 #include <GLFL/glfl.h>
 
@@ -21,5 +20,3 @@ namespace Graphics
         SetClearColor(color.to_vec4(1));
     }
 }
-
-#endif

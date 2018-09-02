@@ -1,5 +1,4 @@
-#ifndef GRAPHICS_VIEWPORT_H_INCLUDED
-#define GRAPHICS_VIEWPORT_H_INCLUDED
+#pragma once
 
 #include <GLFL/glfl.h>
 
@@ -16,5 +15,3 @@ namespace Graphics
         Viewport(ivec2(0), size);
     }
 }
-
-#endif

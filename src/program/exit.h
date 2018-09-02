@@ -1,5 +1,4 @@
-#ifndef PROGRAM_EXIT_H_INCLUDED
-#define PROGRAM_EXIT_H_INCLUDED
+#pragma once
 
 #include <cstdlib>
 
@@ -10,5 +9,3 @@ namespace Program
         std::exit(code);
     }
 }
-
-#endif

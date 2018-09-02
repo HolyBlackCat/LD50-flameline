@@ -1,5 +1,4 @@
-#ifndef GRAPHICS_ERRORS_H_INCLUDED
-#define GRAPHICS_ERRORS_H_INCLUDED
+#pragma once
 
 #include <string>
 
@@ -41,5 +40,3 @@ namespace Graphics
         }
     }
 }
-
-#endif

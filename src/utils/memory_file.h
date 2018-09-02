@@ -1,5 +1,4 @@
-#ifndef UTILS_MEMORY_FILE_H_INCLUDED
-#define UTILS_MEMORY_FILE_H_INCLUDED
+#pragma once
 
 #include <cstddef>
 #include <cstdint>
@@ -175,5 +174,3 @@ class MemoryFile
         Save(file_name, buffer.get(), compressed_end);
     }
 };
-
-#endif

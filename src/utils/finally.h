@@ -1,5 +1,4 @@
-#ifndef UTILS_FINALLY_H_INCLUDED
-#define UTILS_FINALLY_H_INCLUDED
+#pragma once
 
 #include <exception>
 #include <utility>
@@ -22,5 +21,3 @@ template <typename T> class FinallyObject
 
 #define FINALLY(...) ::FinallyObject MA_CAT(_finally_object_,__LINE__) ([&]{ __VA_ARGS__ });
 #define FINALLY_ON_THROW(...) FINALLY( if (::std::uncaught_exceptions()) { __VA_ARGS__ } )
-
-#endif

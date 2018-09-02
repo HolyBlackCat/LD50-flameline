@@ -1,5 +1,4 @@
-#ifndef PROGRAM_PARACHUTE_H_INCLUDED
-#define PROGRAM_PARACHUTE_H_INCLUDED
+#pragma once
 
 #include <csignal>
 #include <exception>
@@ -99,5 +98,3 @@ namespace Program
         }
     };
 }
-
-#endif

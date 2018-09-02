@@ -1,5 +1,4 @@
-#ifndef GRAPHICS_FRAMEBUFFER_H_INCLUDED
-#define GRAPHICS_FRAMEBUFFER_H_INCLUDED
+#pragma once
 
 #include <numeric>
 #include <utility>
@@ -161,5 +160,3 @@ namespace Graphics
         }
     };
 }
-
-#endif

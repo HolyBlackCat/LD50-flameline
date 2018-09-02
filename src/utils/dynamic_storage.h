@@ -1,5 +1,4 @@
-#ifndef UTILS_DYNAMIC_STORAGE_H_INCLUDED
-#define UTILS_DYNAMIC_STORAGE_H_INCLUDED
+#pragma once
 
 #include <memory>
 #include <type_traits>
@@ -168,5 +167,3 @@ namespace DynamicStorage
 }
 
 using DynamicStorage::DynStorage;
-
-#endif

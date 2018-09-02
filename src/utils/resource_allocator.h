@@ -1,5 +1,4 @@
-#ifndef UTILS_RESOURCE_ALLOCATOR_H_INCLUDED
-#define UTILS_RESOURCE_ALLOCATOR_H_INCLUDED
+#pragma once
 
 #include <cstddef>
 #include <numeric>
@@ -98,5 +97,3 @@ template <typename Res = int, typename Index = int> class ResourceAllocator
         return resources.end();
     }
 };
-
-#endif

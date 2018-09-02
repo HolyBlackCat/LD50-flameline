@@ -1,5 +1,4 @@
-#ifndef REFLECTION_STRUCTURES_VEC_MAT_H_INCLUDED
-#define REFLECTION_STRUCTURES_VEC_MAT_H_INCLUDED
+#pragma once
 
 #include <array>
 #include <string>
@@ -34,5 +33,3 @@ namespace Refl::Custom
         }
     };
 }
-
-#endif

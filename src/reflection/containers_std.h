@@ -1,5 +1,4 @@
-#ifndef REFLECTION_CONTAINERS_STD_H_INCLUDED
-#define REFLECTION_CONTAINERS_STD_H_INCLUDED
+#pragma once
 
 #include <utility>
 
@@ -41,5 +40,3 @@ namespace Refl::Custom
         }
     };
 }
-
-#endif

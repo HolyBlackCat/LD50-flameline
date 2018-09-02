@@ -1,5 +1,4 @@
-#ifndef GRAPHICS_IMAGE_H_INCLUDED
-#define GRAPHICS_IMAGE_H_INCLUDED
+#pragma once
 
 #include <vector>
 #include <utility>
@@ -68,5 +67,3 @@ namespace Graphics
         }
     };
 }
-
-#endif

@@ -1,5 +1,4 @@
-#ifndef GRAPHICS_BLENDING_H_INCLUDED
-#define GRAPHICS_BLENDING_H_INCLUDED
+#pragma once
 
 #include <GLFL/glfl.h>
 
@@ -57,5 +56,3 @@ namespace Graphics::Blending
     inline void FuncNormalSimpleToPre() {Func(src_a, one_minus_src_a, one, one_minus_src_a);} // Destination and output are premultiplied, source is not.
     inline void FuncNormalPre        () {Func(one, one_minus_src_a);} // Source, destination and output are premultiplited.
 }
-
-#endif

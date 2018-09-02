@@ -1,5 +1,4 @@
-#ifndef GRAPHICS_VERTEX_BUFFER_H_INCLUDED
-#define GRAPHICS_VERTEX_BUFFER_H_INCLUDED
+#pragma once
 
 #include <type_traits>
 #include <utility>
@@ -242,5 +241,3 @@ namespace Graphics
         }
     };
 }
-
-#endif

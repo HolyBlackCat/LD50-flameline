@@ -1,5 +1,4 @@
-#ifndef REFLECTION_PRIMITIVES_ARITHMETIC_H_INCLUDED
-#define REFLECTION_PRIMITIVES_ARITHMETIC_H_INCLUDED
+#pragma once
 
 #include <cstdio>
 #include <cstdlib>
@@ -119,5 +118,3 @@ namespace Refl::Custom
         }
     };
 }
-
-#endif

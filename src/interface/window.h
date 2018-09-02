@@ -1,5 +1,4 @@
-#ifndef INTERFACE_WINDOW_H_INCLUDED
-#define INTERFACE_WINDOW_H_INCLUDED
+#pragma once
 
 #include <memory>
 #include <string>
@@ -336,5 +335,3 @@ namespace Interface
         void RelativeMouseMode(bool relative = 1);
     };
 }
-
-#endif

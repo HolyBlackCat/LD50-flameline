@@ -1,5 +1,4 @@
-#ifndef UTILS_META_H_INCLUDED
-#define UTILS_META_H_INCLUDED
+#pragma once
 
 #include <type_traits>
 #include <utility>
@@ -30,5 +29,3 @@ namespace Meta
         }
     }
 }
-
-#endif
