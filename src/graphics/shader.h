@@ -1,5 +1,4 @@
-#ifndef GRAPHICS_SHADER_H_INCLUDED
-#define GRAPHICS_SHADER_H_INCLUDED
+#pragma once
 
 #include <string>
 #include <type_traits>
@@ -15,7 +14,7 @@
 #include "utils/meta.h"
 #include "utils/strings.h"
 
-namespace Graphics::Shader
+namespace Graphics
 {
     template <typename T> std::string GlslTypeName()
     {
@@ -59,7 +58,7 @@ namespace Graphics::Shader
         else static_assert(!sizeof(T), "No name for this type.");
     }
 
-    struct Config
+    struct ShaderConfig
     {
         /* GLSL version chart
             OpenGL    GLSL
@@ -89,7 +88,7 @@ namespace Graphics::Shader
         std::string attribute = "attribute";
         std::string uniform = "uniform";
 
-        static Config Old(std::string common = "")
+        static ShaderConfig Old(std::string common = "")
         {
             return
             {
@@ -100,7 +99,7 @@ namespace Graphics::Shader
                 "uniform",
             };
         }
-        static Config Compat(int ver = 320)
+        static ShaderConfig Compat(int ver = 320)
         {
             return
             {
@@ -111,33 +110,33 @@ namespace Graphics::Shader
                 "uniform",
             };
         }
-        static Config Core(int ver = 320)
+        static ShaderConfig Core(int ver = 320)
         {
             return
             {
                 Str("#version ", ver),
                 "/* vertex */\n#define varying out",
-                "/* fragment */\n#define varying in\nout vec4 _gl_FragColor\n#define gl_FragColor _gl_FragColor", // A single leading underscore is allowed, I've checked.
+                "/* fragment */\nout vec4 _gl_FragColor;\n#define gl_FragColor _gl_FragColor\n#define varying in\n#define texture2D texture", // A single leading underscore is allowed, I've checked.
                 "in",
                 "uniform",
             };
         }
     };
 
-    struct Preferences
+    struct ShaderPreferences
     {
         std::string attribute_prefix;
         std::string uniform_prefix;
 
-        Preferences() : Preferences("a_", "u_") {}
-        Preferences(std::string a, std::string u) : attribute_prefix(a), uniform_prefix(u) {}
+        ShaderPreferences() : ShaderPreferences("a_", "u_") {}
+        ShaderPreferences(std::string a, std::string u) : attribute_prefix(a), uniform_prefix(u) {}
     };
 
     struct None_t {} None; // Means no attributes or no uniforms.
 
     template <typename T> class Uniform;
 
-    class Program
+    class Shader
     {
         template <typename T> void AssignUniformLocation(Uniform<T> &uniform, int loc);
 
@@ -158,7 +157,7 @@ namespace Graphics::Shader
             glUseProgram(handle);
         }
 
-        template <typename T> static std::string AppendAttributesToSource(const std::string &source, const Config &cfg, const Preferences &pref)
+        template <typename T> static std::string AppendAttributesToSource(const std::string &source, const ShaderConfig &cfg, const ShaderPreferences &pref)
         {
             if constexpr (std::is_void_v<T> || std::is_same_v<T, None_t>)
             {
@@ -186,7 +185,7 @@ namespace Graphics::Shader
             }
         }
 
-        template <typename T> static std::string AppendUniformsToSource(const std::string &source, const Config &cfg, const Preferences &pref, bool is_vertex)
+        template <typename T> static std::string AppendUniformsToSource(const std::string &source, const ShaderConfig &cfg, const ShaderPreferences &pref, bool is_vertex)
         {
             if constexpr (std::is_void_v<T> || std::is_same_v<T, None_t>)
             {
@@ -224,7 +223,7 @@ namespace Graphics::Shader
             }
         }
 
-        template <typename T> static std::vector<std::string> MakeAttributeList(const Preferences &pref)
+        template <typename T> static std::vector<std::string> MakeAttributeList(const ShaderPreferences &pref)
         {
             if constexpr (std::is_void_v<T> || std::is_same_v<T, None_t>)
             {
@@ -245,13 +244,13 @@ namespace Graphics::Shader
         }
 
 
-        explicit Program(decltype(nullptr)) {}
+        explicit Shader(decltype(nullptr)) {}
 
-        Program(std::string name, const Config &cfg, std::string vert_source, std::string frag_source, const std::vector<std::string> &attributes = {})
+        Shader(std::string name, const ShaderConfig &cfg, std::string vert_source, std::string frag_source, const std::vector<std::string> &attributes = {})
         {
             data.handle = glCreateProgram();
             if (!data.handle)
-                ::Program::Error("Unable to create shader program: `", name, "`.");
+                Program::Error("Unable to create shader program: `", name, "`.");
             FINALLY_ON_THROW( glDeleteProgram(data.handle); )
 
             for (std::string *source_ptr : {&vert_source, &frag_source})
@@ -267,7 +266,7 @@ namespace Graphics::Shader
 
                 GLuint object = glCreateShader(is_vertex ? GL_VERTEX_SHADER : GL_FRAGMENT_SHADER);
                 if (!object)
-                    ::Program::Error("Unable to create ", is_vertex ? "vertex" : "fragment", " shader object: `", name, "`.");
+                    Program::Error("Unable to create ", is_vertex ? "vertex" : "fragment", " shader object: `", name, "`.");
                 FINALLY( glDeleteShader(object); ) // Note that we unconditionally delete the shader. GL keeps it alive as long as it's attached to a program.
 
                 const char *source_bytes = source.c_str();
@@ -294,7 +293,7 @@ namespace Graphics::Shader
                         glGetShaderInfoLog(object, log_len, 0, log.data());
                     }
 
-                    ::Program::Error("Unable to compile ", is_vertex ? "vertex" : "fragment", " shader: `", name, "`.\nLog:\n", Strings::Trim(log));
+                    Program::Error("Unable to compile ", is_vertex ? "vertex" : "fragment", " shader: `", name, "`.\nLog:\n", Strings::Trim(log));
                 }
 
                 glAttachShader(data.handle, object);
@@ -325,13 +324,13 @@ namespace Graphics::Shader
                     glGetProgramInfoLog(data.handle, log_len, 0, log.data());
                 }
 
-                ::Program::Error("Unable to link shader program: `", name, "`.\nLog:\n", Strings::Trim(log));
+                Program::Error("Unable to link shader program: `", name, "`.\nLog:\n", Strings::Trim(log));
             }
         }
 
         template <typename AttributesT, typename UniformsT>
-        Program(std::string name, const Config &cfg, const Preferences &pref, Meta::tag<AttributesT>, UniformsT &uniforms, const std::string &vert_source, const std::string &frag_source)
-            : Program(name, cfg, AppendUniformsToSource<UniformsT>(AppendAttributesToSource<AttributesT>(vert_source, cfg, pref), cfg, pref, 1),
+        Shader(std::string name, const ShaderConfig &cfg, const ShaderPreferences &pref, Meta::tag<AttributesT>, UniformsT &uniforms, const std::string &vert_source, const std::string &frag_source)
+            : Shader(name, cfg, AppendUniformsToSource<UniformsT>(AppendAttributesToSource<AttributesT>(vert_source, cfg, pref), cfg, pref, 1),
                       AppendUniformsToSource<UniformsT>(frag_source, cfg, pref, 0), MakeAttributeList<AttributesT>(pref))
         {
             if constexpr (std::is_void_v<UniformsT> || std::is_same_v<UniformsT, None_t>)
@@ -350,15 +349,15 @@ namespace Graphics::Shader
             }
         }
 
-        ~Program()
+        ~Shader()
         {
             if (Bound())
                 Unbind(); // GL doesn't auto-unbind shaders on deletion, and keeps them alive as long as they're bound.
             glDeleteProgram(data.handle); // Deleting 0 is a no-op.
         }
 
-        Program(Program &&other) noexcept : data(std::exchange(other.data, {})) {}
-        Program &operator=(Program other) noexcept // Note the pass by value to utilize copy&swap idiom.
+        Shader(Shader &&other) noexcept : data(std::exchange(other.data, {})) {}
+        Shader &operator=(Shader other) noexcept // Note the pass by value to utilize copy&swap idiom.
         {
             std::swap(data, other.data);
             return *this;
@@ -394,7 +393,7 @@ namespace Graphics::Shader
         GLuint handle = 0;
         int location = -1;
 
-        friend class Program;
+        friend class Shader;
 
         void modify(GLuint new_handle, int new_location)
         {
@@ -431,7 +430,7 @@ namespace Graphics::Shader
             if (!handle)
                 return object;
 
-            Program::BindHandle(handle);
+            Shader::BindHandle(handle);
 
                  if constexpr (is_texture) glUniform1i(location, object.Index());
             else if constexpr (std::is_same_v<effective_type, float       >) glUniform1f (location, object);
@@ -456,7 +455,7 @@ namespace Graphics::Shader
             if (!handle)
                 return;
 
-            Program::BindHandle(handle);
+            Shader::BindHandle(handle);
 
             set_no_bind(ptr, count, offset);
         }
@@ -464,7 +463,7 @@ namespace Graphics::Shader
         void set_no_bind(const effective_type *ptr, int count, int offset = 0) const
         {
             if (count < 0 || offset < 0 || offset + count > array_elements)
-                ::Program::Error("Invalid shader uniform array range.");
+                Program::Error("Invalid shader uniform array range.");
             int l = location + offset;
                  if constexpr (std::is_same_v<effective_type, float       >) glUniform1fv (l, count, reinterpret_cast<const base_type *>(ptr));
             else if constexpr (std::is_same_v<effective_type, fvec2       >) glUniform2fv (l, count, reinterpret_cast<const base_type *>(ptr));
@@ -509,10 +508,8 @@ namespace Graphics::Shader
         using Uniform<T>::operator=;
     };
 
-    template <typename T> inline void Program::AssignUniformLocation(Uniform<T> &uniform, int loc)
+    template <typename T> inline void Shader::AssignUniformLocation(Uniform<T> &uniform, int loc)
     {
         uniform.modify(data.handle, loc);
     }
 }
-
-#endif
