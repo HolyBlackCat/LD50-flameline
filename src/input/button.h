@@ -1,45 +1,44 @@
-#ifndef INTERFACE_INPUT_H_INCLUDED
-#define INTERFACE_INPUT_H_INCLUDED
+#pragma once
 
-#include <initializer_list>
-#include <vector>
+#include <string>
 
-#include "window.h"
+#include "enum.h"
+#include "interface/window.h"
 
-namespace Interface
+namespace Input
 {
     class Button
     {
-        Inputs::Enum index = Inputs::None;
+        Enum index = None;
 
         mutable uint64_t update_time = 0;
         mutable bool is_pressed = 0, is_released = 0, is_down = 0, is_repeated = 0;
 
         void Update() const
         {
-            auto &window = Window::Instance();
+            auto &window = Interface::Window::Get();
 
             uint64_t tick = window.Ticks();
             if (update_time == tick)
                 return;
-            update_time = tick;
 
-            auto times = window.InputTimes(index);
-
+            auto times = window.GetInputTimes(index);
             is_pressed = times.press == tick;
             is_released = times.release == tick;
             is_down = times.press > times.release;
             is_repeated = times.repeat == tick;
+
+            update_time = tick;
         }
 
-        bool Assign(Inputs::Enum begin, Inputs::Enum end)
+        bool Assign(Enum begin, Enum end)
         {
-            auto &window = Window::Instance();
+            auto &window = Interface::Window::Get();
             uint64_t tick = window.Ticks();
 
-            for (auto i = begin; i < end; i = Inputs::Enum(i+1))
+            for (auto i = begin; i < end; i = Enum(i+1))
             {
-                if (window.InputTimes(i).press == tick)
+                if (window.GetInputTimes(i).press == tick)
                 {
                     index = i;
                     return 1;
@@ -51,7 +50,7 @@ namespace Interface
 
       public:
         Button() {}
-        Button(Inputs::Enum index) : index(index) {}
+        Button(Enum index) : index(index) {}
 
         [[nodiscard]] bool pressed () const {Update(); return is_pressed;}
         [[nodiscard]] bool released() const {Update(); return is_released;}
@@ -59,20 +58,20 @@ namespace Interface
         [[nodiscard]] bool down    () const {Update(); return is_down;}
         [[nodiscard]] bool up      () const {Update(); return !is_down;}
 
-        [[nodiscard]] explicit operator bool() const {return index != Inputs::None;}
+        [[nodiscard]] explicit operator bool() const {return index != None;}
 
-        [[nodiscard]] Inputs::Enum Index() const
+        [[nodiscard]] Enum Index() const
         {
             return index;
         }
 
         [[nodiscard]] std::string Name() const // Returns a layout-dependent name, which
         {
-            if (index == Inputs::None)
+            if (index == None)
             {
                 return "None";
             }
-            else if (index >= Inputs::BeginKeys && index < Inputs::EndKeys)
+            else if (index >= BeginKeys && index < EndKeys)
             {
                 const char *ret;
 
@@ -86,35 +85,35 @@ namespace Interface
                 else
                     return "Unknown " + std::to_string(index);
             }
-            else if (index >= Inputs::BeginMouseButtons && index < Inputs::EndMouseButtons)
+            else if (index >= BeginMouseButtons && index < EndMouseButtons)
             {
                 switch (index)
                 {
-                  case Inputs::mouse_left:
+                  case mouse_left:
                     return "Left Mouse Button";
-                  case Inputs::mouse_middle:
+                  case mouse_middle:
                     return "Middle Mouse Button";
-                  case Inputs::mouse_right:
+                  case mouse_right:
                     return "Right Mouse Button";
-                  case Inputs::mouse_x1:
+                  case mouse_x1:
                     return "X1 Mouse Button";
-                  case Inputs::mouse_x2:
+                  case mouse_x2:
                     return "X2 Mouse Button";
                   default:
-                    return "Mouse Button " + std::to_string(index - Inputs::mouse_left + 1);
+                    return "Mouse Button " + std::to_string(index - mouse_left + 1);
                 }
             }
             else
             {
                 switch (index)
                 {
-                  case Inputs::mouse_wheel_up:
+                  case mouse_wheel_up:
                     return "Mouse Wheel Up";
-                  case Inputs::mouse_wheel_down:
+                  case mouse_wheel_down:
                     return "Mouse Wheel Down";
-                  case Inputs::mouse_wheel_left:
+                  case mouse_wheel_left:
                     return "Mouse Wheel Left";
-                  case Inputs::mouse_wheel_right:
+                  case mouse_wheel_right:
                     return "Mouse Wheel Right";
                   default:
                     return "Invalid " + std::to_string(index);
@@ -124,17 +123,15 @@ namespace Interface
 
         bool AssignKey()
         {
-            return Assign(Inputs::BeginKeys, Inputs::EndKeys);
+            return Assign(BeginKeys, EndKeys);
         }
         bool AssignMouseButton()
         {
-            return Assign(Inputs::BeginMouseButtons, Inputs::EndMouseButtons);
+            return Assign(BeginMouseButtons, EndMouseButtons);
         }
         bool AssignMouseWheel()
         {
-            return Assign(Inputs::BeginMouseWheel, Inputs::EndMouseWheel);
+            return Assign(BeginMouseWheel, EndMouseWheel);
         }
     };
 }
-
-#endif
