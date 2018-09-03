@@ -62,7 +62,7 @@ namespace Graphics
             binding_draw = 0;
         }
 
-        // First, binds storage for the same handle if necessary. Then sets attribute pointers if T is reflected. Otherwise
+        // First, binds storage for the same handle if necessary. Then sets attribute pointers if T is reflected, otherwise disables all attributes.
         // BindDraw(0) is a special case. It disables all attributes, and thus strips draw binding from currently bound buffer (if any).
         template <typename T> static void BindDraw(GLuint handle)
         {
@@ -163,7 +163,7 @@ namespace Graphics
         ~VertexBuffer()
         {
             if (StorageBound())
-                Buffers::ForgetBoundBuffer();
+                Buffers::ForgetBoundBuffer(); // GL unbinds the buffer automatically.
             glDeleteBuffers(1, &data.handle); // Deleting 0 is a no-op.
         }
 
@@ -179,6 +179,8 @@ namespace Graphics
 
         void BindStorage() const
         {
+            if (!*this)
+                return;
             Buffers::BindStorage(data.handle);
         }
         static void UnbindStorage() // Removes draw binding as well. Doesn't disable any attributes for performance reasons.
@@ -192,6 +194,8 @@ namespace Graphics
 
         void BindDraw() const // If element type is not reflected, disables all attributes.
         {
+            if (!*this)
+                return;
             Buffers::BindDraw<T>(data.handle);
         }
         static void UnbindDraw() // Disables all attributes. If any buffer is currently bound, this results in stripping draw binding from it.
@@ -210,6 +214,8 @@ namespace Graphics
 
         void SetData(int count, const T *source = 0, Usage usage = static_draw) // Binds storage.
         {
+            if (!*this)
+                return;
             BindStorage();
             // It seems that glBufferData doesn't invalidate attribute pointers, so we don't need to get rid of draw binding here.
             glBufferData(GL_ARRAY_BUFFER, count * sizeof(T), source, usage);
@@ -221,6 +227,8 @@ namespace Graphics
         }
         void SetDataPartBytes(int offset, int bytes, const uint8_t *source) // Binds storage.
         {
+            if (!*this)
+                return;
             BindStorage();
             glBufferSubData(GL_ARRAY_BUFFER, offset, bytes, source);
         }
@@ -228,6 +236,8 @@ namespace Graphics
         void Draw(DrawMode p, int from, int count) // Binds for drawing.
         {
             static_assert(is_reflected, "Element type of this buffer is not reflected, unable to draw.");
+            if (!*this)
+                return;
             BindDraw();
             glDrawArrays(p, from, count);
         }

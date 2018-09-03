@@ -99,6 +99,8 @@ namespace Graphics
 
         void Bind() const
         {
+            if (!*this)
+                return;
             BindHandle(data.handle);
         }
         static void BindDefault()

@@ -49,7 +49,7 @@ namespace Graphics
 
             return ret;
         }
-        else if constexpr (std::is_same_v<T, TextureUnit >) return "sampler2D";
+        else if constexpr (std::is_same_v<T, TexUnit     >) return "sampler2D";
         else if constexpr (std::is_same_v<T, bool        >) return "bool";
         else if constexpr (std::is_same_v<T, float       >) return "float";
         else if constexpr (std::is_same_v<T, double      >) return "double";
@@ -380,6 +380,8 @@ namespace Graphics
 
         void Bind()
         {
+            if (!*this)
+                return;
             BindHandle(data.handle);
         }
         static void Unbind()
@@ -411,7 +413,7 @@ namespace Graphics
 
         inline static constexpr bool
             is_array   = std::is_array_v<type_with_extent>,
-            is_texture = std::is_same_v<type, TextureUnit>,
+            is_texture = std::is_same_v<type, TexUnit>,
             is_bool    = std::is_same_v<Math::vec_base_t<type>, bool>;
 
         inline static constexpr int array_elements = std::extent_v<std::conditional_t<is_array, type_with_extent, type_with_extent[1]>>;
@@ -426,6 +428,8 @@ namespace Graphics
         const type &operator=(const type &object) const // Binds the shader.
         {
             static_assert(!is_array, "Use .set() to set arrays.");
+
+            // We don't need to check location here. glUniform* silently ignores `-1`.
 
             if (!handle)
                 return object;
@@ -452,6 +456,8 @@ namespace Graphics
         }
         void set(const effective_type *ptr, int count, int offset = 0) const
         {
+            // We don't need to check location here. glUniform* silently ignores `-1`.
+
             if (!handle)
                 return;
 
@@ -493,6 +499,7 @@ namespace Graphics
             else static_assert(std::is_void_v<effective_type>, "Uniforms of this type are not supported.");
         }
     };
+
     template <typename T> class VertUniform : public Uniform<T>
     {
       public:
@@ -500,6 +507,7 @@ namespace Graphics
         using Uniform<T>::Uniform;
         using Uniform<T>::operator=;
     };
+
     template <typename T> class FragUniform : public Uniform<T>
     {
       public:
