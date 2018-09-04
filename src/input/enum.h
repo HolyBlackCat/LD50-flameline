@@ -1,5 +1,7 @@
 #pragma once
 
+#include <SDL2/SDL_scancode.h>
+
 namespace Input
 {
     enum Enum
