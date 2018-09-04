@@ -99,7 +99,7 @@ namespace Graphics
                 "uniform",
             };
         }
-        static ShaderConfig Compat(int ver = 320)
+        static ShaderConfig Compat(int ver = 150)
         {
             return
             {
@@ -110,7 +110,7 @@ namespace Graphics
                 "uniform",
             };
         }
-        static ShaderConfig Core(int ver = 320)
+        static ShaderConfig Core(int ver = 150)
         {
             return
             {
