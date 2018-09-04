@@ -250,4 +250,18 @@ namespace Graphics
             Draw(p, 0, Size());
         }
     };
+
+    struct DummyVertexArray // Good for core profile
+    {
+        DummyVertexArray()
+        {
+            GLuint vao;
+            glGenVertexArrays(1, &vao);
+            if (!vao)
+                Program::Error("Unable to create the dummy vertex array object.");
+            glBindVertexArray(vao);
+        }
+        DummyVertexArray(const DummyVertexArray &) = delete;
+        DummyVertexArray &operator=(const DummyVertexArray &) = delete;
+    };
 }
