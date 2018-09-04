@@ -35,7 +35,7 @@ namespace Interface
         int display = 0;
 
         int gl_major = 3, gl_minor = 2; // 0,0 = don't care.
-        Profile gl_profile = Profile::compat;
+        Profile gl_profile = Profile::core;
         bool gl_debug = 0;
         VSync vsync = VSync::adaptive;
         YesOrNo hw_accelerated = dont_care;
