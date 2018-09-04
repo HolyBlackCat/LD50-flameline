@@ -67,7 +67,7 @@ namespace Interface
             SDL_Window *handle = 0;
             SDL_GLContext context = 0;
 
-            ivec2 size = PosCentered();
+            ivec2 size = ivec2(0);
             VSync vsync = VSync::unspecified;
             bool resizable = 0;
             FullscreenMode mode = FullscreenMode::windowed;

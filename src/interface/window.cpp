@@ -256,7 +256,7 @@ namespace Interface
             SetMode(mode); // This sets `data.mode`.
 
         // Get current window size
-        SDL_GetWindowSize(data.handle, &size.x, &size.y);
+        SDL_GetWindowSize(data.handle, &data.size.x, &data.size.y);
 
         // Load OpenGL functions
         glfl::set_function_loader(SDL_GL_GetProcAddress);
