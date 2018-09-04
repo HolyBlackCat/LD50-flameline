@@ -68,10 +68,20 @@
 		<Unit filename="lib/implementation.cpp">
 			<Option compiler="gcc" use="1" buildCommand="$compiler $options $includes -c $file -o $object -g0 -O3" />
 		</Unit>
+		<Unit filename="src/graphics/blending.h" />
+		<Unit filename="src/graphics/clear.h" />
+		<Unit filename="src/graphics/complete.h" />
+		<Unit filename="src/graphics/errors.h" />
+		<Unit filename="src/graphics/framebuffer.h" />
 		<Unit filename="src/graphics/image.h" />
 		<Unit filename="src/graphics/shader.h" />
 		<Unit filename="src/graphics/texture.h" />
-		<Unit filename="src/interface/input.h" />
+		<Unit filename="src/graphics/vertex_buffer.h" />
+		<Unit filename="src/graphics/viewport.h" />
+		<Unit filename="src/input/button.h" />
+		<Unit filename="src/input/complete.h" />
+		<Unit filename="src/input/enum.h" />
+		<Unit filename="src/input/mouse.h" />
 		<Unit filename="src/interface/messagebox.cpp" />
 		<Unit filename="src/interface/messagebox.h" />
 		<Unit filename="src/interface/window.cpp" />
@@ -85,15 +95,21 @@
 		<Unit filename="src/reflection/interface.h" />
 		<Unit filename="src/reflection/primitives_arithmetic.h" />
 		<Unit filename="src/reflection/structures_macro.h" />
+		<Unit filename="src/reflection/structures_vec_mat.h" />
 		<Unit filename="src/utils/_common.h" />
+		<Unit filename="src/utils/adjust.h" />
 		<Unit filename="src/utils/archive.cpp" />
 		<Unit filename="src/utils/archive.h" />
+		<Unit filename="src/utils/clock.h" />
 		<Unit filename="src/utils/dynamic_storage.h" />
 		<Unit filename="src/utils/finally.h" />
 		<Unit filename="src/utils/macro.h" />
 		<Unit filename="src/utils/mat.h" />
 		<Unit filename="src/utils/memory_file.h" />
 		<Unit filename="src/utils/meta.h" />
+		<Unit filename="src/utils/metronome.h" />
+		<Unit filename="src/utils/random.h" />
+		<Unit filename="src/utils/resource_allocator.h" />
 		<Unit filename="src/utils/strings.h" />
 		<Extensions>
 			<code_completion />

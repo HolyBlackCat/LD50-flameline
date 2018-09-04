@@ -5,96 +5,67 @@
 #include <SDL2/SDL.h>
 #include <GLFL/glfl.h>
 
-#include "graphics/image.h"
-#include "graphics/shader.h"
-#include "interface/input.h"
+#include "graphics/complete.h"
+#include "input/complete.h"
 #include "interface/messagebox.h"
 #include "interface/window.h"
 #include "program/errors.h"
 #include "program/exit.h"
 #include "program/parachute.h"
+#include "reflection/complete.h"
+#include "utils/adjust.h"
 #include "utils/archive.h"
+#include "utils/clock.h"
 #include "utils/dynamic_storage.h"
 #include "utils/finally.h"
 #include "utils/macro.h"
 #include "utils/mat.h"
 #include "utils/memory_file.h"
-#include "reflection/complete.h"
+#include "utils/meta.h"
+#include "utils/metronome.h"
+#include "utils/random.h"
+#include "utils/resource_allocator.h"
 #include "utils/strings.h"
 
 #define main SDL_main
 
-#include <unordered_set>
-
 Program::Parachute error_parachute;
 Interface::Window win("Alpha", vec(800, 600));
-Graphics::Image img("test.png");
 
-struct Attribs
+struct A
 {
-    Reflect(Attribs)
+    Reflect(A)
     (
         (fvec2)(pos),
         (fvec3)(color),
     )
 };
 
-struct Uniforms
-{
-    Reflect(Uniforms)
-    (
-        (Graphics::Shader::Uniform<fmat4>)(matrix),
-    )
-};
-
-Uniforms uni;
-
-Graphics::Shader::Program shader_main("Main", {}, {}, Meta::tag<Attribs>{}, uni, R"(
-
+Graphics::Shader sh("Main", Graphics::ShaderConfig::Core(150), Graphics::ShaderPreferences{}, Meta::tag<A>{}, Graphics::None, R"(
 varying vec3 v_color;
-
 void main()
 {
     v_color = a_color;
-    gl_Position = u_matrix * vec4(a_pos, 0, 1);
-})", R"(
+    gl_Position = vec4(a_pos, 0, 1);
+})",R"(
 varying vec3 v_color;
-
 void main()
 {
-    gl_FragColor = vec4(v_color, 1);
+    gl_FragColor = vec4(sin(pow(v_color.x*10. + sin(v_color.y*5.)*4., 2.))*0.5+0.5,
+                        sin(pow(v_color.y*10. + sin(v_color.z*5.)*4., 2.))*0.5+0.5,
+                        sin(pow(v_color.z*10. + sin(v_color.x*5.)*4., 2.))*0.5+0.5, 1);
 })");
-
-struct A
-{
-    Reflect(A)
-    (
-        (int)(x,y),
-        (float)(z)(=42),
-        (optional)(float)(w)(),
-    )
-};
-
-struct B
-{
-    Reflect(B)
-    (
-        (A)(a),
-        (std::vector<float>)(alpha)(={1.1,2.2,3.3}),
-    )
-};
 
 int main(int, char**)
 {
-//    B obj;
-//    obj.a.x = 1;
-//    obj.a.y = 2;
-//    obj.a.z = 3.3;
-//    obj.a.w = 4.4;
-//    auto refl = Refl::Interface(obj);
-//    std::cout << refl.to_string() << '\n';
-
-    Interface::Button b;
+    A data[]
+    {
+        {fvec2(-0.5, 0.5), fvec3(1,0,0)},
+        {fvec2( 0.5, 0.5), fvec3(0,1,0)},
+        {fvec2(   0,-0.5), fvec3(0,0,1)},
+    };
+    Graphics::VertexBuffer<A> buf(std::extent_v<decltype(data)>, data);
+    sh.Bind();
 
     while (1)
     {
@@ -108,32 +79,10 @@ int main(int, char**)
         if (win.ExitRequested())
             return 0;
 
-        glClear(GL_COLOR_BUFFER_BIT);
-
-        glBegin(GL_TRIANGLES);
-        glColor3f(0.9,0.1,0.6);
-        glVertex2f(-0.5,0.5);
-        glVertex2f(0.5,0.5);
-        glVertex2f(0,-0.5);
-        glEnd();
-
-        if (b)
-        {
-            std::cout << " v" << b.pressed()
-                      << " _" << b.down()
-                      << " ^" << b.released()
-                      << " ~" << b.up()
-                      << " :" << b.repeated() << '\n';
-        }
-        else
-        {
-            if (b.AssignKey())
-                std::cout << "Assigned " << b.Name() << "\n";
-        }
+        Graphics::Clear();
+        buf.Draw(Graphics::triangles);
 
         win.SwapBuffers();
-
-        SDL_Delay(200);
     }
 
     return 0;
