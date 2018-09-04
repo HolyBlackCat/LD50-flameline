@@ -116,7 +116,12 @@ namespace Graphics
             {
                 Str("#version ", ver),
                 "/* vertex */\n#define varying out",
-                "/* fragment */\nout vec4 _gl_FragColor;\n#define gl_FragColor _gl_FragColor\n#define varying in\n#define texture2D texture", // A single leading underscore is allowed, I've checked.
+                "/* fragment */\n"
+                    "out vec4 _gl_FragData[gl_MaxDrawBuffers];\n" // A single leading underscore is allowed, I've checked.
+                    "#define gl_FragData _gl_FragData\n"
+                    "#define gl_FragColor gl_FragData[0]\n"
+                    "#define varying in\n"
+                    "#define texture2D texture",
                 "in",
                 "uniform",
             };

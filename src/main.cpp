@@ -23,7 +23,6 @@
 #include "utils/memory_file.h"
 #include "utils/meta.h"
 #include "utils/metronome.h"
-#include "utils/random.h"
 #include "utils/resource_allocator.h"
 #include "utils/strings.h"
 
@@ -31,6 +30,7 @@
 
 Program::Parachute error_parachute;
 Interface::Window win("Alpha", vec(800, 600));
+Graphics::DummyVertexArray dummy_vao;
 
 struct A
 {
@@ -81,6 +81,7 @@ int main(int, char**)
 
         Graphics::Clear();
         buf.Draw(Graphics::triangles);
+        Graphics::CheckErrors();
 
         win.SwapBuffers();
     }
