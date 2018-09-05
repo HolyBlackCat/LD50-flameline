@@ -6,8 +6,6 @@
 #include <type_traits>
 #include <vector>
 
-#include <GLFL/glfl.h>
-
 #include "vertex_buffer.h"
 
 namespace Graphics
