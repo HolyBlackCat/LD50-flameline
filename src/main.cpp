@@ -53,7 +53,6 @@ int main(int, char**)
             return 0;
 
         Graphics::Clear();
-        for (int i = 0; i < 13; i++)
         queue.Add({fvec2(-0.5, 0.5), fvec3(1,0,0)},
                   {fvec2(   0,-0.5), fvec3(0,0,1)},
                   {fvec2( 0.5, 0.5), fvec3(0,1,0)},
