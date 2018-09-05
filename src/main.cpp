@@ -34,15 +34,10 @@ void main()
                         sin(pow(v_color.z*10. + sin(v_color.x*5.)*4., 2.))*0.5+0.5, 1);
 })");
 
+Graphics::RenderQueue<A, 3> queue(20);
+
 int main(int, char**)
 {
-    A data[]
-    {
-        {fvec2(-0.5, 0.5), fvec3(1,0,0)},
-        {fvec2( 0.5, 0.5), fvec3(0,1,0)},
-        {fvec2(   0,-0.5), fvec3(0,0,1)},
-    };
-    Graphics::VertexBuffer<A> buf(std::extent_v<decltype(data)>, data);
     sh.Bind();
 
     while (1)
@@ -58,7 +53,13 @@ int main(int, char**)
             return 0;
 
         Graphics::Clear();
-        buf.Draw(Graphics::triangles);
+        for (int i = 0; i < 13; i++)
+        queue.Add({fvec2(-0.5, 0.5), fvec3(1,0,0)},
+                  {fvec2(   0,-0.5), fvec3(0,0,1)},
+                  {fvec2( 0.5, 0.5), fvec3(0,1,0)},
+                  {fvec2(   0, 0.75), fvec3(1,0,1)}
+                  );
+        queue.Flush();
         Graphics::CheckErrors();
 
         win.SwapBuffers();
