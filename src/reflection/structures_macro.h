@@ -8,6 +8,8 @@
 #include "interface.h"
 #include "utils/macro.h"
 
+#define ReflectStruct(class_name, seq) struct class_name { Reflect(class_name)(seq) };
+
 #define Reflect(class_name) \
     /* Friending */\
     friend ::Refl::Custom::impl::Macro; \

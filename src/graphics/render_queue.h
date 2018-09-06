@@ -34,6 +34,11 @@ namespace Graphics
         RenderQueue(decltype(nullptr)) {}
         RenderQueue(int size) : size(size), storage(std::make_unique<T[]>(size * N)), buffer(size * N, 0, Graphics::stream_draw) {}
 
+        explicit operator bool()
+        {
+            return bool(storage);
+        }
+
         int Size() const
         {
             return size;
