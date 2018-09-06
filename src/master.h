@@ -23,5 +23,6 @@
 #include "utils/metronome.h"
 #include "utils/resource_allocator.h"
 #include "utils/strings.h"
+#include "utils/tasks.h"
 
 #endif
