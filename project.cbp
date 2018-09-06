@@ -127,6 +127,7 @@
 		<Unit filename="src/utils/random.h" />
 		<Unit filename="src/utils/resource_allocator.h" />
 		<Unit filename="src/utils/strings.h" />
+		<Unit filename="src/utils/tasks.h" />
 		<Extensions>
 			<code_completion />
 			<envvars />
