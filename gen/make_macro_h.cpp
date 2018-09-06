@@ -7,7 +7,7 @@
 #include <type_traits>
 #include <vector>
 
-#define VERSION "1.0.1"
+#define VERSION "1.0.2"
 
 namespace data
 {
@@ -232,6 +232,10 @@ int main()
         next_line();
 
         { // For each variadic element
+            output("// In MA_*_FOR_EACH below, `macro` argument is called as `macro(i, data, element)`. Note that to simplify implementation, `i` counts backwards from N-1 to 0.\n");
+
+            next_line();
+
             for (const auto &suffix : data::suffixes)
             {
                 output("#define MA_VA_FOR_EACH", suffix, "(macro, sep, data, ...) MA_SEQ_FOR_EACH", suffix, "(macro, sep, data, MA_VA_TO_SEQ(__VA_ARGS__))\n");
@@ -252,10 +256,10 @@ int main()
 
                 output("#define MA_SEQ_FOR_EACH", suffix, "(macro, sep, data, seq) MA_CAT(MA_SEQ_FOR_EACH", suffix, "_impl_, MA_SEQ_SIZE(seq))(macro, sep, data, seq)\n");
                 output("#define MA_SEQ_FOR_EACH", suffix, "_impl_0(macro, sep, data, seq)\n");
-                output("#define MA_SEQ_FOR_EACH", suffix, "_impl_1(macro, sep, data, seq) MA_IMPL_CALL", suffix, "(macro, data, MA_SEQ_FIRST(seq))\n"); // Do not use IDENTITY instead of SEQ_FIRST here! Doing so might break it in the parameter macro.
+                output("#define MA_SEQ_FOR_EACH", suffix, "_impl_1(macro, sep, data, seq) MA_IMPL_CALL", suffix, "(macro, 0, data, MA_SEQ_FIRST(seq))\n"); // Do not use IDENTITY instead of SEQ_FIRST here! Doing so might break it in the parameter macro.
                 for (int i = 2; i <= data::n; i++)
                     output("#define MA_SEQ_FOR_EACH", suffix, "_impl_", i, "(macro, sep, data, seq) "
-                           "MA_IMPL_CALL", suffix, "(macro, data, MA_SEQ_FIRST(seq)) sep() MA_SEQ_FOR_EACH", suffix, "_impl_", i-1, "(macro, sep, data, MA_SEQ_NO_FIRST(seq))\n");
+                           "MA_IMPL_CALL", suffix, "(macro, ", i-1, ", data, MA_SEQ_FIRST(seq)) sep() MA_SEQ_FOR_EACH", suffix, "_impl_", i-1, "(macro, sep, data, MA_SEQ_NO_FIRST(seq))\n");
             }
         }
     }

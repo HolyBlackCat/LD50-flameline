@@ -43,39 +43,39 @@
 
 
 // Field declarations
-#define REFL_Structure_FieldDeclPack(unused, seq)               MA_OVERLOAD(REFL_Structure_FieldDeclPack_, MA_SEQ_TO_VA_PARENS(seq))
+#define REFL_Structure_FieldDeclPack(i, unused, seq)            MA_OVERLOAD(REFL_Structure_FieldDeclPack_, MA_SEQ_TO_VA_PARENS(seq))
 #define REFL_Structure_FieldDeclPack_1(x)                       MA_IDENTITY x
 #define REFL_Structure_FieldDeclPack_2(      type, names      ) REFL_Structure_FieldDeclPack_3(type, names, ())
 #define REFL_Structure_FieldDeclPack_3(      type, names, init) ::std::enable_if_t<1, MA_IDENTITY type> MA_VA_FOR_EACH_A(REFL_Structure_FieldDecl, MA_COMMA, init, MA_IDENTITY names) ;
 #define REFL_Structure_FieldDeclPack_4(mode, type, names, init) REFL_Structure_FieldDeclPack_3(type, names, init)
-#define REFL_Structure_FieldDecl(init, name)                    name MA_IDENTITY init
+#define REFL_Structure_FieldDecl(i, init, name)                 name MA_IDENTITY init
 
 // Field member pointers
-#define REFL_Structure_MemPointerPack(unused, seq)               MA_OVERLOAD(REFL_Structure_MemPointerPack_, MA_SEQ_TO_VA_PARENS(seq))
+#define REFL_Structure_MemPointerPack(i, unused, seq)            MA_OVERLOAD(REFL_Structure_MemPointerPack_, MA_SEQ_TO_VA_PARENS(seq))
 #define REFL_Structure_MemPointerPack_1(x)                       // Nothing.
 #define REFL_Structure_MemPointerPack_2(      type, names      ) REFL_Structure_MemPointerPack_Low(names)
 #define REFL_Structure_MemPointerPack_3(      type, names, init) REFL_Structure_MemPointerPack_Low(names)
 #define REFL_Structure_MemPointerPack_4(mode, type, names, init) REFL_Structure_MemPointerPack_Low(names)
 #define REFL_Structure_MemPointerPack_Low(names)                 MA_VA_FOR_EACH_A(REFL_Structure_MemPointer, MA_COMMA, , MA_IDENTITY names)
-#define REFL_Structure_MemPointer(unused, name)                  &_refl_this_type::name
+#define REFL_Structure_MemPointer(i, unused, name)                  &_refl_this_type::name
 
 // Field names
-#define REFL_Structure_FieldNamePack(unused, seq)               MA_OVERLOAD(REFL_Structure_FieldNamePack_, MA_SEQ_TO_VA_PARENS(seq))
+#define REFL_Structure_FieldNamePack(i, unused, seq)            MA_OVERLOAD(REFL_Structure_FieldNamePack_, MA_SEQ_TO_VA_PARENS(seq))
 #define REFL_Structure_FieldNamePack_1(x)                       // Nothing.
 #define REFL_Structure_FieldNamePack_2(      type, names      ) REFL_Structure_FieldNamePack_Low(names)
 #define REFL_Structure_FieldNamePack_3(      type, names, init) REFL_Structure_FieldNamePack_Low(names)
 #define REFL_Structure_FieldNamePack_4(mode, type, names, init) REFL_Structure_FieldNamePack_Low(names)
 #define REFL_Structure_FieldNamePack_Low(names)                 MA_VA_FOR_EACH_A(REFL_Structure_FieldName, MA_COMMA, , MA_IDENTITY names)
-#define REFL_Structure_FieldName(unused, name)                  #name
+#define REFL_Structure_FieldName(i, unused, name)                  #name
 
 // Field categories
-#define REFL_Structure_FieldCategoryPack(unused, seq)               MA_OVERLOAD(REFL_Structure_FieldCategoryPack_, MA_SEQ_TO_VA_PARENS(seq))
+#define REFL_Structure_FieldCategoryPack(i, unused, seq)            MA_OVERLOAD(REFL_Structure_FieldCategoryPack_, MA_SEQ_TO_VA_PARENS(seq))
 #define REFL_Structure_FieldCategoryPack_1(x)                       // Nothing.
 #define REFL_Structure_FieldCategoryPack_2(      type, names      ) REFL_Structure_FieldCategoryPack_Low(names, default_category)
 #define REFL_Structure_FieldCategoryPack_3(      type, names, init) REFL_Structure_FieldCategoryPack_Low(names, default_category)
 #define REFL_Structure_FieldCategoryPack_4(mode, type, names, init) REFL_Structure_FieldCategoryPack_Low(names, MA_IDENTITY mode)
 #define REFL_Structure_FieldCategoryPack_Low(names, mode)           MA_VA_FOR_EACH_A(REFL_Structure_FieldCategory, MA_COMMA, mode, MA_IDENTITY names)
-#define REFL_Structure_FieldCategory(mode, name)                    (::Refl::FieldCategory::mode)
+#define REFL_Structure_FieldCategory(i, mode, name)                 (::Refl::FieldCategory::mode)
 
 
 namespace Refl::Custom
