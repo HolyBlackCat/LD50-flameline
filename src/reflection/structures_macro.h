@@ -8,7 +8,7 @@
 #include "interface.h"
 #include "utils/macro.h"
 
-#define ReflectStruct(class_name, seq) struct class_name { Reflect(class_name)(seq) };
+#define ReflectStruct(class_name, seq) struct class_name { Reflect(class_name) seq };
 
 #define Reflect(class_name) \
     /* Friending */\
@@ -57,7 +57,7 @@
 #define REFL_Structure_MemPointerPack_3(      type, names, init) REFL_Structure_MemPointerPack_Low(names)
 #define REFL_Structure_MemPointerPack_4(mode, type, names, init) REFL_Structure_MemPointerPack_Low(names)
 #define REFL_Structure_MemPointerPack_Low(names)                 MA_VA_FOR_EACH_A(REFL_Structure_MemPointer, MA_COMMA, , MA_IDENTITY names)
-#define REFL_Structure_MemPointer(i, unused, name)                  &_refl_this_type::name
+#define REFL_Structure_MemPointer(i, unused, name)               &_refl_this_type::name
 
 // Field names
 #define REFL_Structure_FieldNamePack(i, unused, seq)            MA_OVERLOAD(REFL_Structure_FieldNamePack_, MA_SEQ_TO_VA_PARENS(seq))
@@ -66,7 +66,7 @@
 #define REFL_Structure_FieldNamePack_3(      type, names, init) REFL_Structure_FieldNamePack_Low(names)
 #define REFL_Structure_FieldNamePack_4(mode, type, names, init) REFL_Structure_FieldNamePack_Low(names)
 #define REFL_Structure_FieldNamePack_Low(names)                 MA_VA_FOR_EACH_A(REFL_Structure_FieldName, MA_COMMA, , MA_IDENTITY names)
-#define REFL_Structure_FieldName(i, unused, name)                  #name
+#define REFL_Structure_FieldName(i, unused, name)               #name
 
 // Field categories
 #define REFL_Structure_FieldCategoryPack(i, unused, seq)            MA_OVERLOAD(REFL_Structure_FieldCategoryPack_, MA_SEQ_TO_VA_PARENS(seq))
