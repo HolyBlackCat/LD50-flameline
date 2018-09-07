@@ -79,6 +79,7 @@
 		<Unit filename="lib/implementation.cpp">
 			<Option compiler="gcc" use="1" buildCommand="$compiler $options $includes -c $file -o $object -g0 -O3" />
 		</Unit>
+		<Unit filename="src/game/render.h" />
 		<Unit filename="src/graphics/blending.h" />
 		<Unit filename="src/graphics/clear.h" />
 		<Unit filename="src/graphics/complete.h" />

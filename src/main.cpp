@@ -1,5 +1,7 @@
 #include "master.h"
 
+#include "game/render.h"
+
 #include <iomanip>
 #include <iostream>
 #include <vector>
