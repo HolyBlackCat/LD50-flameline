@@ -17,7 +17,7 @@ namespace Graphics
 
         int pos = 0, size = 0; // These are measured in primitives, not vertices.
         std::unique_ptr<T[]> storage;
-        Graphics::VertexBuffer<T> buffer = nullptr;
+        Graphics::VertexBuffer<T> buffer = Graphics::VertexBuffer<T>(nullptr);
 
         template <typename ...P> void AddLow(const P &... p)
         {
@@ -31,7 +31,7 @@ namespace Graphics
         }
 
       public:
-        RenderQueue(decltype(nullptr)) {}
+        explicit RenderQueue(decltype(nullptr)) {}
         RenderQueue(int size) : size(size), storage(std::make_unique<T[]>(size * N)), buffer(size * N, 0, Graphics::stream_draw) {}
 
         explicit operator bool()

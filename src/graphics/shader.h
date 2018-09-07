@@ -383,7 +383,7 @@ namespace Graphics
             return data.handle;
         }
 
-        void Bind()
+        void Bind() const
         {
             if (!*this)
                 return;

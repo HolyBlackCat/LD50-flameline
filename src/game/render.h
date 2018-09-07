@@ -55,13 +55,13 @@ void main()
     gl_FragColor.a *= v_factors.z;
 })";
 
-    Graphics::RenderQueue<Attribs> queue = nullptr;
+    Graphics::RenderQueue<Attribs, 3> queue = Graphics::RenderQueue<Attribs, 3>(nullptr);
     Uniforms uni;
-    Graphics::Shader shader = nullptr;
+    Graphics::Shader shader = Graphics::Shader(nullptr);
 
   public:
-    Render(decltype(nullptr)) {}
-    Render(int queue_size, const Graphics::ShaderConfig &config) : queue(queue_size), shader("Main", config, Graphics::Shader::Preferences{}, Meta::tag<Attribs>{}, uni, vertex_source, fragment_source)
+    explicit Render(decltype(nullptr)) {}
+    Render(int queue_size, const Graphics::ShaderConfig &config) : queue(queue_size), shader("Main", config, Graphics::ShaderPreferences{}, Meta::tag<Attribs>{}, uni, vertex_source, fragment_source)
     {
         SetMatrix(fmat4());
         SetColorMatrix(fmat4());
@@ -79,7 +79,7 @@ void main()
 
     void Finish()
     {
-        queue.Finish();
+        queue.Flush();
     }
 
     void SetTexture(const Graphics::TexUnit &unit, ivec2 size)
@@ -96,7 +96,7 @@ void main()
         uni.matrix = m;
     }
 
-    void SetColorMatrix()
+    void SetColorMatrix(const fmat4 &m)
     {
         Finish();
         uni.color_matrix = m;
@@ -106,7 +106,7 @@ void main()
     {
         using ref = Quad_t &&;
 
-        Graphics::RenderQueue<Attribs> *queue; // The constructor sets this.
+        Graphics::RenderQueue<Attribs, 3> *queue; // The constructor sets this.
 
         struct Data
         {
@@ -120,7 +120,7 @@ void main()
             bool center_pos_tex = 0;
 
             bool has_matrix = 0;
-            fmat3 matrix = fmat3::identity();
+            fmat3 matrix = fmat3();
 
             bool has_color = 0;
             fvec3 colors[4] {};
@@ -136,9 +136,10 @@ void main()
 
             bool flip_x = 0, flip_y = 0;
         };
+        Data data;
 
       public:
-        Quad_t(decltype(Poly2D::queue) *queue, fvec2 pos, fvec2 size) : queue(queue)
+        Quad_t(decltype(queue) queue, fvec2 pos, fvec2 size) : queue(queue)
         {
             data.pos = pos;
             data.size = size;
@@ -151,22 +152,16 @@ void main()
             return *this;
         }
 
-        Quad_t(const Quad_t &) = delete;
-        Quad_t &operator=(const Quad_t &) = delete;
-
-        Quad_t(Quad_t &&) = default;
-        Quad_t &operator=(Quad_t &&) = default;
-
         ~Quad_t()
         {
            if (!queue)
                 return;
 
-            DebugAssert("2D poly renderer: Quad with no texture nor color specified.", has_texture || has_color);
-            DebugAssert("2D poly renderer: Quad with absolute corner coodinates with a center specified.", data.abs_pos + has_center < 2);
-            DebugAssert("2D poly renderer: Quad with absolute texture coordinates mode but no texture coordinates specified.", data.abs_tex_pos <= has_texture);
-            DebugAssert("2D poly renderer: Quad with texture and color, but without a mixing factor.", (has_texture && has_color) == has_tex_color_fac);
-            DebugAssert("2D poly renderer: Quad with a matrix but without a center specified.", has_matrix <= has_center);
+            DebugAssert("2D poly renderer: Quad with no texture nor color specified.", data.has_texture || data.has_color);
+            DebugAssert("2D poly renderer: Quad with absolute corner coodinates with a center specified.", data.abs_pos + data.has_center < 2);
+            DebugAssert("2D poly renderer: Quad with absolute texture coordinates mode but no texture coordinates specified.", data.abs_tex_pos <= data.has_texture);
+            DebugAssert("2D poly renderer: Quad with texture and color, but without a mixing factor.", (data.has_texture && data.has_color) == data.has_tex_color_fac);
+            DebugAssert("2D poly renderer: Quad with a matrix but without a center specified.", data.has_matrix <= data.has_center);
 
             if (data.abs_pos)
                 data.size -= data.pos;
@@ -175,7 +170,7 @@ void main()
 
             Attribs out[4];
 
-            if (has_texture)
+            if (data.has_texture)
             {
                 for (int i = 0; i < 4; i++)
                 {
@@ -208,14 +203,14 @@ void main()
             {
                 data.tex_pos.x += data.tex_size.x;
                 data.tex_size.x = -data.tex_size.x;
-                if (has_center)
+                if (data.has_center)
                     data.center.x = data.size.x - data.center.x;
             }
             if (data.flip_y)
             {
                 data.tex_pos.y += data.tex_size.y;
                 data.tex_size.y = -data.tex_size.y;
-                if (has_center)
+                if (data.has_center)
                     data.center.y = data.size.y - data.center.y;
             }
 
@@ -224,7 +219,7 @@ void main()
             out[1].pos = fvec2(out[2].pos.x, out[0].pos.y);
             out[3].pos = fvec2(out[0].pos.x, out[2].pos.y);
 
-            if (has_matrix)
+            if (data.has_matrix)
             {
                 for (auto &it : out)
                     it.pos = data.pos + (data.matrix * it.pos.to_vec3(1)).to_vec2();
@@ -235,18 +230,18 @@ void main()
                     it.pos += data.pos;
             }
 
-            out[0].texture_pos = data.tex_pos;
-            out[2].texture_pos = data.tex_pos + data.tex_size;
-            out[1].texture_pos = {out[2].texture_pos.x, out[0].texture_pos.y};
-            out[3].texture_pos = {out[0].texture_pos.x, out[2].texture_pos.y};
+            out[0].texcoord = data.tex_pos;
+            out[2].texcoord = data.tex_pos + data.tex_size;
+            out[1].texcoord = {out[2].texcoord.x, out[0].texcoord.y};
+            out[3].texcoord = {out[0].texcoord.x, out[2].texcoord.y};
 
             queue->Add(out[0], out[1], out[2], out[3]);
         }
 
         ref tex(fvec2 pos, fvec2 size)
         {
-            DebugAssert("2D poly renderer: Quad_t texture specified twice.", !has_texture);
-            has_texture = 1;
+            DebugAssert("2D poly renderer: Quad_t texture specified twice.", !data.has_texture);
+            data.has_texture = 1;
 
             data.tex_pos = pos;
             data.tex_size = size;
@@ -259,8 +254,8 @@ void main()
         }
         ref center(fvec2 c)
         {
-            DebugAssert("2D poly renderer: Quad_t center specified twice.", !has_center);
-            has_center = 1;
+            DebugAssert("2D poly renderer: Quad_t center specified twice.", !data.has_center);
+            data.has_center = 1;
 
             data.center = c;
             data.center_pos_tex = 1;
@@ -268,8 +263,8 @@ void main()
         }
         ref pixel_center(fvec2 c) // Same as `center()`, but the coordinates are always measured in pixels instead of texels even if a texture is specified.
         {
-            DebugAssert("2D poly renderer: Quad_t center specified twice.", !has_center);
-            has_center = 1;
+            DebugAssert("2D poly renderer: Quad_t center specified twice.", !data.has_center);
+            data.has_center = 1;
 
             data.center = c;
             data.center_pos_tex = 0;
@@ -282,11 +277,13 @@ void main()
         }
         ref matrix(fmat3 m) // This can be called multiple times, resulting in multiplying matrices in the order they were passed.
         {
-            if (has_matrix)
-                data.matrix = data.matrix /mul/ m;
+            if (data.has_matrix)
+            {
+                data.matrix = data.matrix * m;
+            }
             else
             {
-                has_matrix = 1;
+                data.has_matrix = 1;
                 data.matrix = m;
             }
             return (ref)*this;
@@ -298,12 +295,12 @@ void main()
         }
         ref rotate(float a) // Uses `matrix()`.
         {
-            matrix(fmat3::rotate2D(a));
+            matrix(fmat3::rotate(a));
             return (ref)*this;
         }
         ref translate(fvec2 v) // Uses a matrix.
         {
-            matrix(fmat3::translate2D(v));
+            matrix(fmat3::translate(v));
             return (ref)*this;
         }
         ref scale(fvec2 s) // Uses a matrix.
@@ -318,8 +315,8 @@ void main()
         }
         ref color(fvec3 c)
         {
-            DebugAssert("2D poly renderer: Quad_t color specified twice.", !has_color);
-            has_color = 1;
+            DebugAssert("2D poly renderer: Quad_t color specified twice.", !data.has_color);
+            data.has_color = 1;
 
             for (auto &it : data.colors)
                 it = c;
@@ -327,8 +324,8 @@ void main()
         }
         ref color(fvec3 a, fvec3 b, fvec3 c, fvec3 d)
         {
-            DebugAssert("2D poly renderer: Quad_t color specified twice.", !has_color);
-            has_color = 1;
+            DebugAssert("2D poly renderer: Quad_t color specified twice.", !data.has_color);
+            data.has_color = 1;
 
             data.colors[0] = a;
             data.colors[1] = b;
@@ -338,8 +335,8 @@ void main()
         }
         ref mix(float x) // 0 - fill with color, 1 - use texture
         {
-            DebugAssert("2D poly renderer: Quad_t texture/color factor specified twice.", !has_tex_color_fac);
-            has_tex_color_fac = 1;
+            DebugAssert("2D poly renderer: Quad_t texture/color factor specified twice.", !data.has_tex_color_fac);
+            data.has_tex_color_fac = 1;
 
             for (auto &it : data.tex_color_factors)
                 it = x;
@@ -347,8 +344,8 @@ void main()
         }
         ref mix(float a, float b, float c, float d)
         {
-            DebugAssert("2D poly renderer: Quad_t texture/color factor specified twice.", !has_tex_color_fac);
-            has_tex_color_fac = 1;
+            DebugAssert("2D poly renderer: Quad_t texture/color factor specified twice.", !data.has_tex_color_fac);
+            data.has_tex_color_fac = 1;
 
             data.tex_color_factors[0] = a;
             data.tex_color_factors[1] = b;
@@ -405,4 +402,4 @@ void main()
             return (ref)*this;
         }
     };
-}
+};
