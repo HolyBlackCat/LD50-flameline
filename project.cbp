@@ -100,10 +100,6 @@
 		<Unit filename="src/interface/window.cpp" />
 		<Unit filename="src/interface/window.h" />
 		<Unit filename="src/main.cpp" />
-		<Unit filename="src/master.h">
-			<Option compile="1" />
-			<Option weight="20" />
-		</Unit>
 		<Unit filename="src/program/errors.h" />
 		<Unit filename="src/program/exit.h" />
 		<Unit filename="src/program/parachute.h" />

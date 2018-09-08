@@ -47,7 +47,7 @@ namespace Graphics
         };
 
       public:
-        explicit FrameBuffer(decltype(nullptr)) {}
+        FrameBuffer(decltype(nullptr)) {}
 
         FrameBuffer()
         {

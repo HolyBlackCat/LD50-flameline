@@ -30,7 +30,7 @@ namespace Graphics
         )
     };
 
-    class Texture
+    class TexObject
     {
         struct Data
         {
@@ -40,9 +40,9 @@ namespace Graphics
         Data data;
 
       public:
-        explicit Texture(decltype(nullptr)) {}
+        TexObject(decltype(nullptr)) {}
 
-        Texture()
+        TexObject()
         {
             glGenTextures(1, &data.handle);
             if (!data.handle)
@@ -50,14 +50,14 @@ namespace Graphics
             // Not needed because since there is no code below this point: FINALLY_ON_THROW( glDeleteTextures(1, &data.handle); )
         }
 
-        Texture(Texture &&other) noexcept : data(std::exchange(other.data, {})) {}
-        Texture &operator=(Texture &&other) noexcept
+        TexObject(TexObject &&other) noexcept : data(std::exchange(other.data, {})) {}
+        TexObject &operator=(TexObject &&other) noexcept
         {
             std::swap(data, other.data);
             return *this;
         }
 
-        ~Texture()
+        ~TexObject()
         {
             // Deleting a texture unbinds it.
             glDeleteTextures(1, &data.handle); // Deleting 0 is a no-op.
@@ -95,6 +95,8 @@ namespace Graphics
         inline static int active_index = 0;
 
       public:
+        TexUnit(decltype(nullptr)) {}
+
         TexUnit()
         {
             data.index = Allocator().Alloc();
@@ -105,7 +107,7 @@ namespace Graphics
         {
             AttachHandle(handle);
         }
-        explicit TexUnit(const Texture &texture) : TexUnit()
+        explicit TexUnit(const TexObject &texture) : TexUnit()
         {
             Attach(texture);
         }
@@ -160,7 +162,7 @@ namespace Graphics
             glBindTexture(GL_TEXTURE_2D, handle);
             return std::move(*this);
         }
-        TexUnit &&Attach(const Texture &texture)
+        TexUnit &&Attach(const TexObject &texture)
         {
             AttachHandle(texture.Handle());
             return std::move(*this);
@@ -246,5 +248,97 @@ namespace Graphics
             glTexSubImage2D(GL_TEXTURE_2D, 0, pos.x, pos.y, size.x, size.y, format, type, pixels);
             return std::move(*this);
         }
+    };
+
+    class Texture
+    {
+        TexObject object = nullptr;
+        TexUnit unit = nullptr;
+        ivec2 size = ivec2(0);
+
+      public:
+        Texture(decltype(nullptr)) {}
+
+        Texture() : object(), unit()
+        {
+            unit.Attach(object);
+        }
+
+        Texture &&Interpolation(InterpolationMode mode)
+        {
+            unit.Interpolation(mode);
+            return std::move(*this);
+        }
+
+        Texture &&WrapX(WrapMode mode)
+        {
+            unit.WrapX(mode);
+            return std::move(*this);
+        }
+        Texture &&WrapY(WrapMode mode)
+        {
+            unit.WrapY(mode);
+            return std::move(*this);
+        }
+        Texture &&Wrap(WrapMode mode)
+        {
+            unit.Wrap(mode);
+            return std::move(*this);
+        }
+
+        Texture &&SetData(ivec2 new_size, const uint8_t *pixels = 0)
+        {
+            size = new_size;
+            unit.SetData(size, pixels);
+            return std::move(*this);
+        }
+        Texture &&SetData(GLenum internal_format, GLenum format, GLenum type, ivec2 new_size, const uint8_t *pixels = 0)
+        {
+            size = new_size;
+            unit.SetData(internal_format, format, type, size, pixels);
+            return std::move(*this);
+        }
+        Texture &&SetData(const Image &image)
+        {
+            size = image.Size();
+            unit.SetData(image);
+            return std::move(*this);
+        }
+
+        Texture &&SetDataPart(ivec2 part_pos, ivec2 part_size, const uint8_t *pixels)
+        {
+            unit.SetDataPart(part_pos, part_size, pixels);
+            return std::move(*this);
+        }
+        Texture &&SetDataPart(GLenum format, GLenum type, ivec2 part_pos, ivec2 part_size, const uint8_t *pixels)
+        {
+            unit.SetDataPart(format, type, part_pos, part_size, pixels);
+            return std::move(*this);
+        }
+
+        ivec2 Size() const
+        {
+            return size;
+        }
+        int Handle() const
+        {
+            return object.Handle();
+        }
+        int Index() const
+        {
+            return unit.Index();
+        }
+
+              TexObject &Object()       {return object;}
+        const TexObject &Object() const {return object;}
+
+              TexUnit &Unit()       {return unit;}
+        const TexUnit &Unit() const {return unit;}
+
+        operator       TexObject &()       {return object;}
+        operator const TexObject &() const {return object;}
+
+        operator       TexUnit &()       {return unit;}
+        operator const TexUnit &() const {return unit;}
     };
 }

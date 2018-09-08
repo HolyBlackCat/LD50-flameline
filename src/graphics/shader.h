@@ -249,7 +249,7 @@ namespace Graphics
         }
 
 
-        explicit Shader(decltype(nullptr)) {}
+        Shader(decltype(nullptr)) {}
 
         Shader(std::string name, const ShaderConfig &cfg, std::string vert_source, std::string frag_source, const std::vector<std::string> &attributes = {})
         {
@@ -415,6 +415,8 @@ namespace Graphics
 
         using type_with_extent = T;
         using type = std::remove_extent_t<T>;
+
+        static_assert(!std::is_same_v<type, TexObject> && !std::is_same_v<type, Texture>, "Use `TexUnit` template parameter for texture uniforms.");
 
         inline static constexpr bool
             is_array   = std::is_array_v<type_with_extent>,

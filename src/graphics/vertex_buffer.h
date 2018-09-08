@@ -139,7 +139,7 @@ namespace Graphics
       public:
         static constexpr bool is_reflected = Refl::is_reflected<T>;
 
-        explicit VertexBuffer(decltype(nullptr)) {}
+        VertexBuffer(decltype(nullptr)) {}
 
         VertexBuffer()
         {

@@ -47,7 +47,7 @@ varying vec3 v_factors;
 void main()
 {
     vec4 tex_color = texture2D(u_texture, v_texcoord);
-    gl_FragColor = vec4(mix(v_color.rgb, tex_color.rgb, v_factors.x)
+    gl_FragColor = vec4(mix(v_color.rgb, tex_color.rgb, v_factors.x),
                         mix(v_color.a  , tex_color.a  , v_factors.y));
     vec4 result = u_color_matrix * vec4(gl_FragColor.rgb, 1);
     gl_FragColor.a *= result.a;
@@ -55,12 +55,12 @@ void main()
     gl_FragColor.a *= v_factors.z;
 })";
 
-    Graphics::RenderQueue<Attribs, 3> queue = Graphics::RenderQueue<Attribs, 3>(nullptr);
+    Graphics::RenderQueue<Attribs, 3> queue = nullptr;
     Uniforms uni;
-    Graphics::Shader shader = Graphics::Shader(nullptr);
+    Graphics::Shader shader = nullptr;
 
   public:
-    explicit Render(decltype(nullptr)) {}
+    Render(decltype(nullptr)) {}
     Render(int queue_size, const Graphics::ShaderConfig &config) : queue(queue_size), shader("Main", config, Graphics::ShaderPreferences{}, Meta::tag<Attribs>{}, uni, vertex_source, fragment_source)
     {
         SetMatrix(fmat4());
@@ -82,13 +82,24 @@ void main()
         queue.Flush();
     }
 
-    void SetTexture(const Graphics::TexUnit &unit, ivec2 size)
+    void SetTextureUnit(const Graphics::TexUnit &unit)
     {
         Finish();
         uni.texture = unit;
+    }
+    void SetTextureUnit(Graphics::TexUnit &&) = delete;
+
+    void SetTextureSize(ivec2 size)
+    {
         uni.tex_size = size;
     }
-    void SetTexture(Graphics::TexUnit &&) = delete;
+
+    void SetTexture(const Graphics::Texture &tex)
+    {
+        SetTextureUnit(tex);
+        SetTextureSize(tex.Size());
+    }
+    void SetTexture(Graphics::Texture &&) = delete;
 
     void SetMatrix(const fmat4 &m)
     {
@@ -402,4 +413,14 @@ void main()
             return (ref)*this;
         }
     };
+
+    Quad_t fquad(fvec2 pos, fvec2 size)
+    {
+        return Quad_t(&queue, pos, size);
+    }
+    Quad_t iquad(ivec2 pos, ivec2 size)
+    {
+        return Quad_t(&queue, pos, size);
+    }
+    Quad_t iquad(fvec2 pos, fvec2 size) = delete;
 };

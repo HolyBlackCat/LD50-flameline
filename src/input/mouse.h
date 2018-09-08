@@ -43,6 +43,12 @@ namespace Input
         }
 
       public:
+        Mouse() {}
+        Mouse(const fmat3 &mat)
+        {
+            SetMatrix(mat);
+        }
+
         ivec2 pos() const
         {
             Update();
