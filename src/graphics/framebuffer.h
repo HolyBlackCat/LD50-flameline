@@ -29,6 +29,11 @@ namespace Graphics
             GLenum type;
             GLuint handle;
 
+            Attachment(const TexObject &texture)
+            {
+                type = GL_TEXTURE_2D;
+                handle = texture.Handle();
+            }
             Attachment(const Texture &texture)
             {
                 type = GL_TEXTURE_2D;

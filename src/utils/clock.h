@@ -25,4 +25,20 @@ namespace Clock
     {
         return ticks / double(TicksPerSecond());
     }
+
+    class DeltaTimer
+    {
+        uint64_t time = 0;
+      public:
+        DeltaTimer(decltype(nullptr)) {}
+
+        DeltaTimer() : time(Time()) {} // Don't call before SDL initialization.
+
+        uint64_t operator()()
+        {
+            uint64_t new_time = Time(), delta = new_time - time;
+            time = new_time;
+            return delta;
+        }
+    };
 }
