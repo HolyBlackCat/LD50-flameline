@@ -1,123 +1,55 @@
 #pragma once
 
-#include <type_traits>
-#include <utility>
+#include <memory>
 
-#include "graphics/complete.h"
-#include "reflection/complete.h"
+#include "program/errors.h"
 #include "utils/mat.h"
 
 namespace Graphics
 {
     struct ShaderConfig;
+    class TexUnit;
+    class Texture;
 }
 
 class Render
 {
-    ReflectStruct(Attribs, (
-        (fvec2)(pos),
-        (fvec4)(color),
-        (fvec2)(texcoord),
-        (fvec3)(factors),
-    ))
+    struct Data;
+    std::unique_ptr<Data> data;
 
-    ReflectStruct(Uniforms, (
-        (Graphics::VertUniform<fmat4>)(matrix),
-        (Graphics::VertUniform<fvec2>)(tex_size),
-        (Graphics::FragUniform<Graphics::TexUnit>)(texture),
-        (Graphics::FragUniform<fmat4>)(color_matrix),
-    ))
-
-    static constexpr const char *vertex_source = R"(
-varying vec4 v_color;
-varying vec2 v_texcoord;
-varying vec3 v_factors;
-void main()
-{
-    gl_Position = u_matrix * vec4(a_pos, 0, 1);
-    v_color     = a_color;
-    v_texcoord  = a_texcoord / u_tex_size;
-    v_factors   = a_factors;
-})";
-
-    static constexpr const char *fragment_source = R"(
-varying vec4 v_color;
-varying vec2 v_texcoord;
-varying vec3 v_factors;
-void main()
-{
-    vec4 tex_color = texture2D(u_texture, v_texcoord);
-    gl_FragColor = vec4(mix(v_color.rgb, tex_color.rgb, v_factors.x),
-                        mix(v_color.a  , tex_color.a  , v_factors.y));
-    vec4 result = u_color_matrix * vec4(gl_FragColor.rgb, 1);
-    gl_FragColor.a *= result.a;
-    gl_FragColor.rgb = result.rgb * gl_FragColor.a;
-    gl_FragColor.a *= v_factors.z;
-})";
-
-    Graphics::RenderQueue<Attribs, 3> queue = nullptr;
-    Uniforms uni;
-    Graphics::Shader shader = nullptr;
+    void *GetRenderQueuePtr();
 
   public:
-    Render(decltype(nullptr)) {}
-    Render(int queue_size, const Graphics::ShaderConfig &config) : queue(queue_size), shader("Main", config, Graphics::ShaderPreferences{}, Meta::tag<Attribs>{}, uni, vertex_source, fragment_source)
-    {
-        SetMatrix(fmat4());
-        SetColorMatrix(fmat4());
-    }
+    Render(decltype(nullptr));
+    Render(int queue_size, const Graphics::ShaderConfig &config);
 
-    explicit operator bool() const
-    {
-        return bool(shader);
-    }
+    ~Render();
 
-    void BindShader() const
-    {
-        shader.Bind();
-    }
+    explicit operator bool() const;
 
-    void Finish()
-    {
-        queue.Flush();
-    }
+    void BindShader() const;
 
-    void SetTextureUnit(const Graphics::TexUnit &unit)
-    {
-        Finish();
-        uni.texture = unit;
-    }
+    void Finish();
+
+    void SetTextureUnit(const Graphics::TexUnit &unit);
     void SetTextureUnit(Graphics::TexUnit &&) = delete;
 
-    void SetTextureSize(ivec2 size)
-    {
-        uni.tex_size = size;
-    }
+    void SetTextureSize(ivec2 size);
 
-    void SetTexture(const Graphics::Texture &tex)
-    {
-        SetTextureUnit(tex);
-        SetTextureSize(tex.Size());
-    }
+    void SetTexture(const Graphics::Texture &tex);
     void SetTexture(Graphics::Texture &&) = delete;
 
-    void SetMatrix(const fmat4 &m)
-    {
-        Finish();
-        uni.matrix = m;
-    }
+    void SetMatrix(const fmat4 &m);
 
-    void SetColorMatrix(const fmat4 &m)
-    {
-        Finish();
-        uni.color_matrix = m;
-    }
+    void SetColorMatrix(const fmat4 &m);
 
     class Quad_t
     {
+        friend class Render;
+
         using ref = Quad_t &&;
 
-        Graphics::RenderQueue<Attribs, 3> *queue; // The constructor sets this.
+        void *queue = 0; // Actually the type should be `Graphics::RenderQueue<Attribs, 3> *`, but we don't include "graphics/render_queue.h" for better compilation times.
 
         struct Data
         {
@@ -149,12 +81,12 @@ void main()
         };
         Data data;
 
-      public:
-        Quad_t(decltype(queue) queue, fvec2 pos, fvec2 size) : queue(queue)
+        Quad_t(void *queue, fvec2 pos, fvec2 size) : queue(queue)
         {
             data.pos = pos;
             data.size = size;
         }
+      public:
         Quad_t(Quad_t &&other) noexcept : queue(std::exchange(other.queue, {})), data(std::move(other.data)) {}
         Quad_t &operator=(Quad_t other)
         {
@@ -163,91 +95,7 @@ void main()
             return *this;
         }
 
-        ~Quad_t()
-        {
-           if (!queue)
-                return;
-
-            DebugAssert("2D poly renderer: Quad with no texture nor color specified.", data.has_texture || data.has_color);
-            DebugAssert("2D poly renderer: Quad with absolute corner coodinates with a center specified.", data.abs_pos + data.has_center < 2);
-            DebugAssert("2D poly renderer: Quad with absolute texture coordinates mode but no texture coordinates specified.", data.abs_tex_pos <= data.has_texture);
-            DebugAssert("2D poly renderer: Quad with texture and color, but without a mixing factor.", (data.has_texture && data.has_color) == data.has_tex_color_fac);
-            DebugAssert("2D poly renderer: Quad with a matrix but without a center specified.", data.has_matrix <= data.has_center);
-
-            if (data.abs_pos)
-                data.size -= data.pos;
-            if (data.abs_tex_pos)
-                data.tex_size -= data.tex_pos;
-
-            Attribs out[4];
-
-            if (data.has_texture)
-            {
-                for (int i = 0; i < 4; i++)
-                {
-                    out[i].color = data.colors[i].to_vec4(0);
-                    out[i].factors.x = data.tex_color_factors[i];
-                    out[i].factors.y = data.alpha[i];
-                }
-
-                if (data.center_pos_tex)
-                {
-                    if (data.tex_size.x)
-                        data.center.x *= data.size.x / data.tex_size.x;
-                    if (data.tex_size.y)
-                        data.center.y *= data.size.y / data.tex_size.y;
-                }
-            }
-            else
-            {
-                for (int i = 0; i < 4; i++)
-                {
-                    out[i].color = data.colors[i].to_vec4(data.alpha[i]);
-                    out[i].factors.x = out[i].factors.y = 0;
-                }
-            }
-
-            for (int i = 0; i < 4; i++)
-                out[i].factors.z = data.beta[i];
-
-            if (data.flip_x)
-            {
-                data.tex_pos.x += data.tex_size.x;
-                data.tex_size.x = -data.tex_size.x;
-                if (data.has_center)
-                    data.center.x = data.size.x - data.center.x;
-            }
-            if (data.flip_y)
-            {
-                data.tex_pos.y += data.tex_size.y;
-                data.tex_size.y = -data.tex_size.y;
-                if (data.has_center)
-                    data.center.y = data.size.y - data.center.y;
-            }
-
-            out[0].pos = -data.center;
-            out[2].pos = data.size - data.center;
-            out[1].pos = fvec2(out[2].pos.x, out[0].pos.y);
-            out[3].pos = fvec2(out[0].pos.x, out[2].pos.y);
-
-            if (data.has_matrix)
-            {
-                for (auto &it : out)
-                    it.pos = data.pos + (data.matrix * it.pos.to_vec3(1)).to_vec2();
-            }
-            else
-            {
-                for (auto &it : out)
-                    it.pos += data.pos;
-            }
-
-            out[0].texcoord = data.tex_pos;
-            out[2].texcoord = data.tex_pos + data.tex_size;
-            out[1].texcoord = {out[2].texcoord.x, out[0].texcoord.y};
-            out[3].texcoord = {out[0].texcoord.x, out[2].texcoord.y};
-
-            queue->Add(out[0], out[1], out[2], out[3]);
-        }
+        ~Quad_t();
 
         ref tex(fvec2 pos, fvec2 size)
         {
@@ -416,11 +264,11 @@ void main()
 
     Quad_t fquad(fvec2 pos, fvec2 size)
     {
-        return Quad_t(&queue, pos, size);
+        return Quad_t(GetRenderQueuePtr(), pos, size);
     }
     Quad_t iquad(ivec2 pos, ivec2 size)
     {
-        return Quad_t(&queue, pos, size);
+        return Quad_t(GetRenderQueuePtr(), pos, size);
     }
     Quad_t iquad(fvec2 pos, fvec2 size) = delete;
 };

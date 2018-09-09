@@ -137,7 +137,7 @@ namespace Graphics
         ShaderPreferences(std::string a, std::string u) : attribute_prefix(a), uniform_prefix(u) {}
     };
 
-    struct None_t {} None; // Means no attributes or no uniforms.
+    static constexpr struct None_t {} None; // Means no attributes or no uniforms.
 
     template <typename T> class Uniform;
 

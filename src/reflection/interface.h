@@ -89,12 +89,12 @@ namespace Refl
         };
 
 
-        constexpr bool is_alphanum(char ch)
+        inline constexpr bool is_alphanum(char ch)
         {
             return (ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') || (ch >= '0' && ch <= '9') || ch == '_';
         }
 
-        void skip_whitespace(const char *&ptr) // Also skips comments (from '#' to '\n' or `\r`).
+        inline void skip_whitespace(const char *&ptr) // Also skips comments (from '#' to '\n' or `\r`).
         {
             while (1)
             {
