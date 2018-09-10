@@ -42,7 +42,7 @@ class AdaptiveViewport
         {
             target_size = new_target_size;
             scale = (fvec2(new_target_size) / fvec2(size)).min();
-            scale_floor = scale; // Gets truncated automatically.
+            scale_floor = max(1, int(scale));
             intermediate_size = size * scale_floor;
             viewport_size = min(iround(size * scale), new_target_size);
             viewport_pos = (new_target_size - viewport_size)/2;
