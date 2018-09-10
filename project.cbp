@@ -119,6 +119,8 @@
 		<Unit filename="src/utils/clock.h" />
 		<Unit filename="src/utils/dynamic_storage.h" />
 		<Unit filename="src/utils/finally.h" />
+		<Unit filename="src/utils/json.cpp" />
+		<Unit filename="src/utils/json.h" />
 		<Unit filename="src/utils/macro.h" />
 		<Unit filename="src/utils/mat.h" />
 		<Unit filename="src/utils/memory_file.h" />
