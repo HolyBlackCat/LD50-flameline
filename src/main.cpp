@@ -15,6 +15,7 @@
 #include "utils/clock.h"
 #include "utils/dynamic_storage.h"
 #include "utils/finally.h"
+#include "utils/json.h"
 #include "utils/macro.h"
 #include "utils/mat.h"
 #include "utils/memory_file.h"
