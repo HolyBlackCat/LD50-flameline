@@ -26,6 +26,7 @@
 #include "utils/tasks.h"
 
 #include "game/adaptive_viewport.h"
+#include "game/map.h"
 #include "game/render.h"
 
 #define main SDL_main
@@ -42,6 +43,22 @@ Input::Mouse mouse(fmat3::translate(-fvec2(400,300)));
 
 int main(int, char**)
 {
+    MemoryFile map_file("map.json");
+    std::string map_str((char *)map_file.begin(), (char *)map_file.end());
+    Map::TileSheet sheet(ivec2(0,512), ivec2(32,32));
+    Map::Layer la("my_map", &sheet, Json(map_str.c_str(), 64).GetView()["layers"][0]);
+
+    for (int y = 0; y < la.Size().y; y++)
+    {
+        for (int x = 0; x < la.Size().x; x++)
+        {
+            std::cout << std::setw(3) << la.TryGetIndex(ivec2(x,y));
+        }
+        std::cout << '\n';
+    }
+
+
+
     render.SetTexture(tex);
     adaptive_viewport.Update();
 

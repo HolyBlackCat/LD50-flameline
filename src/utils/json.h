@@ -54,6 +54,24 @@ class Json
         {
             throw std::runtime_error("Expected JSON object `" + path + "` to be " + type + ".");
         }
+
+        std::string AppendElementIndexToPath(int index) const
+        {
+            std::string ret = path;
+            ret += '[';
+            ret += std::to_string(index);
+            ret += ']';
+            return ret;
+        }
+        std::string AppendElementNameToPath(std::string name) const
+        {
+            if (path.empty())
+                return name;
+            std::string ret = path;
+            ret += '.';
+            ret += name;
+            return ret;
+        }
       public:
         View() {}
         View(const Json &json, std::string name = "") : ptr(&json), path(std::move(name)) {}
@@ -113,9 +131,23 @@ class Json
             const array_t &arr = *std::get_if<int(array)>(&ptr->variant);
             if (index < 0 || decltype(arr.size())(index) >= arr.size())
                 throw std::runtime_error("Attempt to access element #" + std::to_string(index) + " of JSON object `" + path + "`, but it only contains " + std::to_string(arr.size()) + " elements.");
-            return View(arr[index], (path.empty() ? std::to_string(index) : path + "[" + std::to_string(index) + "]"));
+            return View(arr[index], AppendElementIndexToPath(index));
+        }
+        template <typename F> void ForEachArrayElement(F &&func) // `func` should be `void func(const View &elem)`.
+        {
+            if (!IsArray())
+                ThrowExpectedType("an array");
+            const array_t &arr = *std::get_if<int(array)>(&ptr->variant);
+            for (array_t::size_type i = 0; i < arr.size(); i++)
+                func(View(arr[i], AppendElementIndexToPath(i)));
         }
 
+        int GetObjectSize() const
+        {
+            if (!IsObject())
+                ThrowExpectedType("an object");
+            return std::get_if<int(object)>(&ptr->variant)->size();
+        }
         View GetElement(std::string key) const
         {
             if (!IsObject())
@@ -124,7 +156,15 @@ class Json
             auto it = obj.find(key);
             if (it == obj.end())
                 throw std::runtime_error("Attempt to access nonexistent element `" + key + "` of JSON object `" + path + "`.");
-            return View(it->second, (path.empty() ? key : path + "." + key));
+            return View(it->second, AppendElementNameToPath(key));
+        }
+        template <typename F> void ForEachObjectElement(F &&func) // `func` should be `void func(const std::string &name, const View &elem)`.
+        {
+            if (!IsObject())
+                ThrowExpectedType("an object");
+            const object_t &obj = *std::get_if<int(object)>(&ptr->variant);
+            for (const auto &elem : obj)
+                func(View(elem.second, AppendElementNameToPath(elem.first)));
         }
 
         View operator[](int index) const // Same as GetElement(int).
