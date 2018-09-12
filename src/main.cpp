@@ -52,7 +52,7 @@ int main(int, char**)
     {
         for (int x = 0; x < la.Size().x; x++)
         {
-            std::cout << std::setw(3) << la.TryGetIndex(ivec2(x,y));
+            std::cout << std::setw(3) << la.TryGet(ivec2(x,y)).index;
         }
         std::cout << '\n';
     }

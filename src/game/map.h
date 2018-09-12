@@ -11,10 +11,10 @@
 class Map
 {
   public:
-    using tile_t = u16vec2;
     using index_t = uint16_t;
-    static constexpr tile_t no_tile = tile_t(0xffff);
-    static constexpr index_t no_index = 0; // We use 0 because Tiled uses it.
+    using variant_t = uint16_t;
+    static constexpr index_t index_none = 0; // We use 0 because Tiled uses it.
+    static constexpr variant_t variant_default = 0;
 
     class TileSheet
     {
@@ -35,11 +35,19 @@ class Map
         }
     };
 
+    struct Tile
+    {
+        index_t index = index_none;
+        variant_t variant = variant_default;
+
+        Tile(index_t index = index_none, variant_t variant = variant_default) : index(index), variant(variant) {}
+    };
+
     class Layer
     {
         ivec2 size = ivec2(0);
-        std::vector<tile_t> tiles;
-        std::vector<index_t> indices;
+        std::vector<Tile> tiles;
+
         const TileSheet *sheet = 0;
 
       public:
@@ -67,16 +75,14 @@ class Map
                     Program::Error("Invalid tile count in data array, the file is corrupted.");
 
                 // Read tile indices.
+                tiles.reserve(size.prod());
                 data_array.ForEachArrayElement([&](const Json::View &elem)
                 {
                     int index = elem.GetInt();
                     if (index < std::numeric_limits<index_t>::min() || index > std::numeric_limits<index_t>::max())
                         Program::Error("Tile index out of range.");
-                    indices.push_back(index);
+                    tiles.push_back(Tile(index));
                 });
-
-                // Allocate tile array.
-                tiles.resize(indices.size(), no_tile);
             }
             catch (std::exception &e)
             {
@@ -104,58 +110,51 @@ class Map
             return (pos >= 0).all() && (pos < Size()).all();
         }
 
-        tile_t UnsafeGetTile(ivec2 pos) const
+        Tile UnsafeGet(ivec2 pos) const
         {
             return tiles[pos.x + pos.y * size.x];
         }
-        tile_t TryGetTile(ivec2 pos) const
-        {
-            if (PosInRange(pos))
-                return UnsafeGetTile(pos);
-            else
-                return no_tile;
-        }
-        tile_t ClampGetTile(ivec2 pos) const
+        Tile ClampGet(ivec2 pos) const
         {
             clamp_var(pos, 0, Size()-1);
-            return UnsafeGetTile(pos);
+            return UnsafeGet(pos);
+        }
+        Tile TryGet(ivec2 pos) const
+        {
+            if (PosInRange(pos))
+                return UnsafeGet(pos);
+            else
+                return Tile();
         }
 
-        void UnsafeSetTile(ivec2 pos, tile_t tile)
+        void UnsafeSet(ivec2 pos, Tile tile)
         {
             tiles[pos.x + pos.y * size.x] = tile;
         }
-        void TrySetTile(ivec2 pos, tile_t tile)
+        void TrySet(ivec2 pos, Tile tile)
         {
             if (PosInRange(pos))
-                UnsafeSetTile(pos, tile);
-        }
-
-        index_t UnsafeGetIndex(ivec2 pos) const
-        {
-            return indices[pos.x + pos.y * size.x];
-        }
-        index_t TryGetIndex(ivec2 pos) const
-        {
-            if (PosInRange(pos))
-                return UnsafeGetIndex(pos);
-            else
-                return no_index;
-        }
-        index_t ClampGetIndex(ivec2 pos) const
-        {
-            clamp_var(pos, 0, Size()-1);
-            return UnsafeGetIndex(pos);
+                UnsafeSet(pos, tile);
         }
 
         void UnsafeSetIndex(ivec2 pos, index_t index)
         {
-            indices[pos.x + pos.y * size.x] = index;
+            tiles[pos.x + pos.y * size.x].index = index;
         }
         void TrySetIndex(ivec2 pos, index_t index)
         {
             if (PosInRange(pos))
                 UnsafeSetIndex(pos, index);
+        }
+
+        void UnsafeSetVariant(ivec2 pos, variant_t variant)
+        {
+            tiles[pos.x + pos.y * size.x].variant = variant;
+        }
+        void TrySetVariant(ivec2 pos, variant_t variant)
+        {
+            if (PosInRange(pos))
+                UnsafeSetVariant(pos, variant);
         }
     };
 
