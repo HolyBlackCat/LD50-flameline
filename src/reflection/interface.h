@@ -21,6 +21,9 @@ namespace Refl
         template <typename T> using not_specialized_tag = typename T::not_specialized_tag;
         template <typename T> inline constexpr bool is_specialized = !Meta::is_detected<not_specialized_tag, T>;
 
+        template <typename T> using structure_tuple_tag = typename T::structure_tuple_tag;
+        template <typename T> inline constexpr bool is_structure_tuple = !Meta::is_detected<structure_tuple_tag, T>;
+
         // For any of those templates, T will never be cv-qualified.
 
         template <typename T, typename = void> struct Primitive
@@ -42,6 +45,7 @@ namespace Refl
             inline static const std::string name = "??";
 
             // Field indices are guaranteed to be in valid range.
+            static constexpr bool is_tuple = 0; // Forces `to_string` and `from_string` to use a terse syntax without field names (in this case field categories are ignored, all fields are considered mandatory).
             static constexpr int field_count = 0;
             template <int I> static constexpr void field(T &); // When specialized, should return `auto &`.
             static std::string field_name(int index) {(void)index; return "??";}
@@ -161,6 +165,13 @@ namespace Refl
             }
         }
 
+        static constexpr bool is_structure_tuple = []() -> bool {
+            if constexpr (is_structure)
+                return low::is_tuple;
+            else
+                return 0;
+        }();
+
         constexpr Interface() {};
         constexpr Interface(type_no_ref &ref) : ptr((type_no_cvref *)&ref) {}
         constexpr Interface(type_no_ref &&ref) : ptr((type_no_cvref *)&ref) {}
@@ -185,7 +196,7 @@ namespace Refl
             else if constexpr (is_structure)
             {
                 std::string ret;
-                ret += '{';
+                ret += (!is_structure_tuple ? '{' : '(');
                 for_each_field([&, this](auto index)
                 {
                     constexpr int i = index.value;
@@ -193,11 +204,14 @@ namespace Refl
                     if constexpr (i != 0)
                         ret += ',';
 
-                    ret += field_name(i);
-                    ret += '=';
+                    if constexpr (!is_structure_tuple)
+                    {
+                        ret += field_name(i);
+                        ret += '=';
+                    }
                     ret += field<i>().to_string();
                 });
-                ret += '}';
+                ret += (!is_structure_tuple ? '}' : ')');
                 return ret;
             }
             else // is_container
@@ -238,129 +252,185 @@ namespace Refl
             }
             else if constexpr (is_structure)
             {
-                // Make functions to parse fields.
-                using this_func_t = void(Interface &, const char *&, FromStringMode mode);
-
-                constexpr std::array<this_func_t *, field_count()> field_parsers = []<int ...I>(std::integer_sequence<int, I...>)
+                if constexpr (!is_structure_tuple)
                 {
-                    return std::array<this_func_t *, field_count()>
+                    // Make functions to parse fields.
+                    using this_func_t = void(Interface &, const char *&, FromStringMode mode);
+
+                    constexpr std::array<this_func_t *, field_count()> field_parsers = []<int ...I>(std::integer_sequence<int, I...>)
                     {
-                        [](Interface &interface, const char *&str, FromStringMode mode)
+                        return std::array<this_func_t *, field_count()>
                         {
-                            interface.field<I>().from_string_low(str, mode);
-                        }...
-                    };
-                }
-                (std::make_integer_sequence<int, field_count()>{});
-
-                // Flags for existing fields.
-                bool existing_fields[field_count()]{};
-
-                // Skip the `{`.
-                if (*str != '{') Program::Error("Expected '{'.");
-                str++;
-
-                // Skip whitespace after `{`.
-                impl::skip_whitespace(str);
-
-                bool first = 1;
-
-                while (1)
-                {
-                    // Stop if `}`.
-                    if (*str == '}')
-                    {
-                        str++;
-                        break;
+                            [](Interface &interface, const char *&str, FromStringMode mode)
+                            {
+                                interface.field<I>().from_string_low(str, mode);
+                            }...
+                        };
                     }
+                    (std::make_integer_sequence<int, field_count()>{});
 
-                    // Skip `,` between fields.
-                    if (first)
-                    {
-                        first = 0;
-                    }
-                    else
-                    {
-                        if (*str != ',') Program::Error("Expected ',' or '}'.");
-                        str++;
+                    // Flags for existing fields.
+                    bool existing_fields[field_count()]{};
 
-                        // Skip whitespace after `,`.
+                    // Skip the `{`.
+                    if (*str != '{') Program::Error("Expected '{'.");
+                    str++;
+
+                    // Skip whitespace after `{`.
+                    impl::skip_whitespace(str);
+
+                    bool first = 1;
+
+                    while (1)
+                    {
+                        // Stop if `}`.
+                        if (*str == '}')
+                        {
+                            str++;
+                            break;
+                        }
+
+                        // Skip `,` between fields.
+                        if (first)
+                        {
+                            first = 0;
+                        }
+                        else
+                        {
+                            if (*str != ',') Program::Error("Expected ',' or '}'.");
+                            str++;
+
+                            // Skip whitespace after `,`.
+                            impl::skip_whitespace(str);
+                        }
+
+                        // One more time, stop if `}`.
+                        if (*str == '}')
+                        {
+                            str++;
+                            break;
+                        }
+
+                        // Read field name.
+                        std::string name;
+                        while (impl::is_alphanum(*str))
+                            name += *str++;
+
+                        // Stop if field name is empty.
+                        if (name.empty()) Program::Error("Expected field name.");
+
+                        // Obtain field index.
+                        int index = field_index_from_name(name);
+                        if (index == -1) Program::Error("No field named `", name, "`.");
+
+                        // Make sure we didn't read the same field before.
+                        if (existing_fields[index]) Program::Error("Duplicate field named `", name, "`.");
+
+                        // Skip whitespace after field name.
+                        impl::skip_whitespace(str);
+
+                        // Skip `=`.
+                        if (*str != '=') Program::Error("Expected '='.");
+                            str++;
+
+                        try
+                        {
+                            // Try parsing the field.
+                            field_parsers[index](*this, str, mode);
+                        }
+                        catch (std::exception &e)
+                        {
+                            std::string msg = e.what();
+                            std::string append;
+                            append = "." + name;
+                            if (msg[0] != '.')
+                                append += ": ";
+                            msg = append + msg;
+                            Program::Error(msg);
+                        }
+
+                        // Mark the field as existing.
+                        existing_fields[index] = 1;
+
+                        // Skip whitespace after field.
                         impl::skip_whitespace(str);
                     }
 
-                    // One more time, stop if `}`.
-                    if (*str == '}')
+                    // Check for uninitialized fields.
+                    if (mode == full)
                     {
-                        str++;
-                        break;
-                    }
-
-                    // Read field name.
-                    std::string name;
-                    while (impl::is_alphanum(*str))
-                        name += *str++;
-
-                    // Stop if field name is empty.
-                    if (name.empty()) Program::Error("Expected field name.");
-
-                    // Obtain field index.
-                    int index = field_index_from_name(name);
-                    if (index == -1) Program::Error("No field named `", name, "`.");
-
-                    // Make sure we didn't read the same field before.
-                    if (existing_fields[index]) Program::Error("Duplicate field named `", name, "`.");
-
-                    // Skip whitespace after field name.
-                    impl::skip_whitespace(str);
-
-                    // Skip `=`.
-                    if (*str != '=') Program::Error("Expected '='.");
-                        str++;
-
-                    try
-                    {
-                        // Try parsing the field.
-                        field_parsers[index](*this, str, mode);
-                    }
-                    catch (std::exception &e)
-                    {
-                        std::string msg = e.what();
-                        std::string append;
-                        append = "." + name;
-                        if (msg[0] != '.')
-                            append += ": ";
-                        msg = append + msg;
-                        Program::Error(msg);
-                    }
-
-                    // Mark the field as existing.
-                    existing_fields[index] = 1;
-
-                    // Skip whitespace after field.
-                    impl::skip_whitespace(str);
-                }
-
-                // Check for uninitialized fields.
-                if (mode == full)
-                {
-                    bool incomplete = 0;
-                    std::string missing;
-                    for (int i = 0; i < field_count(); i++)
-                    {
-                        if (field_category(i) == FieldCategory::optional)
-                            continue;
-                        if (!existing_fields[i])
+                        bool incomplete = 0;
+                        std::string missing;
+                        for (int i = 0; i < field_count(); i++)
                         {
-                            incomplete = 1;
-                            if (missing.size() > 0)
-                                missing += ", ";
-                            missing += '`';
-                            missing += field_name(i);
-                            missing += '`';
+                            if (field_category(i) == FieldCategory::optional)
+                                continue;
+                            if (!existing_fields[i])
+                            {
+                                incomplete = 1;
+                                if (missing.size() > 0)
+                                    missing += ", ";
+                                missing += '`';
+                                missing += field_name(i);
+                                missing += '`';
+                            }
                         }
+                        if (incomplete)
+                            Program::Error("Following fields are missing: ", missing, ".");
                     }
-                    if (incomplete)
-                        Program::Error("Following fields are missing: ", missing, ".");
+                }
+                else
+                {
+                    // Skip the `(`.
+                    if (*str != '(') Program::Error("Expected '('.");
+                    str++;
+
+                    // Skip whitespace after `(`.
+                    impl::skip_whitespace(str);
+
+                    for_each_field([&, this](auto index)
+                    {
+                        constexpr int i = index.value;
+
+                        // Skip `,` between fields.
+                        if constexpr (i != 0)
+                        {
+                            if (*str != ',') Program::Error("Expected ','.");
+                            str++;
+                        }
+
+                        try
+                        {
+                            // Try parsing the field.
+                            field<i>().from_string_low(str, mode);
+                        }
+                        catch (std::exception &e)
+                        {
+                            std::string msg = e.what();
+                            std::string append;
+                            append = "." + field_name(i) + "(" + std::to_string(i) + ")";
+                            if (msg[0] != '.')
+                                append += ": ";
+                            msg = append + msg;
+                            Program::Error(msg);
+                        }
+
+                        // Skip whitespace after the field.
+                        impl::skip_whitespace(str);
+                    });
+
+                    // Skip the trailing comma if we have one.
+                    if (*str == ',')
+                    {
+                        str++;
+
+                        // Skip whitespace after the trailing comma.
+                        impl::skip_whitespace(str);
+                    }
+
+                    // Skip the `)`.
+                    if (*str != ')') Program::Error("Expected ')' or ',)'.");
+                    str++;
                 }
             }
             else // is_constainer
@@ -447,7 +517,7 @@ namespace Refl
                 if (msg[0] == '.')
                 {
                     msg.erase(msg.begin());
-                    msg = "At: " + msg;
+                    msg = "At " + msg;
                 }
                 msg = "Unable to parse reflected object:\n" + msg;
                 Program::Error(msg);

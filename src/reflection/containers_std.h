@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstddef>
 #include <utility>
 
 #include "interface.h"
@@ -8,7 +9,13 @@
 
 namespace Refl::Custom
 {
-    template <typename T> struct Container<T, std::void_t<typename T::value_type, typename T::size_type, decltype(std::declval<T&>().begin()), decltype(std::declval<T&>().end())>>
+    namespace impl
+    {
+        template <typename T> inline constexpr bool is_std_array = 0;
+        template <typename T, std::size_t N> inline constexpr bool is_std_array<std::array<T,N>> = 1;
+    }
+
+    template <typename T> struct Container<T, std::void_t<typename T::value_type, typename T::size_type, decltype(std::declval<T&>().begin()), decltype(std::declval<T&>().end()), std::enable_if_t<!impl::is_std_array<T>>>>
     {
         inline static const std::string name = "list";
 

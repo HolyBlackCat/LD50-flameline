@@ -7,6 +7,7 @@
 
 #include "interface.h"
 #include "utils/macro.h"
+#include "utils/meta.h"
 
 #define ReflectStruct(class_name, seq) struct class_name { Reflect(class_name) seq };
 
@@ -39,6 +40,8 @@
         static std::string field_name(int index) {return ::std::array{ MA_SEQ_FOR_EACH(REFL_Structure_FieldNamePack, MA_COMMA, , seq) }[index];} \
         /* Field categories */\
         static constexpr ::Refl::FieldCategory field_category(int index) {return ::std::array{ MA_SEQ_FOR_EACH(REFL_Structure_FieldCategoryPack, MA_COMMA, , seq) }[index];} \
+        /* Note that we don't define `is_tuple` here. It's defined later by the specialization of `Refl::Custom::Structure` for macro-reflected structures. */\
+        /* It's set to 1 if `using _refl_structure_tuple_tag = void;` is detected in the reflected structure. */\
     }; \
 
 
@@ -87,7 +90,12 @@ namespace Refl::Custom
             template <typename T, typename = void> struct impl {};
             template <typename T> struct impl<T, std::void_t<typename T::_refl_interface>> {using interface = typename T::_refl_interface;};
         };
+
+        template <typename T> using structure_tuple_tag = typename T::_refl_structure_tuple_tag;
     }
 
-    template <typename T> struct Structure<T, std::void_t<typename impl::Macro::impl<T>::interface>> : impl::Macro::impl<T>::interface {};
+    template <typename T> struct Structure<T, std::void_t<typename impl::Macro::impl<T>::interface>> : impl::Macro::impl<T>::interface
+    {
+        static constexpr bool is_tuple = Meta::is_detected<impl::structure_tuple_tag, T>;
+    };
 }
