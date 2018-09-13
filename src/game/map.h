@@ -35,6 +35,11 @@ class Map
         }
     };
 
+    struct Format
+    {
+        std::vector<std::string> tile_layers;
+    };
+
     struct Tile
     {
         index_t index = index_none;
@@ -43,7 +48,7 @@ class Map
         Tile(index_t index = index_none, variant_t variant = variant_default) : index(index), variant(variant) {}
     };
 
-    class Layer
+    class TileLayer
     {
         ivec2 size = ivec2(0);
         std::vector<Tile> tiles;
@@ -51,9 +56,9 @@ class Map
         const TileSheet *sheet = 0;
 
       public:
-        Layer() {}
+        TileLayer() {}
 
-        Layer(std::string map_name, const TileSheet *sheet, const Json::View &data) : sheet(sheet)
+        TileLayer(const TileSheet *sheet, const Json::View &data) : sheet(sheet) // Pointer to sheet is saved for future use.
         {
             try
             {
@@ -96,13 +101,23 @@ class Map
                     layer_name = "??";
                 }
 
-                Program::Error("Unable to load map `", map_name, "`, layer `", layer_name, "`: ", e.what());
+                Program::Error("Unable to load layer `", layer_name, "`: ", e.what());
             }
+        }
+
+        explicit operator bool() const
+        {
+            return tiles.size() > 0;
         }
 
         ivec2 Size() const
         {
             return size;
+        }
+
+        const TileSheet &Sheet() const
+        {
+            return *sheet;
         }
 
         bool PosInRange(ivec2 pos) const
@@ -159,10 +174,73 @@ class Map
     };
 
   private:
+    std::vector<TileLayer> layers;
 
   public:
-    Map()
-    {
+    Map() {}
 
+    Map(const Format &format, const TileSheet *sheet, const std::string &map_name, const Json::View &data) // Pointer to sheet is saved for future use.
+    {
+        try
+        {
+            auto layers_data = data["layers"];
+            int layers_count = layers_data.GetArraySize();
+
+            int last_index = -1;
+
+            for (size_t i = 0; i < format.tile_layers.size(); i++)
+            {
+                const std::string &layer_name = format.tile_layers[i];
+
+                bool found = 0;
+                for (int j = 0; j < layers_count; j++)
+                {
+                    auto this_layer = layers_data[j];
+
+                    if (this_layer["name"].GetString() == layer_name)
+                    {
+                        if (found)
+                            Program::Error("Duplicate layer `", layer_name, "`.");
+
+                        if (i != 0 && j <= last_index)
+                            Program::Error("Expected layer `", layer_name, "` to be located after layer `", format.tile_layers[i-1], "`.");
+
+                        found = 1;
+                        last_index = i;
+
+                        layers.push_back(TileLayer(sheet, this_layer));
+
+                        // No `break` here because we want to check other layers for duplicates.
+                    }
+                }
+
+                if (!found)
+                    Program::Error("No layer named `", layer_name, "`.");
+            }
+        }
+        catch (std::exception &e)
+        {
+            Program::Error("Unable to load map `", map_name, "`: ", e.what());
+        }
+    }
+
+    Map(const Format &format, const TileSheet *sheet, MemoryFile file) : Map(format, sheet, file.name(), Json(file.construct_string().c_str(), 64)) {}
+
+    int LayerCount() const
+    {
+        return layers.size();
+    }
+
+    TileLayer &Layer(int index)
+    {
+        if (index < 0 || size_t(index) >= layers.size())
+            Program::Error("Map layer index is out of range.");
+        return layers[index];
+    }
+    const TileLayer &Layer(int index) const
+    {
+        if (index < 0 || size_t(index) >= layers.size())
+            Program::Error("Map layer index is out of range.");
+        return layers[index];
     }
 };

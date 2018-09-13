@@ -155,6 +155,11 @@ class MemoryFile
         return ret;
     }
 
+    [[nodiscard]] std::string construct_string() const
+    {
+        return std::string((char*)begin(), (char*)end());
+    }
+
 
     static void Save(std::string file_name, const uint8_t *begin, const uint8_t *end) // Throws on failure.
     {

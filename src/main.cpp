@@ -43,16 +43,15 @@ Input::Mouse mouse(fmat3::translate(-fvec2(400,300)));
 
 int main(int, char**)
 {
-    MemoryFile map_file("map.json");
-    std::string map_str((char *)map_file.begin(), (char *)map_file.end());
     Map::TileSheet sheet(ivec2(0,512), ivec2(32,32));
-    Map::Layer la("my_map", &sheet, Json(map_str.c_str(), 64).GetView()["layers"][0]);
+    Map::Format format = ADJUST(Map::Format{}, tile_layers = {"mid"});
+    Map map(format, &sheet, "map.json");
 
-    for (int y = 0; y < la.Size().y; y++)
+    for (int y = 0; y < map.Layer(0).Size().y; y++)
     {
-        for (int x = 0; x < la.Size().x; x++)
+        for (int x = 0; x < map.Layer(0).Size().x; x++)
         {
-            std::cout << std::setw(3) << la.TryGet(ivec2(x,y)).index;
+            std::cout << std::setw(3) << map.Layer(0).TryGet(ivec2(x,y)).index;
         }
         std::cout << '\n';
     }

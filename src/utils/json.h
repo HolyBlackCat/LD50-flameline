@@ -74,8 +74,9 @@ class Json
         }
       public:
         View() {}
+
+        // Passed object has to remain alive.
         View(const Json &json, std::string name = "") : ptr(&json), path(std::move(name)) {}
-        View(Json &&, std::string = "") = delete;
 
         type_t Type() const
         {
