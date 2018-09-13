@@ -31,19 +31,30 @@ namespace Refl::Custom
         template <typename A> using _has_single_arg_insert_impl = decltype(std::declval<A &>().insert(std::declval<element_type &>()));
         inline static constexpr bool _has_single_arg_insert = Meta::is_detected<_has_single_arg_insert_impl, T>;
 
-        static constexpr void insert(T &object, const element_type &value)
+        // Those return 1 on success.
+        static constexpr bool insert(T &object, const element_type &value)
         {
             if constexpr (_has_single_arg_insert)
-                object.insert(value);
+            {
+                return object.insert(value).second;
+            }
             else
+            {
                 object.insert(object.end(), value);
+                return true;
+            }
         }
-        static constexpr void insert_move(T &object, element_type &&value)
+        static constexpr bool insert_move(T &object, element_type &&value)
         {
             if constexpr (_has_single_arg_insert)
-                object.insert(std::move(value));
+            {
+                return object.insert(std::move(value)).second;
+            }
             else
+            {
                 object.insert(object.end(), std::move(value));
+                return true;
+            }
         }
     };
 }

@@ -61,14 +61,16 @@ namespace Refl
             static constexpr std::size_t size(const T &) {return 0;}
 
             // Those should return iterators.
-            static constexpr void begin(T &) {}
-            static constexpr void end(T &) {}
-            static constexpr void const_begin(const T &) {}
-            static constexpr void const_end(const T &) {}
+            static constexpr void begin(T &);
+            static constexpr void end(T &);
+            static constexpr void const_begin(const T &);
+            static constexpr void const_end(const T &);
 
             using element_type = int;
-            static constexpr void insert(T &, const element_type &) {}
-            static constexpr void insert_move(T &, element_type &&) {}
+
+            // Those return 1 on success.
+            static constexpr bool insert(T &, const element_type &);
+            static constexpr bool insert_move(T &, element_type &&);
         };
     }
 
@@ -433,7 +435,7 @@ namespace Refl
                     str++;
                 }
             }
-            else // is_constainer
+            else // is_container
             {
                 (void)mode;
 
@@ -441,7 +443,7 @@ namespace Refl
                 *ptr = {};
 
                 // Skip the `[`.
-                if (*str != '[') Program::Error("Expected '{'.");
+                if (*str != '[') Program::Error("Expected '['.");
                 str++;
 
                 // Skip whitespace after `[`.
@@ -461,7 +463,7 @@ namespace Refl
                     // Skip `,` between element.
                     if (index > 0)
                     {
-                        if (*str != ',') Program::Error("Expected ',' or '}'.");
+                        if (*str != ',') Program::Error("Expected ',' or ']'.");
                         str++;
 
                         // Skip whitespace after `,`.
@@ -480,7 +482,8 @@ namespace Refl
                         // Try parsing the element.
                         mutable_element_type tmp{};
                         Refl::Interface(tmp).from_string_low(str, mode);
-                        insert(std::move(tmp));
+                        if (!insert(std::move(tmp)))
+                            Program::Error("Invalid element.");
                     }
                     catch (std::exception &e)
                     {
@@ -612,13 +615,13 @@ namespace Refl
             for (auto it = begin(); it != end(); ++it)
                 func(std::as_const(it));
         }
-        template <typename A> void insert(A &&value)
+        template <typename A> bool insert(A &&value) // Returns 1 on success.
         {
             static_assert(is_container);
-            if (std::is_reference_v<A>)
-                low::insert(*ptr, value);
+            if constexpr (std::is_reference_v<A>)
+                return low::insert(*ptr, value);
             else
-                low::insert_move(*ptr, std::move(value));
+                return low::insert_move(*ptr, std::move(value));
         }
     };
 
