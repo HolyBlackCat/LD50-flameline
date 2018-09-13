@@ -7,6 +7,8 @@
 #include <variant>
 #include <vector>
 
+#include "program/errors.h"
+
 class Json
 {
   public:
@@ -52,7 +54,7 @@ class Json
 
         void ThrowExpectedType(std::string type) const
         {
-            throw std::runtime_error("Expected JSON object `" + path + "` to be " + type + ".");
+            Program::Error("Expected JSON object `", path, "` to be ", type, ".");
         }
 
         std::string AppendElementIndexToPath(int index) const
@@ -131,7 +133,7 @@ class Json
                 ThrowExpectedType("an array");
             const array_t &arr = *std::get_if<int(array)>(&ptr->variant);
             if (index < 0 || decltype(arr.size())(index) >= arr.size())
-                throw std::runtime_error("Attempt to access element #" + std::to_string(index) + " of JSON object `" + path + "`, but it only contains " + std::to_string(arr.size()) + " elements.");
+                Program::Error("Attempt to access element #", index, " of JSON object `", path, "`, but it only contains ", arr.size(), " elements.");
             return View(arr[index], AppendElementIndexToPath(index));
         }
         template <typename F> void ForEachArrayElement(F &&func) // `func` should be `void func(const View &elem)`.
@@ -156,7 +158,7 @@ class Json
             const object_t &obj = *std::get_if<int(object)>(&ptr->variant);
             auto it = obj.find(key);
             if (it == obj.end())
-                throw std::runtime_error("Attempt to access nonexistent element `" + key + "` of JSON object `" + path + "`.");
+                Program::Error("Attempt to access nonexistent element `", key, "` of JSON object `", path, "`.");
             return View(it->second, AppendElementNameToPath(key));
         }
         template <typename F> void ForEachObjectElement(F &&func) // `func` should be `void func(const std::string &name, const View &elem)`.
