@@ -39,7 +39,7 @@ Render render(1000, Graphics::ShaderConfig::Core());
 Graphics::Texture tex = Graphics::Texture().SetData(Graphics::Image("texture.png")).Interpolation(Graphics::nearest).Wrap(Graphics::clamp);
 AdaptiveViewport adaptive_viewport(Graphics::ShaderConfig::Core(), ivec2(1920,1080)/4);
 
-Input::Mouse mouse(fmat3::translate(-fvec2(400,300)));
+Input::Mouse mouse;
 
 int main(int, char**)
 {
@@ -55,7 +55,6 @@ int main(int, char**)
         }
         std::cout << '\n';
     }
-
 
 
     render.SetTexture(tex);
