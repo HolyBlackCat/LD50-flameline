@@ -111,6 +111,7 @@
 		<Unit filename="src/reflection/containers_std.h" />
 		<Unit filename="src/reflection/interface.h" />
 		<Unit filename="src/reflection/primitives_arithmetic.h" />
+		<Unit filename="src/reflection/primitives_string.h" />
 		<Unit filename="src/reflection/structures_array.h" />
 		<Unit filename="src/reflection/structures_macro.h" />
 		<Unit filename="src/reflection/structures_tuple.h" />
