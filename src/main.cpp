@@ -31,31 +31,79 @@
 
 #define main SDL_main
 
+ivec2 screen_size = ivec2(1920,1080)/4;
+
 Program::Parachute error_parachute;
-Interface::Window win("Alpha", ivec2(800, 600));
+Interface::Window win("Gamma", screen_size*2);
 Graphics::DummyVertexArray dummy_vao;
 
 Render render(1000, Graphics::ShaderConfig::Core());
-Graphics::Texture tex = Graphics::Texture().SetData(Graphics::Image("texture.png")).Interpolation(Graphics::nearest).Wrap(Graphics::clamp);
-AdaptiveViewport adaptive_viewport(Graphics::ShaderConfig::Core(), ivec2(1920,1080)/4);
+Graphics::Texture tex = Graphics::Texture().SetData(Graphics::Image("assets/texture.png")).Interpolation(Graphics::nearest).Wrap(Graphics::clamp);
+AdaptiveViewport adaptive_viewport(Graphics::ShaderConfig::Core(), screen_size);
 
 Input::Mouse mouse;
 
 int main(int, char**)
 {
-    Map::TileSheet sheet(ivec2(0,512), ivec2(32,32));
-    Map::Format format = ADJUST(Map::Format{}, tile_layers = {"mid"});
-    Map map(format, &sheet, "map.json");
+    Map::TileSheet sheet("assets/tile_sheet.txt");
+    Map::Format format;
+    format.tile_layers.push_back(Map::TileLayerFormat("mid", &sheet));
+    Map map(format, "assets/map.json");
 
-    for (int y = 0; y < map.Layer(0).Size().y; y++)
-    {
-        for (int x = 0; x < map.Layer(0).Size().x; x++)
+    { // Autotiling
+        Map::TileLayer &la = map.Layer(0);
+
+        for (int y = 0; y < la.Size().y; y++)
+        for (int x = 0; x < la.Size().x; x++)
         {
-            std::cout << std::setw(3) << map.Layer(0).TryGet(ivec2(x,y)).index;
+            int index = la.UnsafeGet(ivec2(x,y)).index;
+            bool a = index == la.ClampGet(ivec2(x,y-1)).index;
+            bool b = index == la.ClampGet(ivec2(x+1,y)).index;
+            bool c = index == la.ClampGet(ivec2(x,y+1)).index;
+            bool d = index == la.ClampGet(ivec2(x-1,y)).index;
+            bool ab = index == la.ClampGet(ivec2(x+1,y-1)).index;
+            bool bc = index == la.ClampGet(ivec2(x+1,y+1)).index;
+            bool cd = index == la.ClampGet(ivec2(x-1,y+1)).index;
+            bool da = index == la.ClampGet(ivec2(x-1,y-1)).index;
+
+            int ret = 0;
+
+            if (!a && !b && !c && !d)
+                ret = 3;
+            else if (a && !b && c && !d)
+                ret = 7;
+            else if (!a && b && !c && d)
+                ret = 11;
+            else if (!a && !b && c && cd && d)
+                ret = 2;
+            else if (!b && !c && d && da && a)
+                ret = 10;
+            else if (!c && !d && a && ab && a)
+                ret = 8;
+            else if (!d && !a && b && bc && c)
+                ret = 0;
+            else if (!a && b && bc && c && cd && d)
+                ret = 1;
+            else if (!b && c && cd && d && da && a)
+                ret = 6;
+            else if (!c && d && da && a && ab && b)
+                ret = 9;
+            else if (!d && a && ab && b && bc && c)
+                ret = 4;
+            else if (a && ab && b && bc && c && cd && d && da)
+                ret = 5;
+            else
+                ret = 3;
+
+            la.TrySetVariant(ivec2(x,y), ret);
         }
-        std::cout << '\n';
+
+        map.ValidateVariantIndices();
     }
 
+
+    Graphics::Blending::Enable();
+    Graphics::Blending::FuncNormalPre();
 
     render.SetTexture(tex);
     adaptive_viewport.Update();
@@ -85,8 +133,10 @@ int main(int, char**)
         adaptive_viewport.BeginFrame();
         Graphics::Clear();
         render.BindShader();
-        render.fquad(mouse.pos(), fvec2(32)).center().color(fvec3(1,0.5,0));
-        render.fquad(mouse.pos().add_y(32), fvec2(16)).center().tex(fvec2(16,0));
+        render.iquad(-screen_size/2, screen_size).color(fvec3(0));
+//        render.fquad(mouse.pos(), fvec2(32)).center().color(fvec3(1,0.5,0));
+//        render.fquad(mouse.pos().add_y(32), fvec2(16)).center().tex(fvec2(16,0));
+        map.Layer(0).Render(render, screen_size, mouse.pos());
         render.Finish();
         adaptive_viewport.FinishFrame();
         Graphics::CheckErrors();
