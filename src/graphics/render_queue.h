@@ -48,8 +48,8 @@ namespace Graphics
         {
             if (pos <= 0)
                 return;
-            buffer.SetDataPart(0, size * N, storage.get());
-            buffer.Draw(std::array{points, lines, triangles}[N-1]);
+            buffer.SetDataPart(0, pos * N, storage.get());
+            buffer.Draw(std::array{points, lines, triangles}[N-1], pos * N);
             pos = 0;
         }
 
