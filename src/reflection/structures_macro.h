@@ -26,7 +26,7 @@
     /* Field declarations */\
     MA_SEQ_FOR_EACH(REFL_Structure_FieldDeclPack, MA_NULL, , seq) \
     /* Tuple of member pointers (note that this has to be defined after the field declarations, otherwise we wouldn't be able to make the member pointers) */\
-    static constexpr ::std::tuple _refl_member_pointers{ MA_SEQ_FOR_EACH(REFL_Structure_MemPointerPack, MA_COMMA, , seq) };\
+    static constexpr ::std::tuple _refl_member_pointers{ MA_SEQ_FOR_EACH(REFL_Structure_MemPointerPack, MA_NULL, , seq) };\
     /* Reflection interface */\
     struct _refl_interface \
     { \
@@ -37,9 +37,9 @@
         /* Field access */\
         template <int I> static constexpr auto &field(_refl_this_type &ref) {return ref .* ::std::get<I>(_refl_member_pointers);} \
         /* Field names */\
-        static std::string field_name(int index) {return ::std::array{ MA_SEQ_FOR_EACH(REFL_Structure_FieldNamePack, MA_COMMA, , seq) }[index];} \
+        static std::string field_name(int index) {return ::std::array{ MA_SEQ_FOR_EACH(REFL_Structure_FieldNamePack, MA_NULL, , seq) }[index];} \
         /* Field categories */\
-        static constexpr ::Refl::FieldCategory field_category(int index) {return ::std::array{ MA_SEQ_FOR_EACH(REFL_Structure_FieldCategoryPack, MA_COMMA, , seq) }[index];} \
+        static constexpr ::Refl::FieldCategory field_category(int index) {return ::std::array{ MA_SEQ_FOR_EACH(REFL_Structure_FieldCategoryPack, MA_NULL, , seq) }[index];} \
         /* Note that we don't define `is_tuple` here. It's defined later by the specialization of `Refl::Custom::Structure` for macro-reflected structures. */\
         /* It's set to 1 if `using _refl_structure_tuple_tag = void;` is detected in the reflected structure. */\
     }; \
@@ -59,8 +59,8 @@
 #define REFL_Structure_MemPointerPack_2(      type, names      ) REFL_Structure_MemPointerPack_Low(names)
 #define REFL_Structure_MemPointerPack_3(      type, names, init) REFL_Structure_MemPointerPack_Low(names)
 #define REFL_Structure_MemPointerPack_4(mode, type, names, init) REFL_Structure_MemPointerPack_Low(names)
-#define REFL_Structure_MemPointerPack_Low(names)                 MA_VA_FOR_EACH_A(REFL_Structure_MemPointer, MA_COMMA, , MA_IDENTITY names)
-#define REFL_Structure_MemPointer(i, unused, name)               &_refl_this_type::name
+#define REFL_Structure_MemPointerPack_Low(names)                 MA_VA_FOR_EACH_A(REFL_Structure_MemPointer, MA_NULL, , MA_IDENTITY names)
+#define REFL_Structure_MemPointer(i, unused, name)               &_refl_this_type::name,
 
 // Field names
 #define REFL_Structure_FieldNamePack(i, unused, seq)            MA_OVERLOAD(REFL_Structure_FieldNamePack_, MA_SEQ_TO_VA_PARENS(seq))
@@ -68,8 +68,8 @@
 #define REFL_Structure_FieldNamePack_2(      type, names      ) REFL_Structure_FieldNamePack_Low(names)
 #define REFL_Structure_FieldNamePack_3(      type, names, init) REFL_Structure_FieldNamePack_Low(names)
 #define REFL_Structure_FieldNamePack_4(mode, type, names, init) REFL_Structure_FieldNamePack_Low(names)
-#define REFL_Structure_FieldNamePack_Low(names)                 MA_VA_FOR_EACH_A(REFL_Structure_FieldName, MA_COMMA, , MA_IDENTITY names)
-#define REFL_Structure_FieldName(i, unused, name)               #name
+#define REFL_Structure_FieldNamePack_Low(names)                 MA_VA_FOR_EACH_A(REFL_Structure_FieldName, MA_NULL, , MA_IDENTITY names)
+#define REFL_Structure_FieldName(i, unused, name)               #name,
 
 // Field categories
 #define REFL_Structure_FieldCategoryPack(i, unused, seq)            MA_OVERLOAD(REFL_Structure_FieldCategoryPack_, MA_SEQ_TO_VA_PARENS(seq))
@@ -77,8 +77,8 @@
 #define REFL_Structure_FieldCategoryPack_2(      type, names      ) REFL_Structure_FieldCategoryPack_Low(names, default_category)
 #define REFL_Structure_FieldCategoryPack_3(      type, names, init) REFL_Structure_FieldCategoryPack_Low(names, default_category)
 #define REFL_Structure_FieldCategoryPack_4(mode, type, names, init) REFL_Structure_FieldCategoryPack_Low(names, MA_IDENTITY mode)
-#define REFL_Structure_FieldCategoryPack_Low(names, mode)           MA_VA_FOR_EACH_A(REFL_Structure_FieldCategory, MA_COMMA, mode, MA_IDENTITY names)
-#define REFL_Structure_FieldCategory(i, mode, name)                 (::Refl::FieldCategory::mode)
+#define REFL_Structure_FieldCategoryPack_Low(names, mode)           MA_VA_FOR_EACH_A(REFL_Structure_FieldCategory, MA_NULL, mode, MA_IDENTITY names)
+#define REFL_Structure_FieldCategory(i, mode, name)                 (::Refl::FieldCategory::mode),
 
 
 namespace Refl::Custom
