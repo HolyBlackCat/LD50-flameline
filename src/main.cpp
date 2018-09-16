@@ -21,7 +21,9 @@
 #include "utils/memory_file.h"
 #include "utils/meta.h"
 #include "utils/metronome.h"
+#include "utils/random.h"
 #include "utils/resource_allocator.h"
+#include "utils/robust_compare.h"
 #include "utils/strings.h"
 #include "utils/tasks.h"
 
@@ -36,6 +38,8 @@ ivec2 screen_size = ivec2(1920,1080)/4;
 Program::Parachute error_parachute;
 Interface::Window win("Gamma", screen_size*2);
 Graphics::DummyVertexArray dummy_vao;
+
+Random random;
 
 Render render(1000, Graphics::ShaderConfig::Core());
 Graphics::Texture tex = Graphics::Texture().SetData(Graphics::Image("assets/texture.png")).Interpolation(Graphics::nearest).Wrap(Graphics::clamp);
@@ -57,45 +61,48 @@ int main(int, char**)
         for (int x = 0; x < la.Size().x; x++)
         {
             int index = la.UnsafeGet(ivec2(x,y)).index;
-            bool a = index == la.ClampGet(ivec2(x,y-1)).index;
-            bool b = index == la.ClampGet(ivec2(x+1,y)).index;
-            bool c = index == la.ClampGet(ivec2(x,y+1)).index;
-            bool d = index == la.ClampGet(ivec2(x-1,y)).index;
-            bool ab = index == la.ClampGet(ivec2(x+1,y-1)).index;
-            bool bc = index == la.ClampGet(ivec2(x+1,y+1)).index;
-            bool cd = index == la.ClampGet(ivec2(x-1,y+1)).index;
-            bool da = index == la.ClampGet(ivec2(x-1,y-1)).index;
+            if (index == Map::index_none)
+                continue;
 
-            int ret = 0;
+//            bool a = index == la.ClampGet(ivec2(x,y-1)).index;
+//            bool b = index == la.ClampGet(ivec2(x+1,y)).index;
+//            bool c = index == la.ClampGet(ivec2(x,y+1)).index;
+//            bool d = index == la.ClampGet(ivec2(x-1,y)).index;
+//            bool ab = index == la.ClampGet(ivec2(x+1,y-1)).index;
+//            bool bc = index == la.ClampGet(ivec2(x+1,y+1)).index;
+//            bool cd = index == la.ClampGet(ivec2(x-1,y+1)).index;
+//            bool da = index == la.ClampGet(ivec2(x-1,y-1)).index;
 
-            if (!a && !b && !c && !d)
-                ret = 3;
-            else if (a && !b && c && !d)
-                ret = 7;
-            else if (!a && b && !c && d)
-                ret = 11;
-            else if (!a && !b && c && cd && d)
-                ret = 2;
-            else if (!b && !c && d && da && a)
-                ret = 10;
-            else if (!c && !d && a && ab && a)
-                ret = 8;
-            else if (!d && !a && b && bc && c)
-                ret = 0;
-            else if (!a && b && bc && c && cd && d)
-                ret = 1;
-            else if (!b && c && cd && d && da && a)
-                ret = 6;
-            else if (!c && d && da && a && ab && b)
-                ret = 9;
-            else if (!d && a && ab && b && bc && c)
-                ret = 4;
-            else if (a && ab && b && bc && c && cd && d && da)
-                ret = 5;
-            else
-                ret = 3;
+            std::string ret;
 
-            la.TrySetVariant(ivec2(x,y), ret);
+//            if (!a && !b && !c && !d)
+//                ret = 3;
+//            else if (a && !b && c && !d)
+//                ret = 7;
+//            else if (!a && b && !c && d)
+//                ret = 11;
+//            else if (!a && !b && c && cd && d)
+//                ret = 2;
+//            else if (!b && !c && d && da && a)
+//                ret = 10;
+//            else if (!c && !d && a && ab && a)
+//                ret = 8;
+//            else if (!d && !a && b && bc && c)
+//                ret = 0;
+//            else if (!a && b && bc && c && cd && d)
+//                ret = 1;
+//            else if (!b && c && cd && d && da && a)
+//                ret = 6;
+//            else if (!c && d && da && a && ab && b)
+//                ret = 9;
+//            else if (!d && a && ab && b && bc && c)
+//                ret = 4;
+//            else if (a && ab && b && bc && c && cd && d && da)
+//                ret = 5;
+//            else
+            ret = Str("*", random.integer() < 2);
+
+            la.TrySetVariantName(ivec2(x,y), ret);
         }
 
         map.ValidateVariantIndices();

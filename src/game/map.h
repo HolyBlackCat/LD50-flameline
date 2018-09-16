@@ -21,6 +21,7 @@ class Map
     class TileSheet
     {
         ReflectStruct(TileVariantData, (
+            (std::string)(name),
             (ivec2)(tex)(=ivec2(0)),
             (optional)(ivec2)(tex_offset)(=ivec2(0)),
             (optional)(ivec2)(tex_size)(=ivec2(1)),
@@ -29,13 +30,13 @@ class Map
         ReflectStruct(TileData, (
             (std::string)(name),
             (std::vector<TileVariantData>)(variants),
+            (std::map<std::string, int> variant_indices;),
         ))
 
         ReflectStruct(Data, (
             (std::string)(name),
-            (ivec2)(tile_size)(=ivec2(1)),
+            (int)(tile_size)(=1),
             (ivec2)(tex_pos)(=ivec2(0)),
-            (ivec2)(tex_tile_count)(=ivec2(0)),
             (std::map<index_t,TileData>)(tiles),
 
             // How much tiles to add at window borders. This is needed when images are larger than 1x1 tile.
@@ -67,18 +68,25 @@ class Map
             {
                 Refl::Interface(data).from_string(string);
 
-                for (const auto &tile : data.tiles)
-                for (const auto &var : tile.second.variants)
+                for (auto &tile : data.tiles)
                 {
-                    ivec2 a = var.tex_offset;
-                    ivec2 b = var.tex_offset + var.tex_size - 1;
-
-                    for (int i = 0; i < 2; i++)
+                    int var_index = 0;
+                    for (const auto &var : tile.second.variants)
                     {
-                        if (a[i] < data.overdraw_a[i])
-                            data.overdraw_a[i] = a[i];
-                        if (b[i] > data.overdraw_b[i])
-                            data.overdraw_b[i] = b[i];
+                        // Add variant to the map.
+                        tile.second.variant_indices.insert({var.name, var_index++});
+
+                        // Compute overdraw extents.
+                        ivec2 a = var.tex_offset;
+                        ivec2 b = var.tex_offset + var.tex_size - 1;
+
+                        for (int i = 0; i < 2; i++)
+                        {
+                            if (a[i] < data.overdraw_a[i])
+                                data.overdraw_a[i] = a[i];
+                            if (b[i] > data.overdraw_b[i])
+                                data.overdraw_b[i] = b[i];
+                        }
                     }
                 }
 
@@ -94,17 +102,13 @@ class Map
         {
             return data.name;
         }
-        ivec2 TileSize() const
+        int TileSize() const
         {
             return data.tile_size;
         }
         ivec2 TexturePos() const
         {
             return data.tex_pos;
-        }
-        ivec2 TextureTileCount() const
-        {
-            return data.tex_tile_count;
         }
 
         // How much tiles to add at window borders. This is needed when images are larger than 1x1 tile.
@@ -125,6 +129,14 @@ class Map
         variant_t GetVariantCount(index_t index) const
         {
             return FindTile(index).variants.size();
+        }
+        variant_t GetVariantFromName(index_t index, const std::string &name) const
+        {
+            const auto &tile = FindTile(index);
+            if (auto it = tile.variant_indices.find(name); it != tile.variant_indices.end())
+                return it->second;
+            else
+                Program::Error("In tile sheet `", SheetName(), "`, tile `", tile.name, "` has no variant named `", name, "`.");
         }
 
         struct TexInfo
@@ -288,6 +300,17 @@ class Map
                 UnsafeSetVariant(pos, variant);
         }
 
+        void UnsafeSetVariantName(ivec2 pos, const std::string &name)
+        {
+            auto &tile = tiles[pos.x + pos.y * size.x];
+            tile.variant = Sheet().GetVariantFromName(tile.index, name);
+        }
+        void TrySetVariantName(ivec2 pos, const std::string &name)
+        {
+            if (PosInRange(pos))
+                UnsafeSetVariantName(pos, name);
+        }
+
         void ValidateVariantIndices() const
         {
             for (int y = 0; y < size.y; y++)
@@ -304,7 +327,7 @@ class Map
 
         void Render(Render &r, ivec2 screen_size, ivec2 cam_pos, float alpha = 1, float beta = 1) const
         {
-            ivec2 tile_size = Sheet().TileSize();
+            int tile_size = Sheet().TileSize();
             ivec2 half_count = (screen_size / 2 - 1) / tile_size + 1;
             ivec2 base_tile = div_ex(cam_pos, tile_size);
             ivec2 overdraw_a = Sheet().OverdrawA();

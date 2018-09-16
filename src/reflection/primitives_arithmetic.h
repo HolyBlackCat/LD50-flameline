@@ -9,6 +9,8 @@
 
 #include "interface.h"
 
+#include "utils/robust_compare.h"
+
 namespace Refl::Custom
 {
     template <typename T> struct Primitive<T, std::enable_if_t<std::is_arithmetic_v<T>>>
@@ -95,7 +97,7 @@ namespace Refl::Custom
                     return 0;
 
                 if constexpr (sizeof(T) < sizeof(result_t))
-                    if (result < std::numeric_limits<T>::min() || result > std::numeric_limits<T>::max())
+                    if (RobustCompare::int_not_in_inclusive_range(result, std::numeric_limits<T>::min(), std::numeric_limits<T>::max()))
                         return 0;
 
                 object = result;
