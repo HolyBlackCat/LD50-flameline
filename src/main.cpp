@@ -65,44 +65,48 @@ int main(int, char**)
                 continue;
 
             bool a = index == la.ClampGet(ivec2(x,y-1)).index;
-//            bool b = index == la.ClampGet(ivec2(x+1,y)).index;
-//            bool c = index == la.ClampGet(ivec2(x,y+1)).index;
-//            bool d = index == la.ClampGet(ivec2(x-1,y)).index;
-//            bool ab = index == la.ClampGet(ivec2(x+1,y-1)).index;
-//            bool bc = index == la.ClampGet(ivec2(x+1,y+1)).index;
-//            bool cd = index == la.ClampGet(ivec2(x-1,y+1)).index;
-//            bool da = index == la.ClampGet(ivec2(x-1,y-1)).index;
+            bool b = index == la.ClampGet(ivec2(x+1,y)).index;
+            bool c = index == la.ClampGet(ivec2(x,y+1)).index;
+            bool d = index == la.ClampGet(ivec2(x-1,y)).index;
+            bool ab = index == la.ClampGet(ivec2(x+1,y-1)).index;
+            bool bc = index == la.ClampGet(ivec2(x+1,y+1)).index;
+            bool cd = index == la.ClampGet(ivec2(x-1,y+1)).index;
+            bool da = index == la.ClampGet(ivec2(x-1,y-1)).index;
 
             std::string ret;
 
-//            if (!a && !b && !c && !d)
-//                ret = 3;
-//            else if (a && !b && c && !d)
-//                ret = 7;
-//            else if (!a && b && !c && d)
-//                ret = 11;
-//            else if (!a && !b && c && cd && d)
-//                ret = 2;
-//            else if (!b && !c && d && da && a)
-//                ret = 10;
-//            else if (!c && !d && a && ab && a)
-//                ret = 8;
-//            else if (!d && !a && b && bc && c)
-//                ret = 0;
-//            else if (!a && b && bc && c && cd && d)
-//                ret = 1;
-//            else if (!b && c && cd && d && da && a)
-//                ret = 6;
-//            else if (!c && d && da && a && ab && b)
-//                ret = 9;
-//            else if (!d && a && ab && b && bc && c)
-//                ret = 4;
-//            else if (a && ab && b && bc && c && cd && d && da)
-//                ret = 5;
-//            else
-            ret = Str("^*"[a], random.integer() < 4);
+            std::string name;
+            int count = 4;
+            if (!a && !b && c && d)
+                name = "^>", count = 1;
+            else if (a && !b && !c && d)
+                name = "v>", count = 1;
+            else if (a && b && !c && !d)
+                name = "<v", count = 1;
+            else if (!a && b && c && !d)
+                name = "<^", count = 1;
+            else if (a && b && c && d && !ab)
+                name = ">^", count = 1;
+            else if (a && b && c && d && !bc)
+                name = ">v", count = 1;
+            else if (a && b && c && d && !cd)
+                name = "v<", count = 1;
+            else if (a && b && c && d && !da)
+                name = "^<", count = 1;
+            else if (!a && b && c && d)
+                name = "^";
+            else if (a && !b && c && d)
+                name = ">";
+            else if (a && b && !c && d)
+                name = "v";
+            else if (a && b && c && !d)
+                name = "<";
+            else
+                name = "*";
 
-            la.TrySetVariantName(ivec2(x,y), ret);
+            ret = Str(name, random.integer() < count);
+
+            la.UnsafeSetVariantName(ivec2(x,y), ret);
         }
 
         map.ValidateVariantIndices();
@@ -140,7 +144,8 @@ int main(int, char**)
         adaptive_viewport.BeginFrame();
         Graphics::Clear();
         render.BindShader();
-        render.iquad(-screen_size/2, screen_size).color(fvec3(0));
+        const fvec3 a = fvec3(12,31,127)/255, b = fvec3(50,111,186)/255;
+        render.iquad(-screen_size/2, screen_size).color(a, a, b, b);
 //        render.fquad(mouse.pos(), fvec2(32)).center().color(fvec3(1,0.5,0));
 //        render.fquad(mouse.pos().add_y(32), fvec2(16)).center().tex(fvec2(16,0));
         map.Layer(0).Render(render, screen_size, mouse.pos());
