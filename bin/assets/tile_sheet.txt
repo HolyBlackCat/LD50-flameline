@@ -6,8 +6,8 @@
 		(1,{
 			name = "wall",
 			variants = [
-				{name = "*0", tex = (0,1)},
-				{name = "*1", tex = (1,1)},
+				{name = "^0", tex = (0,1)}, {name = "^1", tex = (1,1)}, {name = "^2", tex = (2,1)}, {name = "^3", tex = (3,1)},
+				{name = "*0", tex = (0,2)}, {name = "*1", tex = (1,2)}, {name = "*2", tex = (2,2)}, {name = "*3", tex = (3,2)},
 			],
 		}),
 	],

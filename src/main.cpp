@@ -64,7 +64,7 @@ int main(int, char**)
             if (index == Map::index_none)
                 continue;
 
-//            bool a = index == la.ClampGet(ivec2(x,y-1)).index;
+            bool a = index == la.ClampGet(ivec2(x,y-1)).index;
 //            bool b = index == la.ClampGet(ivec2(x+1,y)).index;
 //            bool c = index == la.ClampGet(ivec2(x,y+1)).index;
 //            bool d = index == la.ClampGet(ivec2(x-1,y)).index;
@@ -100,7 +100,7 @@ int main(int, char**)
 //            else if (a && ab && b && bc && c && cd && d && da)
 //                ret = 5;
 //            else
-            ret = Str("*", random.integer() < 2);
+            ret = Str("^*"[a], random.integer() < 4);
 
             la.TrySetVariantName(ivec2(x,y), ret);
         }
