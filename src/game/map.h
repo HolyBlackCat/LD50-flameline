@@ -30,7 +30,7 @@ class Map
         ReflectStruct(TileData, (
             (std::string)(name),
             (std::vector<TileVariantData>)(variants),
-            (std::map<std::string, int> variant_indices;),
+            (std::map<std::string, variant_t> variant_indices;),
         ))
 
         ReflectStruct(Data, (
@@ -38,6 +38,7 @@ class Map
             (int)(tile_size)(=1),
             (ivec2)(tex_pos)(=ivec2(0)),
             (std::map<index_t,TileData>)(tiles),
+            (std::map<std::string, index_t> tile_indices;),
 
             // How much tiles to add at window borders. This is needed when images are larger than 1x1 tile.
             (ivec2 overdraw_a = ivec2(0);), // Top-left, zero or negative.
@@ -70,6 +71,9 @@ class Map
 
                 for (auto &tile : data.tiles)
                 {
+                    // Add tile to the map.
+                    data.tile_indices.insert({tile.second.name, tile.first});
+
                     int var_index = 0;
                     for (const auto &var : tile.second.variants)
                     {
@@ -124,6 +128,13 @@ class Map
         const std::string &GetName(index_t index) const
         {
             return FindTile(index).name;
+        }
+        index_t GetIndexFromName(const std::string &name) const
+        {
+            if (auto it = data.tile_indices.find(name); it != data.tile_indices.end())
+                return it->second;
+            else
+                Program::Error("Tile sheet `", SheetName(), "` has no tile named `", name, "`.");
         }
 
         variant_t GetVariantCount(index_t index) const
@@ -298,6 +309,15 @@ class Map
         {
             if (PosInRange(pos))
                 UnsafeSetVariant(pos, variant);
+        }
+
+        void UnsafeSetIndexName(ivec2 pos, const std::string &name)
+        {
+            UnsafeSetIndex(pos, Sheet().GetIndexFromName(name));
+        }
+        void TrySetIndexName(ivec2 pos, const std::string &name)
+        {
+            TrySetIndex(pos, Sheet().GetIndexFromName(name));
         }
 
         void UnsafeSetVariantName(ivec2 pos, const std::string &name)

@@ -4,7 +4,7 @@
 	tex_pos = (0,512),
 	tiles = [
 		(1,{
-			name = "wall",
+			name = "stone",
 			variants = [
 				{name = "^0", tex = (0,1)}, {name = "^1", tex = (1,1)}, {name = "^2", tex = (2,1)}, {name = "^3", tex = (3,1)},
 				{name = "*0", tex = (0,2)}, {name = "*1", tex = (1,2)}, {name = "*2", tex = (2,2)}, {name = "*3", tex = (3,2)},
@@ -22,5 +22,14 @@
 				
 			],
 		}),
+		(10001,{
+			name = "grass",
+			variants = [
+				{name = "^0", tex = (0,0)}, {name = "^1", tex = (1,0)}, {name = "^2", tex = (2,0)}, {name = "^3", tex = (3,0)},
+				{name = "<0", tex = (4,0)},
+				{name = ">0", tex = (5,0)},
+				{name = "|0", tex = (6,0)}, {name = "|1", tex = (7,0)},
+			],
+		})
 	],
 }
