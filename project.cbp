@@ -82,8 +82,14 @@
 		<Unit filename="src/game/adaptive_viewport.cpp" />
 		<Unit filename="src/game/adaptive_viewport.h" />
 		<Unit filename="src/game/map.h" />
+		<Unit filename="src/game/meta.cpp" />
+		<Unit filename="src/game/meta.h" />
 		<Unit filename="src/game/render.cpp" />
 		<Unit filename="src/game/render.h" />
+		<Unit filename="src/game/state.h" />
+		<Unit filename="src/game/states/world.h" />
+		<Unit filename="src/game/states/world/tile_map.cpp" />
+		<Unit filename="src/game/states/world/tile_map.h" />
 		<Unit filename="src/graphics/blending.h" />
 		<Unit filename="src/graphics/clear.h" />
 		<Unit filename="src/graphics/complete.h" />
@@ -103,7 +109,6 @@
 		<Unit filename="src/interface/messagebox.h" />
 		<Unit filename="src/interface/window.cpp" />
 		<Unit filename="src/interface/window.h" />
-		<Unit filename="src/main.cpp" />
 		<Unit filename="src/program/errors.h" />
 		<Unit filename="src/program/exit.h" />
 		<Unit filename="src/program/parachute.h" />

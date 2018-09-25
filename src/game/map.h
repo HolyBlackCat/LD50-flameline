@@ -9,6 +9,7 @@
 #include "reflection/complete.h"
 #include "utils/json.h"
 #include "utils/mat.h"
+#include "utils/memory_file.h"
 
 class Map
 {

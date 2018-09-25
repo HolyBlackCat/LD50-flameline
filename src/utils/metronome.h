@@ -19,6 +19,8 @@ class Metronome
   public:
     uint64_t ticks = 0;
 
+    Metronome(decltype(nullptr)) {} // For any other constructor to work, the clock has to be initialized first.
+
     Metronome() : Metronome(60) {}
     Metronome(double freq, int max_ticks_per_frame = 8, float compensation_threshold = 0.01, float compensation_amount = 0.5)
     {

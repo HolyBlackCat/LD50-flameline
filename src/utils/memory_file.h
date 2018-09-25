@@ -7,6 +7,7 @@
 #include <string>
 
 #include "archive.h"
+#include "finally.h"
 #include "strings.h"
 #include "program/errors.h"
 

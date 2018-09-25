@@ -112,7 +112,18 @@ namespace DynamicStorage
 
         template <typename D> struct Implementation : Functions<T,D>
         {
-            std::unique_ptr<T> copy_(const T *ptr) override {return ptr ? std::make_unique<D>(*derived<const D>(ptr)) : std::unique_ptr<T>();}
+            std::unique_ptr<T> copy_(const T *ptr) override
+            {
+                if constexpr (!std::is_abstract_v<T>)
+                {
+                    return ptr ? std::make_unique<D>(*derived<const D>(ptr)) : std::unique_ptr<T>();
+                }
+                else
+                {
+                    (void)ptr;
+                    return std::unique_ptr<T>();
+                }
+            }
 
             inline static Implementation object;
         };
@@ -158,8 +169,8 @@ namespace DynamicStorage
         [[nodiscard]]       T &operator*()       {return *ptr;}
         [[nodiscard]] const T &operator*() const {return *ptr;}
 
-        [[nodiscard]]       T *operator->()       {return *ptr;}
-        [[nodiscard]] const T *operator->() const {return *ptr;}
+        [[nodiscard]]       T *operator->()       {return ptr.get();}
+        [[nodiscard]] const T *operator->() const {return ptr.get();}
 
         [[nodiscard]] FunctionsBase &functions() const {return *funcs;}
     };
