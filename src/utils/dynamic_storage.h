@@ -114,7 +114,7 @@ namespace DynamicStorage
         {
             std::unique_ptr<T> copy_(const T *ptr) override
             {
-                if constexpr (!std::is_abstract_v<T>)
+                if constexpr (!std::is_abstract_v<D>)
                 {
                     return ptr ? std::make_unique<D>(*derived<const D>(ptr)) : std::unique_ptr<T>();
                 }
