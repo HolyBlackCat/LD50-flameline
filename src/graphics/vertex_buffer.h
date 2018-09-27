@@ -98,7 +98,7 @@ namespace Graphics
                     constexpr int i = index.value;
                     using field_type = typename refl::template field_type<i>;
                     static_assert(std::is_same_v<Math::vec_base_t<field_type>, float>, "Non-float attributes are not supported.");
-                    glVertexAttribPointer(attrib++, Math::vec_size_v<field_type>, GL_FLOAT, 0, sizeof(T), (void *)offset);
+                    glVertexAttribPointer(attrib++, Math::vec_size_v<field_type>, GL_FLOAT, 0, sizeof(T), (void *)(uintptr_t)offset);
                     offset += sizeof(field_type);
                 });
 
