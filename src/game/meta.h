@@ -10,7 +10,7 @@
 
 extern const ivec2 screen_size;
 extern Interface::Window win;
-extern Random random;
+extern Random<> random; // <> can't be omitted, see `meta.cpp` for details.
 extern Render render;
 extern AdaptiveViewport viewport;
 extern Metronome metronome;

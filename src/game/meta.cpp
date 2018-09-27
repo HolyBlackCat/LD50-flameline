@@ -14,6 +14,7 @@
 #include "utils/archive.h"
 #include "utils/clock.h"
 #include "utils/dynamic_storage.h"
+#include "utils/filesystem.h"
 #include "utils/finally.h"
 #include "utils/json.h"
 #include "utils/macro.h"
@@ -29,6 +30,7 @@
 
 #include "game/adaptive_viewport.h"
 #include "game/map.h"
+#include "game/meta.h"
 #include "game/render.h"
 #include "game/state.h"
 #include "game/states/world.h"
@@ -43,7 +45,9 @@ Interface::Window win("Gamma", screen_size*2);
 
 static Graphics::DummyVertexArray dummy_vao;
 
-Random random;
+// The `<>` should only be needed in `extern` declarations (since omitting it apparently requires class template argument deduction, which doesn't work at all with `extern` declarations).
+// Due to a GCC bug, the presence of `extern` declaration makes `<>` necessary here as well.
+Random<> random;
 
 Render render(1000, Graphics::ShaderConfig::Core());
 
@@ -55,8 +59,21 @@ Metronome metronome;
 
 Input::Mouse mouse;
 
+void PrintTree(const Filesystem::TreeNode &node, int depth = 0)
+{
+    std::cout << std::string(depth*2, ' ');
+    std::cout << (node.info.category == Filesystem::file      ? '-' :
+                  node.info.category == Filesystem::directory ? '+' : '?');
+    std::cout << " `" << node.path << "` (" << node.name << ")\n";
+    for (const auto &sub : node.contents)
+        PrintTree(sub, depth+1);
+}
+
 int main(int, char**)
 {
+    std::cout << Filesystem::GetEntryInfo("assets").time_modified << '\n';
+    std::cout << Filesystem::GetEntryTree("assets").time_modified_recursive << '\n';
+
     Graphics::Blending::Enable();
     Graphics::Blending::FuncNormalPre();
 
