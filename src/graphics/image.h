@@ -25,9 +25,12 @@ namespace Graphics
         enum FlipMode {no_flip, flip_y};
 
         Image() {}
-        Image(ivec2 size, const uint8_t *bytes = 0) : size(size)
+        Image(ivec2 size, const uint8_t *bytes = 0) : size(size) // If `bytes == 0`, then the image will be filled with transparent black.
         {
-            data = std::vector<u8vec4>((u8vec4 *)bytes, (u8vec4 *)bytes + size.prod());
+            if (bytes)
+                data = std::vector<u8vec4>((u8vec4 *)bytes, (u8vec4 *)bytes + size.prod());
+            else
+                data = std::vector<u8vec4>(size.prod());
         }
         Image(MemoryFile file, FlipMode flip_mode = no_flip) // Throws on failure.
         {
@@ -64,6 +67,28 @@ namespace Graphics
 
             if (!ok)
                 Program::Error("Unable to write image to file: ", file_name);
+        }
+
+        u8vec4 &UnsafeAt(ivec2 pos)
+        {
+            return const_cast<u8vec4 &>(std::as_const(*this).UnsafeAt(pos));
+        }
+        const u8vec4 &UnsafeAt(ivec2 pos) const
+        {
+            return data[pos.x + pos.y * size.x];
+        }
+
+        u8vec4 TryGet(ivec2 pos) const // Returns transparent black if out of range.
+        {
+            if ((pos >= 0).all() && (pos < size).all())
+                return UnsafeAt(pos);
+            else
+                return u8vec4(0);
+        }
+        void TrySet(ivec2 pos, u8vec4 color)
+        {
+            if ((pos >= 0).all() && (pos < size).all())
+                UnsafeAt(pos) = color;
         }
     };
 }
