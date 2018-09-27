@@ -61,6 +61,7 @@
 			<Add library="SDL2main" />
 			<Add library="SDL2.dll" />
 			<Add library="z" />
+			<Add library="freetype" />
 			<Add directory="lib" />
 		</Linker>
 		<Unit filename="gen/make_macro_h.cpp">
@@ -94,6 +95,7 @@
 		<Unit filename="src/graphics/clear.h" />
 		<Unit filename="src/graphics/complete.h" />
 		<Unit filename="src/graphics/errors.h" />
+		<Unit filename="src/graphics/font.h" />
 		<Unit filename="src/graphics/framebuffer.h" />
 		<Unit filename="src/graphics/image.h" />
 		<Unit filename="src/graphics/render_queue.h" />
@@ -127,6 +129,8 @@
 		<Unit filename="src/utils/archive.h" />
 		<Unit filename="src/utils/clock.h" />
 		<Unit filename="src/utils/dynamic_storage.h" />
+		<Unit filename="src/utils/filesystem.cpp" />
+		<Unit filename="src/utils/filesystem.h" />
 		<Unit filename="src/utils/finally.h" />
 		<Unit filename="src/utils/json.cpp" />
 		<Unit filename="src/utils/json.h" />
