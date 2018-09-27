@@ -34,7 +34,7 @@ namespace Archive
     }
 
 
-    using size_type = uint32_t;
+    using size_type = uint64_t;
     static_assert(std::is_unsigned_v<size_type> && sizeof(size_type) >= sizeof(std::size_t), "`size_type` must be an unsigned type not smaller than `std::size_t`.");
 
     [[nodiscard]] std::size_t MaxCompressedSize(const uint8_t *src_begin, const uint8_t *src_end)
