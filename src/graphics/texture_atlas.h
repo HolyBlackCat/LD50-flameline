@@ -45,6 +45,11 @@ namespace Graphics
             return image_name;
         }
 
+        const Image &GetImage() const
+        {
+            return image;
+        }
+
         ImageLocation Get(const std::string &name) const
         {
             if (auto it = description.images.find(name); it != description.images.end())

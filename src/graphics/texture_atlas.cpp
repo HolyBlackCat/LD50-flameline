@@ -22,12 +22,17 @@ namespace Graphics
         if (allow_regeneration)
         {
             // Get the tree.
-            source_tree = Filesystem::GetEntryTree(source_dir_name); // This throws if no such file or directory, we let the exception propagate.
-            if (source_tree.info.category != Filesystem::directory)
-                Program::Error("Texture atlas source location `", source_dir_name, "` is not a directory.");
+            try
+            {
+                Filesystem::TreeNode new_source_tree = Filesystem::GetEntryTree(source_dir_name); // This throws if no such file or directory.
+                if (source_tree.info.category != Filesystem::directory)
+                    Program::Error("Texture atlas source location `", source_dir_name, "` is not a directory.");
+                source_tree = std::move(new_source_tree);
+            }
+            catch (...) {}
 
             // Get the latest modification time for all revelant files.
-            Filesystem::ForEachEntry(source_tree, [&](const Filesystem::TreeNode &node, int /*depth*/)
+            Filesystem::ForEachFile(source_tree, [&](const Filesystem::TreeNode &node)
             {
                 // Skip the file if it's not not revelant.
                 if (!Strings::EndsWith(node.name, image_extension))
@@ -99,7 +104,7 @@ namespace Graphics
         std::vector<std::string> name_list(image_count);
         int index = 0;
 
-        Filesystem::ForEachEntry(source_tree, [&](const Filesystem::TreeNode &node, int /*depth*/)
+        Filesystem::ForEachFile(source_tree, [&](const Filesystem::TreeNode &node)
         {
             // Skip the file if it's not not revelant.
             if (!Strings::EndsWith(node.name, image_extension))

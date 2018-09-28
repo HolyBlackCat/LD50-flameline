@@ -10,8 +10,8 @@ namespace Filesystem
 
     struct EntryInfo
     {
-        EntryCategory category;
-        std::time_t time_modified; // Modification of files in nested directories doesn't affect this time.
+        EntryCategory category = EntryCategory::other;
+        std::time_t time_modified = 0; // Modification of files in nested directories doesn't affect this time.
     };
 
     // Throws if the file or directory can't be accessed.
@@ -33,10 +33,11 @@ namespace Filesystem
     // Using a negative `max_depth` disables depth limit. But then a circular symlink might cause stack overflow.
     TreeNode GetEntryTree(const std::string &entry_name, int max_depth = 64);
 
-    template <typename F> void ForEachEntry(const TreeNode &tree, F &&func, int depth = 0) // `func` should be `void func(const TreeNode &node, int depth)`.
+    template <typename F> void ForEachFile(const TreeNode &tree, F &&func) // `func` should be `void func(const TreeNode &node)`.
     {
-        func(tree, depth);
+        if (tree.info.category == EntryCategory::file)
+            func(tree);
         for (const auto &elem : tree.contents)
-            ForEachEntry(elem, func, depth + 1);
+            ForEachFile(elem, func);
     }
 }
