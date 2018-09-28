@@ -22,6 +22,19 @@ namespace Strings
             str.remove_suffix(str.size() - str.find_last_not_of(chars_to_remove) - 1);
         return str;
     }
+
+    [[nodiscard]] inline bool StartsWith(std::string_view str, std::string_view prefix)
+    {
+        // We don't need to check `str.size() < prefix.size()` since substring length is allowed to be larger than necessary.
+        return str.compare(0, prefix.size(), prefix) == 0;
+    }
+
+    [[nodiscard]] inline bool EndsWith(std::string_view str, std::string_view prefix)
+    {
+        if (str.size() < prefix.size()) // We don't want `str.size() - prefix.size()` to overflow.
+            return 0;
+        return str.compare(str.size() - prefix.size(), prefix.size(), prefix) == 0;
+    }
 }
 
 using Strings::Str;

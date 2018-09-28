@@ -8,32 +8,11 @@
 
 namespace Filesystem
 {
-    std::vector<std::string> GetDirectoryContents(const std::string &dir_name)
-    {
-        DIR *dir = opendir(dir_name.c_str());
-        if (!dir)
-            Program::Error("Unable to access directory `", dir_name, "`.");
-        FINALLY( closedir(dir); )
-
-        std::vector<std::string> ret;
-
-        while (1)
-        {
-            dirent *entry = readdir(dir);
-            if (!entry)
-                break;
-
-            ret.push_back(entry->d_name);
-        }
-
-        return ret;
-    }
-
     EntryInfo GetEntryInfo(const std::string &entry_name)
     {
         struct stat info;
         if (stat(entry_name.c_str(), &info))
-            Program::Error("Unable to access file `", entry_name, "`.");
+            Program::Error("Unable to access file or directory `", entry_name, "`.");
 
         EntryInfo ret;
 
@@ -54,13 +33,33 @@ namespace Filesystem
         return ret;
     }
 
+    std::vector<std::string> GetDirectoryContents(const std::string &dir_name)
+    {
+        DIR *dir = opendir(dir_name.c_str());
+        if (!dir)
+            Program::Error("Unable to access directory `", dir_name, "`.");
+        FINALLY( closedir(dir); )
+
+        std::vector<std::string> ret;
+
+        while (1)
+        {
+            dirent *entry = readdir(dir); // `entry` doesn't need to be free'd.
+            if (!entry)
+                break;
+
+            ret.push_back(entry->d_name);
+        }
+
+        return ret;
+    }
+
     static TreeNode GetEntryTreeLow(const std::string &name, const std::string &path, int max_depth)
     {
         TreeNode ret;
         ret.name = name;
         ret.path = path;
         ret.info = GetEntryInfo(path);
-        ret.time_modified_recursive = ret.info.time_modified;
         if (ret.info.category == directory && max_depth != 0)
         {
             std::vector<std::string> contents;
@@ -78,9 +77,7 @@ namespace Filesystem
 
                 try
                 {
-                    auto &last = ret.contents.emplace_back(GetEntryTreeLow(sub_name, path + '/' + sub_name, max_depth-1)); // We use `emplace_back` instead of `push_back` because it returns a reference.
-                    if (ret.time_modified_recursive < last.time_modified_recursive)
-                        ret.time_modified_recursive = last.time_modified_recursive;
+                    ret.contents.push_back(GetEntryTreeLow(sub_name, path + '/' + sub_name, max_depth-1));
                 }
                 catch (...) {} // Silently ignore the fact that we can no longer access the directory.
             }

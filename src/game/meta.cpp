@@ -59,20 +59,16 @@ Metronome metronome;
 
 Input::Mouse mouse;
 
-void PrintTree(const Filesystem::TreeNode &node, int depth = 0)
+const Graphics::TextureAtlas &Atlas()
 {
-    std::cout << std::string(depth*2, ' ');
-    std::cout << (node.info.category == Filesystem::file      ? '-' :
-                  node.info.category == Filesystem::directory ? '+' : '?');
-    std::cout << " `" << node.path << "` (" << node.name << ")\n";
-    for (const auto &sub : node.contents)
-        PrintTree(sub, depth+1);
+    static Graphics::TextureAtlas atlas(ivec2(512, 256), "assets/images", "assets/atlas.png", "assets/atlas.refl");
+    return atlas;
 }
+
 
 int main(int, char**)
 {
-    std::cout << Filesystem::GetEntryInfo("assets").time_modified << '\n';
-    std::cout << Filesystem::GetEntryTree("assets").time_modified_recursive << '\n';
+    Atlas(); // Generate the atlas if it wasn't done before.
 
     Graphics::Blending::Enable();
     Graphics::Blending::FuncNormalPre();

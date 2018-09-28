@@ -10,12 +10,16 @@ namespace States::Details::World
     class TileMap
     {
       public:
-        inline static Map::TileSheet sheet = Map::TileSheet("assets/tile_sheet.txt");
+        static Map::TileSheet &Sheet()
+        {
+            static Map::TileSheet ret("assets/tile_sheet.txt");
+            return ret;
+        }
 
         inline static Map::Format format = []{
             Map::Format format;
-            format.tile_layers.push_back(Map::TileLayerFormat("mid", &sheet));
-            format.tile_layers.push_back(Map::TileLayerFormat("front", &sheet));
+            format.tile_layers.push_back(Map::TileLayerFormat("mid", &Sheet()));
+            format.tile_layers.push_back(Map::TileLayerFormat("front", &Sheet()));
             return format;
         }();
 

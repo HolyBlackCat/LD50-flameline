@@ -2,6 +2,7 @@
 
 #include "game/adaptive_viewport.h"
 #include "game/render.h"
+#include "graphics/texture_atlas.h"
 #include "input/mouse.h"
 #include "interface/window.h"
 #include "utils/mat.h"
@@ -15,3 +16,4 @@ extern Render render;
 extern AdaptiveViewport viewport;
 extern Metronome metronome;
 extern Input::Mouse mouse;
+const Graphics::TextureAtlas &Atlas();

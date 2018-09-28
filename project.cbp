@@ -101,6 +101,8 @@
 		<Unit filename="src/graphics/render_queue.h" />
 		<Unit filename="src/graphics/shader.h" />
 		<Unit filename="src/graphics/texture.h" />
+		<Unit filename="src/graphics/texture_atlas.cpp" />
+		<Unit filename="src/graphics/texture_atlas.h" />
 		<Unit filename="src/graphics/vertex_buffer.h" />
 		<Unit filename="src/graphics/viewport.h" />
 		<Unit filename="src/input/button.h" />

@@ -1,5 +1,6 @@
 #pragma once
 
+#include <algorithm>
 #include <vector>
 #include <utility>
 
@@ -31,6 +32,10 @@ namespace Graphics
                 data = std::vector<u8vec4>((u8vec4 *)bytes, (u8vec4 *)bytes + size.prod());
             else
                 data = std::vector<u8vec4>(size.prod());
+        }
+        Image(ivec2 size, u8vec4 color) : size(size)
+        {
+            data = std::vector<u8vec4>(size.prod(), color);
         }
         Image(MemoryFile file, FlipMode flip_mode = no_flip) // Throws on failure.
         {
@@ -89,6 +94,15 @@ namespace Graphics
         {
             if ((pos >= 0).all() && (pos < size).all())
                 UnsafeAt(pos) = color;
+        }
+
+        void UnsafeDrawImage(const Image &other, ivec2 pos) // Copies other image into this image, at specified location.
+        {
+            for (int y = 0; y < other.Size().y; y++)
+            {
+                auto source_address = &other.UnsafeAt(ivec2(0,y));
+                std::copy(source_address, source_address + other.Size().x, &UnsafeAt(pos.add_y(y)));
+            }
         }
     };
 }

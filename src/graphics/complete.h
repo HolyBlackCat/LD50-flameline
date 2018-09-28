@@ -9,5 +9,6 @@
 #include "graphics/render_queue.h"
 #include "graphics/shader.h"
 #include "graphics/texture.h"
+#include "graphics/texture_atlas.h"
 #include "graphics/vertex_buffer.h"
 #include "graphics/viewport.h"
