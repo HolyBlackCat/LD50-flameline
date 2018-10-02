@@ -97,6 +97,8 @@ namespace Interface
 
         Window(std::string name, ivec2 size, FullscreenMode mode = windowed, const WindowSettings &settings = {});
 
+        static SDL_Window *HandleOrNull(); // Unlike `Handle()`, this doesn't throw if no window.
+
         static Window &Get(); // This will throw if there is no window.
 
         SDL_Window *Handle() const;

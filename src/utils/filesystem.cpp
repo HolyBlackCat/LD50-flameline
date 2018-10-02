@@ -8,24 +8,24 @@
 
 namespace Filesystem
 {
-    EntryInfo GetEntryInfo(const std::string &entry_name)
+    ObjInfo GetObjectInfo(const std::string &entry_name)
     {
         struct stat info;
         if (stat(entry_name.c_str(), &info))
             Program::Error("Unable to access file or directory `", entry_name, "`.");
 
-        EntryInfo ret;
+        ObjInfo ret;
 
         switch (info.st_mode & S_IFMT)
         {
           case S_IFREG:
-            ret.category = EntryCategory::file;
+            ret.category = file;
             break;
           case S_IFDIR:
-            ret.category = EntryCategory::directory;
+            ret.category = directory;
             break;
           default:
-            ret.category = EntryCategory::other;
+            ret.category = other;
         }
 
         ret.time_modified = info.st_mtime; // `struct stat` also contains last access time and last parameter change time, but we don't really need those.
@@ -54,12 +54,13 @@ namespace Filesystem
         return ret;
     }
 
-    static TreeNode GetEntryTreeLow(const std::string &name, const std::string &path, int max_depth)
+    static TreeNode GetObjectTreeLow(const std::string &name, const std::string &path, int max_depth)
     {
         TreeNode ret;
         ret.name = name;
         ret.path = path;
-        ret.info = GetEntryInfo(path);
+        ret.info = GetObjectInfo(path);
+        ret.time_modified_recursive = ret.info.time_modified;
         if (ret.info.category == directory && max_depth != 0)
         {
             std::vector<std::string> contents;
@@ -68,7 +69,7 @@ namespace Filesystem
             {
                 contents = GetDirectoryContents(path);
             }
-            catch (...) {} // Silently ignore the fact that we can no longer access the directory.
+            catch (...) {} // Silently ignore the error if we can no longer access the directory.
 
             for (const std::string &sub_name : contents)
             {
@@ -77,17 +78,21 @@ namespace Filesystem
 
                 try
                 {
-                    ret.contents.push_back(GetEntryTreeLow(sub_name, path + '/' + sub_name, max_depth-1));
+                    ret.contents.push_back(GetObjectTreeLow(sub_name, path + '/' + sub_name, max_depth-1));
+
+                    std::time_t time_modified = ret.contents.back().time_modified_recursive;
+                    if (time_modified > ret.time_modified_recursive)
+                        ret.time_modified_recursive = time_modified;
                 }
-                catch (...) {} // Silently ignore the fact that we can no longer access the directory.
+                catch (...) {} // Silently ignore the error if we can no longer access the directory.
             }
         }
 
         return ret;
     }
 
-    TreeNode GetEntryTree(const std::string &entry_name, int max_depth)
+    TreeNode GetObjectTree(const std::string &entry_name, int max_depth)
     {
-        return GetEntryTreeLow(entry_name, entry_name, max_depth);
+        return GetObjectTreeLow(entry_name, entry_name, max_depth);
     }
 }

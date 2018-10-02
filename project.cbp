@@ -82,7 +82,6 @@
 		</Unit>
 		<Unit filename="src/game/adaptive_viewport.cpp" />
 		<Unit filename="src/game/adaptive_viewport.h" />
-		<Unit filename="src/game/map.h" />
 		<Unit filename="src/game/meta.cpp" />
 		<Unit filename="src/game/meta.h" />
 		<Unit filename="src/game/render.cpp" />
@@ -91,6 +90,8 @@
 		<Unit filename="src/game/states/world.h" />
 		<Unit filename="src/game/states/world/tile_map.cpp" />
 		<Unit filename="src/game/states/world/tile_map.h" />
+		<Unit filename="src/game/texture_atlas.cpp" />
+		<Unit filename="src/game/texture_atlas.h" />
 		<Unit filename="src/graphics/blending.h" />
 		<Unit filename="src/graphics/clear.h" />
 		<Unit filename="src/graphics/complete.h" />
@@ -101,8 +102,6 @@
 		<Unit filename="src/graphics/render_queue.h" />
 		<Unit filename="src/graphics/shader.h" />
 		<Unit filename="src/graphics/texture.h" />
-		<Unit filename="src/graphics/texture_atlas.cpp" />
-		<Unit filename="src/graphics/texture_atlas.h" />
 		<Unit filename="src/graphics/vertex_buffer.h" />
 		<Unit filename="src/graphics/viewport.h" />
 		<Unit filename="src/input/button.h" />

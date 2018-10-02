@@ -10,15 +10,8 @@ namespace Program
 {
     class Parachute
     {
-        Parachute(const Parachute &) = delete;
-        Parachute &operator=(const Parachute &) = delete;
-
         static constexpr int signal_enums[] {SIGSEGV, SIGABRT, SIGINT, SIGTERM, SIGFPE, SIGILL};
         static constexpr int signal_count = std::extent_v<decltype(signal_enums)>;
-
-        using func_t = void(int);
-        func_t *old_signal_handlers[signal_count];
-        std::terminate_handler old_terminate_handler;
 
         inline static bool instance_exists = 0;
 
@@ -68,33 +61,26 @@ namespace Program
         }
 
       public:
-        Parachute()
+        Parachute() // All constructor calls after the first one are no-ops.
         {
             if (instance_exists)
-                Program::HardError("Too many parachutes.");
+                return;
             instance_exists = 1;
 
             for (int i = 0; i < signal_count; i++)
-                old_signal_handlers[i] = std::signal(signal_enums[i], SignalHandler);
+                std::signal(signal_enums[i], SignalHandler);
 
-            old_terminate_handler = std::set_terminate(TerminateHandler);
+            std::set_terminate(TerminateHandler);
         }
 
-        ~Parachute()
+        Parachute(const Parachute &) = delete;
+        Parachute &operator=(const Parachute &) = delete;
+
+        static void ForgetExistingInstances() // A single next constructor call will set the handlers again.
         {
-            for (int i = 0; i < signal_count; i++)
-            {
-                if (old_signal_handlers[i] == SIG_ERR)
-                    continue;
-                func_t *cur_handler = std::signal(signal_enums[i], old_signal_handlers[i]);
-                if (cur_handler != SignalHandler)
-                    std::signal(signal_enums[i], cur_handler);
-            }
-
-            if (std::get_terminate() == TerminateHandler)
-                std::set_terminate(old_terminate_handler);
-
             instance_exists = 0;
         }
     };
+
+    static Program::Parachute error_parachute; // Note that this has to be static to prevent static init order fiasco.
 }
