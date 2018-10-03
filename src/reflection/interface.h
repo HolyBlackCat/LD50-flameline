@@ -189,7 +189,9 @@ namespace Refl
             return low::name;
         }
 
-        std::string to_string() const
+        // `indent` is the amount of spaces you want to indent with, or negative value for no indentation and no line breaks at all.
+        // `cur_indent` is the base intentation level, measured in spaces. It should be non-negative. If `indent < 0`, it has no effect. It's not applied to the first line.
+        std::string to_string(int indent_step = -1, int cur_indent = 0) const
         {
             if constexpr (is_primitive)
             {
@@ -197,40 +199,96 @@ namespace Refl
             }
             else if constexpr (is_structure)
             {
+                bool should_indent = indent_step >= 0;
+                int next_indent = cur_indent + indent_step;
+
                 std::string ret;
+
                 ret += (!is_structure_tuple ? '{' : '(');
+
+                if (!is_structure_tuple && should_indent)
+                    ret += '\n';
+
                 for_each_field([&, this](auto index)
                 {
                     constexpr int i = index.value;
 
                     if constexpr (i != 0)
+                    {
                         ret += ',';
+
+                        if (should_indent)
+                            ret += (is_structure_tuple ? ' ' : '\n');
+                    }
 
                     if constexpr (!is_structure_tuple)
                     {
+                        if (should_indent)
+                            ret += std::string(next_indent, ' ');
+
                         ret += field_name(i);
+
+                        if (should_indent)
+                            ret += ' ';
+
                         ret += '=';
+
+                        if (should_indent)
+                            ret += ' ';
                     }
-                    ret += field<i>().to_string();
+                    ret += field<i>().to_string(indent_step, next_indent);
                 });
+
+                if (!is_structure_tuple && should_indent)
+                {
+                    ret += ",\n";
+                    ret += std::string(cur_indent, ' ');
+                }
+
                 ret += (!is_structure_tuple ? '}' : ')');
+
                 return ret;
             }
             else // is_container
             {
+                bool should_indent = indent_step >= 0;
+                int next_indent = cur_indent + indent_step;
+
                 std::string ret;
+
                 ret += '[';
+
+                if (!is_structure_tuple && should_indent)
+                    ret += '\n';
+
                 bool first = 1;
                 for_each_element([&](auto it)
                 {
                     if (first)
+                    {
                         first = 0;
+                    }
                     else
+                    {
                         ret += ',';
+                        if (should_indent)
+                            ret += '\n';
+                    }
 
-                    ret += Refl::Interface(*it).to_string(); // We have to use `Refl::Interface` instead of `Interface` for template argument deduction to work.
+                    if (should_indent)
+                        ret += std::string(next_indent, ' ');
+
+                    ret += Refl::Interface(*it).to_string(indent_step, next_indent); // We have to use `Refl::Interface` instead of `Interface` for template argument deduction to work.
                 });
+
+                if (!is_structure_tuple && should_indent)
+                {
+                    ret += ",\n";
+                    ret += std::string(cur_indent, ' ');
+                }
+
                 ret += ']';
+
                 return ret;
             }
         }
