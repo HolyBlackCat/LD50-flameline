@@ -1,0 +1,6 @@
+{
+    corner_offset = 20,
+    corner_size = 7.5,
+	corner_speed = 0.01,
+    corner_color = (0.1, 0.1, 0.2),
+}

@@ -87,6 +87,9 @@
 		<Unit filename="src/game/render.cpp" />
 		<Unit filename="src/game/render.h" />
 		<Unit filename="src/game/state.h" />
+		<Unit filename="src/game/states/menu.h" />
+		<Unit filename="src/game/states/menu/background.cpp" />
+		<Unit filename="src/game/states/menu/background.h" />
 		<Unit filename="src/game/states/world.h" />
 		<Unit filename="src/game/states/world/tile_map.cpp" />
 		<Unit filename="src/game/states/world/tile_map.h" />
@@ -129,6 +132,7 @@
 		<Unit filename="src/utils/archive.cpp" />
 		<Unit filename="src/utils/archive.h" />
 		<Unit filename="src/utils/clock.h" />
+		<Unit filename="src/utils/config.h" />
 		<Unit filename="src/utils/dynamic_storage.h" />
 		<Unit filename="src/utils/filesystem.cpp" />
 		<Unit filename="src/utils/filesystem.h" />

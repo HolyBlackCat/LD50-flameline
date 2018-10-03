@@ -17,11 +17,11 @@
 #include "game/render.h"
 #include "game/state.h"
 #include "game/texture_atlas.h"
-#include "game/states/world.h"
+#include "game/states/menu.h"
 
 #define main SDL_main
 
-extern const ivec2 screen_size = ivec2(1920,1080)/4;
+extern const ivec2 screen_size = ivec2(480,270);
 
 Interface::Window win("Gamma", screen_size*2);
 
@@ -52,6 +52,8 @@ int main(int, char**)
 {
     Atlas(); // Generate the atlas if it wasn't done before.
 
+    Graphics::SetClearColor(fvec3(0));
+
     Graphics::Blending::Enable();
     Graphics::Blending::FuncNormalPre();
 
@@ -63,7 +65,7 @@ int main(int, char**)
 
     Clock::DeltaTimer delta_timer;
 
-    DynStorage<States::State> state = decltype(state)::make<States::World>();
+    DynStorage<States::State> state = decltype(state)::make<States::Menu>();
 
     while (1)
     {

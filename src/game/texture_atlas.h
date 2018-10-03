@@ -39,6 +39,26 @@ class TextureAtlas
         Image() {}
     };
 
+    class ImageList
+    {
+        friend class TextureAtlas;
+
+        std::vector<Image> list;
+
+      public:
+        ImageList() {}
+
+        // [] wraps around for easier animation.
+        Image &operator[](int index)
+        {
+            return const_cast<Image &>(std::as_const(*this)[index]);
+        }
+        const Image &operator[](int index) const
+        {
+            return list[mod_ex(index, int(list.size()))];
+        }
+    };
+
     TextureAtlas() {}
 
     // Pass empty string as `source_dir` to disallow regeneration.
@@ -54,15 +74,46 @@ class TextureAtlas
         return image;
     }
 
-    Image Get(const std::string &name) const
+    bool GetOpt(const std::string &name, Image &target) const // Returns false if no such image.
     {
         auto it = desc.images.find(name);
         if (it == desc.images.end())
-            Program::Error("No image `", name, "` in texture atlas for `", source_dir, "`.");
+            return 0;
 
+        target.pos = it->second.pos;
+        target.size = it->second.size;
+        return 1;
+    }
+
+    Image Get(const std::string &name) const
+    {
         Image ret;
-        ret.pos = it->second.pos;
-        ret.size = it->second.size;
+        if (!GetOpt(name, ret))
+            Program::Error("No image `", name, "` in texture atlas for `", source_dir, "`.");
+        return ret;
+    }
+    ImageList GetList(const std::string &prefix, int first_index, const std::string &suffix, int count = -1) const
+    {
+        ImageList ret;
+
+        int offset = 0;
+        while (offset != count)
+        {
+            int index = first_index + offset;
+            std::string name = Str(prefix, index, suffix);
+
+            Image image;
+            if (!GetOpt(name, image))
+            {
+                if (count < 0)
+                    break;
+                Program::Error("Image list `", prefix, '#', suffix, "` from texture atlas for `", source_dir, "` has no image with index ", index, ".");
+            }
+            ret.list.push_back(std::move(image));
+
+            offset++;
+        }
+
         return ret;
     }
 };

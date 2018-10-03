@@ -5,6 +5,7 @@
 #include "game/texture_atlas.h"
 #include "input/mouse.h"
 #include "interface/window.h"
+#include "utils/config.h"
 #include "utils/mat.h"
 #include "utils/metronome.h"
 #include "utils/random.h"

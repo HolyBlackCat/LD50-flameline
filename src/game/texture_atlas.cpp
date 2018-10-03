@@ -158,7 +158,7 @@ TextureAtlas::TextureAtlas(ivec2 target_size, const std::string &source_dir, con
     // Save description.
     try
     {
-        std::string desc_string = Refl::Interface(desc).to_string();
+        std::string desc_string = Refl::Interface(desc).to_string(4);
         MemoryFile::Save(out_desc_file, (uint8_t *)desc_string.data(), (uint8_t *)desc_string.data() + desc_string.size());
     }
     catch (...) {}
