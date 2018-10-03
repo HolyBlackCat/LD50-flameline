@@ -1,8 +1,8 @@
+#include "program/parachute.h"
+
 #include <iomanip>
 #include <iostream>
 #include <vector>
-
-#include "program/parachute.h"
 
 #include "graphics/complete.h"
 #include "input/mouse.h"
@@ -13,6 +13,7 @@
 #include "utils/strings.h"
 
 #include "game/adaptive_viewport.h"
+#include "game/controls.h"
 #include "game/meta.h"
 #include "game/render.h"
 #include "game/state.h"
@@ -35,7 +36,7 @@ Render render(1000, Graphics::ShaderConfig::Core());
 
 const TextureAtlas &Atlas()
 {
-    static TextureAtlas atlas(ivec2(128, 128), "assets/images", "assets/atlas.png", "assets/atlas.refl");
+    static TextureAtlas atlas(ivec2(2048), "assets/images", "assets/atlas.png", "assets/atlas.refl");
     return atlas;
 }
 
@@ -44,8 +45,6 @@ static Graphics::Texture tex = Graphics::Texture().SetData(Atlas().GetImage()).I
 AdaptiveViewport viewport(Graphics::ShaderConfig::Core(), screen_size);
 
 Metronome metronome;
-
-Input::Mouse mouse;
 
 
 int main(int, char**)
@@ -61,7 +60,7 @@ int main(int, char**)
     viewport.Update();
 
     render.SetMatrix(viewport.GetDetails().MatrixCentered());
-    mouse.SetMatrix(viewport.GetDetails().MouseMatrixCentered());
+    controls.mouse.SetMatrix(viewport.GetDetails().MouseMatrixCentered());
 
     Clock::DeltaTimer delta_timer;
 
@@ -78,7 +77,7 @@ int main(int, char**)
             {
                 std::cout << "Resized\n";
                 viewport.Update();
-                mouse.SetMatrix(viewport.GetDetails().MouseMatrixCentered());
+                controls.mouse.SetMatrix(viewport.GetDetails().MouseMatrixCentered());
             }
             if (win.ExitRequested())
                 return 0;

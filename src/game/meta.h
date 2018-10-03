@@ -17,4 +17,3 @@ extern Render render;
 const TextureAtlas &Atlas();
 extern AdaptiveViewport viewport;
 extern Metronome metronome;
-extern Input::Mouse mouse;

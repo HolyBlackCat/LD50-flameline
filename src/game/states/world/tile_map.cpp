@@ -39,6 +39,6 @@ namespace States::Details::World
     void TileMap::Render() const
     {
         render.iquad(-screen_size/2, screen_size).color(fvec3(0), fvec3(0), fvec3(0.1), fvec3(0.1));
-        render.iquad(mouse.pos(), tile_list[0].img[0][0].size).tex(tile_list[0].img[0][0].pos).center().rotate(sin(metronome.ticks / 100.));
+        //render.iquad(mouse.pos(), tile_list[0].img[0][0].size).tex(tile_list[0].img[0][0].pos).center().rotate(sin(metronome.ticks / 100.));
     }
 }

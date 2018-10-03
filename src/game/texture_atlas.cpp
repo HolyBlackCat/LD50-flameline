@@ -139,13 +139,13 @@ TextureAtlas::TextureAtlas(ivec2 target_size, const std::string &source_dir, con
     {
         // Add image to description.
         ImageDesc image_desc;
-        image_desc.pos = ivec2(rect_list[i].x, rect_list[i].y);
+        image_desc.pos = ivec2(rect_list[i].x, rect_list[i].y) + (add_gaps ? 1 : 0);
         image_desc.size = image_list[i].Size(); // Note that we don't extract sizes from rectangles, since those sizes might include gap size.
         if (!desc.images.insert({std::move(name_list[i]), image_desc}).second)
             Program::Error("Internal error while generating description for texture atlas for `", source_dir, "`: Duplicate image paths.");
 
         // Copy this image to target image.
-        image.UnsafeDrawImage(image_list[i], image_desc.pos + (add_gaps ? 1 : 0));
+        image.UnsafeDrawImage(image_list[i], image_desc.pos);
     }
 
     // Save final image.
