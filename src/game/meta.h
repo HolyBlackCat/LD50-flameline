@@ -2,10 +2,12 @@
 
 #include "game/adaptive_viewport.h"
 #include "game/render.h"
+#include "game/state.h"
 #include "game/texture_atlas.h"
 #include "input/mouse.h"
 #include "interface/window.h"
 #include "utils/config.h"
+#include "utils/dynamic_storage.h"
 #include "utils/mat.h"
 #include "utils/metronome.h"
 #include "utils/random.h"
@@ -17,3 +19,4 @@ extern Render render;
 const TextureAtlas &Atlas();
 extern AdaptiveViewport viewport;
 extern Metronome metronome;
+extern DynStorage<States::State> game_state;

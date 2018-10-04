@@ -2,6 +2,7 @@
 
 #include <string>
 #include <vector>
+#include <utility>
 
 #include "reflection/complete.h"
 
@@ -13,56 +14,24 @@ namespace States::Details::World
     class TileMap
     {
       public:
-        struct TileImages
-        {
-            Reflect(TileImages)
-            (
-                (TextureAtlas::ImageList)
-                (
-                    mid,
-                    up, down, left, right,
-                    up_left, up_right, down_left, down_right, // outer corners
-                    left_up, right_up, left_down, right_down // inner corners
-                ),
-            )
-
-            TileImages() {}
-            TileImages(const std::string &name);
-
-            TextureAtlas::ImageList &operator[](int index)
-            {
-                return const_cast<TextureAtlas::ImageList &>(std::as_const(*this)[index]);
-            }
-            const TextureAtlas::ImageList &operator[](int index) const
-            {
-                constexpr int field_count = Refl::Interface<TileImages>().field_count();
-                static_assert(sizeof(TileImages) == field_count * sizeof(TextureAtlas::ImageList));
-                if (index < 0 || index >= field_count)
-                    Program::Error("Tile variant index is out of range.");
-                return *reinterpret_cast<const TextureAtlas::ImageList *>(reinterpret_cast<const char *>(this) + index * sizeof(TextureAtlas::ImageList));
-            }
-        };
+        enum TileDrawMode {fancy, cover};
 
         struct TileInfo
         {
             std::string name;
-            TileImages img;
 
-            TileInfo(const std::string &name) : name(name), img("tiles/" + name) {}
+
+            TileInfo(const std::string &name) : name(name) {}
         };
 
-        struct Tile
-        {
-            int index = -1;
-            int variant = 0;
-            int random = 0;
-        };
         struct TileStack
         {
             Reflect(TileStack)
             (
-                (Tile)(back, mid),
+                (int)(back, mid)(=-1),
             )
+
+            int random = 0;
         };
 
         static constexpr int tile_size = 12;
@@ -79,5 +48,14 @@ namespace States::Details::World
         void Load(const std::string &name);
 
         void Render() const;
+
+        TileStack &UnsafeAt(ivec2 pos) const
+        {
+            return const_cast<TileStack &>(std::as_const(*this).UnsafeAt(pos));
+        }
+        const TileStack &UnsafeAt(ivec2 pos) const
+        {
+            return tiles[pos.x + pos.y * size.x];
+        }
     };
 }

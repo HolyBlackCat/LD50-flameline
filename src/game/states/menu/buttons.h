@@ -1,5 +1,7 @@
 #pragma once
 
+namespace States {class Menu;}
+
 namespace States::Details::Menu
 {
     class Buttons
@@ -19,7 +21,7 @@ namespace States::Details::Menu
       public:
         Buttons();
 
-        void Tick();
+        void Tick(States::Menu &);
         void Render() const;
     };
 }

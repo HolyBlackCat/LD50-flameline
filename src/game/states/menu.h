@@ -17,7 +17,7 @@ namespace States
 
         void Tick() override
         {
-            buttons.Tick();
+            buttons.Tick(*this);
             fade.Tick();
         }
         void Render() const override

@@ -7,7 +7,6 @@
 #include "graphics/complete.h"
 #include "input/mouse.h"
 #include "interface/window.h"
-#include "utils/dynamic_storage.h"
 #include "utils/mat.h"
 #include "utils/metronome.h"
 #include "utils/strings.h"
@@ -46,6 +45,8 @@ AdaptiveViewport viewport(Graphics::ShaderConfig::Core(), screen_size);
 
 Metronome metronome;
 
+DynStorage<States::State> game_state;
+
 
 int main(int, char**)
 {
@@ -64,7 +65,7 @@ int main(int, char**)
 
     Clock::DeltaTimer delta_timer;
 
-    DynStorage<States::State> state = decltype(state)::make<States::Menu>();
+    game_state = decltype(game_state)::make<States::Menu>();
 
     while (1)
     {
@@ -75,20 +76,19 @@ int main(int, char**)
 
             if (win.Resized())
             {
-                std::cout << "Resized\n";
                 viewport.Update();
                 controls.mouse.SetMatrix(viewport.GetDetails().MouseMatrixCentered());
             }
             if (win.ExitRequested())
                 return 0;
 
-            state->Tick();
+            game_state->Tick();
         }
 
         viewport.BeginFrame();
         Graphics::Clear();
         render.BindShader();
-        state->Render();
+        game_state->Render();
         render.Finish();
         viewport.FinishFrame();
         Graphics::CheckErrors();

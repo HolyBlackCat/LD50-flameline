@@ -4,10 +4,14 @@
 
 namespace Cfg
 {
-    ReflectStruct(Common,(
+    ReflectStruct(ObjCommon,(
         (float)(fade_step)(=0.01),
     ))
 
-    inline static const auto common = Config<Common>("assets/config/common.refl");
+    inline const auto &Common()
+    {
+        static Config<ObjCommon> ret("assets/config/common.refl");
+        return ret;
+    }
 }
 
