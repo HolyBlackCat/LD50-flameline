@@ -136,13 +136,17 @@ class Json
                 Program::Error("Attempt to access element #", index, " of JSON object `", path, "`, but it only contains ", arr.size(), " elements.");
             return View(arr[index], AppendElementIndexToPath(index));
         }
-        template <typename F> void ForEachArrayElement(F &&func) // `func` should be `void func(const View &elem)`.
+        template <typename F> void ForEachArrayElement(F &&func) const // `func` should be `void func(const View &elem)`.
         {
             if (!IsArray())
                 ThrowExpectedType("an array");
             const array_t &arr = *std::get_if<int(array)>(&ptr->variant);
             for (array_t::size_type i = 0; i < arr.size(); i++)
                 func(View(arr[i], AppendElementIndexToPath(i)));
+        }
+        bool ElementExists(int index) const
+        {
+            return index >= 0 && index < GetArraySize();
         }
 
         int GetObjectSize() const
@@ -161,13 +165,21 @@ class Json
                 Program::Error("Attempt to access nonexistent element `", key, "` of JSON object `", path, "`.");
             return View(it->second, AppendElementNameToPath(key));
         }
-        template <typename F> void ForEachObjectElement(F &&func) // `func` should be `void func(const std::string &name, const View &elem)`.
+        template <typename F> void ForEachObjectElement(F &&func) const // `func` should be `void func(const std::string &name, const View &elem)`.
         {
             if (!IsObject())
                 ThrowExpectedType("an object");
             const object_t &obj = *std::get_if<int(object)>(&ptr->variant);
             for (const auto &elem : obj)
                 func(View(elem.second, AppendElementNameToPath(elem.first)));
+        }
+        bool ElementExists(std::string key) const
+        {
+            if (!IsObject())
+                ThrowExpectedType("an object");
+            const object_t &obj = *std::get_if<int(object)>(&ptr->variant);
+            auto it = obj.find(key);
+            return it != obj.end();
         }
 
         View operator[](int index) const // Same as GetElement(int).
