@@ -5,11 +5,12 @@
 
 #include "game/states/world/camera.h"
 #include "game/meta.h"
+#include "game/controls.h"
 
 namespace States::Details::World
 {
     void Camera::Tick()
     {
-        SetPos(mouse.pos());
+        SetPos(controls.mouse.pos());
     }
 }

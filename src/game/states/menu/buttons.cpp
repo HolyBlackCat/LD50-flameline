@@ -49,6 +49,8 @@ namespace States::Details::Menu
                 break;
             }
         }
+
+        ""; game_state = decltype(game_state)::make<States::World>();
     }
 
     void Buttons::Render() const

@@ -5,6 +5,8 @@
 #include "game/states/world/camera.h"
 #include "game/states/world/tile_map.h"
 
+#include "graphics/clear.h"
+
 namespace States
 {
     struct World : State
@@ -20,11 +22,14 @@ namespace States
 
         void Tick() override
         {
+            camera.Tick();
             fade.Tick();
         }
         void Render() const override
         {
-            map.Render(*this);
+            Graphics::Clear();
+            map.Render(*this, &Details::World::TileMap::TileStack::back);
+            map.Render(*this, &Details::World::TileMap::TileStack::mid);
             fade.Render();
         }
     };

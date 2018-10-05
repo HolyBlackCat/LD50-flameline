@@ -9,19 +9,20 @@
 #include "game/texture_atlas.h"
 #include "utils/mat.h"
 
+namespace States {class World;}
+
 namespace States::Details::World
 {
     class TileMap
     {
       public:
-        enum TileDrawMode {fancy, cover};
+        enum TileDrawMode {invis, fancy, cover};
 
         struct TileInfo
         {
             std::string name;
-
-
-            TileInfo(const std::string &name) : name(name) {}
+            TileDrawMode draw_mode = invis;
+            int image_index = 0;
         };
 
         struct TileStack
@@ -30,8 +31,6 @@ namespace States::Details::World
             (
                 (int)(back, mid)(=-1),
             )
-
-            int random = 0;
         };
 
         static constexpr int tile_size = 12;
@@ -39,6 +38,7 @@ namespace States::Details::World
       private:
         ivec2 size = ivec2(0);
         std::vector<TileStack> tiles;
+        std::vector<int> random_values;
 
       public:
         TileMap() {}
@@ -47,15 +47,32 @@ namespace States::Details::World
 
         void Load(const std::string &name);
 
-        void Render() const;
+        void Render(const States::World &world, int TileStack::*layer) const;
 
-        TileStack &UnsafeAt(ivec2 pos) const
+        bool TilePosInRange(ivec2 pos) const
+        {
+            return (pos >= 0).all() && (pos < size).all();
+        }
+
+        int GetRandom(ivec2 pos) const
+        {
+            pos = mod_ex(pos, size);
+            return random_values[pos.x + size.x * pos.y];
+        }
+
+        TileStack &UnsafeAt(ivec2 pos)
         {
             return const_cast<TileStack &>(std::as_const(*this).UnsafeAt(pos));
         }
         const TileStack &UnsafeAt(ivec2 pos) const
         {
             return tiles[pos.x + pos.y * size.x];
+        }
+
+        const TileStack &ClampGet(ivec2 pos) const
+        {
+            clamp_var(pos, 0, size-1);
+            return UnsafeAt(pos);
         }
     };
 }
