@@ -15,7 +15,7 @@
     player_jump_speed_begin = 4,
     player_jump_speed_end = 1.5,
     player_jump_ticks = 20,
-    player_wall_jump_speed = (2, 1.6),
+    player_wall_jump_speed = (1.2, 1.8),
     player_wall_jump_ticks = 5,
     player_wall_glide_speed_cap = 0.2,
 }
