@@ -6,7 +6,6 @@
 
 #include "reflection/complete.h"
 
-#include "game/texture_atlas.h"
 #include "utils/mat.h"
 
 namespace States {class World;}

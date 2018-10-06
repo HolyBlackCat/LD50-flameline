@@ -45,7 +45,7 @@ namespace States::Details::Menu
                 this_menu.fade.SetNextState(decltype(game_state)::make<States::World>());
                 break;
               case 1:
-                this_menu.fade.SetNextState({});
+                this_menu.fade.SetNextState(nullptr);
                 break;
             }
         }

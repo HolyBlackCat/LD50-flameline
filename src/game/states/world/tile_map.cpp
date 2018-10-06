@@ -6,6 +6,7 @@
 
 #include "game/states/world.h"
 #include "game/states/world/tile_map.h"
+#include "game/texture_atlas.h"
 #include "game/meta.h"
 #include "utils/json.h"
 

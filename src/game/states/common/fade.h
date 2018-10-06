@@ -13,7 +13,7 @@ namespace States::Details::Common
         fvec3 color;
         float alpha = 1;
         bool have_next_state = 0;
-        DynStorage<State> next_state;
+        DynStorage<State> next_state = nullptr;
       public:
         Fade(fvec3 color) : color(color) {}
         void Tick();

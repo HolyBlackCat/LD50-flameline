@@ -100,6 +100,7 @@
 		<Unit filename="src/game/states/world.h" />
 		<Unit filename="src/game/states/world/camera.cpp" />
 		<Unit filename="src/game/states/world/camera.h" />
+		<Unit filename="src/game/states/world/player_controller.h" />
 		<Unit filename="src/game/states/world/tile_map.cpp" />
 		<Unit filename="src/game/states/world/tile_map.h" />
 		<Unit filename="src/game/texture_atlas.cpp" />

@@ -45,7 +45,7 @@ AdaptiveViewport viewport(Graphics::ShaderConfig::Core(), screen_size);
 
 Metronome metronome;
 
-DynStorage<States::State> game_state;
+DynStorage<States::State> game_state = nullptr;
 
 
 int main(int, char**)

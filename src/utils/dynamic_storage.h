@@ -4,19 +4,19 @@
 #include <type_traits>
 #include <utility>
 
-namespace DynamicStorage
+namespace Dynamic
 {
     /* DynStorage is copyable wrapper for std::unique_ptr, with std::visit-like feature.
      *
-     * When copied, copies the underlying object. The copy is done properly if `DynStorage<Base>` holds a derived class.
+     * When copied, it copies the underlying object. The copy is done properly even if `DynStorage<Base>` holds a derived class.
      *
      * You can't modify objects through `const DynStorage<T>` (unlike std::unique_ptr).
      *
      * How to construct:
-     *     DynStorage<MyClass> x; // Creates null pointer.
-     *     DynStorage<MyClass> y = DynStorage<MyClass>::make(params); // Creates an actual object. If the parameter list is not empty, `DynStorage<MyClass> y(params);` can be used as well.
-     *     DynStorage<Base> z = DynStorage<Base>::make<Derived>(params); // Creates a derived object. If `Derived == Base`, does the same thing as the above line.
-     *     // `auto` could be used here as well.
+     *     DynStorage<MyClass> x = nullptr; // Creates null pointer.
+     *     DynStorage<MyClass> y(...); // Creates an object.
+     *     DynStorage<MyBase> z = DynStorage<MyBase>::make<MyDerived>(...); // Creates an object of a derived type. If `MyBase == MyDerived`, it has the same effect as the line above.
+     *     // `auto` can be used in the last case.
      *     // Conversion from `DynStorage<Derived>` to `DynStorage<Base>` is not supported.
      *     // Storing arrays is not supported.
      *
@@ -25,6 +25,7 @@ namespace DynamicStorage
      *     std::cout << *obj; // Obtains a reference.
      *     std::cout << obj.get(); // Obtains a pointer.
      *     std::cout << obj->foo; // Member access.
+     *     std::cout << obj.bytes(); // Obtains a void pointer to the actual stored class, and not a base class (unlike `get`, `*`, and `->`, which always access the base class).
      *
      * How to do std::visit-like stuff:
      *     struct A {virtual ~A() {}};
@@ -43,17 +44,17 @@ namespace DynamicStorage
      *
      *     // Here is how we do that:
      *
-     *     template <typename BaseT> struct MyFuncsBase : DynamicStorage::FuncBase<BaseT>
+     *     template <typename BaseT> struct MyFuncsBase : Dynamic::FuncBase<BaseT>
      *     {
-     *         virtual void call_foo(BaseT *) = 0;
      *         using Base = MyFuncsBase;
+     *         virtual void call_foo(Dynamic::Param<BaseT>) = 0; // Template parameter of `Param` can be `const`.
      *     };
      *
      *     template <typename BaseT, typename DerivedT> struct MyFuncs : MyFuncsBase<BaseT>
      *     {
-     *         void call_foo(BaseT *base) override
+     *         void call_foo(Dynamic::Param<BaseT> obj) override
      *         {
-     *             foo(*DynamicStorage::derived<DerivedT>(base));
+     *             foo(*obj.template get<DerivedT>());
      *         }
      *     };
      *
@@ -62,119 +63,165 @@ namespace DynamicStorage
      *         auto x = DynStorage<A,MyFuncs>::make();
      *         auto y = DynStorage<A,MyFuncs>::make<B>();
      *
-     *         x.functions().call_foo(x.get()); // prints foo(A)
-     *         y.functions().call_foo(y.get()); // prints foo(B)
+     *         x.funcs().call_foo(x); // prints foo(A)
+     *         y.funcs().call_foo(y); // prints foo(B)
      *     }
      */
 
     namespace impl
     {
-        // Type trait to check if A is static_cast'able to B.
-        template <typename A, typename B, typename = void> struct can_static_cast_impl : std::false_type {};
-        template <typename A, typename B> struct can_static_cast_impl<A, B, std::void_t<decltype(static_cast<B>(std::declval<A>()))>> : std::true_type {};
-        template <typename A, typename B> inline constexpr bool can_static_cast_v = can_static_cast_impl<A,B>::value;
+        template <bool C> struct maybe_copyable {};
+        template <> struct maybe_copyable<0>
+        {
+            maybe_copyable() = default;
+            ~maybe_copyable() = default;
+            maybe_copyable(const maybe_copyable &) = delete;
+            maybe_copyable &operator=(const maybe_copyable &) = delete;
+            maybe_copyable(maybe_copyable &&) = default;
+            maybe_copyable &operator=(maybe_copyable &&) = default;
+        };
 
-        // Type trait to check if A is dynamic_cast'able to B.
-        template <typename A, typename B, typename = void> struct can_dynamic_cast_impl : std::false_type {};
-        template <typename A, typename B> struct can_dynamic_cast_impl<A, B, std::void_t<decltype(dynamic_cast<B>(std::declval<A>()))>> : std::true_type {};
-        template <typename A, typename B> inline constexpr bool can_dynamic_cast_v = can_dynamic_cast_impl<A,B>::value;
+        template <typename T> struct PointerPair
+        {
+            std::conditional_t<std::is_const_v<T>, const T, T> *direct = 0;
+            std::unique_ptr<T> unique;
 
-        template <typename A, typename B> inline constexpr bool can_static_or_dynamic_cast_v = can_static_cast_v<A,B> || can_dynamic_cast_v<A,B>;
+            PointerPair() {}
+            template <typename D> PointerPair(std::unique_ptr<D> &&other) : direct(other.get()), unique(std::move(other)) {}
+        };
     }
 
-    // Downcasts a pointer. Attempts to use static_cast, falls back to dynamic_cast. If none of them work, fails with a static_assert.
-    template <typename Derived, typename Base> Derived *derived(Base *ptr)
+    template <typename T, template <typename,typename> typename Funcs> class Storage;
+
+    template <typename B> class Param
     {
-        static_assert(impl::can_static_or_dynamic_cast_v<Base*, Derived*>, "Unable to downcast.");
-        if constexpr (impl::can_static_cast_v<Base*, Derived*>)
-            return static_cast<Derived *>(ptr); // This doesn't work if base is virtual.
-        else
-            return dynamic_cast<Derived *>(ptr);
-    }
+        template <typename T, template <typename,typename> typename Funcs> friend class Storage;
+
+        static constexpr bool is_const = std::is_const_v<B>;
+        template <typename T> using maybe_const = std::conditional_t<is_const, const T, T>;
+
+        maybe_const<void> *ptr;
+
+        Param(maybe_const<void> *ptr) : ptr(ptr) {}
+
+      public:
+        template <typename D> [[nodiscard]] maybe_const<D> *get() const
+        {
+            static_assert(std::is_base_of_v<B, D>, "Invalid parameter access.");
+            static_assert(!std::is_const_v<D>, "`const` is not permitted here, it's added automatically if necessary.");
+            return static_cast<maybe_const<D> *>(ptr);
+        }
+    };
 
     template <typename B> struct FuncBase
     {
         using Base = FuncBase;
-        virtual std::unique_ptr<B> copy_(const B *) = 0;
+        virtual impl::PointerPair<B> _copy(Param<const B> param) = 0;
     };
 
-    template <typename B, typename D> struct DefaultFuncImpl : FuncBase<B> {};
+    template <typename B, typename D> struct DefaultFuncs : FuncBase<B> {};
 
     template
     <
         typename T,
-        template <typename,typename> typename Functions = DefaultFuncImpl
+        template <typename,typename> typename Funcs = DefaultFuncs
     >
-    class DynStorage
+    class Storage : impl::maybe_copyable<std::is_copy_constructible_v<T>>
     {
         static_assert(!std::is_const_v<T>, "Template parameter can't be const.");
         static_assert(!std::is_array_v<T>, "Template parameter can't be an array.");
 
-        template <typename D> struct Implementation : Functions<T,D>
+        static constexpr bool is_copyable = std::is_copy_constructible_v<T>;
+
+        template <typename D> struct Impl : Funcs<T,D>
         {
-            std::unique_ptr<T> copy_(const T *ptr) override
+            impl::PointerPair<T> _copy(Param<const T> param) override
             {
-                if constexpr (!std::is_abstract_v<D>)
+                if constexpr (is_copyable)
                 {
-                    return ptr ? std::make_unique<D>(*derived<const D>(ptr)) : std::unique_ptr<T>();
+                    const D *other = param.template get<D>();
+                    if (!other)
+                        return {};
+                    return {std::make_unique<D>(*other)};
                 }
                 else
                 {
-                    (void)ptr;
-                    return std::unique_ptr<T>();
+                    (void)param;
+                    return {};
                 }
             }
 
-            inline static Implementation object;
+            inline static Impl obj;
         };
 
-        using Pointer = std::unique_ptr<T>;
-        using FunctionsBase = typename Implementation<T>::Base;
+        using FuncBase = typename Impl<T>::Base;
 
-        FunctionsBase *funcs = &Implementation<T>::object;
-        Pointer ptr;
+        struct Data
+        {
+            impl::PointerPair<T> ptrs;
+            FuncBase *funcs = 0;
+
+            Data() {}
+            Data(impl::PointerPair<T> &&ptrs, FuncBase *funcs) : ptrs(std::move(ptrs)), funcs(funcs) {}
+            template <typename D> Data(std::unique_ptr<D> &&other) : ptrs(std::move(other)), funcs(&Impl<D>::obj) {}
+        };
+        Data data;
+
+        Storage(Data &&data) : data(std::move(data)) {}
 
       public:
-        DynStorage() noexcept {}
+        Storage(decltype(nullptr)) noexcept {}
 
-        template <typename ...P, typename = std::void_t<decltype(T(std::declval<P>()...))>> // Disable if T is not constructible from passed parameters.
-        DynStorage(P &&... p) : ptr(std::make_unique<T>(std::forward<P>(p)...)) {}
+        template <typename ...P, typename = std::void_t<decltype(T(std::declval<P>()...))>> // Disable if T is not constructible from these parameters.
+        Storage(P &&... p) : data(std::make_unique<T>(std::forward<P>(p)...)) {}
 
-        DynStorage(const DynStorage &other) : funcs(other.funcs), ptr(funcs->copy_(other.ptr.get())) {}
-        DynStorage(DynStorage &&other) noexcept : funcs(other.funcs), ptr(std::move(other.ptr)) {}
+        Storage(const Storage &other) : data(other ? Data(other.funcs()._copy(other), other.data.funcs) : Data()) {}
 
-        DynStorage &operator=(const DynStorage &other) {ptr = other.funcs->copy_(other.ptr.get()); funcs = other.funcs; return *this;}
-        DynStorage &operator=(DynStorage &&other) noexcept {ptr = std::move(other.ptr); funcs = other.funcs; return *this;}
+        Storage(Storage &&other) noexcept : data(std::exchange(other.data, {})) {}
+
+        Storage &operator=(Storage other) noexcept
+        {
+            std::swap(data, other.data);
+            return *this;
+        }
 
         template <typename D = T, typename ...P,
-                  typename = std::void_t<decltype(D(std::declval<P>()...))>> // Disable if T is not constructible from passed parameters.
-        [[nodiscard]] static DynStorage make(P &&... p)
+                  typename = std::void_t<decltype(D(std::declval<P>()...))>> // Disable if T is not constructible from these parameters.
+        [[nodiscard]] static Storage make(P &&... p)
         {
             static_assert(!std::is_const_v<D>, "Template parameter can't be const.");
             static_assert(!std::is_array_v<D>, "Template parameter can't be an array.");
             static_assert(std::is_same_v<D,T> || std::has_virtual_destructor_v<T>, "Base has to have a virtual destructor.");
-            static_assert(std::is_convertible_v<D*, T*>, "Unable to upcast the pointers. Probably you have non-public bases or duplicate bases.");
-            static_assert(impl::can_static_or_dynamic_cast_v<T*, D*>, "Unable to downcast the pointers.");
-            DynStorage ret;
-            ret.ptr = std::make_unique<D>(std::forward<P>(p)...);
-            ret.funcs = &Implementation<D>::object;
-            return ret;
+            static_assert(std::is_convertible_v<D*, T*>, "This type is not derived from base, or the base is not public, or the base is duplicated.");
+
+            return Data(std::make_unique<D>(std::forward<P>(p)...));
         }
 
-        [[nodiscard]] explicit operator bool() const {return bool(ptr);}
+        [[nodiscard]] explicit operator bool() const {return bool(data.ptrs.direct);}
 
-        [[nodiscard]]       T *get()       {return ptr.get();}
-        [[nodiscard]] const T *get() const {return ptr.get();}
+        [[nodiscard]]       T *get()       {return data.ptrs.unique.get();}
+        [[nodiscard]] const T *get() const {return data.ptrs.unique.get();}
 
-        [[nodiscard]]       T &operator*()       {return *ptr;}
-        [[nodiscard]] const T &operator*() const {return *ptr;}
+        [[nodiscard]]       T &operator*()       {return *data.ptrs.unique;}
+        [[nodiscard]] const T &operator*() const {return *data.ptrs.unique;}
 
-        [[nodiscard]]       T *operator->()       {return ptr.get();}
-        [[nodiscard]] const T *operator->() const {return ptr.get();}
+        [[nodiscard]]       T *operator->()       {return data.ptrs.unique.get();}
+        [[nodiscard]] const T *operator->() const {return data.ptrs.unique.get();}
 
-        [[nodiscard]] FunctionsBase &functions() const {return *funcs;}
+        // Unlike `get()`, this returns the actual pointer to the class even if multiple inheritance is present.
+        [[nodiscard]]       void *bytes()       {return data.ptrs.direct;}
+        [[nodiscard]] const void *bytes() const {return data.ptrs.direct;}
+
+        [[nodiscard]] FuncBase &funcs() const {return *data.funcs;}
+
+        operator Param<      T>()       {return {data.ptrs.direct};}
+        operator Param<const T>() const {return {data.ptrs.direct};}
     };
-
 }
 
-using DynamicStorage::DynStorage;
+template
+<
+    typename T,
+    template <typename,typename> typename Funcs = Dynamic::DefaultFuncs
+>
+using DynStorage = Dynamic::Storage<T, Funcs>;
