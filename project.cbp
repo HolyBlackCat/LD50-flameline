@@ -83,6 +83,7 @@
 		<Unit filename="src/game/adaptive_viewport.cpp" />
 		<Unit filename="src/game/adaptive_viewport.h" />
 		<Unit filename="src/game/controls.h" />
+		<Unit filename="src/game/hitbox.h" />
 		<Unit filename="src/game/meta.cpp" />
 		<Unit filename="src/game/meta.h" />
 		<Unit filename="src/game/render.cpp" />
@@ -100,6 +101,8 @@
 		<Unit filename="src/game/states/world.h" />
 		<Unit filename="src/game/states/world/camera.cpp" />
 		<Unit filename="src/game/states/world/camera.h" />
+		<Unit filename="src/game/states/world/config.h" />
+		<Unit filename="src/game/states/world/player_controller.cpp" />
 		<Unit filename="src/game/states/world/player_controller.h" />
 		<Unit filename="src/game/states/world/tile_map.cpp" />
 		<Unit filename="src/game/states/world/tile_map.h" />

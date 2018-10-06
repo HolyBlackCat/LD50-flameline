@@ -16,9 +16,9 @@ namespace States::Details::World
 
     static const std::vector<TileMap::TileInfo> tile_list
     {
-        { "moss_stone"  , TileMap::fancy , 0}, // 0
-        { "grass_cover" , TileMap::cover , 0}, // 1
-        { "metal"       , TileMap::fancy , 1}, // 2
+        { "moss_stone"  , TileMap::solid    , TileMap::fancy , 0}, // 0
+        { "grass_cover" , TileMap::nonsolid , TileMap::cover , 0}, // 1
+        { "metal"       , TileMap::solid    , TileMap::fancy , 1}, // 2
     };
 
     const TileMap::TileInfo &TileMap::GetTileInfo(int index)
@@ -28,10 +28,12 @@ namespace States::Details::World
         return tile_list[index];
     }
 
-    void TileMap::Load(const std::string &name)
+    void TileMap::Load(const std::string &file_name)
     {
         try
         {
+            name = file_name;
+
             // Open map file.
             Json json(MemoryFile(name).construct_string().c_str(), 64);
             Json::View view = json.GetView();
@@ -46,7 +48,7 @@ namespace States::Details::World
             for (int &random_value : random_values)
                 random_value = random.integer() <= 0xffff;
 
-
+            // Read tile layers.
             using tile_refl = Refl::Interface<TileStack>;
             tile_refl::for_each_field([&](auto index)
             {
@@ -71,9 +73,39 @@ namespace States::Details::World
                 for (int y = 0; y < size.y; y++)
                 for (int x = 0; x < size.x; x++)
                     Refl::Interface(UnsafeAt(ivec2(x,y))).template field_value<layer_index>() = view_data[x + size.x * y].GetInt() - 1; // Tiled uses 1-based tile indexing, and we want 0-based.
-
             });
 
+            { // Read object layer.
+                constexpr int layer_index = tile_refl::field_count();
+                constexpr char layer_name[] = "obj";
+                Json::View view_layer = view_layer_list[layer_index];
+
+                // Stop if layer is named incorrectly.
+                if (view_layer["name"].GetString() != layer_name)
+                    Program::Error("Expected layer ", layer_index, "` to be named `", layer_name, "`.");
+
+                // Stop if it's not an object layer.
+                if (view_layer["type"].GetString() != "objectgroup")
+                    Program::Error("Expected layer `", layer_name, "` to be an object layer.");
+
+                Json::View view_obj_list = view_layer["objects"];
+                int obj_count = view_obj_list.GetArraySize();
+
+                // Read objects.
+                for (int i = 0; i < obj_count; i++)
+                {
+                    Json::View view_obj = view_obj_list[i];
+
+                    if (view_obj.HasElement("point") && view_obj["point"].GetBool() == true)
+                    { // A point
+                        points[view_obj["name"].GetString()].push_back(iround(fvec2(view_obj["x"].GetReal(), view_obj["y"].GetReal())));
+                    }
+                    else
+                    { // Unknown object, stop.
+                        Program::Error("Object ", i, " belongs to an unknown category.");
+                    }
+                }
+            }
         }
         catch (std::exception &e)
         {

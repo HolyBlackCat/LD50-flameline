@@ -144,7 +144,7 @@ class Json
             for (array_t::size_type i = 0; i < arr.size(); i++)
                 func(View(arr[i], AppendElementIndexToPath(i)));
         }
-        bool ElementExists(int index) const
+        bool HasElement(int index) const
         {
             return index >= 0 && index < GetArraySize();
         }
@@ -173,7 +173,7 @@ class Json
             for (const auto &elem : obj)
                 func(View(elem.second, AppendElementNameToPath(elem.first)));
         }
-        bool ElementExists(std::string key) const
+        bool HasElement(std::string key) const
         {
             if (!IsObject())
                 ThrowExpectedType("an object");

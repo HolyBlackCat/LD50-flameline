@@ -1,5 +1,6 @@
 #pragma once
 
+#include <map>
 #include <string>
 #include <vector>
 #include <utility>
@@ -15,11 +16,13 @@ namespace States::Details::World
     class TileMap
     {
       public:
+        enum Solidity {solid, nonsolid};
         enum TileDrawMode {invis, fancy, cover};
 
         struct TileInfo
         {
             std::string name;
+            Solidity solidity;
             TileDrawMode draw_mode = invis;
             int image_index = 0;
         };
@@ -35,9 +38,14 @@ namespace States::Details::World
         static constexpr int tile_size = 12;
 
       private:
+        std::string name;
         ivec2 size = ivec2(0);
         std::vector<TileStack> tiles;
         std::vector<int> random_values;
+
+        using points_t = std::vector<ivec2>;
+        using point_list_t = std::map<std::string, std::vector<ivec2>>;
+        point_list_t points;
 
       public:
         TileMap() {}
@@ -47,6 +55,24 @@ namespace States::Details::World
         void Load(const std::string &name);
 
         void Render(const States::World &world, int TileStack::*layer) const;
+
+        const std::string Name() const
+        {
+            return name;
+        }
+
+        const point_list_t &GetPoints() const
+        {
+            return points;
+        }
+
+        const points_t *GetPoints(std::string name) const
+        {
+            if (auto it = points.find(name); it != points.end())
+                return &it->second;
+            else
+                return 0;
+        }
 
         bool TilePosInRange(ivec2 pos) const
         {
@@ -71,6 +97,13 @@ namespace States::Details::World
         const TileStack &ClampGet(ivec2 pos) const
         {
             clamp_var(pos, 0, size-1);
+            return UnsafeAt(pos);
+        }
+
+        TileStack TryGet(ivec2 pos) const
+        {
+            if (!TilePosInRange(pos))
+                return {};
             return UnsafeAt(pos);
         }
     };
