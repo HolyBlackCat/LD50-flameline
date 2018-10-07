@@ -22,10 +22,10 @@ namespace States::Details::World
 
             bool ground = 0;
             int jump_ticks_left = 0;
-            int wall_jump_ticks_left = 0;
-            fvec2 wall_jump_vel = fvec2(0);
-            bool flying_after_wall_jump = 0;
+            bool flying = 0;
             bool has_second_jump = 0;
+            int wall_hug_dir = 0; // 0 if not hugging.
+            bool grabbing_ledge = 0;
 
             int anim_state = 0;
             int anim_frame = 0;

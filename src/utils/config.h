@@ -56,7 +56,7 @@ template <typename T> class Config
                 if (!partial_parsing_ok)
                 {
                     // Parsing without completeness check failed as well. Throwing the original exception.
-                    Program::Error("Unable to parse config file `", file_name, "`\nDelete the file if you want it to be regenerated.\n", e.what());
+                    Program::Error("Unable to parse config file `", file_name, "`.\nDelete the file if you want it to be regenerated.\n", e.what());
                 }
 
                 // The file is parsed successfully, but it's incomplete. Proceeding to making a new file.

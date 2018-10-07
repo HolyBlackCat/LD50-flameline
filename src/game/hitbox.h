@@ -37,7 +37,7 @@ namespace Hitboxes
         bool CollidesAt(const TileMap &map, ivec2 pos) const
         {
             for (ivec2 point : points)
-                if (int index = map.ClampGet(div_ex(pos + point, TileMap::tile_size)).mid; index != -1 && map.GetTileInfo(index).solidity == TileMap::solid)
+                if (map.SolidAtPixel(pos + point))
                     return 1;
             return 0;
         }

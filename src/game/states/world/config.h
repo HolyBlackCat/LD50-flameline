@@ -21,9 +21,11 @@ namespace Cfg
         (float)(player_jump_speed_begin)(=2),
         (float)(player_jump_speed_end)(=1),
         (int)(player_jump_ticks)(=15),
-        (fvec2)(player_wall_jump_speed)(=fvec2(2,2)),
-        (int)(player_wall_jump_ticks)(=10),
-        (float)(player_wall_glide_speed_cap)(=0.8),
+        (int)(player_ledge_jump_ticks)(=15),
+        (fvec2)(player_wall_jump_vel)(=fvec2(2,2)),
+        (float)(player_wall_slide_speed_cap)(=0.8),
+        (int)(player_wall_slide_hitbox_offset_y)(=10),
+        (int)(player_ledge_grab_collider_offest_y)(=10),
     ))
 
     inline const auto &World()

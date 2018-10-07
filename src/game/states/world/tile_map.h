@@ -106,5 +106,13 @@ namespace States::Details::World
                 return {};
             return UnsafeAt(pos);
         }
+
+        bool SolidAtPixel(ivec2 pos) const
+        {
+            int index = ClampGet(div_ex(pos, tile_size)).mid;
+            if (index == -1)
+                return 0;
+            return GetTileInfo(index).solidity == solid;
+        }
     };
 }
