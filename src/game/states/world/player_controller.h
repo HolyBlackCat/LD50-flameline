@@ -20,11 +20,13 @@ namespace States::Details::World
             fvec2 vel_lag = fvec2(0);
             ivec2 vel_int = ivec2(0);
 
+            bool facing_left = 0;
             bool ground = 0;
             int jump_ticks_left = 0;
             bool flying = 0;
             bool has_second_jump = 0;
             int wall_hug_dir = 0; // 0 if not hugging.
+            bool wall_sliding = 0;
             bool grabbing_ledge = 0;
 
             int anim_state = 0;

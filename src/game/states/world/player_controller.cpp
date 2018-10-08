@@ -29,6 +29,7 @@ namespace States::Details::World
 
                 if (player->h_control)
                 {
+                    player->facing_left = player->h_control < 0;
                     clamp_var(player->vel.x += player->h_control * cfg.player_ground_walking_acc, -cfg.player_speed_cap.x, cfg.player_speed_cap.x);
                 }
                 else
@@ -47,8 +48,6 @@ namespace States::Details::World
                         player->vel.x -= sign(player->vel.x) * stopping_acc;
                     }
                 }
-
-
             }
 
             { // Jumping
@@ -85,6 +84,8 @@ namespace States::Details::World
             }
 
             { // Wall sliding
+                player->wall_sliding = 0;
+
                 if (player->has_second_jump)
                 {
                     for (int s = -1; s <= 1; s += 2)
@@ -94,6 +95,7 @@ namespace States::Details::World
                         if (!SolidForPlayerAtOffset(world, ivec2(s, cfg.player_wall_slide_hitbox_offset_y)) || !SolidForPlayerAtOffset(world, ivec2(s, 0))) // This is intended, think twice before changing.
                             continue;
 
+                        player->wall_sliding = 1;
                         if (player->vel.y > cfg.player_wall_slide_speed_cap)
                         {
                             player->vel.y = cfg.player_wall_slide_speed_cap;
@@ -121,17 +123,21 @@ namespace States::Details::World
                         player->has_second_jump = 0;
                         player->flying = 1;
                         player->vel = cfg.player_wall_jump_vel * ivec2(-s, -1);
+                        player->facing_left = s > 0;
                     }
                 }
             }
 
             { // Ledge grabbing
                 player->grabbing_ledge = 0;
-                if (player->wall_hug_dir != 0)
+                if (player->wall_hug_dir != 0 && player->vel.y >= 0)
                 {
                     ivec2 collider_pos = player->pos + ivec2(player->wall_hug_dir * (cfg.player_hitbox_size.x/2+1) + (player->wall_hug_dir > 0), -cfg.player_ledge_grab_collider_offest_y);
                     if (world.map.SolidAtPixel(collider_pos) && !world.map.SolidAtPixel(collider_pos.sub_y(1)))
+                    {
                         player->grabbing_ledge = 1;
+                        player->wall_sliding = 0;
+                    }
                 }
             }
 
@@ -201,15 +207,28 @@ namespace States::Details::World
                     }
                 }
             }
-        }
 
+            { // Animation
+                player->anim_state = 0; // Standing
+                player->anim_frame = 0;
+
+                if (player->wall_sliding) // Wall sliding.
+                {
+                    player->anim_state = 1;
+                }
+                else if (player->grabbing_ledge) // Grabbind ledge.
+                {
+                    player->anim_state = 2;
+                }
+            }
+        }
     }
 
     void PlayerController::Render(const States::World &world) const
     {
         if (player)
         {
-            render.iquad(player->pos - world.camera.Pos(), cfg.player_sprite_size).tex(img_player.pos + cfg.player_sprite_size * ivec2(player->anim_frame, player->anim_state)).center();
+            render.iquad(player->pos - world.camera.Pos(), cfg.player_sprite_size).tex(img_player.pos + cfg.player_sprite_size * ivec2(player->anim_frame, player->anim_state)).center().flip_x(player->facing_left);
         }
     }
 

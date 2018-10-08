@@ -24,11 +24,11 @@ namespace Hitboxes
             for (int y = 0; y < point_count.y; y++)
             for (int x = 0; x < point_count.x; x++)
             {
-                ivec2 pos = ivec2(x,y) * TileMap::tile_size - half_extent + 2;
+                ivec2 pos = ivec2(x,y) * TileMap::tile_size - half_extent;
 
                 for (int i = 0; i < 2; i++)
-                    if (pos[i] > half_extent[i] + 1)
-                        pos[i] = half_extent[i] + 1;
+                    if (pos[i] > half_extent[i] - 1)
+                        pos[i] = half_extent[i] - 1;
 
                 points.push_back(pos);
             }
