@@ -23,11 +23,12 @@ namespace States::Details::World
             bool facing_left = 0;
             bool ground = 0;
             int jump_ticks_left = 0;
-            bool flying = 0;
             bool has_second_jump = 0;
             int wall_hug_dir = 0; // 0 if not hugging.
             bool wall_sliding = 0;
-            bool grabbing_ledge = 0;
+            bool grabbing_ledge = 0; //         \_ Only one of those two should be set at a time.
+            bool grabbing_ledge_partial = 0; // /
+            int time_running = 0;
 
             int anim_state = 0;
             int anim_frame = 0;

@@ -29,14 +29,13 @@ namespace States::Details::World
 
                 if (player->h_control)
                 {
+                    float acc = player->ground ? cfg.player_ground_move_acc : cfg.player_air_move_acc;
                     player->facing_left = player->h_control < 0;
-                    clamp_var(player->vel.x += player->h_control * cfg.player_ground_walking_acc, -cfg.player_speed_cap.x, cfg.player_speed_cap.x);
+                    clamp_var(player->vel.x += player->h_control * acc, -cfg.player_speed_cap.x, cfg.player_speed_cap.x);
                 }
                 else
                 {
-                    float stopping_acc = player->flying ? cfg.player_flight_stopping_acc :
-                                         player->ground ? cfg.player_ground_stopping_acc :
-                                                          cfg.player_air_stopping_acc;
+                    float stopping_acc = player->ground ? cfg.player_ground_stopping_acc : cfg.player_air_stopping_acc;
 
                     if (abs(player->vel.x) < stopping_acc)
                     {
@@ -84,15 +83,19 @@ namespace States::Details::World
             }
 
             { // Wall sliding
+                // This should be above ledge grabbing because that can prevent sliding.
+
                 player->wall_sliding = 0;
 
-                if (player->has_second_jump)
+                if (player->has_second_jump && player->vel.y >= 0)
                 {
                     for (int s = -1; s <= 1; s += 2)
                     {
                         if (player->ground || player->wall_hug_dir == 0)
                             continue;
-                        if (!SolidForPlayerAtOffset(world, ivec2(s, cfg.player_wall_slide_hitbox_offset_y)) || !SolidForPlayerAtOffset(world, ivec2(s, 0))) // This is intended, think twice before changing.
+
+                        ivec2 collider_pos = player->pos + ivec2(s * (cfg.player_hitbox_size.x/2) - (s < 0), cfg.player_wall_slide_collider_offset_y);
+                        if (!world.map.SolidAtPixel(collider_pos))
                             continue;
 
                         player->wall_sliding = 1;
@@ -106,9 +109,6 @@ namespace States::Details::World
             }
 
             { // Wall jumping
-                if ((player->vel.x < 0 ? controls.right : controls.left).down() || player->ground || player->grabbing_ledge)
-                    player->flying = 0;
-
                 if (player->has_second_jump && !player->grabbing_ledge)
                 {
                     for (int s = -1; s <= 1; s += 2)
@@ -120,8 +120,8 @@ namespace States::Details::World
                         if (!controls.jump_ok.pressed())
                             continue;
 
+                        player->wall_sliding = 0;
                         player->has_second_jump = 0;
-                        player->flying = 1;
                         player->vel = cfg.player_wall_jump_vel * ivec2(-s, -1);
                         player->facing_left = s > 0;
                     }
@@ -129,14 +129,37 @@ namespace States::Details::World
             }
 
             { // Ledge grabbing
+                // This should be below wall sliding because it can disable sliding.
+
                 player->grabbing_ledge = 0;
+                player->grabbing_ledge_partial = 0;
+
                 if (player->wall_hug_dir != 0 && player->vel.y >= 0)
                 {
-                    ivec2 collider_pos = player->pos + ivec2(player->wall_hug_dir * (cfg.player_hitbox_size.x/2+1) + (player->wall_hug_dir > 0), -cfg.player_ledge_grab_collider_offest_y);
-                    if (world.map.SolidAtPixel(collider_pos) && !world.map.SolidAtPixel(collider_pos.sub_y(1)))
+                    ivec2 collider_pos = player->pos + ivec2(player->wall_hug_dir * (cfg.player_hitbox_size.x/2) - (player->wall_hug_dir < 0), cfg.player_ledge_grab_collider_offest_y);
+
+                    if (!world.map.SolidAtPixel(collider_pos.sub_y(1)))
                     {
-                        player->grabbing_ledge = 1;
-                        player->wall_sliding = 0;
+                        for (int i = 0; i < cfg.player_ledge_grab_collider_height; i++)
+                        {
+                            if (world.map.SolidAtPixel(collider_pos.add_y(i)))
+                            {
+                                if (i == 0)
+                                {
+                                    player->grabbing_ledge = 1;
+                                }
+                                else
+                                {
+                                    player->grabbing_ledge_partial = 1;
+                                    if (player->vel.y > cfg.player_wall_slide_speed_cap)
+                                        player->vel.y = cfg.player_wall_slide_speed_cap;
+                                }
+
+                                player->wall_sliding = 0;
+
+                                break;
+                            }
+                        }
                     }
                 }
             }
@@ -209,16 +232,59 @@ namespace States::Details::World
             }
 
             { // Animation
-                player->anim_state = 0; // Standing
-                player->anim_frame = 0;
+                if (player->ground && player->h_control != 0)
+                    player->time_running++;
+                else
+                    player->time_running = 0;
 
                 if (player->wall_sliding) // Wall sliding.
                 {
                     player->anim_state = 1;
+                    player->anim_frame = 0;
                 }
-                else if (player->grabbing_ledge) // Grabbind ledge.
+                else if (player->grabbing_ledge || player->grabbing_ledge_partial) // Grabbind ledge.
                 {
                     player->anim_state = 2;
+                    player->anim_frame = 0;
+                }
+                else if (player->time_running != 0) // Running.
+                {
+                    player->anim_state = 3;
+
+                    int uncapped_frame_count = player->time_running;
+                    if (uncapped_frame_count <= cfg.player_anim_running_initial_frame_ticks)
+                        player->anim_frame = 0;
+                    else
+                        player->anim_frame = (uncapped_frame_count - cfg.player_anim_running_initial_frame_ticks) / cfg.player_anim_running_frame_len % cfg.player_anim_running_frames;
+                }
+                else if (!player->ground && abs(player->vel.x) < cfg.player_anim_jumping_far_horizontal_speed_threshold) // Jumping.
+                {
+                    player->anim_state = 4;
+
+                    if (player->vel.y < cfg.player_anim_jumping_ascent_frame_speed_threshold)
+                        player->anim_frame = 0;
+                    else if (player->vel.y < cfg.player_anim_jumping_peak_frame_speed_threshold)
+                        player->anim_frame = 1;
+                    else if (player->vel.y < cfg.player_anim_jumping_descent_frame_speed_threshold)
+                        player->anim_frame = 2;
+                    else
+                        player->anim_frame = 3;
+                }
+                else if (!player->ground) // Jumping horizontally.
+                {
+                    player->anim_state = 5;
+
+                    if (player->vel.y < cfg.player_anim_jumping_far_ascent_frame_speed_threshold)
+                        player->anim_frame = 0;
+                    else if (player->vel.y < cfg.player_anim_jumping_far_descent_frame_speed_threshold)
+                        player->anim_frame = 1;
+                    else
+                        player->anim_frame = 2;
+                }
+                else // Standing.
+                {
+                    player->anim_state = 0;
+                    player->anim_frame = 0;
                 }
             }
         }

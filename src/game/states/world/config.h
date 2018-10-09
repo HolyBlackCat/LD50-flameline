@@ -13,10 +13,10 @@ namespace Cfg
         (ivec2)(player_sprite_size)(=ivec2(32)),
         (ivec2)(player_hitbox_size)(=ivec2(32)),
         (fvec2)(player_speed_cap)(=ivec2(8)),
-        (float)(player_ground_walking_acc)(=2),
+        (float)(player_ground_move_acc)(=2),
         (float)(player_ground_stopping_acc)(=2),
+        (float)(player_air_move_acc)(=1),
         (float)(player_air_stopping_acc)(=1),
-        (float)(player_flight_stopping_acc)(=1),
         (float)(player_jump_speed_cap)(=2),
         (float)(player_jump_speed_begin)(=2),
         (float)(player_jump_speed_end)(=1),
@@ -24,8 +24,19 @@ namespace Cfg
         (int)(player_ledge_jump_ticks)(=15),
         (fvec2)(player_wall_jump_vel)(=fvec2(2,2)),
         (float)(player_wall_slide_speed_cap)(=0.8),
-        (int)(player_wall_slide_hitbox_offset_y)(=10),
-        (int)(player_ledge_grab_collider_offest_y)(=10),
+        (int)(player_wall_slide_collider_offset_y)(=-2),
+        (int)(player_ledge_grab_collider_offest_y)(=-4), // This offsets the upper edge of the collider.
+        (int)(player_ledge_grab_collider_height)(=5), // Should be 1 or more. Also should be at least as large as y speed cap + 1, otherwise you can miss a grab if you're falling too fast.
+        (int)(player_anim_running_frame_len)(=12),
+        (int)(player_anim_running_frames)(=6),
+        (int)(player_anim_running_initial_frame_ticks)(=6),
+        (float)(player_anim_jumping_ascent_frame_speed_threshold)(=-2),
+        (float)(player_anim_jumping_peak_frame_speed_threshold)(=1),
+        (float)(player_anim_jumping_descent_frame_speed_threshold)(=2),
+        (float)(player_anim_jumping_far_horizontal_speed_threshold)(=1),
+        (float)(player_anim_jumping_far_ascent_frame_speed_threshold)(=0),
+        (float)(player_anim_jumping_far_descent_frame_speed_threshold)(=-2),
+        (int)(player_camera_offset_y)(=-32),
     ))
 
     inline const auto &World()

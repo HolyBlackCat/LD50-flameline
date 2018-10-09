@@ -18,7 +18,7 @@ namespace States::Details::World
         // Select target
         if (world.player_controller.PlayerExists())
         {
-            target = world.player_controller.GetPlayerPos();
+            target = world.player_controller.GetPlayerPos().add_y(cfg.player_camera_offset_y);
         }
 
         // Move
