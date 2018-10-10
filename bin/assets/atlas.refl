@@ -2,6 +2,7 @@
     images = [
         ("backgrounds/menu.png", ((482, 1), (480, 270))),
         ("backgrounds/unknown.0.png", ((1, 1), (480, 270))),
+        ("creatures/drone.png", ((1566, 1), (36, 36))),
         ("creatures/player.png", ((1220, 1), (216, 216))),
         ("gui/menu.buttons.png", ((1437, 1), (128, 64))),
         ("tiles.png", ((963, 1), (256, 256))),

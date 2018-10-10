@@ -17,7 +17,7 @@ namespace States::Details::World
     {
       public:
         enum Solidity {solid, nonsolid};
-        enum TileDrawMode {invis, fancy, cover};
+        enum TileDrawMode {invis, fancy, cover, pipe};
 
         struct TileInfo
         {
@@ -37,11 +37,20 @@ namespace States::Details::World
 
         static constexpr int tile_size = 12;
 
+        struct ExtraData
+        {
+            Reflect(ExtraData)
+            (
+                (optional)(fvec3)(light)(=fvec3(1)),
+            )
+        };
+
       private:
         std::string name;
         ivec2 size = ivec2(0);
         std::vector<TileStack> tiles;
         std::vector<int> random_values;
+        ExtraData extra_data;
 
         using points_t = std::vector<ivec2>;
         using point_list_t = std::map<std::string, std::vector<ivec2>>;
@@ -72,6 +81,11 @@ namespace States::Details::World
                 return &it->second;
             else
                 return 0;
+        }
+
+        const ExtraData GetExtra() const
+        {
+            return extra_data;
         }
 
         bool TilePosInRange(ivec2 pos) const

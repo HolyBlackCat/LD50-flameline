@@ -7,6 +7,7 @@
 #include "graphics/complete.h"
 #include "input/mouse.h"
 #include "interface/window.h"
+#include "utils/adjust.h"
 #include "utils/mat.h"
 #include "utils/metronome.h"
 #include "utils/strings.h"
@@ -23,7 +24,7 @@
 
 extern const ivec2 screen_size = ivec2(480,270);
 
-Interface::Window win("Gamma", screen_size*2);
+Interface::Window win("Gamma", screen_size*2, Interface::windowed, ADJUST(Interface::WindowSettings{}, min_size = screen_size));
 
 static Graphics::DummyVertexArray dummy_vao;
 

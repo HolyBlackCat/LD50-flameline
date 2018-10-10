@@ -16,9 +16,11 @@ namespace States::Details::World
 
     static const std::vector<TileMap::TileInfo> tile_list
     {
-        { "moss_stone"  , TileMap::solid    , TileMap::fancy , 0}, // 0
-        { "grass_cover" , TileMap::nonsolid , TileMap::cover , 0}, // 1
-        { "metal"       , TileMap::solid    , TileMap::fancy , 1}, // 2
+        { "moss_stone"   , TileMap::solid    , TileMap::fancy , 0}, // 0
+        { "grass_cover"  , TileMap::nonsolid , TileMap::cover , 0}, // 1
+        { "purple_metal" , TileMap::solid    , TileMap::fancy , 1}, // 2
+        { "purple_pipe"  , TileMap::solid    , TileMap::pipe  , 0}, // 3
+        { "purple_pipe_" , TileMap::solid    , TileMap::pipe  , 0}, // 4
     };
 
     const TileMap::TileInfo &TileMap::GetTileInfo(int index)
@@ -106,6 +108,43 @@ namespace States::Details::World
                     }
                 }
             }
+
+            { // Read extra data;
+                Json::View view_property_list = view["properties"];
+                int property_count = view_property_list.GetArraySize();
+
+                auto refl = Refl::Interface(extra_data);
+
+                // For each data field.
+                refl.for_each_field([&](auto index)
+                {
+                    std::string field_name = refl.field_name(index.value);
+
+                    // Try all map properties.
+                    for (int i = 0; i < property_count; i++)
+                    {
+                        Json::View view_property = view_property_list[i];
+
+                        // If name matches...
+                        if (view_property["name"].GetString() == field_name)
+                        {
+                            // Stop if it's not a string property.
+                            if (view_property["type"].GetString() != "string")
+                                Program::Error("Expected property `", field_name, "` to have type `string`.");
+
+                            // Try parsing it.
+                            try
+                            {
+                                refl.field<index.value>().from_string(view_property["value"].GetString().c_str(), Refl::partial);
+                            }
+                            catch (std::exception &e)
+                            {
+                                Program::Error("Unable to parse property `", field_name, "`:\n", e.what());
+                            }
+                        }
+                    }
+                });
+            }
         }
         catch (std::exception &e)
         {
@@ -176,6 +215,43 @@ namespace States::Details::World
                     else                                 state = r % 4;
 
                     render.iquad(pixel_pos, ivec2(tile_size)).tex(img_tiles.pos + ivec2(7 + state, info.image_index) * tile_size);
+                }
+                break;
+              case pipe:
+                {
+                    int mask = 0;
+                    for (int i = 0; i < 4; i++)
+                    {
+                        // Offsets (4): (1,0), (0,1), (-1,0), (0,-1).
+                        ivec2 offset((i == 0) - (i == 2), (i == 1) - (i == 3));
+                        bool should_merge = ClampGet(base_tile + ivec2(x,y) + offset).*layer == index;
+                        mask <<= 1;
+                        mask |= should_merge;
+                    }
+
+                    ivec2 state_array[16]
+                    {
+                        ivec2(0,3), // 0000 o
+                        ivec2(1,3), // 0001 u
+                        ivec2(3,1), // 0010 ]
+                        ivec2(1,1), // 0011 .|
+                        ivec2(1,2), // 0100 n
+                        ivec2(3,0), // 0101 |
+                        ivec2(1,0), // 0110 '|
+                        ivec2(3,3), // 0111 -|
+                        ivec2(2,1), // 1000 [
+                        ivec2(0,1), // 1001 |.
+                        ivec2(2,0), // 1010 -
+                        ivec2(2,3), // 1011 -'-
+                        ivec2(0,0), // 1100 |'
+                        ivec2(2,2), // 1101 |-
+                        ivec2(3,2), // 1110 -.-
+                        ivec2(0,2), // 1111 #
+                    };
+
+                    ivec2 tile_state = state_array[mask];
+
+                    render.iquad(pixel_pos, ivec2(tile_size)).tex(img_tiles.pos + (tile_state + ivec2(13, info.image_index * 4)) * tile_size);
                 }
                 break;
             }
