@@ -16,14 +16,19 @@ namespace States::Details::World
     class TileMap
     {
       public:
-        enum Solidity {solid, nonsolid};
-        enum TileDrawMode {invis, fancy, cover, pipe};
+        enum TileInfoHitbox
+        {
+            hitbox_block, // Hitbox mask no effect.
+            hitbox_cover, // 4 lowest bits of hitbox mask determine if 4 strips of size `tile_size * cover_hitbox_width` along tile sides are a part of the hitbox. (3 - right, 2 - down, 1 - left, 0 - up)
+        };
+        enum TileInfoDrawMode {invis, fancy, flat, pipe, cover};
 
         struct TileInfo
         {
             std::string name;
-            Solidity solidity;
-            TileDrawMode draw_mode = invis;
+            TileInfoHitbox hitbox = hitbox_block;
+            bool solid = 0, kills = 0;
+            TileInfoDrawMode draw_mode = invis;
             int image_index = 0;
         };
 
@@ -36,6 +41,7 @@ namespace States::Details::World
         };
 
         static constexpr int tile_size = 12;
+        static constexpr int cover_hitbox_width = 3; // This affects spikes and other flat tiles.
 
         struct ExtraData
         {
@@ -50,6 +56,8 @@ namespace States::Details::World
         ivec2 size = ivec2(0);
         std::vector<TileStack> tiles;
         std::vector<int> random_values;
+        std::vector<int> collision_masks;
+        std::vector<int> hitboxes; // Meaning of those integer depends on `TileInfo::hitbox`.
         ExtraData extra_data;
 
         using points_t = std::vector<ivec2>;
@@ -121,12 +129,64 @@ namespace States::Details::World
             return UnsafeAt(pos);
         }
 
+        bool PixelCollidesWithTileHitbox(TileInfoHitbox hitbox_type, int hitbox_mask, ivec2 pixel_pos) const // `pixel_pos` is relative to the tile.
+        {
+            switch (hitbox_type)
+            {
+              case hitbox_block:
+                return 1;
+                break;
+
+              case hitbox_cover:
+                {
+                    if (hitbox_mask & 0b1000 && pixel_pos.x >= tile_size - cover_hitbox_width)
+                        return 1;
+                    if (hitbox_mask & 0b0100 && pixel_pos.y >= tile_size - cover_hitbox_width)
+                        return 1;
+                    if (hitbox_mask & 0b0010 && pixel_pos.x < cover_hitbox_width)
+                        return 1;
+                    if (hitbox_mask & 0b0001 && pixel_pos.y < cover_hitbox_width)
+                        return 1;
+
+                    return 0;
+                }
+                break;
+            }
+
+            return 0;
+        }
+
         bool SolidAtPixel(ivec2 pos) const
         {
-            int index = ClampGet(div_ex(pos, tile_size)).mid;
+            ivec2 tile_pos = div_ex(pos, tile_size);
+
+            int index = ClampGet(tile_pos).mid;
             if (index == -1)
                 return 0;
-            return GetTileInfo(index).solidity == solid;
+
+            const TileInfo &info = GetTileInfo(index);
+            if (!info.solid)
+                return 0;
+
+            return PixelCollidesWithTileHitbox(info.hitbox, hitboxes[tile_pos.x + tile_pos.y * size.x], mod_ex(pos, tile_size));
         }
+
+        bool DangerAtPixel(ivec2 pos) const
+        {
+            ivec2 tile_pos = div_ex(pos, tile_size);
+
+            int index = ClampGet(tile_pos).mid;
+            if (index == -1)
+                return 0;
+
+            const TileInfo &info = GetTileInfo(index);
+            if (!info.kills)
+                return 0;
+
+            return PixelCollidesWithTileHitbox(info.hitbox, hitboxes[tile_pos.x + tile_pos.y * size.x], mod_ex(pos, tile_size));
+        }
+
+        void SetColorMatrix() const;
+        void ResetColorMatrix() const;
     };
 }

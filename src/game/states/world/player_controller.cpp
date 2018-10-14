@@ -231,6 +231,12 @@ namespace States::Details::World
                 }
             }
 
+            { // Check death causes
+                { // Blocks that kill on touch
+                    "Add this";
+                }
+            }
+
             { // Animation
                 if (player->ground && player->h_control != 0)
                     player->time_running++;
@@ -294,9 +300,7 @@ namespace States::Details::World
     {
         if (player)
         {
-            render.SetColorMatrix(fmat4::scale(world.map.GetExtra().light));
             render.iquad(player->pos - world.camera.Pos(), cfg.player_sprite_size).tex(img_player.pos + cfg.player_sprite_size * ivec2(player->anim_frame, player->anim_state)).center().flip_x(player->facing_left);
-            render.SetColorMatrix(fmat4());
         }
     }
 
@@ -333,6 +337,6 @@ namespace States::Details::World
     {
         if (!player)
             return 0;
-        return player_tile_hitbox.CollidesAt(world.map, player->pos + offset);
+        return player_tile_hitbox.SolidAt(world.map, player->pos + offset);
     }
 }

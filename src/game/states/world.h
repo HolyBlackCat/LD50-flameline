@@ -34,7 +34,9 @@ namespace States
             Graphics::Clear();
             map.Render(*this, &Details::World::TileMap::TileStack::back);
             map.Render(*this, &Details::World::TileMap::TileStack::mid);
+            map.SetColorMatrix();
             player_controller.Render(*this);
+            map.ResetColorMatrix();
             fade.Render();
         }
     };

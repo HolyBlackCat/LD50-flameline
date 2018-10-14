@@ -16,11 +16,13 @@ namespace States::Details::World
 
     static const std::vector<TileMap::TileInfo> tile_list
     {
-        { "moss_stone"   , TileMap::solid    , TileMap::fancy , 0}, // 0
-        { "grass_cover"  , TileMap::nonsolid , TileMap::cover , 0}, // 1
-        { "purple_metal" , TileMap::solid    , TileMap::fancy , 1}, // 2
-        { "purple_pipe"  , TileMap::solid    , TileMap::pipe  , 0}, // 3
-        { "purple_pipe_" , TileMap::solid    , TileMap::pipe  , 0}, // 4
+        // Name            Hitbox               Solid Kills   RenderMode  TileIndex
+        { "moss_stone"   , TileMap::hitbox_block , 1 , 0 , TileMap::fancy , 0}, // 0
+        { "grass_cover"  , TileMap::hitbox_cover , 0 , 0 , TileMap::flat  , 0}, // 1
+        { "purple_metal" , TileMap::hitbox_block , 1 , 0 , TileMap::fancy , 1}, // 2
+        { "purple_pipe"  , TileMap::hitbox_block , 1 , 0 , TileMap::pipe  , 0}, // 3
+        { "purple_pipe"  , TileMap::hitbox_block , 1 , 0 , TileMap::pipe  , 0}, // 4
+        { "purple_spike" , TileMap::hitbox_cover , 0 , 1 , TileMap::cover , 0}, // 5
     };
 
     const TileMap::TileInfo &TileMap::GetTileInfo(int index)
@@ -145,6 +147,50 @@ namespace States::Details::World
                     }
                 });
             }
+
+            { // Generate tile hitboxes
+                hitboxes.resize(size.prod());
+
+                for (int y = 0; y < size.y; y++)
+                for (int x = 0; x < size.x; x++)
+                {
+                    int index = ClampGet(ivec2(x,y)).mid;
+                    if (index == -1)
+                        continue;
+
+                    const TileInfo &info = GetTileInfo(index);
+
+                    switch (info.hitbox)
+                    {
+                      case hitbox_block:
+                        // Nothing.
+                        break;
+
+                      case hitbox_cover:
+                        {
+                            int &mask = hitboxes[x + size.x * y];
+
+                            int adj_same = 0, adj_solid = 0;
+                            for (int i = 0; i < 4; i++)
+                            {
+                                int other = ClampGet(ivec2(x,y) + ivec2(1,0).rot90(i)).mid;
+
+                                adj_same <<= 1;
+                                adj_same |= other == index;
+
+                                adj_solid <<= 1;
+                                adj_solid |= other != -1 && TileMap::GetTileInfo(other).solid;
+                            }
+
+                            if (adj_same & (adj_same + 1)) // If at least two bits are set...
+                                mask = adj_solid;
+                            else
+                                mask = adj_solid & (adj_same & 0b1010 ? 0b01010 : 0b1010);
+                        }
+                        break;
+                    }
+                }
+            }
         }
         catch (std::exception &e)
         {
@@ -205,7 +251,7 @@ namespace States::Details::World
                     render.iquad(pixel_pos, ivec2(tile_size)).tex(img_tiles.pos + tile_state.add_y(info.image_index * 4) * tile_size);
                 }
                 break;
-              case cover:
+              case flat:
                 {
                     bool merge_left = ClampGet(base_tile + ivec2(x-1,y)).*layer == index;
                     bool merge_right = ClampGet(base_tile + ivec2(x+1,y)).*layer == index;
@@ -222,9 +268,7 @@ namespace States::Details::World
                     int mask = 0;
                     for (int i = 0; i < 4; i++)
                     {
-                        // Offsets (4): (1,0), (0,1), (-1,0), (0,-1).
-                        ivec2 offset((i == 0) - (i == 2), (i == 1) - (i == 3));
-                        bool should_merge = ClampGet(base_tile + ivec2(x,y) + offset).*layer == index;
+                        bool should_merge = ClampGet(base_tile + ivec2(x,y) + ivec2(1,0).rot90(i)).*layer == index;
                         mask <<= 1;
                         mask |= should_merge;
                     }
@@ -254,7 +298,44 @@ namespace States::Details::World
                     render.iquad(pixel_pos, ivec2(tile_size)).tex(img_tiles.pos + (tile_state + ivec2(13, info.image_index * 4)) * tile_size);
                 }
                 break;
+              case cover:
+                {
+                    int adj_same = 0, adj_solid = 0;
+                    for (int i = 0; i < 8; i++)
+                    {
+                        // Offsets (8): (1,0), (1,1), (0,1), (-1,1), ..., (1,-1).
+                        ivec2 offset(1 - (i >= 2) - (i >= 3) + (i >= 6) + (i >= 7), (i >= 1) - (i >= 4) - (i >= 5));
+                        int other = ClampGet(base_tile + ivec2(x,y) + offset).*layer;
+
+                        adj_same <<= 1;
+                        adj_same |= other == index;
+
+                        adj_solid <<= 1;
+                        adj_solid |= other != -1 && world.map.GetTileInfo(other).solid;
+                    }
+
+                    ivec2 tile_state;
+
+                         if ((adj_same & 0b10100000) == 0b10100000) tile_state = (adj_solid & 0b01000000 ? ivec2(1,1) : ivec2(0,0)); // .-
+                    else if ((adj_same & 0b00101000) == 0b00101000) tile_state = (adj_solid & 0b00010000 ? ivec2(2,1) : ivec2(3,0)); // -.
+                    else if ((adj_same & 0b00001010) == 0b00001010) tile_state = (adj_solid & 0b00000100 ? ivec2(2,2) : ivec2(3,3)); // -'
+                    else if ((adj_same & 0b10000010) == 0b10000010) tile_state = (adj_solid & 0b00000001 ? ivec2(1,2) : ivec2(0,3)); // '-
+                    else if (adj_same & 0b00100010) tile_state = ivec2(adj_solid & 0b00001000 ? 0 : 3, 1 + r % 2);
+                    else                            tile_state = ivec2(1 + r % 2, adj_solid & 0b00000010 ? 0 : 3);
+
+                    render.iquad(pixel_pos, ivec2(tile_size)).tex(img_tiles.pos + (tile_state + ivec2(17, info.image_index * 4)) * tile_size);
+                }
+                break;
             }
         }
+    }
+
+    void TileMap::SetColorMatrix() const
+    {
+        render.SetColorMatrix(fmat4::scale(GetExtra().light));
+    }
+    void TileMap::ResetColorMatrix() const
+    {
+        render.SetColorMatrix(fmat4());
     }
 }

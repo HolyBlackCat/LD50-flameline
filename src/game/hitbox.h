@@ -34,10 +34,18 @@ namespace Hitboxes
             }
         }
 
-        bool CollidesAt(const TileMap &map, ivec2 pos) const
+        bool SolidAt(const TileMap &map, ivec2 pos) const
         {
             for (ivec2 point : points)
                 if (map.SolidAtPixel(pos + point))
+                    return 1;
+            return 0;
+        }
+
+        bool DangerAt(const TileMap &map, ivec2 pos) const
+        {
+            for (ivec2 point : points)
+                if (map.DangerAtPixel(pos + point))
                     return 1;
             return 0;
         }
