@@ -6,7 +6,7 @@
 #include <sstream>
 #include <type_traits>
 
-#define VERSION "3.0.1"
+#define VERSION "3.0.2"
 
 namespace data
 {
@@ -1311,29 +1311,66 @@ int main()
                     return (val > 0) - (val < 0);
                 }
 
-                template <typename A, typename B, typename C> [[nodiscard]] constexpr A clamp(A val, B min, C max)
+                template <typename A, typename B> constexpr void clamp_var_min(A &var, B min)
                 {
-                    static_assert(no_vectors_v<B,C> || is_vector_v<A>, "If `min` and/or `max` are vectors, `val` has to be a vector as well.");
+                    static_assert(no_vectors_v<B> || is_vector_v<A>, "If `min` is a vector, `var` has to be a vector as well.");
 
-                    if constexpr (no_vectors_v<A,B,C>)
+                    if constexpr (no_vectors_v<A,B>)
                     {
-                        if (val > max) return max;
-                        if (val < min) return min;
-                        return val;
+                        if (var < min)
+                            var = min;
                     }
                     else
                     {
-                        return apply_elementwise(clamp<vec_base_t<A>, vec_base_t<B>, vec_base_t<C>>, val, min, max);
+                        apply_elementwise(clamp_var_min<vec_base_t<A>, vec_base_t<B>>, var, min);
+                    }
+                }
+
+                template <typename A, typename B> constexpr void clamp_var_max(A &var, B max)
+                {
+                    static_assert(no_vectors_v<B> || is_vector_v<A>, "If `max` is a vector, `var` has to be a vector as well.");
+
+                    if constexpr (no_vectors_v<A,B>)
+                    {
+                        if (var > max)
+                            var = max;
+                    }
+                    else
+                    {
+                        apply_elementwise(clamp_var_max<vec_base_t<A>, vec_base_t<B>>, var, max);
                     }
                 }
 
                 template <typename A, typename B, typename C> constexpr void clamp_var(A &var, B min, C max)
                 {
-                    var = clamp(var, min, max);
+                    clamp_var_min(var, min);
+                    clamp_var_max(var, max);
+                }
+
+                template <typename A, typename B> [[nodiscard]] constexpr A clamp_min(A val, B min)
+                {
+                    clamp_var_min(val, min);
+                    return val;
+                }
+
+                template <typename A, typename B> [[nodiscard]] constexpr A clamp_max(A val, B max)
+                {
+                    clamp_var_max(val, max);
+                    return val;
+                }
+
+                template <typename A, typename B, typename C> [[nodiscard]] constexpr A clamp(A val, B min, C max)
+                {
+                    clamp_var(val, min, max);
+                    return val;
                 }
 
                 template <typename A> [[nodiscard]] constexpr A clamp(A val) {return clamp(val, 0, 1);}
+                template <typename A> [[nodiscard]] constexpr A clamp_min(A val) {return clamp_min(val, 0);}
+                template <typename A> [[nodiscard]] constexpr A clamp_max(A val) {return clamp_max(val, 1);}
                 template <typename A> constexpr void clamp_var(A &var) {clamp_var(var, 0, 1);}
+                template <typename A> constexpr void clamp_var_min(A &var) {clamp_var_min(var, 0);}
+                template <typename A> constexpr void clamp_var_max(A &var) {clamp_var_max(var, 1);}
 
                 template <typename I = int, typename F> [[nodiscard]] change_vec_base_t<F,I> iround(F x)
                 {

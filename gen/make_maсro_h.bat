@@ -5,7 +5,7 @@ set EXECUTABLE=make_macro_h.exe
 set OUTPUT=macro.h
 set DESTINATION=src/utils
 
-g++ %CODE% -o %EXECUTABLE% -std=c++17 -Wall -Wextra -pedantic-errors
+g++ %CODE% -o %EXECUTABLE% -std=c++2a -Wall -Wextra -pedantic-errors -static
 @if not %ERRORLEVEL% == 0 (
 	echo Compilation failed. 
 	@pause
@@ -29,7 +29,7 @@ move /Y %OUTPUT% ../%DESTINATION% >NUL 2>NUL
 	@exit /B 1
 )
 
-g++ ../%DESTINATION%/%OUTPUT% -std=c++17 -Wall -Wextra -pedantic-errors -fsyntax-only
+g++ ../%DESTINATION%/%OUTPUT% -std=c++2a -Wall -Wextra -pedantic-errors -fsyntax-only
 @if not %ERRORLEVEL% == 0 (
     echo Syntax check failed.
 	@pause
