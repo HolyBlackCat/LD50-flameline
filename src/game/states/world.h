@@ -3,6 +3,7 @@
 #include "game/state.h"
 #include "game/states/common/fade.h"
 #include "game/states/world/camera.h"
+#include "game/states/world/particle_controller.h"
 #include "game/states/world/player_controller.h"
 #include "game/states/world/tile_map.h"
 
@@ -16,6 +17,7 @@ namespace States
         Details::World::Camera camera;
         Details::World::TileMap map;
         Details::World::PlayerController player_controller;
+        Details::World::ParticleController particles;
 
         World()
         {
@@ -26,9 +28,11 @@ namespace States
         void Tick() override
         {
             player_controller.Tick(*this);
+            particles.Tick(*this);
             camera.Tick(*this);
             fade.Tick();
         }
+
         void Render() const override
         {
             Graphics::Clear();
@@ -36,6 +40,7 @@ namespace States
             map.Render(*this, &Details::World::TileMap::TileStack::mid);
             map.SetColorMatrix();
             player_controller.Render(*this);
+            particles.Render(*this);
             map.ResetColorMatrix();
             fade.Render();
         }

@@ -102,6 +102,8 @@
 		<Unit filename="src/game/states/world/camera.cpp" />
 		<Unit filename="src/game/states/world/camera.h" />
 		<Unit filename="src/game/states/world/config.h" />
+		<Unit filename="src/game/states/world/particle_controller.cpp" />
+		<Unit filename="src/game/states/world/particle_controller.h" />
 		<Unit filename="src/game/states/world/player_controller.cpp" />
 		<Unit filename="src/game/states/world/player_controller.h" />
 		<Unit filename="src/game/states/world/tile_map.cpp" />
