@@ -1,0 +1,70 @@
+# Ugh, this is needed by some rules below.
+.SECONDEXPANSION:
+
+# All source files.
+SOURCES = $(foreach dir,$(SOURCE_DIRS),$(call rwildcard, $(dir), *.c)$(call rwildcard, $(dir), *.cpp))
+
+# All object files.
+OBJECTS = $(patsubst %,$(OBJECT_DIR)/%,$(patsubst %.c,%.c.o,$(patsubst %.cpp,%.cpp.o,$(SOURCES))))
+
+# Dependency lists
+DEP_FILES = $(patsubst %.o,%.d,$(OBJECTS))
+
+.PHONY: foo
+foo:
+	@echo $(DEP_FILES)
+
+# Fancy alias for the primary target.
+.PHONY: build
+build: $(OUTPUT_FILE)
+		
+# The target that actually builds the executable.
+# I'm not sure why we need `.SECONDEXPANSION:` and `$$` before `(OBJECTS)`, but it's definitely necessary.
+# Note that object files come before linker flags.
+$(OUTPUT_FILE): $$(OBJECTS)
+	@echo [Linking] $(OUTPUT_FILE)
+	@$(CXX) $(OBJECTS) $(LDFLAGS) -o $@
+
+# Targets that compile source files.	
+# Note that flags come before the source file.
+$(OBJECT_DIR)/%.c.o: %.c $(dir $@)
+	@echo [C] $<
+	$(call mkdir,$(dir $@))
+	@$(CC) -MMD -MP $(CFLAGS) $< -c -o $@
+$(OBJECT_DIR)/%.cpp.o: %.cpp $(dir $@)
+	@echo [C++] $<
+	$(call mkdir,$(dir $@))
+	@$(CXX) -MMD -MP $(CXXFLAGS) $< -c -o $@
+	
+# Target that cleans the build.
+.PHONY: clean
+clean:
+	$(call rmdir,$(OBJECT_DIR))
+	$(call rmfile,$(OUTPUT_FILE))
+
+# FUNCTIONS
+	
+# Recursive wildcard function.
+# Source: https://stackoverflow.com/a/18258352/2752075
+# Recursively searches a directory for all files matching a pattern.
+# The first parameter is a directory, the second is a pattern.
+# Don't use `.` as a directory, or else it'll search your entire drive! (Huh.) Instead use an empty parameter.
+# Example usage: SOURCES = $(call rwildcard, src, *.cpp)
+rwildcard=$(foreach d,$(wildcard $1*),$(call rwildcard,$d/,$2)$(filter $(subst *,%,$2),$d))
+
+# OS-specific functions
+# `-` at the beginning makes `make` ignore errors when executing shell commands.
+# `|| cd .` forces error code to be 0, silencing errors. Unlike `-` it prints no warnings.
+# Example usage: $(call rmfile, bin/out.exe)
+SILENT = >NUL 2>NUL || cd .
+ifeq ($(OS), Windows_NT)
+rmfile = @del /F /Q $(subst /,\,$1) $(SILENT)
+rmdir = @rd /S /Q $(subst /,\,$1) $(SILENT)
+mkdir = @mkdir >NUL 2>NUL $(subst /,\,$1) $(SILENT)
+else
+rmfile = @del /F /Q $1 $(SILENT)
+rmdir = @rm -rf $1 $(SILENT)
+mkdir = @mkdir -p $1 $(SILENT)
+endif
+
+-include $(DEP_FILES)
