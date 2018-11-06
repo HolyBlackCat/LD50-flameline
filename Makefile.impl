@@ -24,6 +24,7 @@ build: $(OUTPUT_FILE)
 $(OUTPUT_FILE): $$(OBJECTS)
 	@echo [Linking] $(OUTPUT_FILE)
 	@$(CXX) $(OBJECTS) $(LDFLAGS) -o $@
+	@echo [Done]
 
 # Targets that compile source files.	
 # Note that flags come before the source file.
@@ -56,12 +57,22 @@ rwildcard=$(foreach d,$(wildcard $1*),$(call rwildcard,$d/,$2)$(filter $(subst *
 # `-` at the beginning makes `make` ignore errors when executing shell commands.
 # `|| cd .` forces error code to be 0, silencing errors. Unlike `-` it prints no warnings.
 # Example usage: $(call rmfile, bin/out.exe)
+HOST_OS = linux
+ifneq ($(OS), Windows_NT)
+HOST_OS = linux
+else ifndef MSYSTEM
+HOST_OS = windows
+else
+HOST_OS = linux
+endif
+
+ifeq ($(HOST_OS), windows)
 SILENT = >NUL 2>NUL || cd .
-ifeq ($(OS), Windows_NT)
 rmfile = @del /F /Q $(subst /,\,$1) $(SILENT)
 rmdir = @rd /S /Q $(subst /,\,$1) $(SILENT)
 mkdir = @mkdir >NUL 2>NUL $(subst /,\,$1) $(SILENT)
 else
+SILENT = >/dev/null 2>/dev/null || cd .
 rmfile = @del /F /Q $1 $(SILENT)
 rmdir = @rm -rf $1 $(SILENT)
 mkdir = @mkdir -p $1 $(SILENT)
