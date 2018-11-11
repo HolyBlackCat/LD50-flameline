@@ -6,7 +6,7 @@
 #include <sstream>
 #include <type_traits>
 
-#define VERSION "3.0.2"
+#define VERSION "3.1.0"
 
 namespace data
 {
@@ -1524,6 +1524,39 @@ int main()
                     else
                     $   return apply_elementwise(max<vec_base_t<P>...>, params...);
                 }
+
+                template <typename T> struct linear_mapping
+                {
+                    static_assert(std::is_floating_point_v<vec_base_t<T>>, "Template parameter must be floating-point.");
+
+                    T scale = T(1), offset = T(0);
+
+                    linear_mapping() = default;
+
+                    linear_mapping(T src_a, T src_b, T dst_a, T dst_b)
+                    {
+                        T factor = 1 / (src_a - src_b);
+                        scale = (dst_a - dst_b) * factor;
+                        offset = (dst_b * src_a - dst_a * src_b) * factor;
+                    }
+
+                    T operator()(T x) const
+                    {
+                        return x * scale + offset;
+                    }
+
+                    using matrix_t = mat<vec_size_v<T>+1, vec_size_v<T>+1, vec_base_t<T>>;
+                    matrix_t matrix() const
+                    {
+                        matrix_t ret{};
+                        for (int i = 0; i < vec_size_v<T>; i++)
+                        {
+                            ret[i][i] = scale[i];
+                            ret[vec_size_v<T>][i] = offset[i];
+                        }
+                        return ret;
+                    }
+                };
             )");
         });
 
