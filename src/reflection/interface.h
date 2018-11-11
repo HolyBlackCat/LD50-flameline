@@ -206,43 +206,46 @@ namespace Refl
 
                 ret += (!is_structure_tuple ? '{' : '(');
 
-                if (!is_structure_tuple && should_indent)
-                    ret += '\n';
-
-                for_each_field([&, this](auto index)
+                if constexpr (field_count() > 0)
                 {
-                    constexpr int i = index.value;
+                    if (!is_structure_tuple && should_indent)
+                        ret += '\n';
 
-                    if constexpr (i != 0)
+                    for_each_field([&, this](auto index)
                     {
-                        ret += ',';
+                        constexpr int i = index.value;
 
-                        if (should_indent)
-                            ret += (is_structure_tuple ? ' ' : '\n');
-                    }
+                        if constexpr (i != 0)
+                        {
+                            ret += ',';
 
-                    if constexpr (!is_structure_tuple)
+                            if (should_indent)
+                                ret += (is_structure_tuple ? ' ' : '\n');
+                        }
+
+                        if constexpr (!is_structure_tuple)
+                        {
+                            if (should_indent)
+                                ret += std::string(next_indent, ' ');
+
+                            ret += field_name(i);
+
+                            if (should_indent)
+                                ret += ' ';
+
+                            ret += '=';
+
+                            if (should_indent)
+                                ret += ' ';
+                        }
+                        ret += field<i>().to_string(indent_step, next_indent);
+                    });
+
+                    if (!is_structure_tuple && should_indent)
                     {
-                        if (should_indent)
-                            ret += std::string(next_indent, ' ');
-
-                        ret += field_name(i);
-
-                        if (should_indent)
-                            ret += ' ';
-
-                        ret += '=';
-
-                        if (should_indent)
-                            ret += ' ';
+                        ret += ",\n";
+                        ret += std::string(cur_indent, ' ');
                     }
-                    ret += field<i>().to_string(indent_step, next_indent);
-                });
-
-                if (!is_structure_tuple && should_indent)
-                {
-                    ret += ",\n";
-                    ret += std::string(cur_indent, ' ');
                 }
 
                 ret += (!is_structure_tuple ? '}' : ')');
@@ -258,33 +261,37 @@ namespace Refl
 
                 ret += '[';
 
-                if (!is_structure_tuple && should_indent)
-                    ret += '\n';
-
-                bool first = 1;
-                for_each_element([&](auto it)
+                if (size() > 0)
                 {
-                    if (first)
+                    if (should_indent)
+                        ret += '\n';
+
+                    bool first = 1;
+                    for_each_element([&](auto it)
                     {
-                        first = 0;
-                    }
-                    else
-                    {
-                        ret += ',';
+                        if (first)
+                        {
+                            first = 0;
+                        }
+                        else
+                        {
+                            ret += ',';
+                            if (should_indent)
+                                ret += '\n';
+                        }
+
                         if (should_indent)
-                            ret += '\n';
-                    }
+                            ret += std::string(next_indent, ' ');
+
+                        ret += Refl::Interface(*it).to_string(indent_step, next_indent); // We have to use `Refl::Interface` instead of `Interface` for template argument deduction to work.
+                    });
 
                     if (should_indent)
-                        ret += std::string(next_indent, ' ');
-
-                    ret += Refl::Interface(*it).to_string(indent_step, next_indent); // We have to use `Refl::Interface` instead of `Interface` for template argument deduction to work.
-                });
-
-                if (!is_structure_tuple && should_indent)
-                {
-                    ret += ",\n";
-                    ret += std::string(cur_indent, ' ');
+                    {
+                        if (!first)
+                            ret += ",\n";
+                        ret += std::string(cur_indent, ' ');
+                    }
                 }
 
                 ret += ']';
@@ -651,7 +658,17 @@ namespace Refl
         // Container-specific
         using element_type = typename decltype(element_type_tag())::type;
         using mutable_element_type = typename impl::make_mutable<std::remove_const_t<element_type>>::type;
-        constexpr auto begin() const
+        std::size_t size() const
+        {
+            static_assert(is_container);
+            return low::size(*ptr);
+        }
+        bool empty() const
+        {
+            static_assert(is_container);
+            return size() == 0;
+        }
+        auto begin() const
         {
             static_assert(is_container);
             if constexpr (is_mutable)
@@ -659,7 +676,7 @@ namespace Refl
             else
                 return low::const_begin(*ptr);
         }
-        constexpr auto end() const
+        auto end() const
         {
             static_assert(is_container);
             if constexpr (is_mutable)
