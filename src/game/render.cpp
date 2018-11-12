@@ -1,5 +1,7 @@
 #include "render.h"
 
+#include <algorithm>
+
 #include "graphics/complete.h"
 #include "reflection/complete.h"
 
@@ -197,4 +199,50 @@ Render::Quad_t::~Quad_t()
     out[3].texcoord = {out[0].texcoord.x, out[2].texcoord.y};
 
     ((decltype(Render::Data::queue) *)queue)->Add(out[0], out[1], out[2], out[3]);
+}
+
+Render::Triangle_t::~Triangle_t()
+{
+   if (!queue)
+        return;
+
+    DebugAssert("2D poly renderer: Triangle with no texture nor color specified.", data.has_texture || data.has_color);
+    DebugAssert("2D poly renderer: Triangle with texture and color, but without a mixing factor.", (data.has_texture && data.has_color) == data.has_tex_color_fac);
+
+    Render::Data::Attribs out[3];
+
+    if (data.has_texture)
+    {
+        for (int i = 0; i < 3; i++)
+        {
+            out[i].color = data.colors[i].to_vec4(0);
+            out[i].factors.x = data.tex_color_factors[i];
+            out[i].factors.y = data.alpha[i];
+        }
+    }
+    else
+    {
+        for (int i = 0; i < 3; i++)
+        {
+            out[i].color = data.colors[i].to_vec4(data.alpha[i]);
+            out[i].factors.x = out[i].factors.y = 0;
+        }
+    }
+
+    for (int i = 0; i < 3; i++)
+        out[i].factors.z = data.beta[i];
+
+    for (int i = 0; i < 3; i++)
+    {
+        out[i].pos = data.pos[i];
+        out[i].texcoord = data.tex_pos[i];
+    }
+
+    if (data.has_matrix)
+    {
+        for (auto &it : out)
+            it.pos = (data.matrix * it.pos.to_vec3(1)).to_vec2();
+    }
+
+    ((decltype(Render::Data::queue) *)queue)->Add(out[0], out[1], out[2]);
 }
