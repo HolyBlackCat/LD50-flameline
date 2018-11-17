@@ -6,7 +6,7 @@
 #include <sstream>
 #include <type_traits>
 
-#define VERSION "3.1.0"
+#define VERSION "3.1.1"
 
 namespace data
 {
@@ -1557,6 +1557,14 @@ int main()
                         return ret;
                     }
                 };
+
+                template <typename T> vec2<T> intersection_point(vec2<T> a1, vec2<T> a2, vec2<T> b1, vec2<T> b2)
+                {
+                    static_assert(std::is_floating_point_v<vec_base_t<T>>, "Arguments must be floating-point.");
+                    auto delta_a = a2 - a1;
+                    auto delta_b = b2 - b1;
+                    return ((a1.y - b1.y) * delta_b.x - (a1.x - b1.x) * delta_b.y) / (delta_a.x * delta_b.y - delta_a.y * delta_b.x) * delta_a + a1;
+                }
             )");
         });
 
