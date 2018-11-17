@@ -104,6 +104,8 @@ namespace Interface
         SDL_Window *Handle() const;
         SDL_GLContext Context() const;
 
+        void SetTitle(std::string new_name);
+
         ivec2 Size() const;
 
         VSync VSyncMode() const;

@@ -296,6 +296,11 @@ namespace Interface
         return data.context;
     }
 
+    void Window::SetTitle(std::string new_name)
+    {
+        SDL_SetWindowTitle(data.handle, new_name.c_str());
+    }
+
     ivec2 Window::Size() const
     {
         return data.size;
