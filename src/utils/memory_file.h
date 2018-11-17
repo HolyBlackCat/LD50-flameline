@@ -83,7 +83,7 @@ class MemoryFile
             Program::Error("Unable to get size of file `", file_name, "`.");
 
         ret.ref->storage = std::make_unique<uint8_t[]>(size);
-        if (!std::fread(ret.ref->storage.get(), size, 1, file))
+        if (size > 0 && !std::fread(ret.ref->storage.get(), size, 1, file))
             Program::Error("Unable to read from file `", file_name, "`.");
 
         ret.ref->begin = ret.ref->storage.get();
