@@ -42,7 +42,7 @@
  *
  * The rule is: you can't have YIELD in the same scope (or nested in such scope) as a local variable below said variable.
  * The compiler won't enforce the rule for variables with trivial default constructors without initializers,
- * but keep in mind that such variables won't, retain their values after resuming the task, so they shouldn't be used.
+ * but keep in mind that such variables won't retain their values after resuming the task, so they shouldn't be used.
  *
  * If you want to store the state, you have to declare all the state variables at the beginning of the function, like so:
  *
@@ -55,7 +55,7 @@
  *         std::cout << ++i << "\n";
  *     });
  *
- * The syntax here is the same as in a lambda capture list, since we use lambdas under the hood, so you can have regular captures too.
+ * The syntax here is the same as in a lambda capture list since we use lambdas under the hood, so you can have regular captures too.
  * The underlying lambda is always mutable.
  */
 
