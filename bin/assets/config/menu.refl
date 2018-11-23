@@ -1,9 +1,0 @@
-{
-    button_offset = (0, 50),
-    button_y_step = 32,
-    button_y_size = 32,
-    button_time_step = 0.300000012,
-    button_color_shadow = (0, 0, 0),
-    button_color_main = (1, 1, 1),
-    button_color_active = (1, 0.3333333333, 0.5),
-}

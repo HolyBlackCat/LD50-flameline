@@ -18,11 +18,12 @@
 #include "game/render.h"
 #include "game/state.h"
 #include "game/texture_atlas.h"
-#include "game/states/menu.h"
+#include "game/states/world.h"
 
 #define main SDL_main
 
 extern const ivec2 screen_size = ivec2(480,270);
+static const Graphics::ShaderConfig shader_config;
 
 Interface::Window win("Gamma", screen_size*2, Interface::windowed, ADJUST(Interface::WindowSettings{}, min_size = screen_size));
 
@@ -32,7 +33,7 @@ static Graphics::DummyVertexArray dummy_vao;
 // Due to a GCC bug, the presence of `extern` declaration makes `<>` necessary here as well.
 Random<> random;
 
-Render render(1000, Graphics::ShaderConfig::Core());
+Render render(1000, shader_config);
 
 const TextureAtlas &Atlas()
 {
@@ -42,7 +43,7 @@ const TextureAtlas &Atlas()
 
 static Graphics::Texture tex = Graphics::Texture().SetData(Atlas().GetImage()).Interpolation(Graphics::nearest).Wrap(Graphics::clamp);
 
-AdaptiveViewport viewport(Graphics::ShaderConfig::Core(), screen_size);
+AdaptiveViewport viewport(shader_config, screen_size);
 
 Metronome metronome;
 
@@ -66,7 +67,7 @@ int main(int, char**)
 
     Clock::DeltaTimer delta_timer;
 
-    game_state = decltype(game_state)::make<States::Menu>();
+    game_state = game_state.make<States::World>();
 
     while (1)
     {
@@ -86,13 +87,7 @@ int main(int, char**)
             game_state->Tick();
         }
 
-        viewport.BeginFrame();
-        Graphics::Clear();
-        render.BindShader();
         game_state->Render();
-        render.Finish();
-        viewport.FinishFrame();
-        Graphics::CheckErrors();
 
         win.SwapBuffers();
     }

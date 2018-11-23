@@ -1,48 +1,27 @@
-#pragma once
-
-#include "game/state.h"
-#include "game/states/common/fade.h"
-#include "game/states/world/camera.h"
-#include "game/states/world/particle_controller.h"
-#include "game/states/world/player_controller.h"
-#include "game/states/world/tile_map.h"
-
-#include "graphics/clear.h"
+#include "game/meta.h"
 
 namespace States
 {
-    struct World : State
+    class World : public State
     {
-        Details::Common::Fade fade = fvec3(0);
-        Details::World::Camera camera;
-        Details::World::TileMap map;
-        Details::World::PlayerController player_controller;
-        Details::World::ParticleController particles;
-
-        World()
-        {
-            map.Load("assets/maps/tutorial.json");
-            player_controller.RespawnPlayer(*this);
-        }
-
+        float angle = 0;
+      public:
         void Tick() override
         {
-            player_controller.Tick(*this);
-            particles.Tick(*this);
-            camera.Tick(*this);
-            fade.Tick();
+            angle += 0.01;
         }
 
         void Render() const override
         {
+            viewport.BeginFrame();
             Graphics::Clear();
-            map.Render(*this, &Details::World::TileMap::TileStack::back);
-            map.Render(*this, &Details::World::TileMap::TileStack::mid);
-            map.SetColorMatrix();
-            player_controller.Render(*this);
-            particles.Render(*this);
-            map.ResetColorMatrix();
-            fade.Render();
+            render.BindShader();
+
+            render.iquad(ivec2(0), ivec2(32)).color(fvec3(0,0.5,1)).center().rotate(angle);
+
+            render.Finish();
+            viewport.FinishFrame();
+            Graphics::CheckErrors();
         }
     };
 }
