@@ -52,7 +52,8 @@
 			<Add option="-Wextra" />
 			<Add option="-Wall" />
 			<Add option="-std=c++2a" />
-			<Add option="-include src/utils/_common.h" />
+			<Add option="-include src/utils/common.h" />
+			<Add option="-include src/program/parachute.h" />
 			<Add directory="lib/include" />
 			<Add directory="src" />
 		</Compiler>
@@ -111,6 +112,7 @@
 		<Unit filename="src/interface/messagebox.h" />
 		<Unit filename="src/interface/window.cpp" />
 		<Unit filename="src/interface/window.h" />
+		<Unit filename="src/program/errors.cpp" />
 		<Unit filename="src/program/errors.h" />
 		<Unit filename="src/program/exit.h" />
 		<Unit filename="src/program/parachute.h" />
@@ -123,11 +125,11 @@
 		<Unit filename="src/reflection/structures_macro.h" />
 		<Unit filename="src/reflection/structures_tuple.h" />
 		<Unit filename="src/reflection/structures_vec_mat.h" />
-		<Unit filename="src/utils/_common.h" />
 		<Unit filename="src/utils/adjust.h" />
 		<Unit filename="src/utils/archive.cpp" />
 		<Unit filename="src/utils/archive.h" />
 		<Unit filename="src/utils/clock.h" />
+		<Unit filename="src/utils/common.h" />
 		<Unit filename="src/utils/config.h" />
 		<Unit filename="src/utils/dynamic_storage.h" />
 		<Unit filename="src/utils/filesystem.cpp" />

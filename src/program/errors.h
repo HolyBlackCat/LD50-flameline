@@ -3,7 +3,7 @@
 #include <exception>
 #include <string>
 
-#include "exit.h"
+#include "program/exit.h"
 #include "interface/messagebox.h"
 #include "utils/strings.h"
 
@@ -34,6 +34,8 @@ namespace Program
     {
         Error(Str(params...));
     }
+
+    void SetErrorHandlers(bool only_if_not_set_before = 1);
 
     #ifdef NDEBUG
     #  define DebugAssert(text, ...) do {} while (0)
