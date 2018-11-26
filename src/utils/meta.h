@@ -28,4 +28,7 @@ namespace Meta
             (std::make_integer_sequence<int, N>{});
         }
     }
+
+
+    template <auto V, typename> inline constexpr auto always = V;
 }
