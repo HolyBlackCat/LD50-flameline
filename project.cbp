@@ -135,6 +135,7 @@
 		<Unit filename="src/utils/filesystem.cpp" />
 		<Unit filename="src/utils/filesystem.h" />
 		<Unit filename="src/utils/finally.h" />
+		<Unit filename="src/utils/hash.h" />
 		<Unit filename="src/utils/json.cpp" />
 		<Unit filename="src/utils/json.h" />
 		<Unit filename="src/utils/macro.h" />
