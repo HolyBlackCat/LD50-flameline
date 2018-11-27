@@ -18,9 +18,9 @@
 
 namespace Graphics
 {
-    // Unlike most other graphics classes, `Font` doesn't rely on SDL or OpenGL. You can safely call it even if they aren't initialized.
+    // Unlike most other graphics classes, `FontFile` doesn't rely on SDL or OpenGL. You can safely call it even if they aren't initialized.
 
-    class Font
+    class FontFile
     {
         inline static bool ft_initialized = 0;
         inline static FT_Library ft_context = 0;
@@ -35,15 +35,15 @@ namespace Graphics
         Data data;
 
       public:
-        Font(decltype(nullptr)) {}
+        FontFile(decltype(nullptr)) {}
 
         // File is copied into the font, since FreeType requires original data to be available when the font is used. (Since files are ref-counted, file contents aren't copied.)
         // `size` is measured in pixels. Normally you only provide height, but you can also provide width. In this case, `[x,0]` and `[0,x]` are equivalent to `[x,x]` due to how FreeType operates.
         // Some font files contain several fonts; `index` determines which one of them is loaded. Upper 16 bits of `index` contain so-called "variation" (sub-font?) index, which starts from 1. Use 0 to load the default one.
 
-        Font(MemoryFile file, int size, int index = 0) : Font(file, ivec2(0, size), index) {}
+        FontFile(MemoryFile file, int size, int index = 0) : FontFile(file, ivec2(0, size), index) {}
 
-        Font(MemoryFile file, ivec2 size, int index = 0)
+        FontFile(MemoryFile file, ivec2 size, int index = 0)
         {
             if (!ft_initialized)
             {
@@ -101,14 +101,14 @@ namespace Graphics
             open_font_count++; // This must remain at the bottom of the constructor in case something throws.
         }
 
-        Font(Font &&other) noexcept : data(std::exchange(other.data, {})) {}
-        Font &operator=(Font other) noexcept
+        FontFile(FontFile &&other) noexcept : data(std::exchange(other.data, {})) {}
+        FontFile &operator=(FontFile other) noexcept
         {
             std::swap(data, other.data);
             return *this;
         }
 
-        ~Font()
+        ~FontFile()
         {
             if (data.ft_font)
             {
@@ -117,7 +117,7 @@ namespace Graphics
             }
         }
 
-        void UnloadLibrary() // Use this to unload freetype. This function throws if you have opened fonts. When
+        static void UnloadLibrary() // Use this to unload freetype. This function throws if you have opened fonts. When
         {
             if (open_font_count > 0)
                 Program::Error("Unable to unload FreeType: ", open_font_count, " fonts are still in use.");
