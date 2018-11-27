@@ -97,6 +97,7 @@
 		<Unit filename="src/graphics/complete.h" />
 		<Unit filename="src/graphics/errors.h" />
 		<Unit filename="src/graphics/font.h" />
+		<Unit filename="src/graphics/font_file.h" />
 		<Unit filename="src/graphics/framebuffer.h" />
 		<Unit filename="src/graphics/image.h" />
 		<Unit filename="src/graphics/render_queue.h" />
