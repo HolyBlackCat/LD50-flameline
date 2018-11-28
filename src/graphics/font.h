@@ -1,6 +1,8 @@
 #pragma once
 
+#include <functional>
 #include <unordered_map>
+#include <utility>
 
 #include "utils/mat.h"
 
@@ -21,6 +23,11 @@ namespace Graphics
         int descent = 0;
         int line_skip = 0;
 
+        using kerning_func_t = std::function<int(uint32_t, uint32_t)>;
+        kerning_func_t kerning_func = 0;
+
+        ivec2 base_texture_pos = ivec2(0);
+
         std::unordered_map<uint32_t, Glyph> glyphs;
         Glyph default_glyph;
 
@@ -36,6 +43,14 @@ namespace Graphics
         void SetLineSkip(int new_line_skip)
         {
             line_skip = new_line_skip;
+        }
+        void SetKerningFunc(kerning_func_t new_kerning_func) // You can use null function if you don't want kerning.
+        {
+            kerning_func = std::move(new_kerning_func);
+        }
+        void SetBaseTexturePos(ivec2 new_base_texture_pos)
+        {
+            base_texture_pos = new_base_texture_pos;
         }
 
         int Ascent() const
@@ -57,6 +72,27 @@ namespace Graphics
         int LineGap() const
         {
             return line_skip - Height();
+        }
+
+        const kerning_func_t KerningFunc() const
+        {
+            return kerning_func;
+        }
+        bool HasKerning() const
+        {
+            return bool(kerning_func);
+        }
+        int Kerning(uint32_t a, uint32_t b) const
+        {
+            if (kerning_func)
+                return kerning_func(a, b);
+            else
+                return 0;
+        }
+
+        ivec2 BaseTexturePos() const
+        {
+            return base_texture_pos;
         }
 
         Glyph &DefaultGlyph()
