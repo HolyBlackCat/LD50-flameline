@@ -1,9 +1,8 @@
 #include "texture_atlas.h"
 
-#include <iostream>
 #include <memory>
 
-#include <stb_rect_pack.h>
+#include "utils/packing.h"
 
 TextureAtlas::TextureAtlas(ivec2 target_size, const std::string &source_dir, const std::string &out_image_file, const std::string &out_desc_file, bool add_gaps)
     : source_dir(source_dir)
@@ -96,7 +95,7 @@ TextureAtlas::TextureAtlas(ivec2 target_size, const std::string &source_dir, con
     std::vector<Graphics::Image> image_list;
     image_list.reserve(image_count);
 
-    std::vector<stbrp_rect> rect_list;
+    std::vector<Packing::Rect> rect_list;
     rect_list.reserve(image_count);
 
     Filesystem::ForEachObject(source_tree, [&](const Filesystem::TreeNode &node)
@@ -111,26 +110,11 @@ TextureAtlas::TextureAtlas(ivec2 target_size, const std::string &source_dir, con
         image_list.push_back(Graphics::Image(node.path));
 
         // Make rectangle.
-        auto &rect = rect_list.emplace_back();
-        rect.w = image_list.back().Size().x;
-        rect.h = image_list.back().Size().y;
-
-        if (add_gaps)
-        {
-            rect.w++;
-            rect.h++;
-        }
+        rect_list.emplace_back(image_list.back().Size());
     });
 
-    // Prepare for packing rectangles.
-    stbrp_context packing_context;
-    ivec2 packing_size = target_size - (add_gaps ? 1 : 0);
-    int packing_buffer_size = packing_size.x; // Comments in `stb_rect_pack` say we need the amount of elements equal to target width.
-    auto packing_buffer = std::make_unique<stbrp_node[]>(packing_buffer_size);
-    stbrp_init_target(&packing_context, packing_size.x, packing_size.y, packing_buffer.get(), packing_buffer_size); // No cleanup needed.
-
     // Try packing rectangles.
-    if (!stbrp_pack_rects(&packing_context, rect_list.data(), rect_list.size()))
+    if (Packing::PackRects(target_size, rect_list.data(), rect_list.size(), add_gaps))
         Program::Error("Unable to fit texture atlas for `", source_dir, "` into ", target_size.x, 'x', target_size.y, " texture.");
 
     // Construct description and final image.
@@ -139,7 +123,7 @@ TextureAtlas::TextureAtlas(ivec2 target_size, const std::string &source_dir, con
     {
         // Add image to description.
         ImageDesc image_desc;
-        image_desc.pos = ivec2(rect_list[i].x, rect_list[i].y) + (add_gaps ? 1 : 0);
+        image_desc.pos = rect_list[i].pos;
         image_desc.size = image_list[i].Size(); // Note that we don't extract sizes from rectangles, since those sizes might include gap size.
         if (!desc.images.insert({std::move(name_list[i]), image_desc}).second)
             Program::Error("Internal error while generating description for texture atlas for `", source_dir, "`: Duplicate image paths.");
