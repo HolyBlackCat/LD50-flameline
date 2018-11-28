@@ -87,12 +87,12 @@ template <typename T> class RangeSet
         return values;
     }
 
-    template <typename F> void ForEachRange(F &&func/* void(const T &begin, const T &end) */) // Both ends of ranges are inclusive.
+    template <typename F> void ForEachRange(F &&func/* void(const T &begin, const T &end) */) const // Both ends of ranges are inclusive.
     {
         for (auto [begin, end] : map)
             func(begin, end);
     }
-    template <typename F> void ForEachValue(F &&func/* void(const T &value) */)
+    template <typename F> void ForEachValue(F &&func/* void(const T &value) */) const
     {
         for (auto [begin, end] : map)
         for (auto it = begin; it <= end; it++)
