@@ -2,6 +2,8 @@
 
 #include <map>
 #include <type_traits>
+#include <utility>
+
 #include "utils/mat.h"
 
 template <typename T> class RangeSet
@@ -41,7 +43,24 @@ template <typename T> class RangeSet
 
   public:
     RangeSet() {}
+    RangeSet(const T &value)
+    {
+        Add(value);
+    }
+    RangeSet(const T &first, const T &second)
+    {
+        Add(first, second);
+    }
+    RangeSet(std::initializer_list<std::pair<T,T>> ranges)
+    {
+        for (auto range : ranges)
+            Add(range.first, range.second);
+    }
 
+    void Add(const T &value)
+    {
+        Add(value, value);
+    }
     void Add(const T &first, const T &last) // The range is inclusive.
     {
         // Try inserting.
@@ -65,11 +84,6 @@ template <typename T> class RangeSet
         // Check for intersections with next range.
         if (auto it_next = std::next(it_cur); it_next != map.end())
             TryMergingAdjacent(it_cur, it_next);
-    }
-
-    void Add(const T &value)
-    {
-        Add(value, value);
     }
 
     void Clear()
@@ -97,5 +111,17 @@ template <typename T> class RangeSet
         for (auto [begin, end] : map)
         for (auto it = begin; it <= end; it++)
             func(it);
+    }
+
+    [[nodiscard]] RangeSet operator+(const RangeSet &other) const
+    {
+        RangeSet ret = *this;
+        ret += other;
+        return ret;
+    }
+    RangeSet &operator+=(const RangeSet &other)
+    {
+        for (auto range : other.map)
+            Add(range.first, range.second);
     }
 };
