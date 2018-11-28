@@ -241,7 +241,8 @@ namespace Graphics
                 if (is_antialiased)
                 {
                     for (int y = 0; y < size.y; y++)
-                        std::copy(bitmap.buffer + bitmap.pitch * y, bitmap.buffer + bitmap.pitch * y + size.x, (uint8_t *)ret.image.Data() + size.x * y);
+                    for (int x = 0; x < size.x; x++)
+                        ret.image.UnsafeAt(ivec2(x,y)) = u8vec3(255).to_vec4(bitmap.buffer[bitmap.pitch * y + x]);
                 }
                 else
                 {
@@ -253,7 +254,7 @@ namespace Graphics
                         {
                             if (x % 8 == 0)
                                 byte = *byte_ptr++;
-                            ret.image.UnsafeAt(ivec2(x,y)) = u8vec4(byte & 128 ? 255 : 0);
+                            ret.image.UnsafeAt(ivec2(x,y)) = u8vec3(255).to_vec4(byte & 128 ? 255 : 0);
                             byte <<= 1;
                         }
                     }
@@ -272,12 +273,13 @@ namespace Graphics
     {
         Font *target = 0;
         const FontFile *source = 0;
-        const RangeSet<uint32_t> *glyphs = 0;
+        const Unicode::CharSet *glyphs = 0;
         FontFile::RenderMode render_mode = FontFile::normal;
+        bool include_default_glyph = 1;
 
         FontAtlasEntry() {}
-        FontAtlasEntry(Font &target, const FontFile &source, const RangeSet<uint32_t> &glyphs, FontFile::RenderMode render_mode = FontFile::normal)
-            : target(&target), source(&source), glyphs(&glyphs), render_mode(render_mode) {}
+        FontAtlasEntry(Font *target, const FontFile *source, const Unicode::CharSet *glyphs, FontFile::RenderMode render_mode = FontFile::normal)
+            : target(target), source(source), glyphs(glyphs), render_mode(render_mode) {}
     };
 
     inline void MakeFontAtlas(Image &image, ivec2 pos, ivec2 size, const std::vector<FontAtlasEntry> &entries, bool add_gaps = 1) // Throws on failure.
@@ -304,6 +306,9 @@ namespace Graphics
 
             auto AddGlyph = [&](uint32_t ch)
             {
+                if (!entry.source->HasGlyph(ch))
+                    return;
+
                 // Copy glyph to the font.
                 FontFile::GlyphData glyph_data = entry.source->GetGlyph(ch, entry.render_mode);
                 Font::Glyph &font_glyph = entry.target->Insert(ch);
@@ -319,7 +324,8 @@ namespace Graphics
             };
 
             // Save the default glyph.
-            AddGlyph(Unicode::default_char);
+            if (entry.include_default_glyph)
+                AddGlyph(Unicode::default_char);
 
             // Save the rest of the glyphs.
             entry.glyphs->ForEachValue([&](uint32_t ch)
