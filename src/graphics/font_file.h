@@ -8,11 +8,13 @@
 #include <ft2build.h>
 #include FT_FREETYPE_H // Ugh.
 
+#include "graphics/font.h"
 #include "graphics/image.h"
 #include "program/errors.h"
 #include "utils/finally.h"
 #include "utils/mat.h"
 #include "utils/memory_file.h"
+#include "utils/range_set.h"
 #include "utils/strings.h"
 
 
@@ -200,7 +202,7 @@ namespace Graphics
             int advance;
         };
 
-        GlyphData GetChar(uint32_t ch, RenderMode mode)
+        GlyphData GetChar(uint32_t ch, RenderMode mode) const
         {
             try
             {
@@ -260,5 +262,12 @@ namespace Graphics
                 Program::Error("Unable to render glyph ", ch, " for font `", data.file.name(), "`: ", e.what());
             }
         }
+    };
+
+    struct FontAtlasEntry
+    {
+        Font *target;
+        const RangeSet<uint32_t> *glyphs;
+        const FontFile *source;
     };
 }
