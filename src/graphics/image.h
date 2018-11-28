@@ -54,6 +54,15 @@ namespace Graphics
         const uint8_t *Data() const {return (const uint8_t *)Pixels();}
         ivec2 Size() const {return size;}
 
+        bool PointInBounds(ivec2 point) const
+        {
+            return (point >= 0).all() && (point < size).all();
+        }
+        bool RectInBounds(ivec2 rect_pos, ivec2 rect_size) const
+        {
+            return (rect_pos >= 0).all() && (rect_pos + rect_size <= size).all() && (rect_size >= 0).all();
+        }
+
         void Save(std::string file_name, Format format = png) // Throws on failure.
         {
             if (!*this)
@@ -85,15 +94,22 @@ namespace Graphics
 
         u8vec4 TryGet(ivec2 pos) const // Returns transparent black if out of range.
         {
-            if ((pos >= 0).all() && (pos < size).all())
+            if (PointInBounds(pos))
                 return UnsafeAt(pos);
             else
                 return u8vec4(0);
         }
         void TrySet(ivec2 pos, u8vec4 color)
         {
-            if ((pos >= 0).all() && (pos < size).all())
+            if (PointInBounds(pos))
                 UnsafeAt(pos) = color;
+        }
+
+        void UnsafeFill(ivec2 rect_pos, ivec2 rect_size, u8vec4 color)
+        {
+            for (int y = rect_pos.y; y < rect_pos.y + rect_size.y; y++)
+            for (int x = rect_pos.x; x < rect_pos.x + rect_size.x; x++)
+                UnsafeAt(ivec2(x,y)) = color;
         }
 
         void UnsafeDrawImage(const Image &other, ivec2 pos) // Copies other image into this image, at specified location.
