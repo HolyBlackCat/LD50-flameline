@@ -26,8 +26,7 @@ namespace Graphics
         using kerning_func_t = std::function<int(uint32_t, uint32_t)>;
         kerning_func_t kerning_func = 0;
 
-        ivec2 base_texture_pos = ivec2(0);
-
+        // Some code might rely on references not being invalidated on insertion. Keep that in mind if you decide to change the container.
         std::unordered_map<uint32_t, Glyph> glyphs;
         Glyph default_glyph;
 
@@ -47,10 +46,6 @@ namespace Graphics
         void SetKerningFunc(kerning_func_t new_kerning_func) // You can use null function if you don't want kerning.
         {
             kerning_func = std::move(new_kerning_func);
-        }
-        void SetBaseTexturePos(ivec2 new_base_texture_pos)
-        {
-            base_texture_pos = new_base_texture_pos;
         }
 
         int Ascent() const
@@ -90,11 +85,6 @@ namespace Graphics
                 return 0;
         }
 
-        ivec2 BaseTexturePos() const
-        {
-            return base_texture_pos;
-        }
-
         Glyph &DefaultGlyph()
         {
             return default_glyph;
@@ -104,6 +94,7 @@ namespace Graphics
             return default_glyph;
         }
 
+        // Note that returned references remain valid even after insertions.
         const Glyph &Get(uint32_t ch) const
         {
             if (auto it = glyphs.find(ch); it != glyphs.end())
