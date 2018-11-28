@@ -152,6 +152,7 @@
 		<Unit filename="src/utils/robust_compare.h" />
 		<Unit filename="src/utils/strings.h" />
 		<Unit filename="src/utils/tasks.h" />
+		<Unit filename="src/utils/unicode.h" />
 		<Extensions>
 			<code_completion />
 			<envvars />
