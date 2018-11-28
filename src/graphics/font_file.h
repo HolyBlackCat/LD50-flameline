@@ -14,13 +14,15 @@
 #include "utils/finally.h"
 #include "utils/mat.h"
 #include "utils/memory_file.h"
+#include "utils/packing.h"
 #include "utils/range_set.h"
 #include "utils/strings.h"
+#include "utils/unicode.h"
 
 
 namespace Graphics
 {
-    // Unlike most other graphics classes, `FontFile` doesn't rely on SDL or OpenGL. You can safely call it even if they aren't initialized.
+    // Unlike most other graphics classes, `FontFile` doesn't rely on SDL or OpenGL. You can safely use it even if they aren't initialized.
 
     class FontFile
     {
@@ -183,9 +185,10 @@ namespace Graphics
             };
         }
 
-        bool HasChar(uint32_t ch) const
+        // This always returns `true` for 0xFFFD `Unicode::default_char`, since freetype itself seems to able to draw it if it's not included in the font.
+        bool HasGlyph(uint32_t ch) const
         {
-            return bool(FT_Get_Char_Index(data.ft_font, ch));
+            return bool(FT_Get_Char_Index(data.ft_font, ch)) || ch == Unicode::default_char;
         }
 
         enum RenderMode
@@ -202,11 +205,12 @@ namespace Graphics
             int advance;
         };
 
-        GlyphData GetChar(uint32_t ch, RenderMode mode) const
+        // Throws on failure. In particular, throws if the font has no such glyph.
+        GlyphData GetGlyph(uint32_t ch, RenderMode mode) const
         {
             try
             {
-                if (!HasChar(ch))
+                if (!HasGlyph(ch))
                     Program::Error("No such glyph.");
                 if (FT_Load_Char(data.ft_font, ch, FT_LOAD_RENDER | mode))
                     Program::Error("Unknown error.");
@@ -266,8 +270,79 @@ namespace Graphics
 
     struct FontAtlasEntry
     {
-        Font *target;
-        const RangeSet<uint32_t> *glyphs;
-        const FontFile *source;
+        Font *target = 0;
+        const FontFile *source = 0;
+        const RangeSet<uint32_t> *glyphs = 0;
+        FontFile::RenderMode render_mode = FontFile::normal;
+
+        FontAtlasEntry() {}
+        FontAtlasEntry(Font &target, const FontFile &source, const RangeSet<uint32_t> &glyphs, FontFile::RenderMode render_mode = FontFile::normal)
+            : target(&target), source(&source), glyphs(&glyphs), render_mode(render_mode) {}
     };
+
+    inline void MakeFontAtlas(Image &image, ivec2 pos, ivec2 size, const std::vector<FontAtlasEntry> &entries, bool add_gaps = 1) // Throws on failure.
+    {
+        if (!image.RectInBounds(pos, size))
+            Program::Error("Invalid target rectangle for a font atlas.");
+
+        struct Glyph
+        {
+            Font::Glyph *target = 0;
+            Image image;
+        };
+
+        std::vector<Glyph> glyphs;
+        std::vector<Packing::Rect> rects;
+
+        for (const FontAtlasEntry &entry : entries)
+        {
+            // Save font metrics.
+            entry.target->SetAscent(entry.source->Ascent());
+            entry.target->SetDescent(entry.source->Descent());
+            entry.target->SetLineSkip(entry.source->LineSkip());
+            entry.target->SetKerningFunc(entry.source->KerningFunc());
+
+            auto AddGlyph = [&](uint32_t ch)
+            {
+                // Copy glyph to the font.
+                FontFile::GlyphData glyph_data = entry.source->GetGlyph(ch, entry.render_mode);
+                Font::Glyph &font_glyph = entry.target->Insert(ch);
+                font_glyph.size = glyph_data.image.Size();
+                font_glyph.offset = glyph_data.offset;
+                font_glyph.advance = glyph_data.advance;
+
+                // Save it into the glyph vector.
+                glyphs.push_back({&font_glyph, std::move(glyph_data.image)}); // We rely on the fact that Graphics::Font doesn't invalidate references on insertions.
+
+                // Save it into the rect vector.
+                rects.emplace_back(font_glyph.size);
+            };
+
+            // Save the default glyph.
+            AddGlyph(Unicode::default_char);
+
+            // Save the rest of the glyphs.
+            entry.glyphs->ForEachValue([&](uint32_t ch)
+            {
+                AddGlyph(ch);
+            });
+        }
+
+        // Pack rectangles.
+        if (Packing::PackRects(size, rects.data(), rects.size(), add_gaps))
+            Program::Error("Unable to fit the font atlas for into ", size.x, 'x', size.y, " rectangle.");
+
+        // Fill target area with transparent black.
+        image.UnsafeFill(pos, size, u8vec4(0));
+
+        // Export results.
+        for (size_t i = 0; i < glyphs.size(); i++)
+        {
+            ivec2 glyph_pos = pos + rects[i].pos;
+
+            glyphs[i].target->texture_pos = glyph_pos;
+
+            image.UnsafeDrawImage(glyphs[i].image, glyph_pos);
+        }
+    }
 }
