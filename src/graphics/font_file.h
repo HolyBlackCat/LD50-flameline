@@ -218,10 +218,10 @@ namespace Graphics
                 switch (bitmap.pixel_mode)
                 {
                   case FT_PIXEL_MODE_MONO:
-                    is_antialiased = 1;
+                    is_antialiased = 0;
                     break;
                   case FT_PIXEL_MODE_GRAY:
-                    is_antialiased = 0;
+                    is_antialiased = 1;
                     break;
                   default:
                     Program::Error("Bitmap format ", bitmap.pixel_mode, " is not supported.");
