@@ -144,7 +144,7 @@ namespace Graphics
             std::vector<GLenum> draw_buffers(att.size());
             std::iota(draw_buffers.begin(), draw_buffers.end(), GL_COLOR_ATTACHMENT0);
 
-            for (std::size_t i = 0; i < att.size(); i++)
+            for (size_t i = 0; i < att.size(); i++)
                 glFramebufferTexture2D(GL_DRAW_FRAMEBUFFER, GL_COLOR_ATTACHMENT0 + i, att[i].type, att[i].handle, 0);
 
             glDrawBuffers(draw_buffers.size(), draw_buffers.data());
