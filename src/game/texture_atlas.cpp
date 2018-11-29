@@ -7,6 +7,8 @@
 TextureAtlas::TextureAtlas(ivec2 target_size, const std::string &source_dir, const std::string &out_image_file, const std::string &out_desc_file, bool add_gaps)
     : source_dir(source_dir)
 {
+    constexpr int max_nesting_level = 32;
+
     // Decide if regenrating the atlas should be allowed.
     bool allow_regeneration = source_dir.size() > 0;
 
@@ -16,37 +18,42 @@ TextureAtlas::TextureAtlas(ivec2 target_size, const std::string &source_dir, con
     if (allow_regeneration)
     {
         // Get the tree.
-        try
+        bool tree_ok;
+        Filesystem::TreeNode new_source_tree = Filesystem::GetObjectTree(source_dir, max_nesting_level, &tree_ok); // This throws if no such file or directory.
+        if (tree_ok)
         {
-            Filesystem::TreeNode new_source_tree = Filesystem::GetObjectTree(source_dir); // This throws if no such file or directory.
             if (new_source_tree.info.category != Filesystem::directory)
                 Program::Error("Texture atlas source location `", source_dir, "` is not a directory.");
             source_tree = std::move(new_source_tree); // We use a temporary to make sure that if it's not a directory, we have an empty file tree.
         }
-        catch (...) {}
     }
 
-    // Get image file modification time. 0 if no file.
     std::time_t image_time_modified = 0;
-    try
-    {
-        auto info = Filesystem::GetObjectInfo(out_image_file);
-        if (info.category != Filesystem::file)
-            Program::Error("Texture atlas image `", out_image_file, "` is not a file.");
-        image_time_modified = info.time_modified;
-    }
-    catch (...) {}
 
-    // Get description file modification time. 0 if no file.
-    std::time_t desc_time_modified = 0;
-    try
-    {
-        auto info = Filesystem::GetObjectInfo(out_desc_file);
-        if (info.category != Filesystem::file)
-            Program::Error("Texture atlas description `", out_desc_file, "` is not a file.");
-        desc_time_modified = info.time_modified;
+    { // Get image file modification time. 0 if no file.
+        bool image_ok;
+        auto info = Filesystem::GetObjectInfo(out_image_file, &image_ok);
+        if (image_ok)
+        {
+            if (info.category != Filesystem::file)
+                Program::Error("Texture atlas image `", out_image_file, "` is not a file.");
+            image_time_modified = info.time_modified;
+        }
     }
-    catch (...) {}
+
+    std::time_t desc_time_modified = 0;
+
+    { // Get description file modification time. 0 if no file.
+        bool desc_ok;
+        auto info = Filesystem::GetObjectInfo(out_desc_file, &desc_ok);
+        if (desc_ok)
+        {
+            if (info.category != Filesystem::file)
+                Program::Error("Texture atlas description `", out_desc_file, "` is not a file.");
+            desc_time_modified = info.time_modified;
+        }
+    }
+
 
     // Decide if we should load the atlas or regenerate it.
     if (!allow_regeneration || source_tree.time_modified_recursive < min(image_time_modified, desc_time_modified))
