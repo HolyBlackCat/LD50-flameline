@@ -273,12 +273,12 @@ namespace Graphics
     {
         Font *target = 0;
         const FontFile *source = 0;
-        const Unicode::CharSet *glyphs = 0;
+        const RangeSet<uint32_t> *glyphs = 0;
         FontFile::RenderMode render_mode = FontFile::normal;
         bool include_default_glyph = 1;
 
         FontAtlasEntry() {}
-        FontAtlasEntry(Font *target, const FontFile *source, const Unicode::CharSet *glyphs, FontFile::RenderMode render_mode = FontFile::normal)
+        FontAtlasEntry(Font *target, const FontFile *source, const RangeSet<uint32_t> *glyphs, FontFile::RenderMode render_mode = FontFile::normal)
             : target(target), source(source), glyphs(glyphs), render_mode(render_mode) {}
     };
 

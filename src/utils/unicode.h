@@ -1,14 +1,13 @@
 #pragma once
 
 #include <cstddef>
-
-#include "utils/range_set.h"
+#include <iterator>
+#include <string>
+#include <string_view>
 
 namespace Unicode
 {
     using std::uint32_t;
-
-    using CharSet = RangeSet<uint32_t>;
 
     inline constexpr uint32_t default_char = 0xfffd;
 
@@ -43,12 +42,25 @@ namespace Unicode
     // Returns a decoded character or `default_char` on failure.
     // If `end` is not null, it won't attempt to read past it.
     // If `next_char` is not null, it will be set to point to the next byte after the current character.
-    // If `data == end`, returns '\0'.
+    // If `data == end`, returns '\0'. (If `end != 0` and `data > end`, also returns '\0'.)
+    // If `data == 0`, returns '\0'.
     inline uint32_t Decode(const char *data, const char *end = 0, const char **next_char = 0)
     {
+        // Stop if `data` is a null pointer.
+        if (!data)
+        {
+            if (next_char)
+                *next_char = 0;
+            return 0;
+        }
+
         // Stop if we have an empty string.
         if (end && data >= end) // For `data >= end` to be well-defined, `end` has to be not null if `data` is not null.
+        {
+            if (next_char)
+                *next_char = data;
             return 0;
+        }
 
         // Get character length.
         int len = CharacterLength(*data);
@@ -101,4 +113,77 @@ namespace Unicode
 
         return ret;
     }
+
+
+    class Iterator
+    {
+        const char *cur = 0;
+        const char *next = 0;
+        const char *range_end = 0;
+        uint32_t ch = 0;
+
+      public:
+        Iterator() {}
+        Iterator(const char *from, const char *to = 0) : next(from), range_end(to)
+        {
+            ++(*this);
+        }
+        Iterator(const std::string &str) : Iterator(&*str.begin(), &*str.end()) {}
+        Iterator(std::string_view str) : Iterator(&*str.begin(), &*str.end()) {}
+
+        Iterator begin() const
+        {
+            return *this;
+        }
+        Iterator end() const
+        {
+            return {};
+        }
+
+        using difference_type   = std::ptrdiff_t;
+        using value_type        = uint32_t;
+        using pointer           = const uint32_t *;
+        using reference         = uint32_t; // Sic!
+        using iterator_category = std::forward_iterator_tag;
+
+        Iterator &operator++()
+        {
+            // Detect end of range if `range_end` is not null.
+            if (range_end && next >= range_end)
+                next = 0;
+
+            cur = next;
+            ch = Decode(cur, range_end, &next);
+
+            // Detect end of range if `range_end` is null.
+            if (!range_end && ch == 0)
+                cur = next = 0;
+
+            return *this;
+        }
+        Iterator operator++(int)
+        {
+            Iterator ret = *this;
+            ++(*this);
+            return ret;
+        }
+
+        reference operator*() const
+        {
+            return ch;
+        }
+        pointer operator->() const
+        {
+            return &ch;
+        }
+
+        bool operator==(const Iterator &other) const
+        {
+            return cur == other.cur;
+        }
+        bool operator!=(const Iterator &other) const
+        {
+            return !(*this == other);
+        }
+    };
 }
