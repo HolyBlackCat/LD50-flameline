@@ -146,7 +146,8 @@ namespace Graphics
             glGenBuffers(1, &data.handle);
             if (!data.handle)
                 Program::Error("Unable to create a vertex buffer.");
-            // Not needed because since there is no code below this point: FINALLY_ON_THROW( glDeleteBuffers(1, &handle); )
+            // Not needed because there is no code below this point:
+            // FINALLY_ON_THROW( glDeleteBuffers(1, &handle); )
         }
         VertexBuffer(int count, const T *source = 0, Usage usage = static_draw) : VertexBuffer() // Binds storage.
         {
