@@ -37,6 +37,22 @@ class TextureAtlas
         ivec2 size = ivec2(0);
 
         Image() {}
+
+        Image Region(ivec2 sub_pos, ivec2 sub_size) const
+        {
+            Image ret;
+            ret.pos = pos + sub_pos;
+            ret.size = sub_size;
+            return ret;
+        }
+
+        Image Margin(int margin) const
+        {
+            Image ret;
+            ret.pos = pos + margin;
+            ret.size = size - 2 * margin;
+            return ret;
+        }
     };
 
     class ImageList
