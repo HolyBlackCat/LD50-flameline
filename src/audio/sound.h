@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstring>
+#include <utility>
 #include <vector>
 
 #include <AL/al.h>
@@ -35,6 +36,7 @@ namespace Audio
             (void)OV_CALLBACKS_STREAMONLY;
             (void)OV_CALLBACKS_STREAMONLY_NOCLOSE;
         }
+
         Sound(std::size_t samples, Channels channel_count, Bits bits_per_sample, int sampling_rate, std::uint8_t *source = 0)
             : channel_count(channel_count), bits_per_sample(bits_per_sample), sampling_rate(sampling_rate)
         {
@@ -44,7 +46,16 @@ namespace Audio
             else
                 data = std::vector<uint8_t>(byte_count);
         }
+
         Sound(Format format, MemoryFile file, Bits preferred_bits_per_sample = bits_16); // `preferred_bits_per_sample` is ignored for WAV files.
+
+        // Throws if the file doesn't contain `desired_channel_count` channels.
+        Sound(Format format, Channels desired_channel_count, MemoryFile file, Bits preferred_bits_per_sample = bits_16)
+            : Sound(format, file, preferred_bits_per_sample)
+        {
+            if (channel_count != desired_channel_count)
+                Program::Error("Expected `", file.name(), "` to be ", (desired_channel_count == mono ? "mono" : "stereo"));
+        }
 
         Channels ChannelCount() const
         {
