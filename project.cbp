@@ -102,6 +102,7 @@
 		<Unit filename="src/graphics/image.h" />
 		<Unit filename="src/graphics/render_queue.h" />
 		<Unit filename="src/graphics/shader.h" />
+		<Unit filename="src/graphics/text.h" />
 		<Unit filename="src/graphics/texture.h" />
 		<Unit filename="src/graphics/vertex_buffer.h" />
 		<Unit filename="src/graphics/viewport.h" />

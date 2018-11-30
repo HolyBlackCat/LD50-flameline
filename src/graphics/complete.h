@@ -9,6 +9,7 @@
 #include "graphics/image.h"
 #include "graphics/render_queue.h"
 #include "graphics/shader.h"
+#include "graphics/text.h"
 #include "graphics/texture.h"
 #include "graphics/vertex_buffer.h"
 #include "graphics/viewport.h"
