@@ -117,7 +117,7 @@ void Render::SetColorMatrix(const fmat4 &m)
 
 Render::Quad_t::~Quad_t()
 {
-   if (!queue)
+    if (!queue)
         return;
 
     DebugAssert("2D poly renderer: Quad with no texture nor color specified.", data.has_texture || data.has_color);
@@ -203,7 +203,7 @@ Render::Quad_t::~Quad_t()
 
 Render::Triangle_t::~Triangle_t()
 {
-   if (!queue)
+    if (!queue)
         return;
 
     DebugAssert("2D poly renderer: Triangle with no texture nor color specified.", data.has_texture || data.has_color);
@@ -245,4 +245,37 @@ Render::Triangle_t::~Triangle_t()
     }
 
     ((decltype(Render::Data::queue) *)queue)->Add(out[0], out[1], out[2]);
+}
+
+Render::Text_t::~Text_t()
+{
+    if (!renderer)
+        return;
+
+    Graphics::Text::Stats stats = data.text.ComputeStats();
+
+    ivec2 align_box(data.has_box_alignment ? data.align_box_x : data.align.x, data.align.y);
+
+    fvec2 pos = data.pos;
+    pos -= stats.size * (1 + align_box) / 2;
+    pos.x += stats.size.x * (1 + data.align.x) / 2; // Note that we don't change vertical position here.
+
+    float start_x = pos.x;
+
+    for (size_t line_index = 0; line_index < data.text.lines.size(); line_index++)
+    {
+        const Graphics::Text::Line &line = data.text.lines[line_index];
+        const Graphics::Text::Stats::Line &line_stats = stats.lines[line_index];
+
+        pos.x = start_x - line_stats.width * (1 + data.align.x) / 2;
+        pos.y += line_stats.ascent;
+
+        for (const Graphics::Text::Symbol &symbol : line.symbols)
+        {
+            renderer->fquad(pos + symbol.offset, symbol.size).tex(symbol.texture_pos).color(data.color).mix(0).alpha(data.alpha).beta(data.beta);
+            pos.x += symbol.advance + symbol.kerning;
+        }
+
+        pos.y += line_stats.descent + line_stats.gap;
+    }
 }

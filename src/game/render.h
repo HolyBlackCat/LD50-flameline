@@ -1,7 +1,10 @@
 #pragma once
 
 #include <memory>
+#include <utility>
 
+#include "game/texture_atlas.h"
+#include "graphics/text.h"
 #include "program/errors.h"
 #include "utils/mat.h"
 
@@ -408,23 +411,133 @@ class Render
         }
     };
 
+    class Text_t
+    {
+        friend class Render;
+
+        using ref = Text_t &&;
+
+        Render *renderer = 0; // For `Text_t` we store renderer pointer rather than queue pointer.
+
+        struct Data
+        {
+            // The constructor sets those:
+            fvec2 pos;
+            Graphics::Text text;
+
+            ivec2 align = ivec2(0);
+
+            bool has_box_alignment = 0;
+            int align_box_x = 0;
+
+            fvec3 color = fvec3(1);
+            float alpha = 1;
+            float beta = 1;
+        };
+        Data data;
+
+        Text_t(Render *renderer, fvec2 pos, Graphics::Text text) : renderer(renderer)
+        {
+            data.pos = pos;
+            data.text = std::move(text);
+        }
+      public:
+        Text_t(Text_t &&other) noexcept : renderer(std::exchange(other.renderer, {})), data(std::move(other.data)) {}
+        Text_t &operator=(Text_t other)
+        {
+            std::swap(renderer, other.renderer);
+            std::swap(data, other.data);
+            return *this;
+        }
+
+        ref color(fvec3 c)
+        {
+            data.color = c;
+            return (ref)*this;
+        }
+        ref alpha(float x)
+        {
+            data.alpha = x;
+            return (ref)*this;
+        }
+        ref beta(float x)
+        {
+            data.beta = x;
+            return (ref)*this;
+        }
+        ref align(ivec2 a)
+        {
+            data.align = sign(a);
+            return (ref)*this;
+        }
+        ref align_x(int x)
+        {
+            data.align.x = sign(x);
+            return (ref)*this;
+        }
+        ref align_y(int y)
+        {
+            data.align.y = sign(y);
+            return (ref)*this;
+        }
+        ref align_box_x(int x)
+        {
+            data.has_box_alignment = 1;
+            data.align_box_x = sign(x);
+            return (ref)*this;
+        }
+
+        ref align(ivec2 align_text, int align_box)
+        {
+            data.align = sign(align_text);
+            data.has_box_alignment = 1;
+            data.align_box_x = align_box;
+            return (ref)*this;
+        }
+
+        ~Text_t();
+    };
+
     Quad_t fquad(fvec2 pos, fvec2 size)
     {
         return Quad_t(GetRenderQueuePtr(), pos, size);
     }
+
+    Quad_t iquad(fvec2 pos, fvec2 size) = delete;
     Quad_t iquad(ivec2 pos, ivec2 size)
     {
         return Quad_t(GetRenderQueuePtr(), pos, size);
     }
-    Quad_t iquad(fvec2 pos, fvec2 size) = delete;
+
+    Quad_t fquad(fvec2 pos, const TextureAtlas::Image &image)
+    {
+        return fquad(pos, image.size).tex(image.pos);
+    }
+
+    Quad_t iquad(fvec2 pos, const TextureAtlas::Image &image) = delete;
+    Quad_t iquad(ivec2 pos, const TextureAtlas::Image &image)
+    {
+        return fquad(pos, image);
+    }
 
     Triangle_t ftriangle(fvec2 a, fvec2 b, fvec2 c)
     {
         return Triangle_t(GetRenderQueuePtr(), a, b, c);
     }
+
+    Triangle_t itriangle(fvec2 a, fvec2 b, fvec2 c) = delete;
     Triangle_t itriangle(ivec2 a, ivec2 b, ivec2 c)
     {
         return Triangle_t(GetRenderQueuePtr(), a, b, c);
     }
-    Triangle_t itriangle(fvec2 a, fvec2 b, fvec2 c) = delete;
+
+    Text_t ftext(fvec2 pos, Graphics::Text text)
+    {
+        return Text_t(this, pos, std::move(text));
+    }
+    Text_t itext(fvec2 pos, Graphics::Text text) = delete;
+    Text_t itext(ivec2 pos, Graphics::Text text)
+    {
+        return Text_t(this, pos, std::move(text));
+    }
 };
