@@ -10,6 +10,7 @@
 #include "utils/adjust.h"
 #include "utils/mat.h"
 #include "utils/metronome.h"
+#include "utils/range_set.h"
 #include "utils/strings.h"
 
 #include "game/adaptive_viewport.h"
@@ -35,9 +36,43 @@ Random<> random;
 
 Render render(1000, shader_config);
 
+//{ Fonts
+Graphics::Font font_main;
+static Graphics::FontFile fontfile_main("assets/Monokat_6x12.ttf", 12);
+//}
+
 const TextureAtlas &Atlas()
 {
-    static TextureAtlas atlas(ivec2(2048), "assets/images", "assets/atlas.png", "assets/atlas.refl");
+    static const TextureAtlas &atlas = []() -> TextureAtlas &
+    {
+        static TextureAtlas atlas(ivec2(2048), "assets/images", "assets/atlas.png", "assets/atlas.refl");
+
+        namespace Ranges = Unicode::Ranges;
+        Unicode::CharSet symbols =
+        {
+            Unicode::Ranges::Basic_Latin,
+            Unicode::Ranges::Latin_1_Supplement,
+            Unicode::Ranges::Latin_Extended_A,
+            Unicode::Ranges::Latin_Extended_B,
+            Unicode::Ranges::Latin_Extended_C,
+            Unicode::Ranges::IPA_Extensions,
+            Unicode::Ranges::Spacing_Modifier_Letters,
+            Unicode::Ranges::Combining_Diacritical_Marks,
+            Unicode::Ranges::Greek_and_Coptic,
+            Unicode::Ranges::Currency_Symbols,
+            Unicode::Ranges::Cyrillic,
+            Unicode::Ranges::Cyrillic_Supplement,
+        };
+
+        auto storage = atlas.Get("font_storage.png");
+
+        Graphics::MakeFontAtlas(const_cast<Graphics::Image &>(atlas.GetImage()), storage.pos, storage.size,
+        {
+            {font_main, fontfile_main, symbols},
+        });
+
+        return atlas;
+    }();
     return atlas;
 }
 
@@ -49,10 +84,9 @@ Metronome metronome;
 
 DynStorage<States::State> game_state = nullptr;
 
-
 int main(int, char**)
 {
-    Atlas(); // Generate the atlas if it wasn't done before.
+    Atlas(); // Make sure the atlas is generated.
 
     Graphics::SetClearColor(fvec3(0));
 
