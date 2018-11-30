@@ -51,10 +51,14 @@ template <typename T> class RangeSet
     {
         Add(first, second);
     }
+    RangeSet(const std::pair<T, T> &range)
+    {
+        Add(range);
+    }
     RangeSet(std::initializer_list<std::pair<T,T>> ranges)
     {
         for (auto range : ranges)
-            Add(range.first, range.second);
+            Add(range);
     }
 
     void Add(const T &value)
@@ -84,6 +88,15 @@ template <typename T> class RangeSet
         // Check for intersections with next range.
         if (auto it_next = std::next(it_cur); it_next != map.end())
             TryMergingAdjacent(it_cur, it_next);
+    }
+    void Add(const std::pair<T,T> &range)
+    {
+        Add(range.first, range.second);
+    }
+    void Add(std::initializer_list<std::pair<T,T>> ranges)
+    {
+        for (auto range : ranges)
+            Add(range);
     }
 
     void Clear()
