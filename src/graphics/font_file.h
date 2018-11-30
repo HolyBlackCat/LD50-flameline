@@ -15,9 +15,9 @@
 #include "utils/mat.h"
 #include "utils/memory_file.h"
 #include "utils/packing.h"
-#include "utils/range_set.h"
 #include "utils/strings.h"
 #include "utils/unicode.h"
+#include "utils/unicode_ranges.h"
 
 
 namespace Graphics
@@ -271,15 +271,24 @@ namespace Graphics
 
     struct FontAtlasEntry
     {
+        enum Flags
+        {
+            none             = 0,
+            no_default_glyph = 0b1,
+            no_line_gap      = 0b10,
+        };
+        friend constexpr Flags operator|(Flags a, Flags b) {return Flags(int(a) | int(b));}
+        friend constexpr Flags operator&(Flags a, Flags b) {return Flags(int(a) & int(b));}
+
         Font *target = 0;
         const FontFile *source = 0;
-        const RangeSet<uint32_t> *glyphs = 0;
+        const Unicode::CharSet *glyphs = 0;
         FontFile::RenderMode render_mode = FontFile::normal;
-        bool include_default_glyph = 1;
+        Flags flags = none;
 
         FontAtlasEntry() {}
-        FontAtlasEntry(Font *target, const FontFile *source, const RangeSet<uint32_t> *glyphs, FontFile::RenderMode render_mode = FontFile::normal)
-            : target(target), source(source), glyphs(glyphs), render_mode(render_mode) {}
+        FontAtlasEntry(Font &target, const FontFile &source, const Unicode::CharSet &glyphs, FontFile::RenderMode render_mode = FontFile::normal, Flags flags = none)
+            : target(&target), source(&source), glyphs(&glyphs), render_mode(render_mode), flags(flags) {}
     };
 
     inline void MakeFontAtlas(Image &image, ivec2 pos, ivec2 size, const std::vector<FontAtlasEntry> &entries, bool add_gaps = 1) // Throws on failure.
@@ -301,7 +310,7 @@ namespace Graphics
             // Save font metrics.
             entry.target->SetAscent(entry.source->Ascent());
             entry.target->SetDescent(entry.source->Descent());
-            entry.target->SetLineSkip(entry.source->LineSkip());
+            entry.target->SetLineSkip(entry.flags & entry.no_line_gap ? entry.source->Height() : entry.source->LineSkip());
             entry.target->SetKerningFunc(entry.source->KerningFunc());
 
             auto AddGlyph = [&](uint32_t ch)
@@ -311,7 +320,7 @@ namespace Graphics
 
                 // Copy glyph to the font.
                 FontFile::GlyphData glyph_data = entry.source->GetGlyph(ch, entry.render_mode);
-                Font::Glyph &font_glyph = entry.target->Insert(ch);
+                Font::Glyph &font_glyph = (ch != Unicode::default_char ? entry.target->Insert(ch) : entry.target->DefaultGlyph());
                 font_glyph.size = glyph_data.image.Size();
                 font_glyph.offset = glyph_data.offset;
                 font_glyph.advance = glyph_data.advance;
@@ -324,7 +333,7 @@ namespace Graphics
             };
 
             // Save the default glyph.
-            if (entry.include_default_glyph)
+            if (!(entry.flags & entry.no_default_glyph))
                 AddGlyph(Unicode::default_char);
 
             // Save the rest of the glyphs.
