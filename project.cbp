@@ -153,6 +153,7 @@
 		<Unit filename="src/utils/strings.h" />
 		<Unit filename="src/utils/tasks.h" />
 		<Unit filename="src/utils/unicode.h" />
+		<Unit filename="src/utils/unicode_ranges.h" />
 		<Extensions>
 			<code_completion />
 			<envvars />
