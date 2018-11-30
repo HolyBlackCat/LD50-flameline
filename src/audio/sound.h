@@ -4,10 +4,6 @@
 #include <utility>
 #include <vector>
 
-#include <AL/al.h>
-#include <AL/alc.h>
-#include <vorbis/vorbisfile.h>
-
 #include "program/errors.h"
 #include "utils/byte_order.h"
 #include "utils/finally.h"
@@ -29,13 +25,7 @@ namespace Audio
         int sampling_rate = 8000;
 
       public:
-        Sound()
-        {
-            (void)OV_CALLBACKS_DEFAULT;
-            (void)OV_CALLBACKS_NOCLOSE;
-            (void)OV_CALLBACKS_STREAMONLY;
-            (void)OV_CALLBACKS_STREAMONLY_NOCLOSE;
-        }
+        Sound() {}
 
         Sound(std::size_t samples, Channels channel_count, Bits bits_per_sample, int sampling_rate, std::uint8_t *source = 0)
             : channel_count(channel_count), bits_per_sample(bits_per_sample), sampling_rate(sampling_rate)

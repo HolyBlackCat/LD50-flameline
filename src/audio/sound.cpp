@@ -1,6 +1,9 @@
 #include "sound.h"
 
+#include <exception>
 #include <limits>
+
+#include <vorbis/vorbisfile.h>
 
 namespace Audio
 {
@@ -107,6 +110,11 @@ namespace Audio
                 break;
               case ogg:
                 {
+                    (void)OV_CALLBACKS_DEFAULT;
+                    (void)OV_CALLBACKS_NOCLOSE;
+                    (void)OV_CALLBACKS_STREAMONLY;
+                    (void)OV_CALLBACKS_STREAMONLY_NOCLOSE;
+
                     // Construct callbacks for reading from memory buffer.
                     struct Descriptor
                     {
