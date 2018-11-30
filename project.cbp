@@ -86,6 +86,9 @@
 		<Unit filename="lib/implementation.cpp">
 			<Option compiler="gcc" use="1" buildCommand="$compiler $options $includes -c $file -o $object -g0 -O3" />
 		</Unit>
+		<Unit filename="src/audio/complete.h" />
+		<Unit filename="src/audio/sound.cpp" />
+		<Unit filename="src/audio/sound.h" />
 		<Unit filename="src/game/adaptive_viewport.cpp" />
 		<Unit filename="src/game/adaptive_viewport.h" />
 		<Unit filename="src/game/controls.h" />
