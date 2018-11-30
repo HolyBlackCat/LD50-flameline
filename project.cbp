@@ -135,6 +135,7 @@
 		<Unit filename="src/utils/adjust.h" />
 		<Unit filename="src/utils/archive.cpp" />
 		<Unit filename="src/utils/archive.h" />
+		<Unit filename="src/utils/byte_order.h" />
 		<Unit filename="src/utils/clock.h" />
 		<Unit filename="src/utils/common.h" />
 		<Unit filename="src/utils/config.h" />
