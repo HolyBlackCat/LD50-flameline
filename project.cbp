@@ -63,6 +63,11 @@
 			<Add library="SDL2.dll" />
 			<Add library="z" />
 			<Add library="freetype" />
+			<Add library="openal32" />
+			<Add library="vorbisfile" />
+			<Add library="vorbisenc" />
+			<Add library="vorbis" />
+			<Add library="ogg" />
 			<Add directory="lib" />
 		</Linker>
 		<Unit filename="gen/make_macro_h.cpp">
