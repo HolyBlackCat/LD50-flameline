@@ -148,6 +148,7 @@
 		<Unit filename="src/utils/json.h" />
 		<Unit filename="src/utils/macro.h" />
 		<Unit filename="src/utils/mat.h" />
+		<Unit filename="src/utils/memory_access.h" />
 		<Unit filename="src/utils/memory_file.h" />
 		<Unit filename="src/utils/meta.h" />
 		<Unit filename="src/utils/metronome.h" />
