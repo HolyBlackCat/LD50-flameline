@@ -1,5 +1,7 @@
 #pragma once
 
+#include <AL/alc.h>
+
 #include "audio/context.h"
 #include "program/errors.h"
 
