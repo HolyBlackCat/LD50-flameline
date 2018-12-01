@@ -93,6 +93,7 @@
 		<Unit filename="src/audio/parameters.h" />
 		<Unit filename="src/audio/sound.cpp" />
 		<Unit filename="src/audio/sound.h" />
+		<Unit filename="src/audio/source.h" />
 		<Unit filename="src/game/adaptive_viewport.cpp" />
 		<Unit filename="src/game/adaptive_viewport.h" />
 		<Unit filename="src/game/controls.h" />

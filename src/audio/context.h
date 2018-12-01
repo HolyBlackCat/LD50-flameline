@@ -6,6 +6,7 @@
 #include <AL/al.h>
 #include <AL/alc.h>
 
+#include "audio/source.h"
 #include "program/errors.h"
 #include "utils/finally.h"
 
@@ -99,6 +100,11 @@ namespace Audio
         ALCcontext *ContextHandle() const
         {
             return data.context;
+        }
+
+        void Tick()
+        {
+            Source::Cleanup();
         }
     };
 }

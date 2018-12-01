@@ -5,3 +5,4 @@
 #include "audio/errors.h"
 #include "audio/parameters.h"
 #include "audio/sound.h"
+#include "audio/source.h"
