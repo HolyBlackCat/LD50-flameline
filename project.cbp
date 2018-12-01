@@ -90,6 +90,7 @@
 		<Unit filename="src/audio/complete.h" />
 		<Unit filename="src/audio/context.h" />
 		<Unit filename="src/audio/errors.h" />
+		<Unit filename="src/audio/parameters.h" />
 		<Unit filename="src/audio/sound.cpp" />
 		<Unit filename="src/audio/sound.h" />
 		<Unit filename="src/game/adaptive_viewport.cpp" />
