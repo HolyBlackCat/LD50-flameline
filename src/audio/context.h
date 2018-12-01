@@ -30,6 +30,10 @@ namespace Audio
         {
             constexpr int required_major = 1, required_minor = 1;
 
+            // Stop if a context already exists.
+            if (instance)
+                Program::Error("Attempt to create multiple OpenAL contexts.");
+
             // Open device.
             data.device = alcOpenDevice(0);
             if (!data.device)
