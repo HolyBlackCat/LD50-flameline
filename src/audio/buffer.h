@@ -4,7 +4,6 @@
 #include <utility>
 
 #include <AL/al.h>
-#include <AL/alc.h>
 
 #include "audio/sound.h"
 #include "program/errors.h"
@@ -31,12 +30,18 @@ namespace Audio
             // Not needed because there is no code below this point:
             // FINALLY_ON_THROW( alDeleteBuffers(1, &value); )
         }
+        Buffer(const Sound &sound) : Buffer()
+        {
+            SetData(sound);
+        }
+
         Buffer(Buffer &&other) noexcept : data(std::exchange(other.data, {})) {}
         Buffer &operator=(Buffer other) noexcept
         {
             std::swap(data, other.data);
             return *this;
         }
+
         ~Buffer()
         {
             // Not sure if `alDeleteBuffers` is a no-op if you pass 0 to it. Better be safe.
@@ -49,9 +54,9 @@ namespace Audio
             return bool(data.handle);
         }
 
-        Buffer(const Sound &sound) : Buffer()
+        ALuint Handle() const
         {
-            SetData(sound);
+            return data.handle;
         }
 
         void SetData(Bits bits_per_sample, Channels channel_count, int sampling_rate, int byte_count, const std::uint8_t *source = 0)
