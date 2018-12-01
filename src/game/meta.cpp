@@ -28,6 +28,8 @@ static const Graphics::ShaderConfig shader_config;
 
 Interface::Window win("Gamma", screen_size*2, Interface::windowed, ADJUST(Interface::WindowSettings{}, min_size = screen_size));
 
+Audio::Context audio_context;
+
 static Graphics::DummyVertexArray dummy_vao;
 
 // The `<>` should only be needed in `extern` declarations (since omitting it apparently requires class template argument deduction, which doesn't work at all with `extern` declarations).
@@ -119,6 +121,9 @@ int main(int, char**)
                 return 0;
 
             game_state->Tick();
+
+            audio_context.Tick();
+            Audio::CheckErrors();
         }
 
         game_state->Render();

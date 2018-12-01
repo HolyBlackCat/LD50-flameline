@@ -1,5 +1,6 @@
 #pragma once
 
+#include "audio/context.h"
 #include "game/adaptive_viewport.h"
 #include "game/render.h"
 #include "game/state.h"
@@ -16,6 +17,8 @@
 extern const ivec2 screen_size;
 
 extern Interface::Window win;
+
+extern Audio::Context audio_context;
 
 extern Random<> random; // <> can't be omitted, see `meta.cpp` for details.
 
