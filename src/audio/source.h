@@ -7,6 +7,7 @@
 #include <AL/al.h>
 
 #include "audio/buffer.h"
+#include "utils/mat.h"
 
 namespace Audio
 {
