@@ -4,6 +4,7 @@
 #include <iostream>
 #include <vector>
 
+#include "audio/complete.h"
 #include "graphics/complete.h"
 #include "input/mouse.h"
 #include "interface/window.h"
