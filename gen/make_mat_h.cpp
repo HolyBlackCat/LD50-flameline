@@ -6,7 +6,7 @@
 #include <sstream>
 #include <type_traits>
 
-#define VERSION "3.1.1"
+#define VERSION "3.1.2"
 
 namespace data
 {
@@ -392,10 +392,10 @@ int main()
 
                         { // Boolean
                             // Convert to bool
-                            output("[[nodiscard]] explicit constexpr operator bool() const {return this->any(); static_assert(!std::is_same_v<type, bool>, \"Use .none(), .any(), or .all() for vectors/matrices of bool.\");}\n");
+                            output("[[nodiscard]] explicit constexpr operator bool() const {return any(); static_assert(!std::is_same_v<type, bool>, \"Use .none(), .any(), or .all() for vectors of bool.\");}\n");
 
                             // None of
-                            output("[[nodiscard]] constexpr bool none() const {return !this->any();}\n");
+                            output("[[nodiscard]] constexpr bool none() const {return !any();}\n");
 
                             // Any of
                             output("[[nodiscard]] constexpr bool any() const {return ",Fields(" || "),";}\n");
@@ -505,14 +505,14 @@ int main()
                             output("[[nodiscard]] constexpr auto len() const {return std::sqrt(len_sqr());}\n");
 
                             // Normalize
-                            output("[[nodiscard]] constexpr auto norm() const -> vec",w,"<decltype(type{}/len())> {if (auto l = len(); l != 0) return *this / l; else return vec(0);}\n");
+                            output("[[nodiscard]] constexpr auto norm() const -> vec",w,"<decltype(type{}/len())> {if (auto l = len()) return *this / l; else return vec(0);}\n");
                         }
 
                         { // Angles and directions
                             if (w == 2)
                             {
                                 // Construct from angle
-                                output("template <typename TT> [[nodiscard]] static constexpr vec dir(TT angle, type len = 1) {return vec(std::cos(angle) * len, std::sin(angle) * len); static_assert(is_floating_point, \"The vector must be floating-point.\");}\n");
+                                output("[[nodiscard]] static constexpr vec dir(type angle, type len = 1) {return vec(std::cos(angle) * len, std::sin(angle) * len); static_assert(is_floating_point, \"The vector must be floating-point.\");}\n");
 
                                 // Get angle
                                 output("template <typename TT = double> [[nodiscard]] constexpr T angle() const {return std::atan2(TT(y), TT(x));}\n"); // Note that atan2 is well-defined even when applied to (0,0).
