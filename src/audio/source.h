@@ -71,7 +71,7 @@ namespace Audio
         }
 
         Source(Source &&other) noexcept : data(std::exchange(other.data, {})) {}
-        Source &operator=(Source &&other) noexcept
+        Source &operator=(Source other) noexcept
         {
             std::swap(data, other.data);
             return *this;
