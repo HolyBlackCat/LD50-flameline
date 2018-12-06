@@ -193,6 +193,12 @@ namespace Refl
         // `cur_indent` is the base intentation level, measured in spaces. It should be non-negative. If `indent < 0`, it has no effect. It's not applied to the first line.
         std::string to_string(int indent_step = -1, int cur_indent = 0) const
         {
+            // Clang warns about useless explicit `this` captures in the following lambdas. Yet GCC trips with "internal compiler error" over those lambdas if the captures aren't present.
+            // Thus we disable the Clang warning. Since GCC doesn't have such warning flag, with need to disable GCC warning about unknown warning category as well.
+            #pragma GCC diagnostic push
+            #pragma GCC diagnostic ignored "-Wpragmas"
+            #pragma GCC diagnostic ignored "-Wunused-lambda-capture"
+
             if constexpr (is_primitive)
             {
                 return low::to_string(*ptr);
@@ -298,10 +304,18 @@ namespace Refl
 
                 return ret;
             }
+
+            #pragma GCC diagnostic pop
         }
 
         void from_string_low(const char *&str, FromStringMode mode)
         {
+            // Clang warns about useless explicit `this` captures in the following lambdas. Yet GCC trips with "internal compiler error" over those lambdas if the captures aren't present.
+            // Thus we disable the Clang warning. Since GCC doesn't have such warning flag, with need to disable GCC warning about unknown warning category as well.
+            #pragma GCC diagnostic push
+            #pragma GCC diagnostic ignored "-Wpragmas"
+            #pragma GCC diagnostic ignored "-Wunused-lambda-capture"
+
             static_assert(is_mutable);
 
             impl::skip_whitespace(str);
@@ -566,6 +580,8 @@ namespace Refl
                     index++;
                 }
             }
+
+            #pragma GCC diagnostic pop
         }
         void from_string(const std::string &str, FromStringMode mode = full)
         {
