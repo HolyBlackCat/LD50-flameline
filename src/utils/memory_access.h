@@ -27,14 +27,14 @@ namespace Memory
     template <typename T> void Write(uint8_t *ptr, const std::enable_if_t<1, T> &object, ByteOrder::Order order = ByteOrder::native)
     {
         std::memcpy(ptr, &object, sizeof(T));
-        ByteOrder::ConvertBytes(ptr, ptr + sizeof(T), order);
+        ByteOrder::ConvertBytes(ptr, sizeof(T), order);
     }
     template <typename T> void WriteLittle(const uint8_t *ptr, const std::enable_if_t<1, T> &object)
     {
-        Write<T>(ptr, ByteOrder::little);
+        Write<T>(ptr, object, ByteOrder::little);
     }
     template <typename T> void WriteBig(const uint8_t *ptr, const std::enable_if_t<1, T> &object)
     {
-        Write<T>(ptr, ByteOrder::big);
+        Write<T>(ptr, object, ByteOrder::big);
     }
 }
