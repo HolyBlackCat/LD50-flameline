@@ -1,5 +1,6 @@
 #include "adaptive_viewport.h"
 
+#include "graphics/clear.h"
 #include "graphics/framebuffer.h"
 #include "graphics/shader.h"
 #include "graphics/texture.h"
@@ -108,6 +109,7 @@ void AdaptiveViewport::FinishFrame(const Graphics::FrameBuffer *fbuf)
     else
         Graphics::FrameBuffer::BindDefault();
     Graphics::Viewport(data->details.ViewportPos(), data->details.ViewportSize());
+    Graphics::Clear();
     data->tex_unit.Attach(data->fbuf_tex_intermediate);
     data->vertex_buf.Draw(Graphics::triangles);
 }
