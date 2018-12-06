@@ -4,21 +4,24 @@
 #include <string>
 #include <utility>
 
+#include "interface/messagebox.h"
 #include "program/errors.h"
 #include "reflection/complete.h"
 #include "utils/memory_file.h"
 
 template <typename T> class Config
 {
-    T object;
+    T object = {};
+
+    std::string file_name;
 
   public:
-    Config(decltype(nullptr)) : object() {}
+    Config(decltype(nullptr)) {}
 
     explicit Config(const T &object) : object(object) {}
     explicit Config(T &&object) : object(std::move(object)) {}
 
-    Config(const std::string &file_name) : object()
+    Config(const std::string &file_name) : file_name(file_name)
     {
         MemoryFile file;
 
@@ -35,7 +38,8 @@ template <typename T> class Config
             try
             {
                 // Try parsing normally.
-                Refl::Interface(object).from_string(file.construct_string().c_str());
+                auto refl = Refl::Interface(object);
+                refl.from_string(file.construct_string().c_str());
 
                 // Success, we're done.
                 return;
@@ -48,7 +52,8 @@ template <typename T> class Config
                 bool partial_parsing_ok = 0;
                 try
                 {
-                    Refl::Interface(object).from_string(file.construct_string().c_str(), Refl::partial);
+                    auto refl = Refl::Interface(object);
+                    refl.from_string(file.construct_string().c_str(), Refl::partial);
                     partial_parsing_ok = 1;
                 }
                 catch (...) {}
@@ -66,7 +71,8 @@ template <typename T> class Config
         // We can't open the file, unable to parse the file, or file is incomplete.
         // Creating a new file.
 
-        std::string obj_string = Refl::Interface(object).to_string(4);
+        auto refl = Refl::Interface(object);
+        std::string obj_string = refl.to_string(4);
         try
         {
             MemoryFile::Save(file_name, (uint8_t *)obj_string.data(), (uint8_t *)obj_string.data() + obj_string.size());
@@ -76,4 +82,16 @@ template <typename T> class Config
 
     const T &operator*() const {return object;}
     const T *operator->() const {return &object;}
+
+    void Reload()
+    {
+        try
+        {
+            *this = Config(file_name);
+        }
+        catch (std::exception &e)
+        {
+            Interface::MessageBox(Interface::MessageBoxType::warning, "Unable to load config", e.what());
+        }
+    }
 };
