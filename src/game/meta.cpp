@@ -27,7 +27,7 @@
 extern const ivec2 screen_size = ivec2(480,270);
 static const Graphics::ShaderConfig shader_config;
 
-Interface::Window win("Gamma", screen_size*2, Interface::windowed, ADJUST(Interface::WindowSettings{}, min_size = screen_size));
+Interface::Window win("Gamma", screen_size*2, Interface::windowed, ADJUST_G(Interface::WindowSettings{}, min_size = screen_size));
 
 Audio::Context audio_context;
 
