@@ -80,6 +80,11 @@ class Json
         // Passed object has to remain alive.
         View(const Json &json, std::string name = "") : ptr(&json), path(std::move(name)) {}
 
+        const Json &Target() const
+        {
+            return *ptr;
+        }
+
         type_t Type() const
         {
             return type_t(ptr->variant.index());
