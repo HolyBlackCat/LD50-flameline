@@ -4,14 +4,14 @@
 	<Project>
 		<Option title="imp-re" />
 		<Option pch_mode="2" />
-		<Option compiler="gcc" />
+		<Option compiler="clang" />
 		<Build>
 			<Target title="Debug">
 				<Option output="bin/imp-re" prefix_auto="1" extension_auto="1" />
 				<Option working_dir="bin/" />
 				<Option object_output="obj/" />
 				<Option type="1" />
-				<Option compiler="gcc" />
+				<Option compiler="clang" />
 				<Option use_console_runner="0" />
 				<Compiler>
 					<Add option="-D_GLIBCXX_DEBUG" />
@@ -23,7 +23,7 @@
 				<Option working_dir="bin/" />
 				<Option object_output="obj/" />
 				<Option type="0" />
-				<Option compiler="gcc" />
+				<Option compiler="clang" />
 				<Compiler>
 					<Add option="-flto" />
 					<Add option="-O3" />
@@ -39,7 +39,7 @@
 				<Option working_dir="bin/" />
 				<Option object_output="obj/" />
 				<Option type="1" />
-				<Option compiler="gcc" />
+				<Option compiler="clang" />
 				<Compiler>
 					<Add option="-D_GLIBCXX_DEBUG" />
 					<Add option="-g" />
