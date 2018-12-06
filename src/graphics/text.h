@@ -57,11 +57,9 @@ namespace Graphics
                 Stats::Line &line_stats = ret.lines.emplace_back();
 
                 line_stats.width = 0;
-
-                constexpr int min_value = std::numeric_limits<int>::min();
-                line_stats.ascent = min_value;
-                line_stats.descent = min_value;
-                line_stats.gap = min_value;
+                line_stats.ascent = 0;
+                line_stats.descent = 0;
+                line_stats.gap = 0;
 
                 for (const Symbol &symbol : line.symbols)
                 {
