@@ -69,7 +69,7 @@ namespace Hash
         }
         else
         {
-            static_assert(Meta::always<false, T>, "This type can't be hashed.");
+            static_assert(Meta::value<false, T>, "This type can't be hashed.");
             return 0;
         }
     }
