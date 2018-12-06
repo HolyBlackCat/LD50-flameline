@@ -94,6 +94,7 @@ void Render::SetTextureUnit(const Graphics::TexUnit &unit)
 
 void Render::SetTextureSize(ivec2 size)
 {
+    Finish();
     data->uni.tex_size = size;
 }
 
