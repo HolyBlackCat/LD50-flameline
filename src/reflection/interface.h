@@ -283,7 +283,7 @@ namespace Refl
                         if (should_indent)
                             ret += std::string(next_indent, ' ');
 
-                        ret += Refl::Interface(*it).to_string(indent_step, next_indent); // We have to use `Refl::Interface` instead of `Interface` for template argument deduction to work.
+                        ret += Interface<element_type>(*it).to_string(indent_step, next_indent); // We have to use `Refl::Interface` instead of `Interface` for template argument deduction to work.
                     });
 
                     if (should_indent)
@@ -322,19 +322,17 @@ namespace Refl
                 if constexpr (!is_structure_tuple)
                 {
                     // Make functions to parse fields.
-                    using this_func_t = void(Interface &, const char *&, FromStringMode mode);
-
-                    constexpr std::array<this_func_t *, field_count()> field_parsers = []<int ...I>(std::integer_sequence<int, I...>)
-                    {
-                        return std::array<this_func_t *, field_count()>
+                    constexpr auto field_parsers = Meta::cexpr_generate_array<field_count()>(
+                        [](auto index)
                         {
-                            [](Interface &interface, const char *&str, FromStringMode mode)
+                            constexpr int i = index.value;
+
+                            return +[](Interface &interface, const char *&str, FromStringMode mode)
                             {
-                                interface.field<I>().from_string_low(str, mode);
-                            }...
-                        };
-                    }
-                    (std::make_integer_sequence<int, field_count()>{});
+                                interface.field<i>().from_string_low(str, mode);
+                            };
+                        }
+                    );
 
                     // Flags for existing fields.
                     bool existing_fields[field_count()]{};
@@ -546,7 +544,7 @@ namespace Refl
                     {
                         // Try parsing the element.
                         mutable_element_type tmp{};
-                        Refl::Interface(tmp).from_string_low(str, mode);
+                        Interface<mutable_element_type>(tmp).from_string_low(str, mode);
                         if (!insert(std::move(tmp)))
                             Program::Error("Invalid element.");
                     }
@@ -618,7 +616,7 @@ namespace Refl
         template <int I> constexpr auto field() const
         {
             static_assert(is_structure);
-            return Refl::Interface(field_value<I>()); // We have to use `Refl::Interface` instead of `Interface` for template argument deduction to work.
+            return Interface<decltype(field_value<I>())>(field_value<I>()); // We have to use `Refl::Interface` instead of `Interface` for template argument deduction to work.
         }
         static std::string field_name(int index)
         {
@@ -642,11 +640,13 @@ namespace Refl
             }
             else
             {
-                static const std::map<std::string, int> map = []<int ...I>(std::integer_sequence<int, I...>)
-                {
-                    return std::map<std::string, int>{{field_name(I), I}...};
-                }
-                (std::make_integer_sequence<int, field_count()>{});
+                static const auto map = Meta::cexpr_generate<std::map<std::string, int>, field_count()>(
+                    [](auto index)
+                    {
+                        constexpr int i = index.value;
+                        return std::pair{field_name(i), i};
+                    }
+                );
 
                 if (auto it = map.find(name); it != map.end())
                     return it->second;

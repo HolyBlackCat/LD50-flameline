@@ -20,7 +20,7 @@ namespace Refl::Custom
     template <typename T> struct Container
     <
         T,
-        std::void_t
+        Meta::void_type
         <
             std::enable_if_t<!impl::assume_not_std_container<T>>,
             typename T::value_type,

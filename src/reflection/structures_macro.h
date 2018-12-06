@@ -88,13 +88,13 @@ namespace Refl::Custom
         struct Macro // This is a class because we need to be able to friend it from within the macros.
         {
             template <typename T, typename = void> struct impl {};
-            template <typename T> struct impl<T, std::void_t<typename T::_refl_interface>> {using interface = typename T::_refl_interface;};
+            template <typename T> struct impl<T, Meta::void_type<typename T::_refl_interface>> {using interface = typename T::_refl_interface;};
         };
 
         template <typename T> using structure_tuple_tag = typename T::_refl_structure_tuple_tag;
     }
 
-    template <typename T> struct Structure<T, std::void_t<typename impl::Macro::impl<T>::interface>> : impl::Macro::impl<T>::interface
+    template <typename T> struct Structure<T, Meta::void_type<typename impl::Macro::impl<T>::interface>> : impl::Macro::impl<T>::interface
     {
         static constexpr bool is_tuple = Meta::is_detected<impl::structure_tuple_tag, T>;
     };

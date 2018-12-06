@@ -9,7 +9,7 @@
 namespace Refl::Custom
 {
     // This specialization matches `std::tuple`, `std::array`, `std::pair`, and whatever else works with `std::get` and `std::tuple_size`.
-    template <typename T> struct Structure<T, std::void_t<decltype(std::tuple_size<T>::value)>> // Note that we can't use `std::tuple_size_v` here, because it's not SFINAE-friendly.
+    template <typename T> struct Structure<T, Meta::void_type<decltype(std::tuple_size<T>::value)>> // Note that we can't use `std::tuple_size_v` here, because it's not SFINAE-friendly (at least on GCC).
     {
         // Field indices are guaranteed to be in valid range.
         inline static const std::string name = "tuple?";
