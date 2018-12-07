@@ -25,12 +25,10 @@
 				<Option type="0" />
 				<Option compiler="clang" />
 				<Compiler>
-					<Add option="-flto" />
 					<Add option="-O3" />
 					<Add option="-DNDEBUG" />
 				</Compiler>
 				<Linker>
-					<Add option="-flto" />
 					<Add option="-s" />
 				</Linker>
 			</Target>
