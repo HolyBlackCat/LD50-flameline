@@ -21,7 +21,7 @@ namespace Graphics::Blending
         constant_a           = GL_CONSTANT_ALPHA,
         one_minus_constant_a = GL_ONE_MINUS_CONSTANT_ALPHA,
         src_a_saturate       = GL_SRC_ALPHA_SATURATE,
-        OnPC
+        OnPlatform(PC)
         (
             src1             = GL_SRC1_COLOR,
             one_minus_src1   = GL_ONE_MINUS_SRC1_COLOR,
@@ -34,7 +34,7 @@ namespace Graphics::Blending
         eq_add              = GL_FUNC_ADD,
         eq_subtract         = GL_FUNC_SUBTRACT,
         eq_reverse_subtract = GL_FUNC_REVERSE_SUBTRACT,
-        OnPC
+        OnPlatform(PC)
         (
             eq_min          = GL_MIN,
             eq_max          = GL_MAX,

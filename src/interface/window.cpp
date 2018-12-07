@@ -8,7 +8,7 @@
 
 
 // Export some variables to advise video drivers to use the best available video card for the application.
-OnPC
+OnPlatform(WINDOWS)
 (
     extern "C"
     {
@@ -95,10 +95,18 @@ namespace Interface
 
     Window::Window(std::string name, ivec2 size, FullscreenMode mode, const WindowSettings &settings)
     {
-        constexpr const char *extra_error_details = OnPC("If you have several video cards, change your video driver settings\n"
-                                                         "to make it use the best available video card for this application.\n"
-                                                         "If it didn't help, try updating your video card driver.\n"
-                                                         "If it didn't help as well, your video card is probably too old to run this application.");
+        constexpr const char *extra_error_details =
+            OnPlatform(PC)
+            (
+                "If you have several video cards, change your video driver settings\n"
+                "to make it use the best available video card for this application.\n"
+                "If it doesn't help, try updating your video card driver.\n"
+                "If it doesn't help as well, your video card is probably too old to run this application.";
+            )
+            OnPlatform(MOBILE)
+            (
+                "Your device doesn't support this application.";
+            )
 
         // Stop if a window already exists
         if (instance)
@@ -183,7 +191,7 @@ namespace Interface
         // Create the window
         data.handle = SDL_CreateWindow(name.c_str(), pos.x, pos.y, size.x, size.y, window_flags);
         if (!data.handle)
-            Program::Error("Unable to create a window with following properties:\n", settings.Summary(), "\n", extra_error_details);
+            Program::Error("Unable to create a window with following properties:\n", settings.Summary(), extra_error_details);
         FINALLY_ON_THROW( SDL_DestroyWindow(data.handle); )
 
         // Get an appropriate display mode for fullscreen.
@@ -205,7 +213,7 @@ namespace Interface
         // Create the context
         data.context = SDL_GL_CreateContext(data.handle);
         if (!data.context)
-            Program::Error("Unable to create an OpenGL context with following properties:\n", settings.Summary(), "\n", extra_error_details);
+            Program::Error("Unable to create an OpenGL context with following properties:\n", settings.Summary(), extra_error_details);
         FINALLY_ON_THROW( SDL_GL_DeleteContext(data.context); )
 
         // Set the minimal size

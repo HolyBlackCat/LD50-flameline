@@ -25,7 +25,7 @@ namespace Graphics
         clamp  = GL_CLAMP_TO_EDGE,
         mirror = GL_MIRRORED_REPEAT,
         repeat = GL_REPEAT,
-        OnPC(
+        OnPlatform(PC)(
         fill   = GL_CLAMP_TO_BORDER,
         )
     };
@@ -217,7 +217,7 @@ namespace Graphics
 
         TexUnit &&SetData(ivec2 size, const uint8_t *pixels = 0)
         {
-            SetData(OnPC(GL_RGBA8) OnMobile(GL_RGBA), GL_RGBA, GL_UNSIGNED_BYTE, size, pixels);
+            SetData(OnPlatform(PC)(GL_RGBA8) OnPlatform(MOBILE)(GL_RGBA), GL_RGBA, GL_UNSIGNED_BYTE, size, pixels);
             return std::move(*this);
         }
         TexUnit &&SetData(GLenum internal_format, GLenum format, GLenum type, ivec2 size, const uint8_t *pixels = 0)

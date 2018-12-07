@@ -9,13 +9,7 @@ namespace ByteOrder
 {
     enum Order {little, big};
 
-    inline constexpr Order native =
-    #ifdef PLATFORM_LITTLE_ENDIAN
-        little;
-    #endif
-    #ifdef PLATFORM_BIG_ENDIAN
-        big;
-    #endif
+    inline constexpr Order native = OnPlatform(LITTLE_ENDIAN)( little ) OnPlatform(BIG_ENDIAN)( big );
 
     inline void SwapBytes(std::uint8_t *data, std::size_t len)
     {

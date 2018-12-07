@@ -452,7 +452,7 @@ namespace Graphics
             else if constexpr (std::is_same_v<effective_type, ivec2       >) glUniform2i (location, object.x, object.y);
             else if constexpr (std::is_same_v<effective_type, ivec3       >) glUniform3i (location, object.x, object.y, object.z);
             else if constexpr (std::is_same_v<effective_type, ivec4       >) glUniform4i (location, object.x, object.y, object.z, object.w);
-            OnPC(
+            OnPlatform(PC)(
             else if constexpr (std::is_same_v<effective_type, unsigned int>) glUniform1ui(location, object);
             else if constexpr (std::is_same_v<effective_type, uvec2       >) glUniform2ui(location, object.x, object.y);
             else if constexpr (std::is_same_v<effective_type, uvec3       >) glUniform3ui(location, object.x, object.y, object.z);
@@ -486,7 +486,7 @@ namespace Graphics
             else if constexpr (std::is_same_v<effective_type, ivec2       >) glUniform2iv (l, count, reinterpret_cast<const base_type *>(ptr));
             else if constexpr (std::is_same_v<effective_type, ivec3       >) glUniform3iv (l, count, reinterpret_cast<const base_type *>(ptr));
             else if constexpr (std::is_same_v<effective_type, ivec4       >) glUniform4iv (l, count, reinterpret_cast<const base_type *>(ptr));
-            OnPC(
+            OnPlatform(PC)(
             else if constexpr (std::is_same_v<effective_type, unsigned int>) glUniform1uiv(l, count, reinterpret_cast<const base_type *>(ptr));
             else if constexpr (std::is_same_v<effective_type, uvec2       >) glUniform2uiv(l, count, reinterpret_cast<const base_type *>(ptr));
             else if constexpr (std::is_same_v<effective_type, uvec3       >) glUniform3uiv(l, count, reinterpret_cast<const base_type *>(ptr));
@@ -495,7 +495,7 @@ namespace Graphics
             else if constexpr (std::is_same_v<effective_type, fmat2       >) glUniformMatrix2fv(l, count, 0, reinterpret_cast<const base_type *>(ptr));
             else if constexpr (std::is_same_v<effective_type, fmat3       >) glUniformMatrix3fv(l, count, 0, reinterpret_cast<const base_type *>(ptr));
             else if constexpr (std::is_same_v<effective_type, fmat4       >) glUniformMatrix4fv(l, count, 0, reinterpret_cast<const base_type *>(ptr));
-            OnPC(
+            OnPlatform(PC)(
             else if constexpr (std::is_same_v<effective_type, fmat3x2     >) glUniformMatrix3x2fv(l, count, 0, reinterpret_cast<const base_type *>(ptr));
             else if constexpr (std::is_same_v<effective_type, fmat4x2     >) glUniformMatrix4x2fv(l, count, 0, reinterpret_cast<const base_type *>(ptr));
             else if constexpr (std::is_same_v<effective_type, fmat2x3     >) glUniformMatrix2x3fv(l, count, 0, reinterpret_cast<const base_type *>(ptr));

@@ -128,12 +128,13 @@ namespace Graphics
             FINALLY( BindHandle(old_binding); )
 
             glFramebufferTexture2D(GL_DRAW_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, att.type, att.handle, 0);
-            OnPC( glDrawBuffer(GL_COLOR_ATTACHMENT0); )
+            OnPlatform(PC)( glDrawBuffer(GL_COLOR_ATTACHMENT0); )
 
             return std::move(*this);
         }
 
-        OnPC( FrameBuffer &&Attach(const std::vector<Attachment> &att) // Old non-depth attachments are discarded.
+        OnPlatform(PC)(
+        FrameBuffer &&Attach(const std::vector<Attachment> &att) // Old non-depth attachments are discarded.
         {
             if (!*this)
                 return std::move(*this);
@@ -151,7 +152,8 @@ namespace Graphics
             glDrawBuffers(draw_buffers.size(), draw_buffers.data());
 
             return std::move(*this);
-        } )
+        }
+        )
 
         FrameBuffer &&AttachDepth(Attachment att) // Binds the framebuffer.
         {
