@@ -31,4 +31,4 @@ extern AdaptiveViewport viewport;
 
 extern Metronome metronome;
 
-extern DynStorage<States::State> game_state;
+extern Dyn<States::State> game_state;
