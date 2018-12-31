@@ -1,6 +1,6 @@
 #pragma once
 
-#include <new>
+#include <cstdlib>
 #include <type_traits>
 #include <utility>
 
@@ -138,6 +138,7 @@ namespace Dynamic
     {
         static_assert(!std::is_const_v<T> && !std::is_volatile_v<T>, "The template parameter has to have no cv-qualifiers.");
         static_assert(std::is_class_v<T>, "The template parameter has to be a structure or a class.");
+        static_assert(alignof(T) <= __STDCPP_DEFAULT_NEW_ALIGNMENT__, "Overaligned types are not supported.");
 
       public:
         static constexpr bool is_copyable = std::is_copy_constructible_v<T>;
@@ -203,7 +204,7 @@ namespace Dynamic
                 const T *base() const {return data.base;}
             };
 
-            struct Funcs : UserFuncs
+            struct Table : UserFuncs
             {
                 Unique (*_copy)(Param<const T>);
 
@@ -211,22 +212,26 @@ namespace Dynamic
                 {
                     UserFuncs::template _make<D>();
 
-                    _copy = [](Param<const T> param) -> Unique
+                    if constexpr (is_copyable)
                     {
-                        if (is_copyable)
+                        _copy = [](Param<const T> param) -> Unique
+                        {
                             return Unique::template make<D>(param.template get<D>());
-                        else
-                            return {};
-                    };
+                        };
+                    }
+                    else
+                    {
+                        _copy = 0;
+                    }
                 }
             };
 
-            template <typename D> inline static constexpr Funcs table_storage = []{Funcs ret{}; ret.template _make<D>(); return ret;}();
+            template <typename D> inline static constexpr Table table_storage = []{Table ret{}; ret.template _make<D>(); return ret;}();
 
             struct Data
             {
                 Unique pointers;
-                const Funcs *table = 0;
+                const Table *table = 0;
             };
             Data data;
 
@@ -250,9 +255,10 @@ namespace Dynamic
             {
                 static_assert(!std::is_const_v<D> && !std::is_volatile_v<D>, "The template parameter has to have no cv-qualifiers.");
                 static_assert(std::is_base_of_v<T, D>, "The template parameter has to be equal to T or to be derived from T.");
-                static_assert(is_copyable <= std::is_copy_constructible_v<D>, "The base class is copy constructible, so the derived class has to be copy constructible too.");
+                static_assert(is_copyable <= std::is_copy_constructible_v<D>, "The base class is copy constructible, so the derived class has to be copy constructible as well.");
                 static_assert(std::is_same_v<T, D> || std::has_virtual_destructor_v<T> || std::is_trivially_destructible_v<D>,
                               "If you want to store derived classes, the base class has to have a virtual destructor. Alternatively, those derived classes have to have trivial destructors.");
+                static_assert(alignof(D) <= __STDCPP_DEFAULT_NEW_ALIGNMENT__, "Overaligned types are not supported.");
 
                 Low ret;
                 ret.data.pointers = Unique::template make<D>(std::forward<P>(params)...);
