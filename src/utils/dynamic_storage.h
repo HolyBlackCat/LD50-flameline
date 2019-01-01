@@ -168,7 +168,7 @@ namespace Dynamic
                 {
                     Unique ret;
 
-                    ret.data.bytes = new(std::align_val_t(alignof(D))) unsigned char[sizeof(D)];
+                    ret.data.bytes = new unsigned char[sizeof(D)];
                     FINALLY_ON_THROW( delete[] ret.data.bytes; )
 
                     D *derived = new(ret.data.bytes) D(std::forward<P>(params)...);
