@@ -7,6 +7,8 @@
 namespace Meta
 {
     template <typename T> struct tag {using type = T;};
+    template <typename...> struct type_list {};
+    template <auto...> struct value_list {};
 
 
     namespace impl
@@ -21,6 +23,7 @@ namespace Meta
 
     template <typename T, typename A, typename ...B> using type = typename impl::dependent_type<T, A, B...>::type;
     template <typename A, typename ...B> using void_type = type<void, A, B...>;
+
 
     namespace impl
     {
