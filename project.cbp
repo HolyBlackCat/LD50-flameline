@@ -158,6 +158,7 @@
 		<Unit filename="src/utils/memory_file.h" />
 		<Unit filename="src/utils/meta.h" />
 		<Unit filename="src/utils/metronome.h" />
+		<Unit filename="src/utils/multiarray.h" />
 		<Unit filename="src/utils/packing.cpp" />
 		<Unit filename="src/utils/packing.h" />
 		<Unit filename="src/utils/random.h" />
