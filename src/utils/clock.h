@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cmath>
 #include <cstddef>
 
 #include <SDL2/SDL_timer.h>
@@ -24,6 +25,11 @@ namespace Clock
     inline double TicksToSeconds(uint64_t ticks)
     {
         return ticks / double(TicksPerSecond());
+    }
+
+    inline void WaitSeconds(double secs) // Waits the specified amount of seconds, rounded down to milliseconds.
+    {
+        SDL_Delay(std::lround(secs * 1000));
     }
 
     class DeltaTimer

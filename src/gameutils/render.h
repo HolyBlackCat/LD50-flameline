@@ -3,7 +3,7 @@
 #include <memory>
 #include <utility>
 
-#include "game/texture_atlas.h"
+#include "gameutils/texture_atlas.h"
 #include "graphics/text.h"
 #include "program/errors.h"
 #include "utils/mat.h"

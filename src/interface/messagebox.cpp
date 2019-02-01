@@ -28,6 +28,6 @@ namespace Interface
             break;
         }
 
-        SDL_ShowSimpleMessageBox(type_value, title.c_str(), message.c_str(), Window::HandleOrNull());
+        SDL_ShowSimpleMessageBox(type_value, title.c_str(), message.c_str(), Window::GetHandleOrNull());
     }
 }

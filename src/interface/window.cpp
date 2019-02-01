@@ -280,7 +280,7 @@ namespace Interface
         instance = this;
     }
 
-    SDL_Window *Window::HandleOrNull() // Unlike `Handle()`, this doesn't throw if no window.
+    SDL_Window *Window::GetHandleOrNull() // Unlike `Handle()`, this doesn't throw if no window.
     {
         if (!instance)
             return 0;
