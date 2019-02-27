@@ -1,0 +1,128 @@
+# This file (`Makefile.details`) is an universal makefile for C/C++ executables.
+#
+# It requires a GCC-like compiler with support for `-MMD -MP` flags.
+# You need to have a separate file (probably named `Makefile`) to set some high-level parameters.
+# An example of such file is provided below:
+#
+#    # Source directories
+#    SOURCE_DIRS = src lib   <- All files from these directories will be compiled.
+#    
+#    # Object directory
+#    OBJECT_DIR = obj   <- All object files will be placed into this directory.
+#    
+#    # Resulting binary
+#    OUTPUT_FILE = bin/imp-re   <- The resulting executable. An extension is appended to it automatically.
+#    
+#    # Flags
+#    CXXFLAGS = -Wall -Wextra -pedantic-errors -std=c++2a
+#    override CXXFLAGS += -Isrc
+#    override LDFLAGS += -Llib -lwhatever
+#    
+#    # Targets
+#    .PHONY: debug   <- Those are the targets. The first one is used by default. Additionally a `build` target is made, without any additional flags.
+#    debug: override CXXFLAGS += -g -D_GLIBCXX_DEBUG
+#    debug: build
+#    
+#    .PHONY: release   <- Yet another target.
+#    release: override CXXFLAGS += -DNDEBUG -O3
+#    release: override LDFLAGS += -O3 -s
+#    release: build
+#
+#    # File-specific flags   <- Note that target names start with `OBJECT_DIR`, followed by one of `SOURCE_DIRS`.
+#    obj/lib/glfl.cpp.o: override CXXFLAGS += -O3
+#    obj/lib/implementation.cpp.o: override CXXFLAGS += -O3
+#
+#    include Makefile.details
+
+
+# --- FUNCTIONS ---
+
+# Recursive wildcard function.
+# Source: https://stackoverflow.com/a/18258352/2752075
+# Recursively searches a directory for all files matching a pattern.
+# The first parameter is a directory, the second is a pattern.
+# THE PARAMETER MUST END WITH /
+# Example usage: SOURCES = $(call rwildcard, src/, *.cpp)
+rwildcard=$(foreach d,$(wildcard $1*),$(call rwildcard,$d/,$2)$(filter $(subst *,%,$2),$d))
+
+# OS-specific functions and other stuff
+# `-` at the beginning makes `make` ignore errors when executing shell commands.
+# `|| cd .` forces error code to be 0, silencing errors. Unlike `-` it prints no warnings.
+# Example usage: $(call rmfile, bin/out.exe)
+ifeq ($(shell echo "foo"),"foo")
+HOST_OS = windows
+else
+HOST_OS = linux
+endif
+
+ifeq ($(HOST_OS), windows)
+override SILENCE = >NUL 2>NUL || (exit 0)
+override rmfile = @del /F /Q $(subst /,\,$1) $(SILENCE)
+override rmdir = @rd /S /Q $(subst /,\,$1) $(SILENCE)
+override mkdir = @mkdir >NUL 2>NUL $(subst /,\,$1) $(SILENCE)
+else
+override SILENCE = >/dev/null 2>/dev/null || true
+override rmfile = @rm -f $1 $(SILENCE)
+override rmdir = @rm -rf $1 $(SILENCE)
+override mkdir = @mkdir -p $1 $(SILENCE)
+endif
+
+# Target OS-specific stuff
+ifeq ($(OS),Windows_NT)
+TARGET_OS = windows
+else
+TARGET_OS = linux
+endif
+
+ifeq ($(TARGET_OS),windows)
+override extension_exe = .exe
+else
+override extension_exe =
+endif
+
+
+# --- LOGIC ---
+
+# All source files.
+override SOURCES = $(foreach dir,$(SOURCE_DIRS),$(call rwildcard, $(dir)/, *.c)$(call rwildcard, $(dir)/, *.cpp))
+
+# All object files.
+override OBJECTS = $(patsubst %,$(OBJECT_DIR)/%,$(patsubst %.c,%.c.o,$(patsubst %.cpp,%.cpp.o,$(SOURCES))))
+
+# Dependency lists
+override DEP_FILES = $(patsubst %.o,%.d,$(OBJECTS))
+
+# Add a proper extension to the output file.
+OUTPUT_FILE_EXT = $(OUTPUT_FILE)$(extension_exe)
+
+# Fancy alias for the primary target.
+.PHONY: build
+build: $(OUTPUT_FILE_EXT)
+		
+# The target that actually builds the executable.
+# I'm not sure why we need `.SECONDEXPANSION:` and `$$` before `(OBJECTS)`, but it's definitely necessary.
+# Note that object files come before linker flags.
+$(OUTPUT_FILE_EXT): $(OBJECTS)
+	@echo [Linking] $(OUTPUT_FILE_EXT)
+	$(call mkdir,$(dir $@))
+	@$(CXX) $(OBJECTS) $(LDFLAGS) -o $@
+	@echo [Done]
+
+# Targets that compile source files.	
+# Note that flags come before the source file.
+$(OBJECT_DIR)/%.c.o: %.c
+	@echo [C] $<
+	$(call mkdir,$(dir $@))
+	@$(CC) -MMD -MP $(CFLAGS) $< -c -o $@
+$(OBJECT_DIR)/%.cpp.o: %.cpp
+	@echo [C++] $<
+	$(call mkdir,$(dir $@))
+	@$(CXX) -MMD -MP $(CXXFLAGS) $< -c -o $@
+	
+# Target that cleans the build.
+.PHONY: clean
+clean:
+	$(call rmdir,$(OBJECT_DIR))
+	$(call rmfile,$(OUTPUT_FILE_EXT))
+
+-include $(DEP_FILES)
