@@ -16,7 +16,7 @@ class MemoryFile
     struct Data
     {
         std::unique_ptr<uint8_t[]> storage;
-        const uint8_t *begin, *end;
+        const uint8_t *begin = 0, *end = 0;
         std::string name;
     };
 
@@ -51,13 +51,14 @@ class MemoryFile
     }
     [[nodiscard]] static MemoryFile mem_copy(const uint8_t *begin, const uint8_t *end)
     {
-        auto size = end - begin;
+        auto size = end - begin + 1; // 1 extra byte for the null-terminator.
 
         MemoryFile ret;
         ret.ref = std::make_shared<Data>();
 
         ret.ref->storage = std::make_unique<uint8_t[]>(size);
         std::copy(begin, end, ret.ref->storage.get());
+        ret.ref->storage[size-1] = '\0';
 
         ret.ref->begin = ret.ref->storage.get();
         ret.ref->end = ret.ref->begin + size;
@@ -82,9 +83,12 @@ class MemoryFile
         if (std::ferror(file) || size == EOF)
             Program::Error("Unable to get size of file `", file_name, "`.");
 
+        size++; // 1 extra byte for the null-terminator.
+
         ret.ref->storage = std::make_unique<uint8_t[]>(size);
-        if (size > 0 && !std::fread(ret.ref->storage.get(), size, 1, file))
+        if (size > 0 && !std::fread(ret.ref->storage.get(), size-1, 1, file)) // `-1` leaves a free byte for the null-terminator.
             Program::Error("Unable to read from file `", file_name, "`.");
+        ret.ref->storage[size-1] = '\0';
 
         ret.ref->begin = ret.ref->storage.get();
         ret.ref->end = ret.ref->begin + size;
@@ -136,12 +140,13 @@ class MemoryFile
 
         try
         {
-            auto size = Archive::UncompressedSize(ref->begin, ref->end);
+            auto size = Archive::UncompressedSize(ref->begin, ref->end) + 1; // 1 extra byte for a null-terminator.
 
             ret.ref = std::make_shared<Data>();
 
             ret.ref->storage = std::make_unique<uint8_t[]>(size);
             Archive::Uncompress(ref->begin, ref->end, ret.ref->storage.get());
+            ret.ref->storage[size-1] = '\0';
 
             ret.ref->begin = ret.ref->storage.get();
             ret.ref->end = ret.ref->begin + size;
@@ -156,9 +161,47 @@ class MemoryFile
         return ret;
     }
 
-    [[nodiscard]] std::string construct_string() const
+    [[nodiscard]] bool is_null_terminated() const
     {
-        return std::string((char*)begin(), (char*)end());
+        if (!ref)
+            return 0;
+
+        if (size() == 0)
+            return 0;
+
+        return char(end()[-1]) == '\0';
+    }
+    [[nodiscard]] MemoryFile null_terminate() const
+    {
+        if (!ref)
+            return {};
+
+        if (is_null_terminated())
+            return *this;
+
+        MemoryFile ret;
+        ret.ref = std::make_shared<Data>();
+
+        ret.ref->storage = std::make_unique<uint8_t[]>(size()+1);
+        std::copy(begin(), end(), ret.ref->storage.get());
+        ret.ref->storage[size()] = '\0';
+
+        ret.ref->begin = ret.ref->storage.get();
+        ret.ref->end = ret.ref->begin + size()+1;
+
+        ret.ref->name = name();
+        return ret;
+    }
+
+    [[nodiscard]] const char *string()
+    {
+        if (!ref)
+            return "";
+
+        if (!is_null_terminated())
+            *this = null_terminate();
+
+        return (const char *)data();
     }
 
 
@@ -166,10 +209,10 @@ class MemoryFile
     {
         FILE *file = std::fopen(file_name.c_str(), "wb");
         if (!file)
-            Program::Error("Unable to open file for writing: ", file_name);
+            Program::Error("Unable to open file `", file_name, "` for writing.");
         FINALLY( std::fclose(file); )
         if (!std::fwrite(begin, end - begin, 1, file))
-            Program::Error("Unable to write to file: ", file_name);
+            Program::Error("Unable to write to file `", file_name, "`.");
     }
 
     static void SaveCompressed(std::string file_name, const uint8_t *begin, const uint8_t *end) // Throws on failure.

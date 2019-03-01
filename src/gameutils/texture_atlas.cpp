@@ -65,7 +65,7 @@ TextureAtlas::TextureAtlas(ivec2 target_size, const std::string &source_dir, con
             image = Graphics::Image(out_image_file);
 
             // Load description.
-            std::string desc_string = MemoryFile(out_desc_file).construct_string();
+            std::string desc_string = MemoryFile(out_desc_file).string();
 
             // Parse description.
             Desc new_desc; // We use a temporary instead of `description` because if conversion fails, we might need `description` to be empty to regenerate the atlas into it.
