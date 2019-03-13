@@ -54,7 +54,7 @@ class Json
 
         void ThrowExpectedType(std::string type) const
         {
-            Program::Error("Expected JSON object `", path, "` to be ", type, ".");
+            Program::Error("Expected JSON element `", path, "` to be ", type, ".");
         }
 
         std::string AppendElementIndexToPath(int index) const
@@ -79,6 +79,12 @@ class Json
 
         // Passed object has to remain alive.
         View(const Json &json, std::string name = "") : ptr(&json), path(std::move(name)) {}
+        View(Json &&, std::string = "") = delete;
+
+        explicit operator bool() const
+        {
+            return bool(ptr);
+        }
 
         const Json &Target() const
         {
@@ -90,13 +96,13 @@ class Json
             return type_t(ptr->variant.index());
         }
 
-        bool IsNull()   const {return Type() == null;}
-        bool IsBool()   const {return Type() == boolean;}
-        bool IsInt()    const {return Type() == num_int;}
-        bool IsReal()   const {return Type() == num_real || IsInt();}
-        bool IsString() const {return Type() == string;}
-        bool IsArray()  const {return Type() == array;}
-        bool IsObject() const {return Type() == object;}
+        bool IsNull()   const {return !ptr || Type() == null;}
+        bool IsBool()   const {return ptr && Type() == boolean;}
+        bool IsInt()    const {return ptr && Type() == num_int;}
+        bool IsReal()   const {return ptr && (Type() == num_real || IsInt());}
+        bool IsString() const {return ptr && Type() == string;}
+        bool IsArray()  const {return ptr && Type() == array;}
+        bool IsObject() const {return ptr && Type() == object;}
 
         bool GetBool() const
         {
