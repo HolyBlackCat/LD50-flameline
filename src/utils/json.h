@@ -12,14 +12,14 @@
 class Json
 {
   public:
-    // If you decide to reorder this enum, you also have to reorder the variant below.
+    // Sync order with `variant_t`.
     enum type_t {null, boolean, num_int, num_real, string, array, object};
 
   private:
     using array_t = std::vector<Json>;
     using object_t = std::map<std::string, Json>;
 
-    // If you decide to reorder this bariant, you also have to reorder the enum above.
+    // Sync order with `enum type_t`.
     using variant_t = std::variant<
         std::monostate, // type_t::null
         bool,           // type_t::boolean

@@ -51,7 +51,7 @@ namespace Strings
             if (line == 0 && column == 0)
                 return "";
             else
-                return Str(':', line, ':', column);
+                return Str(line, ':', column);
         }
     };
 
