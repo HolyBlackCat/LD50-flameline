@@ -85,6 +85,10 @@ class TextureAtlas
         return source_dir;
     }
 
+    Graphics::Image &GetImage()
+    {
+        return image;
+    }
     const Graphics::Image &GetImage() const
     {
         return image;

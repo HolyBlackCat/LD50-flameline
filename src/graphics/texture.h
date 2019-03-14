@@ -96,7 +96,11 @@ namespace Graphics
         inline static int active_index = 0;
 
       public:
-        TexUnit(decltype(nullptr)) {}
+        TexUnit(decltype(nullptr))
+        {
+            // We need to create the allocator even in the null constructor to dodge the destruction order fiasco.
+            Allocator();
+        }
 
         TexUnit()
         {

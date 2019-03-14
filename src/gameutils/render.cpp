@@ -69,6 +69,8 @@ Render::Render(int queue_size, const Graphics::ShaderConfig &config)
     SetColorMatrix(fmat4());
 }
 
+Render::Render(Render &&) = default;
+Render &Render::operator=(Render &&) = default;
 Render::~Render() = default;
 
 Render::operator bool() const
