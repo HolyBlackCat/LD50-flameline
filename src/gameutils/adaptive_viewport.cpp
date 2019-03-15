@@ -70,7 +70,9 @@ AdaptiveViewport::AdaptiveViewport(const Graphics::ShaderConfig &shader_config, 
     SetSize(new_size);
 }
 
-AdaptiveViewport::~AdaptiveViewport() {}
+AdaptiveViewport::AdaptiveViewport(AdaptiveViewport &&) = default;
+AdaptiveViewport &AdaptiveViewport::operator=(AdaptiveViewport &&) = default;
+AdaptiveViewport::~AdaptiveViewport() = default;
 
 void AdaptiveViewport::SetSize(ivec2 new_size)
 {
