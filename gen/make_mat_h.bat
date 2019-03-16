@@ -20,8 +20,6 @@ g++ %CODE% -o %EXECUTABLE% -std=c++2a -Wall -Wextra -pedantic-errors -static
 	@exit /B 1
 )
 
-del /F /Q %EXECUTABLE% >NUL 2>NUL
-
 move /Y %OUTPUT% ../%DESTINATION% >NUL 2>NUL
 @if not %ERRORLEVEL% == 0 (
     echo Can't move the file to the target directory.
@@ -35,6 +33,9 @@ g++ ../%DESTINATION%/%OUTPUT% -std=c++2a -Wall -Wextra -pedantic-errors -fsyntax
 	@pause
 	@exit /B 1
 )
+
+@rem Deleting the executable immediately after it closes sometimes doesn't work, so we do it here. (Maybe it's my antivirus software acting up.)
+del /F /Q %EXECUTABLE% >NUL 2>NUL
 
 @color 0a
 pause

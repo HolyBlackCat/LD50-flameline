@@ -6,7 +6,7 @@
 #include <sstream>
 #include <type_traits>
 
-#define VERSION "3.1.2"
+#define VERSION "3.1.3"
 
 namespace data
 {
@@ -46,6 +46,8 @@ namespace data
         "r","g","b","a",
         // "s","t","p","q", // Who uses this anyway.
     };
+
+    const std::string custom_operator_symbol = "/", custom_operator_list[]{"dot","cross"};
 }
 
 namespace impl
@@ -1196,71 +1198,74 @@ int main()
 
         next_line();
 
-        section("inline namespace CustomOperators", []
+        section("inline namespace Utility", []
         {
-            const std::string
-                symbol = "/",
-                ops[]{"dot","cross"};
-
-            for (auto op : ops)
-                output("inline constexpr struct op_type_",op," {} ",op,";\n");
-
-            next_line();
-
-            for (auto op : ops)
+            decorative_section("Member access", []
             {
                 output(1+R"(
-                    template <typename A> struct op_expr_type_)",op,R"(
+                    template <int I, typename T> constexpr auto &get_vec_element(T &&vec)
                     {
-                        A &&a;
-                        template <typename B> [[nodiscard]] constexpr decltype(auto) operator)",symbol,R"((B &&b) {return std::forward<A>(a).)",op,R"((std::forward<B>(b));}
-                        template <typename B> constexpr decltype(auto) operator)",symbol,R"(=(B &&b) {a = std::forward<A>(a).)",op,R"((std::forward<B>(b)); return std::forward<A>(a);}
-                    };
+                        // Returns a non-const reference only if the parameter is a non-const lvalue; otherwise returns a const reference.
+                        static_assert(I >= 0 && I < 4);
+                        constexpr bool not_const = std::is_reference_v<T> && !std::is_const_v<std::remove_reference_t<T>>;
+                        if constexpr (!is_vector_v<std::remove_reference_t<T>>)
+                        $   return std::conditional_t<not_const, T &, const T &>(vec);
+                        else
+                        $   return std::conditional_t<not_const, vec_base_t<std::remove_reference_t<T>> &, const vec_base_t<std::remove_reference_t<T>> &>(vec.template get<I>());
+                    }
+
+                    template <int D, typename F> constexpr void cexpr_for(F &&func)
+                    {
+                        static_assert(D >= 1 && D <= 4);
                 )");
-            }
+                for (int i = 0; i < 4; i++)
+                {
+                    if (i >= 1)
+                        output("if constexpr (D > ",i,") ");
+                    output("func(std::integral_constant<int,",i,">{});\n");
+                }
+                output(1+R"(
+                    }
+                )");
+            });
 
             next_line();
 
-            for (auto op : ops)
-                output("template <typename T> inline constexpr op_expr_type_",op,"<T> operator",symbol,"(T &&param, op_type_",op,") {return {std::forward<T>(param)};}\n");
-
-        });
-
-        next_line();
-
-        section("inline namespace Utility // Member access", []
-        {
-            output(1+R"(
-                template <int I, typename T> constexpr auto &get_vec_element(T &&vec)
-                {
-                    // Returns a non-const reference only if the parameter is a non-const lvalue; otherwise returns a const reference.
-                    static_assert(I >= 0 && I < 4);
-                    constexpr bool not_const = std::is_reference_v<T> && !std::is_const_v<std::remove_reference_t<T>>;
-                    if constexpr (!is_vector_v<std::remove_reference_t<T>>)
-                    $   return std::conditional_t<not_const, T &, const T &>(vec);
-                    else
-                    $   return std::conditional_t<not_const, vec_base_t<std::remove_reference_t<T>> &, const vec_base_t<std::remove_reference_t<T>> &>(vec.template get<I>());
-                }
-
-                template <int D, typename F> constexpr void cexpr_for(F &&func)
-                {
-                    static_assert(D >= 1 && D <= 4);
-            )");
-            for (int i = 0; i < 4; i++)
+            decorative_section("Custom operators", []
             {
-                if (i >= 1)
-                    output("if constexpr (D > ",i,") ");
-                output("func(std::integral_constant<int,",i,">{});\n");
-            }
-            output(1+R"(
+                for (auto op : data::custom_operator_list)
+                    output("struct op_type_",op," {};\n");
+
+                next_line();
+
+                for (auto op : data::custom_operator_list)
+                {
+                    output(1+R"(
+                        template <typename A> struct op_expr_type_)",op,R"(
+                        {
+                            A &&a;
+                            template <typename B> [[nodiscard]] constexpr decltype(auto) operator)",data::custom_operator_symbol,R"((B &&b) {return std::forward<A>(a).)",op,R"((std::forward<B>(b));}
+                            template <typename B> constexpr decltype(auto) operator)",data::custom_operator_symbol,R"(=(B &&b) {a = std::forward<A>(a).)",op,R"((std::forward<B>(b)); return std::forward<A>(a);}
+                        };
+                    )");
                 }
-            )");
+
+                next_line();
+
+                for (auto op : data::custom_operator_list)
+                    output("template <typename T> inline constexpr op_expr_type_",op,"<T> operator",data::custom_operator_symbol,"(T &&param, op_type_",op,") {return {std::forward<T>(param)};}\n");
+            });
         });
 
         next_line();
 
         section("inline namespace Misc", []
         {
+            for (auto op : data::custom_operator_list)
+                output("inline constexpr op_type_", op, " ", op, ";\n");
+
+            next_line();
+
             output(1+R"(
                 template <typename F, typename ...P> constexpr auto apply_elementwise(F &&func, P &&... params)
                 {
@@ -1318,7 +1323,7 @@ int main()
                     if constexpr (no_vectors_v<A,B>)
                     {
                         if (var < min)
-                            var = min;
+                        $   var = min;
                     }
                     else
                     {
@@ -1333,7 +1338,7 @@ int main()
                     if constexpr (no_vectors_v<A,B>)
                     {
                         if (var > max)
-                            var = max;
+                        $   var = max;
                     }
                     else
                     {
@@ -1574,7 +1579,6 @@ int main()
         {
             output(1+R"(
                 using namespace Vector;
-                using namespace CustomOperators;
                 using namespace Misc;
 
                 using std::int8_t;
