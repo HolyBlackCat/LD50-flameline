@@ -6,7 +6,7 @@
 #include <sstream>
 #include <type_traits>
 
-#define VERSION "3.1.3"
+#define VERSION "3.1.4"
 
 namespace data
 {
@@ -61,7 +61,7 @@ namespace impl
     int indentation = 0;
     int section_depth = 0;
 
-    constexpr const char *indentation_string = "    ";
+    constexpr const char *indentation_string = "    ", *indentation_string_labels = "  ";
 }
 
 template <typename ...P> [[nodiscard]] std::string make_str(const P &... params)
@@ -88,11 +88,12 @@ void output_str(const std::string &str)
                 continue;
 
             for (int i = 0; i < impl::indentation; i++)
-                impl::output_file << impl::indentation_string;
+                impl::output_file << (i == impl::indentation-1 && ch == '@' ? impl::indentation_string_labels : impl::indentation_string);
             impl::at_line_start = 0;
         }
 
-        impl::output_file.put(ch == '$' ? ' ' : ch);
+        if (ch != '@')
+            impl::output_file.put(ch == '$' ? ' ' : ch);
 
         if (ch == '{')
             impl::indentation++;
@@ -246,7 +247,11 @@ int main()
                 template <int W, int H, typename T> struct is_matrix_impl<const mat<W,H,T>> : std::true_type {};
                 template <typename T> inline constexpr bool is_matrix_v = is_matrix_impl<T>::value;
 
-                template <typename T> inline constexpr bool is_scalar_v = !is_vector_v<T> && !is_matrix_v<T>;
+                template <typename T, typename = void> struct is_other_impl : std::false_type {};
+                template <typename T> struct is_other_impl<T, decltype(std::enable_if<1, typename T::disable_vec_mat_operators>{}, void())> : std::true_type {}; // Note the use of `enable_if` without `_t`. We just need an arbitrary template type here.
+                template <typename T> inline constexpr bool is_other_v = is_other_impl<T>::value;
+
+                template <typename T> inline constexpr bool is_scalar_v = !is_vector_v<T> && !is_matrix_v<T> && !is_other_v<T>;
 
                 template <typename A, typename B = void> using enable_if_scalar_t = std::enable_if_t<is_scalar_v<A>, B>;
 
@@ -1234,7 +1239,7 @@ int main()
             decorative_section("Custom operators", []
             {
                 for (auto op : data::custom_operator_list)
-                    output("struct op_type_",op," {};\n");
+                    output("struct op_type_",op," {using disable_vec_mat_operators = void;};\n");
 
                 next_line();
 
@@ -1243,6 +1248,7 @@ int main()
                     output(1+R"(
                         template <typename A> struct op_expr_type_)",op,R"(
                         {
+                            using disable_vec_mat_operators = void;
                             A &&a;
                             template <typename B> [[nodiscard]] constexpr decltype(auto) operator)",data::custom_operator_symbol,R"((B &&b) {return std::forward<A>(a).)",op,R"((std::forward<B>(b));}
                             template <typename B> constexpr decltype(auto) operator)",data::custom_operator_symbol,R"(=(B &&b) {a = std::forward<A>(a).)",op,R"((std::forward<B>(b)); return std::forward<A>(a);}
@@ -1255,6 +1261,163 @@ int main()
                 for (auto op : data::custom_operator_list)
                     output("template <typename T> inline constexpr op_expr_type_",op,"<T> operator",data::custom_operator_symbol,"(T &&param, op_type_",op,") {return {std::forward<T>(param)};}\n");
             });
+
+            next_line();
+
+            decorative_section("Ranges", []
+            {
+                output(1+R"(
+                    template <typename T> class vector_range
+                    {
+                        static_assert(is_vector_v<T> && !std::is_const_v<T> && std::is_integral_v<vec_base_t<T>>, "The template parameter must be an integral vector.");
+
+                        T vec_begin = T(0);
+                        T vec_end = T(0);
+
+                      @public:
+                        using disable_vec_mat_operators = void;
+
+                        class iterator
+                        {
+                            friend class vector_range<T>;
+
+                            T vec_begin = T(0);
+                            T vec_end = T(0);
+                            T vec_cur = T(0);
+                            bool finished = 1;
+
+                            iterator() {}
+                            iterator(T vec_begin, T vec_end) : vec_begin(vec_begin), vec_end(vec_end), vec_cur(vec_begin), finished((vec_begin >= vec_end).any()) {}
+                          @public:
+                            using difference_type   = std::ptrdiff_t;
+                            using value_type        = T;
+                            using pointer           = const T *;
+                            using reference         = T; // Sic!
+                            using iterator_category = std::forward_iterator_tag;
+
+                            iterator &operator++()
+                            {
+                                bool stop = 0;
+                                cexpr_for<vec_size_v<T>>([&](auto index)
+                                {
+                                    if (stop)
+                                    $   return;
+
+                                    constexpr int i = index.value;
+
+                                    auto &elem = get_vec_element<i>(vec_cur);
+                                    elem++;
+                                    if (elem >= get_vec_element<i>(vec_end))
+                                    {
+                                        elem = get_vec_element<i>(vec_begin);
+
+                                        if constexpr (i == vec_size_v<T> - 1)
+                                        $   finished = 1;
+                                    }
+                                    else
+                                    {
+                                        stop = 1;
+                                    }
+                                });
+
+                                return *this;
+                            }
+                            iterator operator++(int)
+                            {
+                                iterator ret = *this;
+                                ++(*this);
+                                return ret;
+                            }
+
+                            reference operator*() const
+                            {
+                                return vec_cur;
+                            }
+                            pointer operator->() const
+                            {
+                                return &vec_cur;
+                            }
+
+                            bool operator==(const iterator &other) const
+                            {
+                                if (finished != other.finished)
+                                $   return 0;
+                                if (finished && other.finished)
+                                $   return 1;
+                                return vec_cur == other.vec_cur;
+                            }
+                            bool operator!=(const iterator &other) const
+                            {
+                                return !(*this == other);
+                            }
+                        };
+
+                        vector_range() {}
+                        vector_range(T vec_begin, T vec_end) : vec_begin(vec_begin), vec_end(vec_end) {}
+
+                        iterator begin() const
+                        {
+                            return iterator(vec_begin, vec_end);
+                        }
+
+                        iterator end() const
+                        {
+                            return {};
+                        }
+
+                        template <int A, typename B> friend vector_range operator+(const vector_range &range, vec<A,B> offset)
+                        {
+                            static_assert(std::is_same_v<T, vec<A,B>>, "The offset must have exactly the same type as the range.");
+                            return vector_range(range.vec_begin + offset, range.vec_end + offset);
+                        }
+                        template <int A, typename B> friend vector_range operator+(vec<A,B> offset, const vector_range &range)
+                        {
+                            return range + offset;
+                        }
+                    };
+
+                    template <typename T> class vector_range_halfbound
+                    {
+                        static_assert(is_vector_v<T> && !std::is_const_v<T> && std::is_integral_v<vec_base_t<T>>, "The template parameter must be an integral vector.");
+
+                        T vec_begin = T(0);
+
+                      @public:
+                        using disable_vec_mat_operators = void;
+
+                        vector_range_halfbound(T vec_begin) : vec_begin(vec_begin) {}
+
+                        template <int A, typename B> friend vector_range<T> operator<(const vector_range_halfbound &range, vec<A,B> point)
+                        {
+                            static_assert(std::is_same_v<T, vec<A,B>>, "The upper limit must have exactly the same type as the lower limit.");
+                            return vector_range<T>(range.vec_begin, point);
+                        }
+                        template <int A, typename B> friend vector_range<T> operator<=(const vector_range_halfbound &range, vec<A,B> point)
+                        {
+                            return range < point+1;
+                        }
+                    };
+
+                    struct vector_range_factory
+                    {
+                        using disable_vec_mat_operators = void;
+
+                        template <int A, typename B> vector_range<vec<A,B>> operator()(vec<A,B> size) const
+                        {
+                            return vector_range<vec<A,B>>(vec<A,B>(0), size);
+                        }
+
+                        template <int A, typename B> friend vector_range_halfbound<vec<A,B>> operator<=(vec<A,B> point, vector_range_factory)
+                        {
+                            return {point};
+                        }
+                        template <int A, typename B> friend vector_range_halfbound<vec<A,B>> operator<(vec<A,B> point, vector_range_factory)
+                        {
+                            return point+1 <= vector_range_factory{};
+                        }
+                    };
+                )");
+            });
         });
 
         next_line();
@@ -1263,6 +1426,10 @@ int main()
         {
             for (auto op : data::custom_operator_list)
                 output("inline constexpr op_type_", op, " ", op, ";\n");
+
+            next_line();
+
+            output("inline constexpr vector_range_factory vector_range;\n");
 
             next_line();
 
