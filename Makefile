@@ -10,7 +10,7 @@ OUTPUT_FILE = bin/imp-re
 # Flags
 CXXFLAGS = -Wall -Wextra -pedantic-errors -std=c++2a
 override CXXFLAGS += -include src/utils/common.h -include src/program/parachute.h -Ilib\include -Isrc
-override LDFLAGS += -Llib -lmingw32 -lSDL2main -lSDL2.dll -lz -lfreetype -lopenal32 -lvorbisfile -lvorbisenc -lvorbis -logg
+override LDFLAGS += -Llib -lmingw32 -lSDL2main -lSDL2.dll -lfreetype -lopenal32 -lvorbisfile -lvorbisenc -lvorbis -logg -lbz2 -lz
 
 # Targets
 .PHONY: debug
