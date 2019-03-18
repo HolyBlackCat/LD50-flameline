@@ -155,7 +155,7 @@ namespace Graphics
         }
         )
 
-        FrameBuffer &&AttachDepth(Attachment att) // Binds the framebuffer.
+        FrameBuffer &&AttachDepth(Attachment att)
         {
             if (!*this)
                 return std::move(*this);
