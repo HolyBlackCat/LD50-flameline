@@ -260,25 +260,36 @@ Render::Text_t::~Text_t()
     ivec2 align_box(data.has_box_alignment ? data.align_box_x : data.align.x, data.align.y);
 
     fvec2 pos = data.pos;
-    pos -= stats.size * (1 + align_box) / 2;
-    pos.x += stats.size.x * (1 + data.align.x) / 2; // Note that we don't change vertical position here.
 
-    float start_x = pos.x;
+    fvec2 offset = -stats.size * (1 + align_box) / 2;
+    offset.x += stats.size.x * (1 + data.align.x) / 2; // Note that we don't change vertical position here.
+
+    float line_start_offset_x = offset.x;
 
     for (size_t line_index = 0; line_index < data.text.lines.size(); line_index++)
     {
         const Graphics::Text::Line &line = data.text.lines[line_index];
         const Graphics::Text::Stats::Line &line_stats = stats.lines[line_index];
 
-        pos.x = start_x - line_stats.width * (1 + data.align.x) / 2;
-        pos.y += line_stats.ascent;
+        offset.x = line_start_offset_x - line_stats.width * (1 + data.align.x) / 2;
+        offset.y += line_stats.ascent;
 
         for (const Graphics::Text::Symbol &symbol : line.symbols)
         {
-            renderer->fquad(pos + symbol.offset, symbol.size).tex(symbol.texture_pos).color(data.color).mix(0).alpha(data.alpha).beta(data.beta);
-            pos.x += symbol.advance + symbol.kerning;
+            fvec2 symbol_pos;
+
+            if (!data.has_matrix)
+                symbol_pos = pos + offset + symbol.offset;
+            else
+                symbol_pos = pos + (data.matrix * (offset + symbol.offset).to_vec3(1)).to_vec2();
+
+            auto quad = renderer->fquad(symbol_pos, symbol.size).tex(symbol.texture_pos).color(data.color).mix(0).alpha(data.alpha).beta(data.beta);
+            if (data.has_matrix)
+                quad.matrix(data.matrix.to_mat2()).pixel_center(fvec2(0));
+
+            offset.x += symbol.advance + symbol.kerning;
         }
 
-        pos.y += line_stats.descent + line_stats.line_gap;
+        offset.y += line_stats.descent + line_stats.line_gap;
     }
 }

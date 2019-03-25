@@ -435,6 +435,9 @@ class Render
             fvec3 color = fvec3(1);
             float alpha = 1;
             float beta = 1;
+
+            bool has_matrix = 0;
+            fmat3 matrix = {};
         };
         Data data;
 
@@ -488,12 +491,49 @@ class Render
             data.align_box_x = sign(x);
             return (ref)*this;
         }
-
         ref align(ivec2 align_text, int align_box)
         {
             data.align = sign(align_text);
             data.has_box_alignment = 1;
             data.align_box_x = align_box;
+            return (ref)*this;
+        }
+        ref matrix(fmat3 m) // This can be called multiple times, resulting in multiplying matrices in the order they were passed.
+        {
+            if (data.has_matrix)
+            {
+                data.matrix = data.matrix * m;
+            }
+            else
+            {
+                data.has_matrix = 1;
+                data.matrix = m;
+            }
+            return (ref)*this;
+        }
+        ref matrix(fmat2 m)
+        {
+            matrix(m.to_mat3());
+            return (ref)*this;
+        }
+        ref rotate(float a) // Uses `matrix()`.
+        {
+            matrix(fmat3::rotate(a));
+            return (ref)*this;
+        }
+        ref translate(fvec2 v) // Uses a matrix.
+        {
+            matrix(fmat3::translate(v));
+            return (ref)*this;
+        }
+        ref scale(fvec2 s) // Uses a matrix.
+        {
+            matrix(fmat3::scale(s));
+            return (ref)*this;
+        }
+        ref scale(float s) // Uses a matrix.
+        {
+            scale(fvec2(s));
             return (ref)*this;
         }
 
