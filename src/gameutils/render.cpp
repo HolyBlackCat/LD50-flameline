@@ -279,6 +279,6 @@ Render::Text_t::~Text_t()
             pos.x += symbol.advance + symbol.kerning;
         }
 
-        pos.y += line_stats.descent + line_stats.gap;
+        pos.y += line_stats.descent + line_stats.line_gap;
     }
 }

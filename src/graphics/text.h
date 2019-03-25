@@ -30,6 +30,9 @@ namespace Graphics
         struct Line
         {
             std::vector<Symbol> symbols;
+            int default_ascent = 0;
+            int default_descent = 0;
+            int default_line_gap = 0;
         };
 
         std::vector<Line> lines = {{}}; // We start with one line by default.
@@ -42,7 +45,7 @@ namespace Graphics
                 int width = 0;
                 int ascent = 0;
                 int descent = 0;
-                int gap = 0;
+                int line_gap = 0;
             };
             std::vector<Line> lines;
 
@@ -57,23 +60,34 @@ namespace Graphics
                 Stats::Line &line_stats = ret.lines.emplace_back();
 
                 line_stats.width = 0;
-                line_stats.ascent = 0;
-                line_stats.descent = 0;
-                line_stats.gap = 0;
 
-                for (const Symbol &symbol : line.symbols)
+                if (line.symbols.size() == 0)
                 {
-                    line_stats.width += symbol.advance + symbol.kerning;
-                    clamp_var_min(line_stats.ascent, symbol.ascent);
-                    clamp_var_min(line_stats.descent, symbol.descent);
-                    clamp_var_min(line_stats.gap, symbol.line_gap);
+                    line_stats.ascent = line.default_ascent;
+                    line_stats.descent = line.default_descent;
+                    line_stats.line_gap = line.default_line_gap;
+                }
+                else
+                {
+                    line_stats.ascent = 0;
+                    line_stats.descent = 0;
+                    line_stats.line_gap = 0;
+
+                    for (const Symbol &symbol : line.symbols)
+                    {
+                        line_stats.width += symbol.advance + symbol.kerning;
+                        clamp_var_min(line_stats.ascent, symbol.ascent);
+                        clamp_var_min(line_stats.descent, symbol.descent);
+                        clamp_var_min(line_stats.line_gap, symbol.line_gap);
+                    }
+
+                    clamp_var_min(ret.size.x, line_stats.width);
                 }
 
-                clamp_var_min(ret.size.x, line_stats.width);
-                ret.size.y += line_stats.ascent + line_stats.descent + line_stats.gap;
+                ret.size.y += line_stats.ascent + line_stats.descent + line_stats.line_gap;
             }
 
-            ret.size.y -= ret.lines.back().gap;
+            ret.size.y -= ret.lines.back().line_gap;
 
             return ret;
         }
@@ -93,15 +107,25 @@ namespace Graphics
         void AddSymbol(const Symbol &glyph)
         {
             if (glyph.ch == '\n')
-                lines.emplace_back();
+            {
+                Line &line = lines.emplace_back();
+                line.default_ascent = glyph.ascent;
+                line.default_descent = glyph.descent;
+                line.default_line_gap = glyph.line_gap;
+            }
             else
+            {
                 lines.back().symbols.push_back(glyph);
+            }
         }
         void AddSymbol(const Font &font, uint32_t ch)
         {
             if (ch == '\n')
             {
-                lines.emplace_back();
+                Line &line = lines.emplace_back();
+                line.default_ascent = font.Ascent();
+                line.default_descent = font.Descent();
+                line.default_line_gap = font.LineGap();
             }
             else
             {
@@ -133,12 +157,12 @@ namespace Graphics
             bool first = 1;
             for (uint32_t ch : Unicode::Iterator(begin, end))
             {
+                AddSymbol(font, ch);
+
                 if (first)
                     first = 0;
                 else
                     KernLastTwoSymbols(font);
-
-                AddSymbol(font, ch);
             }
 
             return *this;
