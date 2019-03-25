@@ -10,7 +10,9 @@ namespace Input
     class Mouse
     {
         mutable uint64_t update_time = 0;
-        mutable ivec2 cur_pos = ivec2(0), cur_pos_delta = ivec2(0), cur_movement = ivec2(0);
+        mutable fvec2 cur_pos_f = fvec2(0), cur_pos_delta_f = fvec2(0);
+        mutable ivec2 cur_pos = ivec2(0), cur_pos_delta = ivec2(0);
+        mutable ivec2 cur_movement = ivec2(0);
         mutable bool no_delta_next_tick = 1;
         fmat3 matrix = fmat3();
 
@@ -25,19 +27,26 @@ namespace Input
                 return;
 
             // Remember old cur_pos
-            ivec2 prev_position = cur_pos;
+            ivec2 prev_pos_f = cur_pos_f;
+            ivec2 prev_pos = cur_pos;
 
             // Get cur_pos and transform it
-            cur_pos = iround((matrix * window.MousePos().to_vec3(1)).to_vec2());
+            cur_pos_f = (matrix * window.MousePos().to_vec3(1)).to_vec2();
+            cur_pos = iround(cur_pos_f);
 
             // Get movement
             cur_movement = window.MouseMovement();
 
             // Compute delta if needed
             if (no_delta_next_tick == 0)
-                cur_pos_delta = cur_pos - prev_position;
+            {
+                cur_pos_delta_f = cur_pos_f - prev_pos_f;
+                cur_pos_delta = cur_pos - prev_pos;
+            }
             else
+            {
                 no_delta_next_tick = 0;
+            }
 
             // Remember current time
             update_time = tick;
@@ -59,6 +68,16 @@ namespace Input
         {
             Update();
             return cur_pos_delta;
+        }
+        fvec2 pos_f() const
+        {
+            Update();
+            return cur_pos_f;
+        }
+        fvec2 pos_delta_f() const
+        {
+            Update();
+            return cur_pos_delta_f;
         }
         ivec2 movement() const
         {
