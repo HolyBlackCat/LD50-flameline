@@ -6,7 +6,7 @@
 #include <sstream>
 #include <type_traits>
 
-#define VERSION "3.1.4"
+#define VERSION "3.1.5"
 
 namespace data
 {
@@ -1292,7 +1292,7 @@ int main()
                             using difference_type   = std::ptrdiff_t;
                             using value_type        = T;
                             using pointer           = const T *;
-                            using reference         = T; // Sic!
+                            using reference         = const T &;
                             using iterator_category = std::forward_iterator_tag;
 
                             iterator &operator++()
