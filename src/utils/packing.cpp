@@ -38,7 +38,7 @@ namespace Packing
         // Counts rectangles that weren't packed.
         int rects_not_packed = 0;
         if (!ok)
-            std::count_if(rects.begin(), rects.end(), [](const stbrp_rect &rect){return rect.was_packed;});
+            rects_not_packed = std::count_if(rects.begin(), rects.end(), [](const stbrp_rect &rect){return !rect.was_packed;});
 
         // Output data.
         for (int i = 0; i < count; i++)
