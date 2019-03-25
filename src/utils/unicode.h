@@ -144,7 +144,7 @@ namespace Unicode
         using difference_type   = std::ptrdiff_t;
         using value_type        = uint32_t;
         using pointer           = const uint32_t *;
-        using reference         = uint32_t; // Sic!
+        using reference         = const uint32_t &;
         using iterator_category = std::forward_iterator_tag;
 
         Iterator &operator++()
