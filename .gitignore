@@ -4,3 +4,4 @@
 *.gch
 *.depend
 *.layout
+compile_commands.json
