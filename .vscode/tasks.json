@@ -1,0 +1,63 @@
+{
+    // See https://go.microsoft.com/fwlink/?LinkId=733558
+    // for the documentation about the tasks.json format
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "Build",
+            "type": "shell",
+            "command": "mingw32-make current -j4",
+            "options": {"env": {"CXX": "clang++"}},
+            "presentation": {"echo": true, "reveal": "always", "focus": false, "panel": "shared", "showReuseMessage": false, "clear": true},
+        },
+        {
+            "label": "Build & Run",
+            "type": "shell",
+            "dependsOn": ["Build"],
+            "windows": {"command": "cd bin && imp-re.exe"},
+            "linux": {"command": "cd bin && ./imp-re"},
+            "presentation": {"echo": true, "reveal": "always", "focus": false, "panel": "shared", "showReuseMessage": false, "clear": true},
+        },
+        {
+            "label": "Run",
+            "type": "shell",
+            "windows": {"command": "cd bin && imp-re.exe"},
+            "linux": {"command": "cd bin && ./imp-re"},
+            "presentation": {"echo": true, "reveal": "always", "focus": false, "panel": "shared", "showReuseMessage": false, "clear": true},
+        },
+        {
+            "label": "Update project",
+            "type": "shell",
+            "command": "mingw32-make commands_fixed",
+            "options": {"env": {"CXX": "clang++", "EXCLUDE_DIRS": "lib"}},
+            "presentation": {"echo": true, "reveal": "always", "focus": false, "panel": "shared", "showReuseMessage": false, "clear": true},
+        },
+        {
+            "label": "Clean",
+            "type": "shell",
+            "command": "mingw32-make clean",
+            "presentation": {"echo": true, "reveal": "always", "focus": false, "panel": "shared", "showReuseMessage": false, "clear": true},
+        },
+        {
+            "label": "-> Debug",
+            "type": "shell",
+            "command": "mingw32-make set_current_clean",
+            "options": {"env": {"TARGET": "debug"}},
+            "presentation": {"echo": true, "reveal": "always", "focus": false, "panel": "shared", "showReuseMessage": false, "clear": true},
+        },
+        {
+            "label": "-> Debug (hard)",
+            "type": "shell",
+            "command": "mingw32-make set_current_clean",
+            "options": {"env": {"TARGET": "debug_hard"}},
+            "presentation": {"echo": true, "reveal": "always", "focus": false, "panel": "shared", "showReuseMessage": false, "clear": true},
+        },
+        {
+            "label": "-> Release",
+            "type": "shell",
+            "command": "mingw32-make set_current_clean",
+            "options": {"env": {"TARGET": "release"}},
+            "presentation": {"echo": true, "reveal": "always", "focus": false, "panel": "shared", "showReuseMessage": false, "clear": true},
+        },
+    ]
+}

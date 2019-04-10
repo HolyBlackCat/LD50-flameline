@@ -5,3 +5,4 @@
 *.depend
 *.layout
 compile_commands.json
+.config.mk

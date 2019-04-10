@@ -1,5 +1,5 @@
-# Source directories
-SOURCE_DIRS ?= src lib
+# Sources
+override SOURCE_DIRS += src lib
 
 # Object directory
 OBJECT_DIR ?= obj
@@ -14,12 +14,16 @@ override LDFLAGS += -Llib -lmingw32 -lSDL2main -lSDL2.dll -lfreetype -lopenal32 
 
 # Targets
 .PHONY: debug
-debug: override CXXFLAGS += -g -D_GLIBCXX_DEBUG
+debug: override CXXFLAGS += -g -D_GLIBCXX_ASSERTIONS
 debug: build
+
+.PHONY: debug_hard
+debug_hard: override CXXFLAGS += -g -D_GLIBCXX_DEBUG
+debug_hard: build
 
 .PHONY: release
 release: override CXXFLAGS += -DNDEBUG -O3
-release: override LDFLAGS += -O3 -s
+release: override LDFLAGS += -O3 -s -mwindows
 release: build
 
 # File-specific flags
