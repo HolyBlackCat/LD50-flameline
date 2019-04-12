@@ -182,7 +182,7 @@ clean:
 
 # Helpers for generating compile_commands.json
 override EXCLUDE_FILES += $(foreach dir,$(EXCLUDE_DIRS), $(call rwildcard,$(dir),*.c *.cpp *.h *.hpp)) # Note the `+=`.
-override include_files = $(filter-out $(excluded_files), $(SOURCES))
+override include_files = $(filter-out $(EXCLUDE_FILES), $(SOURCES))
 override file_command = && $(call echo,{"directory": "."$(comma) "file": "$(cur_dir)/$2"$(comma) "command": "$1 $2"}$(comma)) >>compile_commands.json
 override all_commands = $(foreach file,$(filter %.c,$(include_files)),$(call file_command,$(CC) $(CFLAGS),$(file))) $(foreach file,$(filter %.cpp,$(include_files)),$(call file_command,$(CXX) $(CXXFLAGS),$(file)))
 override all_stub_commands = $(foreach file,$(EXCLUDE_FILES),$(call file_command,,$(file)))
