@@ -29,7 +29,7 @@ namespace Clock
 
     inline void WaitSeconds(double secs) // Waits the specified amount of seconds, rounded down to milliseconds.
     {
-        SDL_Delay(std::lround(secs * 1000));
+        SDL_Delay(int(secs * 1000));
     }
 
     class DeltaTimer
@@ -45,6 +45,11 @@ namespace Clock
             uint64_t new_time = Time(), delta = new_time - time;
             time = new_time;
             return delta;
+        }
+
+        uint64_t LastTimePoint() const
+        {
+            return time;
         }
     };
 }
