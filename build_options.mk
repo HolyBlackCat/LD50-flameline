@@ -27,5 +27,5 @@ release: override LDFLAGS += -O3 -s -mwindows
 release: build
 
 # File-specific flags
-obj/lib/glfl.cpp.o: override CXXFLAGS += -O3
-obj/lib/implementation.cpp.o: override CXXFLAGS += -O3
+obj/lib/%.cpp.o: override CXXFLAGS += -O3
+obj/src/game/main.cpp.o: src/game/master.hpp.gch

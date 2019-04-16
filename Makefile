@@ -33,7 +33,7 @@
 #    release: override LDFLAGS += -O3 -s -mwindows
 #    release: build
 #
-#    # File-specific flags
+#    # File-specific flags (you can apply flags to several flags by using `%` as a wildcard symbol)
 #    obj/lib/glfl.cpp.o: override CXXFLAGS += -O3
 #    obj/lib/implementation.cpp.o: override CXXFLAGS += -O3
 
@@ -87,17 +87,17 @@ endif
 # Example usage: $(call rmfile, bin/out.exe)
 ifeq ($(HOST_SHELL),windows)
 override silence = >NUL 2>NUL || (exit 0)
-override rmfile = @del /F /Q $(subst /,\,$1) $(silence)
-override rmdir = @rd /S /Q $(subst /,\,$1) $(silence)
-override mkdir = @mkdir >NUL 2>NUL $(subst /,\,$1) $(silence)
+override rmfile = del /F /Q $(subst /,\,$1) $(silence)
+override rmdir = rd /S /Q $(subst /,\,$1) $(silence)
+override mkdir = mkdir >NUL 2>NUL $(subst /,\,$1) $(silence)
 override echo = echo $1
 override native_path = $(subst /,\,$1)
 override cur_dir := $(subst \,/,$(shell echo %CD%))
 else
 override silence = >/dev/null 2>/dev/null || true
-override rmfile = @rm -f $1 $(silence)
-override rmdir = @rm -rf $1 $(silence)
-override mkdir = @mkdir -p $1 $(silence)
+override rmfile = rm -f $1 $(silence)
+override rmdir = rm -rf $1 $(silence)
+override mkdir = mkdir -p $1 $(silence)
 override echo = echo "$(subst ",\",$(subst \,\\,$1))"
 override native_path = $1
 ifeq ($(HOST_OS),windows)
@@ -153,31 +153,44 @@ build: $(OUTPUT_FILE_EXT)
 # Note that object files come before linker flags.
 $(OUTPUT_FILE_EXT): $(objects)
 	@$(call echo,[Linking] $(OUTPUT_FILE_EXT))
-	$(call mkdir,$(dir $@))
+	@$(call mkdir,$(dir $@))
 	@$(CXX) $(objects) $(LDFLAGS) -o $@
 	@$(call echo,[Done])
 
 # Internal targets that build the source files.
-# Note that flags come before the source file.
+# Note that flags come before the files.
+# * C sources
 $(OBJECT_DIR)/%.c.o: %.c
 	@$(call echo,[C] $<)
-	$(call mkdir,$(dir $@))
-	@$(CC) -MMD -MP $(CFLAGS) $< -c -o $@
+	@$(call mkdir,$(dir $@))
+	@$(CC) -MMD -MP $(foreach f,$(filter %.gch,$^),-include-pch $f) $(CFLAGS) $< -c -o $@
+# * C++ sources
 $(OBJECT_DIR)/%.cpp.o: %.cpp
 	@$(call echo,[C++] $<)
-	$(call mkdir,$(dir $@))
-	@$(CXX) -MMD -MP $(CXXFLAGS) $< -c -o $@
+	@$(call mkdir,$(dir $@))
+	@$(CXX) -MMD -MP $(foreach f,$(filter %.gch,$^),-include-pch $f) $(CXXFLAGS) $< -c -o $@
+# * C precompiled headers
+%.h.gch: %.h
+	@$(call echo,[C header] $<)
+	@$(call mkdir,$(dir $@))
+	@$(CC) $(CFLAGS) $< -c -o $@
+# * C++ precompiled headers
+%.hpp.gch: %.hpp
+	@$(call echo,[C++ header] $<)
+	@$(call mkdir,$(dir $@))
+	@$(CXX) $(CXXFLAGS) $< -c -o $@
+# * Windows resources
 $(OBJECT_DIR)/%.res: %.rc
 	@$(call echo,[Resource] $<)
-	$(call mkdir,$(dir $@))
+	@$(call mkdir,$(dir $@))
 	@$(WINDRES) $(WINDRES_FLAGS) -i $< -o $@
 
 # Target: clean the build
 .PHONY: clean
 clean:
 	@$(call echo,[Cleaning])
-	$(call rmdir,$(OBJECT_DIR))
-	$(call rmfile,$(OUTPUT_FILE_EXT))
+	@$(call rmdir,$(OBJECT_DIR))
+	@($(call rmfile,$(OUTPUT_FILE_EXT))) $(foreach file,$(foreach dir,$(SOURCE_DIRS),$(call rwildcard, $(dir), *.gch)),&& ($(call rmfile,$(file))))
 	@$(call echo,[Done])
 
 # Helpers for generating compile_commands.json
@@ -204,7 +217,7 @@ commands_fixed:
 # Target: clean compile_commands.json
 .PHONY: clean_commands
 clean_commands:
-	$(call rmfile,compile_commands.json)
+	@$(call rmfile,compile_commands.json)
 
 # Import saved target
 override saved_target =
