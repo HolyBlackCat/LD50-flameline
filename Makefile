@@ -130,6 +130,13 @@ CXXFLAGS ?= -std=c++17 -Wall -Wextra -pedantic-errors -g
 WINDRES ?= windres
 WINDRES_FLAGS ?= -J rc -O coff
 
+PRECOMPILED_HEADERS ?=
+# `PRECOMPILED_HEADERS` must be a space-separated list of precompiled header entries.
+# Each entry is written as `patterns>header`, where `header` is a header file name (without `.gch`)
+# and `patterns` is a `|`-separated list of file patterns (using `*` as the wildcard character).
+# Files that match a pattern will use this precompiled header.
+# Example: `PRECOMPILED_HEADERS = src/game/*.cpp|src/states/*.cpp>src/pch.hpp lib/*.c>lib/common.h`.
+
 
 # --- LOCATE FILES ---
 
@@ -144,6 +151,11 @@ override dep_files = $(patsubst %.o,%.d,$(filter %.o,$(objects)))
 
 # Add a proper extension to the output file.
 OUTPUT_FILE_EXT ?= $(OUTPUT_FILE)$(extension_exe)
+
+
+# --- HANDLE PRECOMPILED HEADERS ---
+# Here we add precompiled headers as dependencies for corresponding source files. The rest is handled automatically
+$(foreach x,$(PRECOMPILED_HEADERS),$(foreach y,$(filter $(subst *,%,$(subst |, ,$(word 1,$(subst >, ,$x)))),$(SOURCES)),$(eval $(OBJECT_DIR)/$y.o: $(word 2,$(subst >, ,$x)).gch)))
 
 
 # --- COMBINE FLAGS ---
@@ -180,12 +192,10 @@ $(OBJECT_DIR)/%.cpp.o: %.cpp
 # * C precompiled headers
 %.h.gch: %.h
 	@$(call echo,[C header] $<)
-	@$(call mkdir,$(dir $@))
 	@$(CC) $(CFLAGS) $< -c -o $@
 # * C++ precompiled headers
 %.hpp.gch: %.hpp
 	@$(call echo,[C++ header] $<)
-	@$(call mkdir,$(dir $@))
 	@$(CXX) $(CXXFLAGS) $< -c -o $@
 # * Windows resources
 $(OBJECT_DIR)/%.res: %.rc
