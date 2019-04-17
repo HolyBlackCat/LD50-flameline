@@ -90,7 +90,7 @@ override silence = >NUL 2>NUL || (exit 0)
 override rmfile = del /F /Q $(subst /,\,$1) $(silence)
 override rmdir = rd /S /Q $(subst /,\,$1) $(silence)
 override mkdir = mkdir >NUL 2>NUL $(subst /,\,$1) $(silence)
-override echo = echo $1
+override echo = echo $(subst <,^<,$(subst >,^>,$1))
 override native_path = $(subst /,\,$1)
 override cur_dir := $(subst \,/,$(shell echo %CD%))
 else
@@ -107,6 +107,14 @@ else
 override cur_dir := $(PWD)
 endif
 endif
+
+# --- CONFIG FUNCTIONS ---
+override define new_target =
+$(eval
+.PHONY: $(strip $1)
+$(strip $1): generic_build
+)
+endef
 
 
 # --- INCLUDE USER CONFIG ---
@@ -158,8 +166,8 @@ override CXXFLAGS += $(CXXFLAGS_EXTRA)
 # --- TARGETS ---
 
 # Target: generic build
-.PHONY: build
-build: $(OUTPUT_FILE_EXT)
+.PHONY: generic_build
+generic_build: $(OUTPUT_FILE_EXT)
 
 # An internal target that actually builds the executable.
 # Note that object files come before linker flags.
@@ -239,7 +247,7 @@ override saved_target =
 ifeq ($(TARGET),)
 set_current_clean:
 set_current:
-	@$(call echo,Set TARGET variable to a desired target name.)
+	@$(call echo,Set TARGET variable to the desired target name.)
 	@exit 1
 else
 ifeq ($(TARGET),$(strip $(saved_target)))
@@ -249,7 +257,7 @@ else
 set_current_clean: set_current clean
 set_current:
 	@$(call echo,override saved_target := $(TARGET)) >.config.mk
-	@$(call echo,[Info] New target is: $(TARGET))
+	@$(call echo,[Target] -> $(TARGET))
 endif
 endif
 
