@@ -109,6 +109,14 @@ endif
 endif
 
 
+# --- CONFIG FUNCTIONS ---
+
+# Usage (at top level in build_options.mk): $(call use_precompiled_header,HeaderName,FilePatterns)
+# Example: $(call use_precompiled_header,src/my_pch.hpp,src/*.cpp lib/*.cpp)
+# Note that we have to call `rwildcard` manually here because at this point source list isn't updated yet.
+override use_precompiled_header = $(foreach f,$(filter $(subst *,%,$2),$(SOURCES) $(foreach dir,$(SOURCE_DIRS),$(call rwildcard, $(dir), *.c *.cpp))),$(eval $(OBJECT_DIR)/$f.o: $1.gch))
+
+
 # --- INCLUDE USER CONFIG ---
 include build_options.mk
 

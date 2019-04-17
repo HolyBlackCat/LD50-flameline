@@ -28,4 +28,4 @@ release: build
 
 # File-specific flags
 obj/lib/%.cpp.o: override CXXFLAGS += -O3
-obj/src/game/main.cpp.o: src/game/master.hpp.gch
+$(call use_precompiled_header,src/game/master.hpp,src/game/*.cpp)
