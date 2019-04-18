@@ -191,10 +191,10 @@ PRECOMPILED_HEADERS ?=
 override SOURCES += $(strip $(foreach dir,$(SOURCE_DIRS),$(call rwildcard, $(dir), *.c *.cpp *.rc))) # Note the `+=`.
 
 # Object files.
-override objects = $(patsubst %,$(OBJECT_DIR)/%,$(patsubst %.c,%.c.o,$(patsubst %.cpp,%.cpp.o,$(patsubst %.rc,%.rc.o,$(SOURCES)))))
+override objects = $(SOURCES:%=$(OBJECT_DIR)/%.o)
 
 # Dependency lists
-override dep_files = $(patsubst %.o,%.d,$(filter %.o,$(objects)))
+override dep_files = $(patsubst %.o,%.d,$(filter %.c.o %.cpp.o,$(objects)))
 
 # Add a proper extension to the output file.
 OUTPUT_FILE_EXT ?= $(OUTPUT_FILE)$(extension_exe)
@@ -202,7 +202,8 @@ OUTPUT_FILE_EXT ?= $(OUTPUT_FILE)$(extension_exe)
 
 # --- HANDLE PRECOMPILED HEADERS ---
 # Here we add precompiled headers as dependencies for corresponding source files. The rest is handled automatically
-$(foreach x,$(PRECOMPILED_HEADERS),$(foreach y,$(filter $(subst *,%,$(subst |, ,$(word 1,$(subst >, ,$x)))),$(SOURCES)),$(eval $(OBJECT_DIR)/$y.o: $(word 2,$(subst >, ,$x)).gch)))
+$(foreach x,$(PRECOMPILED_HEADERS),$(foreach y,$(filter $(subst *,%,$(subst |, ,$(word 1,$(subst >, ,$x)))),$(SOURCES)),$(eval $(OBJECT_DIR)/$y.o: $(OBJECT_DIR)/$(word 2,$(subst >, ,$x)).gch)))
+override dep_files += $(foreach x,$(PRECOMPILED_HEADERS),$(OBJECT_DIR)/$(word 2,$(subst >, ,$x)).d)
 
 
 # --- COMBINE FLAGS ---
@@ -239,13 +240,15 @@ $(OBJECT_DIR)/%.cpp.o: %.cpp
 	@$(call mkdir,$(dir $@))
 	@$(CXX_COMPILER) -MMD -MP $(foreach f,$(filter %.gch,$^),-include-pch $f) $(CXXFLAGS) $< -c -o $@
 # * C precompiled headers
-%.h.gch: %.h
+$(OBJECT_DIR)/%.h.gch: %.h
 	@$(call echo,[C header] $<)
-	@$(C_COMPILER) $(CFLAGS) $< -c -o $@
+	@$(call mkdir,$(dir $@))
+	@$(C_COMPILER) -MMD -MP $(CFLAGS) $< -c -o $@
 # * C++ precompiled headers
-%.hpp.gch: %.hpp
+$(OBJECT_DIR)/%.hpp.gch: %.hpp
 	@$(call echo,[C++ header] $<)
-	@$(CXX_COMPILER) $(CXXFLAGS) $< -c -o $@
+	@$(call mkdir,$(dir $@))
+	@$(CXX_COMPILER) -MMD -MP $(CXXFLAGS) $< -c -o $@
 # * Windows resources
 $(OBJECT_DIR)/%.rc.o: %.rc
 	@$(call echo,[Resource] $<)
@@ -257,7 +260,7 @@ $(OBJECT_DIR)/%.rc.o: %.rc
 clean:
 	@$(call echo,[Cleaning])
 	@$(call rmdir,$(OBJECT_DIR))
-	@($(call rmfile,$(OUTPUT_FILE_EXT))) $(foreach file,$(foreach dir,$(SOURCE_DIRS),$(call rwildcard, $(dir), *.gch)),&& ($(call rmfile,$(file))))
+	@$(call rmfile,$(OUTPUT_FILE_EXT))
 	@$(call echo,[Done])
 
 # Helpers for generating compile_commands.json
