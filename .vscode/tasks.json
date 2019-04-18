@@ -7,7 +7,6 @@
             "label": "Build",
             "type": "shell",
             "command": "mingw32-make current -j4",
-            "options": {"env": {"CXX": "clang++"}},
             "presentation": {"echo": true, "reveal": "always", "focus": false, "panel": "shared", "showReuseMessage": false, "clear": true},
         },
         {
@@ -28,8 +27,7 @@
         {
             "label": "Update project",
             "type": "shell",
-            "command": "mingw32-make commands_fixed",
-            "options": {"env": {"CXX": "clang++", "EXCLUDE_DIRS": "lib"}},
+            "command": "mingw32-make commands_fixed EXCLUDE_DIRS=lib",
             "presentation": {"echo": true, "reveal": "always", "focus": false, "panel": "shared", "showReuseMessage": false, "clear": true},
         },
         {
@@ -41,22 +39,19 @@
         {
             "label": "-> Debug",
             "type": "shell",
-            "command": "mingw32-make set_current_clean",
-            "options": {"env": {"TARGET": "debug"}},
+            "command": "mingw32-make set_current_clean TARGET=debug",
             "presentation": {"echo": true, "reveal": "always", "focus": false, "panel": "shared", "showReuseMessage": false, "clear": true},
         },
         {
             "label": "-> Debug (hard)",
             "type": "shell",
-            "command": "mingw32-make set_current_clean",
-            "options": {"env": {"TARGET": "debug_hard"}},
+            "command": "mingw32-make set_current_clean TARGET=debug_hard",
             "presentation": {"echo": true, "reveal": "always", "focus": false, "panel": "shared", "showReuseMessage": false, "clear": true},
         },
         {
             "label": "-> Release",
             "type": "shell",
-            "command": "mingw32-make set_current_clean",
-            "options": {"env": {"TARGET": "release"}},
+            "command": "mingw32-make set_current_clean TARGET=release",
             "presentation": {"echo": true, "reveal": "always", "focus": false, "panel": "shared", "showReuseMessage": false, "clear": true},
         },
     ]

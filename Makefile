@@ -27,6 +27,8 @@
 #
 #       <- Compiler flags
 #    CXXFLAGS ?= -Wall -Wextra -pedantic-errors -std=c++2a   <- Those can be easily overriden by user.
+#    LDFLAGS =
+#       <- Important compiler flags (those are not affected by setting `*FLAGS` variables from outside)
 #    override CXXFLAGS += -include src/utils/common.h -include src/program/parachute.h -Ilib/include -Isrc   <- Those are harder to override, define important flags this way.
 #    override LDFLAGS += -Llib -lmingw32 -lSDL2main -lSDL2.dll -lfreetype -lopenal32 -lvorbisfile -lvorbisenc -lvorbis -logg -lbz2 -lz
 #
@@ -128,24 +130,32 @@ endif
 
 
 # --- IMPORT LOCAL CONFIG
+
+# Default value with higher priority than env variables
+POST_BUILD_COMMANDS =
+
+# Include the config
 -include .local_config.mk
+
+# Default value with lower priority than env variables
+WINDRES ?= windres
 
 ifeq (,$(or $(C_COMPILER), $(CXX_COMPILER)))
 $(error No compiler specified.\
    $(lf)Define `C_COMPILER` and/or `CXX_COMPILER` in `.local_config.mk` or somewhere else.\
    $(lf)..)
 endif
-ifeq (,$(LINKER))
+ifeq (,$(or $(C_LINKER), $(CXX_LINKER)))
 $(error No linker specified.\
-   $(lf)Define `LINKER` in `.local_config.mk` or somewhere else.\
-   $(lf)Normally it should be equal to `C_COMPILER` or `CXX_COMPILER`, depending on the project language.\
+   $(lf)Define `C_LINKER` and/or `CXX_LINKER` in `.local_config.mk` or somewhere else.\
+   $(lf)Normally they should be equal to `C_COMPILER` and `CXX_COMPILER`.\
    $(lf)\
-   $(lf)If you're using Clang, you can also add `-fuse-ld=lld` to `LINKER` to greatly improve linking times. See comments in the makefile for details.\
+   $(lf)If you're using Clang, you can also add `-fuse-ld=lld` to those variables to greatly improve linking times. See comments in the makefile for details.\
    $(lf)..)
 # Using `-fuse-ld=lld` enables Clang's experimental LLD linker.
 # If you're using LLD on Windows, note following:
 # * MSYS2's LLD appears to be broken as of now (often hangs when run), so if you want LLD, you need to install the official binaries, then specify
-#     path to the official LLD binary in `LINKER`, along with `-target ...` flag with a target matching whatever target MSYS2's `clang --version` outputs.
+#     path to the official clang/clang++ binary in `C/CXX_LINKER`, along with `-target ...` flag with a target matching whatever target MSYS2's `clang --version` outputs.
 # * LLD will generate `<exec_name>.lib` file alongside the resulting binary. Add following to `.local_config.mk` to automatically delete it:
 #
 #     ifeq ($(TARGET_OS),windows)
@@ -164,25 +174,26 @@ $(strip $1): generic_build
 endef
 
 
-# --- INCLUDE USER CONFIG ---
-include build_options.mk
-
-
 # --- DEFAULT VARIABLE VALUES ---
-SOURCE_DIRS ?= .
-OUTPUT_FILE ?= program
-OBJECT_DIR ?= obj
-CFLAGS ?= -std=c11 -Wall -Wextra -pedantic-errors -g
-CXXFLAGS ?= -std=c++17 -Wall -Wextra -pedantic-errors -g
-WINDRES ?= windres
-POST_BUILD_COMMANDS ?=
+SOURCES =
+SOURCE_DIRS = .
+OUTPUT_FILE = program
+OBJECT_DIR = obj
+CFLAGS = -std=c11 -Wall -Wextra -pedantic-errors -g
+CXXFLAGS = -std=c++17 -Wall -Wextra -pedantic-errors -g
+LDFLAGS =
+LINKER_MODE = CXX # C or CXX
 
-PRECOMPILED_HEADERS ?=
+PRECOMPILED_HEADERS =
 # `PRECOMPILED_HEADERS` must be a space-separated list of precompiled header entries.
 # Each entry is written as `patterns>header`, where `header` is a header file name (without `.gch`)
 # and `patterns` is a `|`-separated list of file patterns (using `*` as the wildcard character).
 # Files that match a pattern will use this precompiled header.
 # Example: `PRECOMPILED_HEADERS = src/game/*.cpp|src/states/*.cpp>src/pch.hpp lib/*.c>lib/common.h`.
+
+
+# --- INCLUDE PROJECT CONFIG ---
+-include build_options.mk
 
 
 # --- LOCATE FILES ---
@@ -197,7 +208,7 @@ override objects = $(SOURCES:%=$(OBJECT_DIR)/%.o)
 override dep_files = $(patsubst %.o,%.d,$(filter %.c.o %.cpp.o,$(objects)))
 
 # Add a proper extension to the output file.
-OUTPUT_FILE_EXT ?= $(OUTPUT_FILE)$(extension_exe)
+OUTPUT_FILE_EXT = $(OUTPUT_FILE)$(extension_exe)
 
 
 # --- HANDLE PRECOMPILED HEADERS ---
@@ -222,7 +233,7 @@ generic_build: $(OUTPUT_FILE_EXT)
 $(OUTPUT_FILE_EXT): $(objects)
 	@$(call echo,[Linking] $(OUTPUT_FILE_EXT))
 	@$(call mkdir,$(dir $@))
-	@$(LINKER) $(objects) $(LDFLAGS) -o $@
+	@$($(LINKER_MODE)_LINKER) $(objects) $(LDFLAGS) -o $@
 	$(if $(POST_BUILD_COMMANDS),@$(call echo,[Finishing]))
 	$(POST_BUILD_COMMANDS)
 	@$(call echo,[Done])
@@ -264,7 +275,9 @@ clean:
 	@$(call echo,[Done])
 
 # Helpers for generating compile_commands.json
-override EXCLUDE_FILES += $(foreach dir,$(EXCLUDE_DIRS), $(call rwildcard,$(dir),*.c *.cpp *.h *.hpp)) # Note the `+=`.
+EXCLUDE_FILES =
+EXCLUDE_DIRS =
+override EXCLUDE_FILES += $(foreach dir,$(EXCLUDE_DIRS), $(call rwildcard,$(dir),*.c *.cpp *.h *.hpp))
 override include_files = $(filter-out $(EXCLUDE_FILES), $(SOURCES))
 override file_command = && $(call echo,{"directory": "."$(comma) "file": "$(cur_dir)/$2"$(comma) "command": "$1 $2"}$(comma)) >>compile_commands.json
 override all_commands = $(foreach file,$(filter %.c,$(include_files)),$(call file_command,$(C_COMPILER) $(CFLAGS),$(file))) $(foreach file,$(filter %.cpp,$(include_files)),$(call file_command,$(CXX_COMPILER) $(CXXFLAGS),$(file)))
@@ -294,6 +307,7 @@ override saved_target =
 -include .current_target.mk
 
 # Target: set target for `make current`
+TARGET =
 .PHONY: set_current
 .PHONY: set_current_clean
 ifeq ($(TARGET),)

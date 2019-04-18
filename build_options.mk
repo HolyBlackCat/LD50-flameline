@@ -1,14 +1,17 @@
 # Sources
-override SOURCE_DIRS += src lib
+SOURCE_DIRS = src lib
 
 # Object directory
-OBJECT_DIR ?= obj
+OBJECT_DIR = obj
 
 # Resulting binary
-OUTPUT_FILE ?= bin/imp-re
+OUTPUT_FILE = bin/imp-re
+LINKER_MODE = CXX
 
 # Flags
-CXXFLAGS ?= -Wall -Wextra -pedantic-errors -std=c++2a
+CXXFLAGS = -Wall -Wextra -pedantic-errors -std=c++2a
+LDFLAGS =
+# Important flags
 override CXXFLAGS += -include src/utils/common.h -include src/program/parachute.h -Ilib/include -Isrc
 override LDFLAGS += -Llib -lmingw32 -lSDL2main -lSDL2.dll -lfreetype -lopenal32 -lvorbisfile -lvorbisenc -lvorbis -logg -lbz2 -lz -lfmt -pthread
 
@@ -27,4 +30,4 @@ release: override LDFLAGS += -O3 -s -mwindows
 obj/lib/%.cpp.o: override CXXFLAGS += -O3
 
 # Precompiled headers
-PRECOMPILED_HEADERS ?= src/game/*.cpp>src/game/master.hpp
+PRECOMPILED_HEADERS = src/game/*.cpp>src/game/master.hpp
