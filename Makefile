@@ -170,40 +170,42 @@ endif
 
 
 # --- CONFIG FUNCTIONS ---
-override mode_list =
-override last_mode =
+override mode_list :=
+override last_mode :=
 
-# Make new mode
+# Function: make new mode.
+# Example: `$(call new_mode,debug)`.
 override define new_mode =
 $(eval
 override mode_list += $1
-override last_mode = $1
+override last_mode := $1
 .PHONY: __mode_$(strip $1)
 __mode_$(strip $1): __generic_build
 )
 endef
 
-# Change mode flags
-override mode_flags = __mode_$(last_mode):
+# Function: set mode-specific flags. It only affects the last defined mode.
+# Example: `$(mode_flags) CXXFLAGS += -g`.
+override mode_flags = __mode_$(last_mode): override$(space)
 
-# Check if mode exists
+# Internal function: check if mode exists.
 # Note that we shouldn't use `findstring` here, since it can match a part of mode name.
 override mode_exists = $(filter $1,$(mode_list))
 
 
 # --- DEFAULT VARIABLE VALUES ---
-SOURCES =
-SOURCE_DIRS = .
-OUTPUT_FILE = program
-OUTPUT_FILE_EXT = $(OUTPUT_FILE)$(extension_exe) # Output filename with extension. Normally you don't need to touch this, override `OUTPUT_FILE` instead.
-OBJECT_DIR = obj
-CFLAGS = -std=c11 -Wall -Wextra -pedantic-errors -g
-CXXFLAGS = -std=c++17 -Wall -Wextra -pedantic-errors -g
-LDFLAGS =
-LINKER_MODE = CXX # C or CXX
-ALLOW_PCH = 1 # 0 or 1
+SOURCES :=
+SOURCE_DIRS := .
+OUTPUT_FILE := program
+OUTPUT_FILE_EXT = $(OUTPUT_FILE)$(extension_exe) # Output filename with extension. Normally you don't need to touch this, override `OUTPUT_FILE` instead. Note that we can't use `:=` here.
+OBJECT_DIR := obj
+CFLAGS := -std=c11 -Wall -Wextra -pedantic-errors -g
+CXXFLAGS := -std=c++17 -Wall -Wextra -pedantic-errors -g
+LDFLAGS :=
+LINKER_MODE := CXX # C or CXX
+ALLOW_PCH := 1 # 0 or 1
 
-PRECOMPILED_HEADERS =
+PRECOMPILED_HEADERS :=
 # Controls recompiled headers. Must be a space-separated list.
 # Each entry is written as `patterns>header`, where `header` is a header file name (without `.gch`)
 # and `patterns` is a `|`-separated list of file names or name patterns (using `*` as a wildcard character).
@@ -211,7 +213,7 @@ PRECOMPILED_HEADERS =
 # Example: `PRECOMPILED_HEADERS = src/game/*.cpp|src/states/*.cpp>src/pch.hpp lib/*.c>lib/common.h`.
 # If `ALLOW_PCH` == 0, then headers are not precompiled, but are still included using compiler flags.
 
-FILE_SPECIFIC_FLAGS =
+FILE_SPECIFIC_FLAGS :=
 # Applies additional flags to specific files. Must be a `|`-separated list.
 # Each entry is written as `patterns>flags`, where `patterns` is a space-separated list of file names or
 # name patterns (using `*` as a wildcard character) and `flags` is a space-separated list of flags.
@@ -225,15 +227,12 @@ FILE_SPECIFIC_FLAGS =
 # --- SELECT BUILD MODE ---
 
 # Prevent env variables from overriding `target`.
-mode =
+mode :=
 
 # Try loading saved mode name
 override current_mode :=
 -include .current_mode.mk
 $(if $(current_mode),$(if $(call mode_exists,$(current_mode)),,$(error Invalid mode name specified in `.current_mode.mk`. Delete that file and try again)))
-
-# Function that checks if a mode name is valid
-override is_valid_mode =
 
 # Target: Make sure a valid mode is selected. Save current mode to the config file if necessary.
 .PHONY: __check_mode
@@ -277,15 +276,15 @@ override FILE_SPECIFIC_FLAGS += $(FILE_SPECIFIC_FLAGS_EXTRA)
 override SOURCES += $(strip $(foreach dir,$(SOURCE_DIRS),$(call rwildcard, $(dir), *.c *.cpp *.rc))) # Note the `+=`.
 
 # Object files.
-override objects = $(SOURCES:%=$(OBJECT_DIR)/%.o)
+override objects := $(SOURCES:%=$(OBJECT_DIR)/%.o)
 
 # Dependency lists
-override dep_files = $(patsubst %.o,%.d,$(filter %.c.o %.cpp.o,$(objects)))
+override dep_files := $(patsubst %.o,%.d,$(filter %.c.o %.cpp.o,$(objects)))
 
 
 # --- HANDLE PRECOMPILED HEADERS ---
 # List of all precompiled headers.
-override pch_headers = $(foreach x,$(PRECOMPILED_HEADERS),$(word 2,$(subst >, ,$x)))
+override pch_headers := $(foreach x,$(PRECOMPILED_HEADERS),$(word 2,$(subst >, ,$x)))
 # Add precompiled headers as dependencies for corresponding source files. The rest is handled automatically.
 $(foreach x,$(PRECOMPILED_HEADERS),$(foreach y,$(filter $(subst *,%,$(subst |, ,$(word 1,$(subst >, ,$x)))),$(SOURCES)),$(eval $(OBJECT_DIR)/$y.o: $(OBJECT_DIR)/$(word 2,$(subst >, ,$x)).gch)))
 ifeq ($(strip $(ALLOW_PCH)),1)
@@ -300,7 +299,7 @@ endif
 
 
 # --- HANDLE FILE-SPECIFIC FLAGS ---
-override file_local_flags =
+override file_local_flags :=
 $(foreach x,$(subst |, ,$(subst $(space),<,$(FILE_SPECIFIC_FLAGS))),$(foreach y,$(filter $(subst *,%,$(subst <, ,$(word 1,$(subst >, ,$x)))),$(SOURCES)),\
 																	  $(eval $(OBJECT_DIR)/$y.o: override file_local_flags += $(strip $(subst <, ,$(word 2,$(subst >, ,$x)))))))
 
@@ -385,6 +384,7 @@ $(OBJECT_DIR)/%.rc.o: %.rc
 	@$(WINDRES) $(WINDRES_FLAGS) -i $< -o $@
 
 # Helpers for generating compile_commands.json
+# Note that we avoid using `:=` here because those aren't used often.
 EXCLUDE_FILES =
 EXCLUDE_DIRS =
 override EXCLUDE_FILES += $(foreach dir,$(EXCLUDE_DIRS), $(call rwildcard,$(dir),*.c *.cpp *.h *.hpp))
