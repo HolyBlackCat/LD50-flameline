@@ -1,5 +1,3 @@
-#include "master.hpp"
-
 int main()
 {
     ivec2 window_size(800, 600);

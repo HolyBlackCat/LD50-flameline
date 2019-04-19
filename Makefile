@@ -1,4 +1,4 @@
-# This file is an universal makefile for C/C++ executables.
+# This file is an universal makefile for simple C/C++ executable projects.
 #
 # Notable make targets include:
 #    Whatever build mode targets you define (see below).
@@ -131,35 +131,35 @@ endif
 
 # --- IMPORT LOCAL CONFIG
 
-# Default value with higher priority than env variables
+# Default settings with higher priority than env variables
 POST_BUILD_COMMANDS =
 
 # Include the config
 -include .local_config.mk
 
-# Default value with lower priority than env variables
+# Default settings with lower priority than env variables
 WINDRES ?= windres
 
 ifeq (,$(or $(C_COMPILER), $(CXX_COMPILER)))
 $(error No compiler specified.\
-   $(lf)Define `C_COMPILER` and/or `CXX_COMPILER` in `.local_config.mk` or somewhere else.\
+   $(lf)Define `C_COMPILER` and/or `CXX_COMPILER` in `.local_config.mk` or directly when invoking `make`.\
    $(lf)..)
 endif
 ifeq (,$(or $(C_LINKER), $(CXX_LINKER)))
 $(error No linker specified.\
-   $(lf)Define `C_LINKER` and/or `CXX_LINKER` in `.local_config.mk` or somewhere else.\
+   $(lf)Define `C_LINKER` and/or `CXX_LINKER` in `.local_config.mk` or directly when invoking `make`.\
    $(lf)Normally they should be equal to `C_COMPILER` and `CXX_COMPILER`.\
    $(lf)\
-   $(lf)If you're using Clang, you can also add `-fuse-ld=lld` to those variables to greatly improve linking times. See comments in the makefile for details.\
+   $(lf)If you're using Clang, consider using LLD linker to improve linking times. See comments in the makefile for details.\
    $(lf)..)
-# Using `-fuse-ld=lld` enables Clang's experimental LLD linker.
+# To use LLD linker, append `-fuse-ld=lld` to `*_LINKER` variables.
 # If you're using LLD on Windows, note following:
-# * MSYS2's LLD appears to be broken as of now (often hangs when run), so if you want LLD, you need to install the official binaries, then specify
+# * MSYS2's LLD appears to be broken as of now (often hangs when run), so you need to install the official binaries. Specify
 #     path to the official clang/clang++ binary in `C/CXX_LINKER`, along with `-target ...` flag with a target matching whatever target MSYS2's `clang --version` outputs.
 # * LLD will generate `<exec_name>.lib` file alongside the resulting binary. Add following to `.local_config.mk` to automatically delete it:
 #
 #     ifeq ($(TARGET_OS),windows)
-#     POST_BUILD_COMMANDS = @$(call rmfile, $(OUTPUT_FILE).lib)
+#     POST_BUILD_COMMANDS = @$(call rmfile,$(OUTPUT_FILE).lib)
 #     endif
 #
 endif
@@ -178,11 +178,13 @@ endef
 SOURCES =
 SOURCE_DIRS = .
 OUTPUT_FILE = program
+OUTPUT_FILE_EXT = $(OUTPUT_FILE)$(extension_exe) # Output filename with extension. Normally you don't need to touch this, override `OUTPUT_FILE` instead.
 OBJECT_DIR = obj
 CFLAGS = -std=c11 -Wall -Wextra -pedantic-errors -g
 CXXFLAGS = -std=c++17 -Wall -Wextra -pedantic-errors -g
 LDFLAGS =
 LINKER_MODE = CXX # C or CXX
+ALLOW_PCH = 1 # 0 or 1
 
 PRECOMPILED_HEADERS =
 # `PRECOMPILED_HEADERS` must be a space-separated list of precompiled header entries.
@@ -190,6 +192,7 @@ PRECOMPILED_HEADERS =
 # and `patterns` is a `|`-separated list of file patterns (using `*` as the wildcard character).
 # Files that match a pattern will use this precompiled header.
 # Example: `PRECOMPILED_HEADERS = src/game/*.cpp|src/states/*.cpp>src/pch.hpp lib/*.c>lib/common.h`.
+# If `ALLOW_PCH` == 0, then headers are not precompiled, but still included using compiler flags.
 
 
 # --- INCLUDE PROJECT CONFIG ---
@@ -207,14 +210,16 @@ override objects = $(SOURCES:%=$(OBJECT_DIR)/%.o)
 # Dependency lists
 override dep_files = $(patsubst %.o,%.d,$(filter %.c.o %.cpp.o,$(objects)))
 
-# Add a proper extension to the output file.
-OUTPUT_FILE_EXT = $(OUTPUT_FILE)$(extension_exe)
-
 
 # --- HANDLE PRECOMPILED HEADERS ---
+ifeq ($(strip $(ALLOW_PCH)),1)
 # Here we add precompiled headers as dependencies for corresponding source files. The rest is handled automatically
 $(foreach x,$(PRECOMPILED_HEADERS),$(foreach y,$(filter $(subst *,%,$(subst |, ,$(word 1,$(subst >, ,$x)))),$(SOURCES)),$(eval $(OBJECT_DIR)/$y.o: $(OBJECT_DIR)/$(word 2,$(subst >, ,$x)).gch)))
 override dep_files += $(foreach x,$(PRECOMPILED_HEADERS),$(OBJECT_DIR)/$(word 2,$(subst >, ,$x)).d)
+override include_pch = -include $(patsubst %.gch,%,$1)
+else
+override include_pch = -include $(patsubst $(OBJECT_DIR)/%.gch,%,$1)
+endif
 
 
 # --- COMBINE FLAGS ---
@@ -244,12 +249,12 @@ $(OUTPUT_FILE_EXT): $(objects)
 $(OBJECT_DIR)/%.c.o: %.c
 	@$(call echo,[C] $<)
 	@$(call mkdir,$(dir $@))
-	@$(C_COMPILER) -MMD -MP $(foreach f,$(filter %.gch,$^),-include-pch $f) $(CFLAGS) $< -c -o $@
+	@$(C_COMPILER) -MMD -MP $(foreach f,$(filter %.gch,$^),$(call include_pch,$f)) $(CFLAGS) $< -c -o $@
 # * C++ sources
 $(OBJECT_DIR)/%.cpp.o: %.cpp
 	@$(call echo,[C++] $<)
 	@$(call mkdir,$(dir $@))
-	@$(CXX_COMPILER) -MMD -MP $(foreach f,$(filter %.gch,$^),-include-pch $f) $(CXXFLAGS) $< -c -o $@
+	@$(CXX_COMPILER) -MMD -MP $(foreach f,$(filter %.gch,$^),$(call include_pch,$f)) $(CXXFLAGS) $< -c -o $@
 # * C precompiled headers
 $(OBJECT_DIR)/%.h.gch: %.h
 	@$(call echo,[C header] $<)
@@ -279,9 +284,11 @@ EXCLUDE_FILES =
 EXCLUDE_DIRS =
 override EXCLUDE_FILES += $(foreach dir,$(EXCLUDE_DIRS), $(call rwildcard,$(dir),*.c *.cpp *.h *.hpp))
 override include_files = $(filter-out $(EXCLUDE_FILES), $(SOURCES))
-override file_command = && $(call echo,{"directory": "."$(comma) "file": "$(cur_dir)/$2"$(comma) "command": "$1 $2"}$(comma)) >>compile_commands.json
-override all_commands = $(foreach file,$(filter %.c,$(include_files)),$(call file_command,$(C_COMPILER) $(CFLAGS),$(file))) $(foreach file,$(filter %.cpp,$(include_files)),$(call file_command,$(CXX_COMPILER) $(CXXFLAGS),$(file)))
-override all_stub_commands = $(foreach file,$(EXCLUDE_FILES),$(call file_command,,$(file)))
+override file_headers = $(foreach x,$(PRECOMPILED_HEADERS),$(if $(filter $(subst *,%,$(subst |, ,$(word 1,$(subst >, ,$x)))),$1),-include $(word 2,$(subst >, ,$x))))
+override file_command = && $(call echo,{"directory": "."$(comma) "file": "$(cur_dir)/$3"$(comma) "command": "$(strip $1 $(call file_headers,$3) $2 $3)"}$(comma)) >>compile_commands.json
+override all_commands = $(foreach f,$(filter %.c,$(include_files)),$(call file_command,$(C_COMPILER),$(CFLAGS),$f)) \
+						$(foreach f,$(filter %.cpp,$(include_files)),$(call file_command,$(CXX_COMPILER),$(CXXFLAGS),$f))
+override all_stub_commands = $(foreach file,$(EXCLUDE_FILES),$(call file_command,,,$(file)))
 
 # Target: generate compile_commands.json
 .PHONY: commands
