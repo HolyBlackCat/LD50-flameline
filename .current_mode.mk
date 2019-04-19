@@ -1,1 +1,1 @@
-override CURRENT_MODE := debug
+override current_mode := debug

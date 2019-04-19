@@ -228,9 +228,9 @@ FILE_SPECIFIC_FLAGS =
 mode =
 
 # Try loading saved mode name
-override CURRENT_MODE :=
+override current_mode :=
 -include .current_mode.mk
-$(if $(CURRENT_MODE),$(if $(call mode_exists,$(CURRENT_MODE)),,$(error Invalid mode name specified in `.current_mode.mk`. Delete that file and try again)))
+$(if $(current_mode),$(if $(call mode_exists,$(current_mode)),,$(error Invalid mode name specified in `.current_mode.mk`. Delete that file and try again)))
 
 # Function that checks if a mode name is valid
 override is_valid_mode =
@@ -239,20 +239,21 @@ override is_valid_mode =
 .PHONY: __check_mode
 __check_mode:
 ifeq ($(strip $(mode)),)
-ifeq ($(strip $(CURRENT_MODE)),)
+ifeq ($(strip $(current_mode)),)
 __check_mode:
 	$(error No build mode selected.\
 		$(lf)Add `mode=...` to the flags. Selected mode will be remembered and used by default until changed.\
 		$(lf)You can also do `make use mode=...` to change mode without doing anything else)
 endif
 else
-ifneq ($(strip $(mode)),$(strip $(CURRENT_MODE)))
+ifneq ($(strip $(mode)),$(strip $(current_mode)))
 # Check if specified target is valid
 __check_mode:
-	$(if $(call mode_exists,$(mode)),,$(error Invalid build mode specified))
-	@$(call echo,override CURRENT_MODE := $(mode)) >.current_mode.mk
-	$(info [Info] Changed target to: $(mode))
-override CURRENT_MODE := $(mode)
+	$(if $(call mode_exists,$(mode)),,$(error Invalid build mode specified.\
+		$(lf)Expected one of: $(mode_list)))
+	@$(call echo,override current_mode := $(mode)) >.current_mode.mk
+	$(info [Info] Changed build mode to: $(mode))
+override current_mode := $(mode)
 endif
 endif
 
@@ -263,7 +264,8 @@ __no_mode_needed:
 
 
 # --- COMBINE FLAGS ---
-override OBJECT_DIR := $(OBJECT_DIR)/$(CURRENT_MODE)
+override common_object_dir := $(OBJECT_DIR)
+override OBJECT_DIR := $(OBJECT_DIR)/$(current_mode)
 override CFLAGS += $(CFLAGS_EXTRA)
 override CXXFLAGS += $(CXXFLAGS_EXTRA)
 override FILE_SPECIFIC_FLAGS += $(FILE_SPECIFIC_FLAGS_EXTRA)
@@ -285,9 +287,12 @@ override dep_files = $(patsubst %.o,%.d,$(filter %.c.o %.cpp.o,$(objects)))
 # Here we add precompiled headers as dependencies for corresponding source files. The rest is handled automatically
 $(foreach x,$(PRECOMPILED_HEADERS),$(foreach y,$(filter $(subst *,%,$(subst |, ,$(word 1,$(subst >, ,$x)))),$(SOURCES)),$(eval $(OBJECT_DIR)/$y.o: $(OBJECT_DIR)/$(word 2,$(subst >, ,$x)).gch)))
 ifeq ($(strip $(ALLOW_PCH)),1)
+# Register dependency files for precompiled headers.
 override dep_files += $(foreach x,$(PRECOMPILED_HEADERS),$(OBJECT_DIR)/$(word 2,$(subst >, ,$x)).d)
+# This function processes compiler flags for files. If this file uses a PCH, all `-include` flags are removed and the PCH is included instead.
 override add_pch_to_flags = $(if $2,$(filter-out -include|%,$(subst -include ,-include|,$(strip $1))) -include $(patsubst %.gch,%,$2),$1)
 else
+# This function processes compiler flags for files when PCHs are disabled. If this file uses a PCH, non-precompiled version of that header is included.
 override add_pch_to_flags = $1 $(if $2,-include $(patsubst $(OBJECT_DIR)/%.gch,%,$2))
 endif
 
@@ -300,21 +305,37 @@ $(foreach x,$(subst |, ,$(subst $(space),<,$(FILE_SPECIFIC_FLAGS))),$(foreach y,
 
 # --- TARGETS ---
 
-# Public target: set mode without doing anything else.
+# Public: set mode without doing anything else.
 .PHONY: use
 use: __check_mode
 	$(if $(mode),,$(error No build mode specified.\
 		$(lf)Add `mode=...` to the flags to change mode))
 
-# Public target: build stuff.
+# Public: build stuff.
 .PHONY: build
-build: __check_mode __mode_$(CURRENT_MODE)
+build: __check_mode __mode_$(current_mode)
 
-# Internal target: generic build. This is used by `__mode_*` targets.
+# Public: clean everything.
+.PHONY: clean
+clean: __no_mode_needed
+	$(info [Cleaning] <everything>)
+	@$(call rmdir,$(common_object_dir))
+	@$(call rmfile,$(OUTPUT_FILE_EXT))
+	$(info [Done])
+
+# Public: clean files for the current build mode.
+.PHONY: clean_mode
+clean_mode: __check_mode
+	$(info [Cleaning] $(current_mode))
+	@$(call rmdir,$(OBJECT_DIR))
+	@$(call rmfile,$(OUTPUT_FILE_EXT))
+	$(info [Done])
+
+# Internal: generic build. This is used by `__mode_*` targets.
 .PHONY: __generic_build
 __generic_build: $(OUTPUT_FILE_EXT)
 
-# Internal target: actually build the executable.
+# Internal: actually build the executable.
 # Note that object files come before linker flags.
 $(OUTPUT_FILE_EXT): $(objects)
 	$(info [Linking] $(OUTPUT_FILE_EXT))
@@ -325,7 +346,7 @@ $(OUTPUT_FILE_EXT): $(objects)
 	$(info [Done])
 
 # Internal targets that build the source files.
-# Note that flags come before the files. Note that file-specific flags aren't passed to `add_pch_to_flags`, to prevent removal of `-include` from them
+# Note that flags come before the files. Note that file-specific flags aren't passed to `add_pch_to_flags`, to prevent removal of `-include` from them.
 # * C sources
 $(OBJECT_DIR)/%.c.o: %.c
 	$(info [C] $<)
@@ -361,14 +382,6 @@ $(OBJECT_DIR)/%.rc.o: %.rc
 	@$(call mkdir,$(dir $@))
 	@$(WINDRES) $(WINDRES_FLAGS) -i $< -o $@
 
-# Target: clean the build
-.PHONY: clean
-clean: __no_mode_needed
-	$(info [Cleaning])
-	@$(call rmdir,$(OBJECT_DIR))
-	@$(call rmfile,$(OUTPUT_FILE_EXT))
-	$(info [Done])
-
 # Helpers for generating compile_commands.json
 EXCLUDE_FILES =
 EXCLUDE_DIRS =
@@ -381,21 +394,23 @@ override all_commands = $(foreach f,$(filter %.c,$(include_files)),$(call file_c
 						$(foreach f,$(filter %.cpp,$(include_files)),$(call file_command,$(CXX_COMPILER),$(CXXFLAGS),$f))
 override all_stub_commands = $(foreach file,$(EXCLUDE_FILES),$(call file_command,,,$(file)))
 
-# Target: generate compile_commands.json
+# Public: generate `compile_commands.json`.
+#   Target-specific
 .PHONY: commands
 commands: __no_mode_needed
 	$(info [Generating] compile_commands.json)
 	@$(call echo,[) >compile_commands.json $(all_commands) && $(call echo,]) >>compile_commands.json
 	$(info [Done])
 
-# Target: generate compile_commands.json with invalid commands for EXCLUDE_FILES and all files from EXCLUDE_DIRS.
+# Public: same as `commands`, but `compile_commands.json` will contain invalid commands for `EXCLUDE_FILES` and all files from `EXCLUDE_DIRS`.
+#   This helps to get rid on unwanted warnings in files not under your control when using clangd, by disabling clangd on those excluded files.
 .PHONY: commands_fixed
 commands_fixed: __no_mode_needed
 	$(info [Generating] compile_commands.json (fixed))
 	@$(call echo,[) >compile_commands.json $(all_commands) $(all_stub_commands) && $(call echo,]) >>compile_commands.json
 	$(info [Done])
 
-# Target: clean compile_commands.json
+# Public: `remove compile_commands.json`.
 .PHONY: clean_commands
 clean_commands: __no_mode_needed
 	@$(call rmfile,compile_commands.json)
