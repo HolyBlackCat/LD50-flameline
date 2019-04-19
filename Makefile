@@ -9,13 +9,13 @@
 #                          not under your control (such as library headers) might improve experience when using clangd (e.g. as a vscode plugin), since
 #                          it prevents any clang-tidy warnings from appearing in excluded files. Sadly it also prevents clangd from working with excluded files at all.
 #    current           - Builds currently selected target. This is useful for IDE integration.
-#    set_current       - Selects a target based on the value of `TARGET`. The setting is saved in `.current_target.mk`.
+#    set_current       - Selects a target based on the value of `TARGET`. The setting is saved in `.current_mode.mk`.
 #    set_current_clean - Same as `set_current`, but also cleans the repo.
 #
 #
 #
 # It requires a GCC-like compiler with support for `-MMD -MP` flags.
-# You need to have a separate file called `build_options.mk` in the same directory, which has to contain some high-level build options.
+# You need to have a separate file called `project_config.mk` in the same directory, which has to contain some high-level build options.
 # An example of such file is provided below:
 #
 #    override SOURCE_DIRS += src lib   <- All *.c/*.cpp/*.rc files from these directories will be compiled and linked.
@@ -51,6 +51,10 @@
 # You will be asked to create this file and add specific variables to it if they're missing.
 #
 # You might want to add `.*.mk` to your `.gitignore`.
+
+
+# --- DEFAULT TARGET ---
+build:
 
 
 # --- DEFINITIONS ---
@@ -144,16 +148,14 @@ WINDRES ?= windres
 
 ifeq (,$(or $(C_COMPILER), $(CXX_COMPILER)))
 $(error No compiler specified.\
-   $(lf)Define `C_COMPILER` and/or `CXX_COMPILER` in `.local_config.mk` or directly when invoking `make`.\
-   $(lf)..)
+	$(lf)Define `C_COMPILER` and/or `CXX_COMPILER` in `.local_config.mk` or directly when invoking `make`)
 endif
 ifeq (,$(or $(C_LINKER), $(CXX_LINKER)))
 $(error No linker specified.\
-   $(lf)Define `C_LINKER` and/or `CXX_LINKER` in `.local_config.mk` or directly when invoking `make`.\
-   $(lf)Normally they should be equal to `C_COMPILER` and `CXX_COMPILER`.\
-   $(lf)\
-   $(lf)If you're using Clang, consider using LLD linker to improve linking times. See comments in the makefile for details.\
-   $(lf)..)
+	$(lf)Define `C_LINKER` and/or `CXX_LINKER` in `.local_config.mk` or directly when invoking `make`.\
+	$(lf)Normally they should be equal to `C_COMPILER` and `CXX_COMPILER`.\
+	$(lf)\
+	$(lf)If you're using Clang, consider using LLD linker to improve linking times. See comments in the makefile for details)
 # To use LLD linker, append `-fuse-ld=lld` to `*_LINKER` variables.
 # If you're using LLD on Windows, note following:
 # * MSYS2's LLD appears to be broken as of now (often hangs when run), so you need to install the official binaries. Specify
@@ -168,12 +170,25 @@ endif
 
 
 # --- CONFIG FUNCTIONS ---
-override define new_target =
+override mode_list =
+override last_mode =
+
+# Make new mode
+override define new_mode =
 $(eval
-.PHONY: $(strip $1)
-$(strip $1): generic_build
+override mode_list += $1
+override last_mode = $1
+.PHONY: __mode_$(strip $1)
+__mode_$(strip $1): __generic_build
 )
 endef
+
+# Change mode flags
+override mode_flags = __mode_$(last_mode):
+
+# Check if mode exists
+# Note that we shouldn't use `findstring` here, since it can match a part of mode name.
+override mode_exists = $(filter $1,$(mode_list))
 
 
 # --- DEFAULT VARIABLE VALUES ---
@@ -204,10 +219,51 @@ FILE_SPECIFIC_FLAGS =
 
 
 # --- INCLUDE PROJECT CONFIG ---
--include build_options.mk
+-include project_config.mk
+
+
+# --- SELECT BUILD MODE ---
+
+# Prevent env variables from overriding `target`.
+mode =
+
+# Try loading saved mode name
+override CURRENT_MODE :=
+-include .current_mode.mk
+$(if $(CURRENT_MODE),$(if $(call mode_exists,$(CURRENT_MODE)),,$(error Invalid mode name specified in `.current_mode.mk`. Delete that file and try again)))
+
+# Function that checks if a mode name is valid
+override is_valid_mode =
+
+# Target: Make sure a valid mode is selected. Save current mode to the config file if necessary.
+.PHONY: __check_mode
+__check_mode:
+ifeq ($(strip $(mode)),)
+ifeq ($(strip $(CURRENT_MODE)),)
+__check_mode:
+	$(error No build mode selected.\
+		$(lf)Add `mode=...` to the flags. Selected mode will be remembered and used by default until changed.\
+		$(lf)You can also do `make use mode=...` to change mode without doing anything else)
+endif
+else
+ifneq ($(strip $(mode)),$(strip $(CURRENT_MODE)))
+# Check if specified target is valid
+__check_mode:
+	$(if $(call mode_exists,$(mode)),,$(error Invalid build mode specified))
+	@$(call echo,override CURRENT_MODE := $(mode)) >.current_mode.mk
+	$(info [Info] Changed target to: $(mode))
+override CURRENT_MODE := $(mode)
+endif
+endif
+
+# Target: Make sure no mode is specified in the flags. (Use this for targets that don't need to know build mode.)
+.PHONY:
+__no_mode_needed:
+	$(if $(mode),$(error This operation doesn't require a build mode))
 
 
 # --- COMBINE FLAGS ---
+override OBJECT_DIR := $(OBJECT_DIR)/$(CURRENT_MODE)
 override CFLAGS += $(CFLAGS_EXTRA)
 override CXXFLAGS += $(CXXFLAGS_EXTRA)
 override FILE_SPECIFIC_FLAGS += $(FILE_SPECIFIC_FLAGS_EXTRA)
@@ -241,43 +297,54 @@ override file_local_flags =
 $(foreach x,$(subst |, ,$(subst $(space),<,$(FILE_SPECIFIC_FLAGS))),$(foreach y,$(filter $(subst *,%,$(subst <, ,$(word 1,$(subst >, ,$x)))),$(SOURCES)),\
 																	  $(eval $(OBJECT_DIR)/$y.o: override file_local_flags += $(strip $(subst <, ,$(word 2,$(subst >, ,$x)))))))
 
+
 # --- TARGETS ---
 
-# Target: generic build
-.PHONY: generic_build
-generic_build: $(OUTPUT_FILE_EXT)
+# Public target: set mode without doing anything else.
+.PHONY: use
+use: __check_mode
+	$(if $(mode),,$(error No build mode specified.\
+		$(lf)Add `mode=...` to the flags to change mode))
 
-# An internal target that actually builds the executable.
+# Public target: build stuff.
+.PHONY: build
+build: __check_mode __mode_$(CURRENT_MODE)
+
+# Internal target: generic build. This is used by `__mode_*` targets.
+.PHONY: __generic_build
+__generic_build: $(OUTPUT_FILE_EXT)
+
+# Internal target: actually build the executable.
 # Note that object files come before linker flags.
 $(OUTPUT_FILE_EXT): $(objects)
-	@$(call echo,[Linking] $(OUTPUT_FILE_EXT))
+	$(info [Linking] $(OUTPUT_FILE_EXT))
 	@$(call mkdir,$(dir $@))
 	@$($(LINKER_MODE)_LINKER) $(objects) $(LDFLAGS) -o $@
-	$(if $(POST_BUILD_COMMANDS),@$(call echo,[Finishing]))
+	$(if $(POST_BUILD_COMMANDS),$(info [Finishing]))
 	$(POST_BUILD_COMMANDS)
-	@$(call echo,[Done])
+	$(info [Done])
 
 # Internal targets that build the source files.
 # Note that flags come before the files. Note that file-specific flags aren't passed to `add_pch_to_flags`, to prevent removal of `-include` from them
 # * C sources
 $(OBJECT_DIR)/%.c.o: %.c
-	@$(call echo,[C] $<)
+	$(info [C] $<)
 	@$(call mkdir,$(dir $@))
 	@$(strip $(C_COMPILER) -MMD -MP $(call add_pch_to_flags,$(CFLAGS),$(filter %.gch,$^)) $(file_local_flags) $< -c -o $@)
 # * C++ sources
 $(OBJECT_DIR)/%.cpp.o: %.cpp
-	@$(call echo,[C++] $<)
+	$(info [C++] $<)
 	@$(call mkdir,$(dir $@))
 	@$(strip $(CXX_COMPILER) -MMD -MP $(call add_pch_to_flags,$(CXXFLAGS),$(filter %.gch,$^)) $(file_local_flags) $< -c -o $@)
 ifeq ($(strip $(ALLOW_PCH)),1)
 # * C precompiled headers
 $(OBJECT_DIR)/%.h.gch: %.h
-	@$(call echo,[C header] $<)
+	$(info [C header] $<)
 	@$(call mkdir,$(dir $@))
 	@$(strip $(C_COMPILER) -MMD -MP $(CFLAGS) $(file_local_flags) $< -c -o $@)
 # * C++ precompiled headers
 $(OBJECT_DIR)/%.hpp.gch: %.hpp
-	@$(call echo,[C++ header] $<)
+	$(info [C++ header] $<)
 	@$(call mkdir,$(dir $@))
 	@$(strip $(CXX_COMPILER) -MMD -MP $(CXXFLAGS) $(file_local_flags) $< -c -o $@)
 else
@@ -290,17 +357,17 @@ $(OBJECT_DIR)/%.hpp.gch: %.hpp
 endif
 # * Windows resources
 $(OBJECT_DIR)/%.rc.o: %.rc
-	@$(call echo,[Resource] $<)
+	$(info [Resource] $<)
 	@$(call mkdir,$(dir $@))
 	@$(WINDRES) $(WINDRES_FLAGS) -i $< -o $@
 
 # Target: clean the build
 .PHONY: clean
-clean:
-	@$(call echo,[Cleaning])
+clean: __no_mode_needed
+	$(info [Cleaning])
 	@$(call rmdir,$(OBJECT_DIR))
 	@$(call rmfile,$(OUTPUT_FILE_EXT))
-	@$(call echo,[Done])
+	$(info [Done])
 
 # Helpers for generating compile_commands.json
 EXCLUDE_FILES =
@@ -316,60 +383,22 @@ override all_stub_commands = $(foreach file,$(EXCLUDE_FILES),$(call file_command
 
 # Target: generate compile_commands.json
 .PHONY: commands
-commands:
-	@$(call echo,[Generating] compile_commands.json)
+commands: __no_mode_needed
+	$(info [Generating] compile_commands.json)
 	@$(call echo,[) >compile_commands.json $(all_commands) && $(call echo,]) >>compile_commands.json
-	@$(call echo,[Done])
+	$(info [Done])
 
 # Target: generate compile_commands.json with invalid commands for EXCLUDE_FILES and all files from EXCLUDE_DIRS.
 .PHONY: commands_fixed
-commands_fixed:
-	@$(call echo,[Generating] compile_commands.json (fixed))
+commands_fixed: __no_mode_needed
+	$(info [Generating] compile_commands.json (fixed))
 	@$(call echo,[) >compile_commands.json $(all_commands) $(all_stub_commands) && $(call echo,]) >>compile_commands.json
-	@$(call echo,[Done])
+	$(info [Done])
 
 # Target: clean compile_commands.json
 .PHONY: clean_commands
-clean_commands:
+clean_commands: __no_mode_needed
 	@$(call rmfile,compile_commands.json)
-
-# Import saved target
-override saved_target =
--include .current_target.mk
-
-# Target: set target for `make current`
-TARGET =
-.PHONY: set_current
-.PHONY: set_current_clean
-ifeq ($(TARGET),)
-set_current_clean:
-set_current:
-	@$(call echo,Set TARGET variable to the desired target name.)
-	@exit 1
-else
-ifeq ($(TARGET),$(strip $(saved_target)))
-set_current_clean:
-set_current:
-else
-set_current_clean: set_current clean
-set_current:
-	@$(call echo,override saved_target := $(TARGET)) >.current_target.mk
-	@$(call echo,[Target] -> $(TARGET))
-endif
-endif
-
-# Target: build current target
-.PHONY: current
-ifeq ($(saved_target),)
-print_current:
-current:
-	@$(call echo,No target selected.)
-	@exit 1
-else
-print_current:
-	@$(call echo,[Target] $(saved_target))
-current: print_current $(saved_target)
-endif
 
 
 # --- INCLUDE DEPENDENCIES ---
