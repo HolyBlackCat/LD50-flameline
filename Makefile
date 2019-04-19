@@ -284,7 +284,9 @@ override dep_files = $(patsubst %.o,%.d,$(filter %.c.o %.cpp.o,$(objects)))
 
 
 # --- HANDLE PRECOMPILED HEADERS ---
-# Here we add precompiled headers as dependencies for corresponding source files. The rest is handled automatically
+# List of all precompiled headers.
+override pch_headers = $(foreach x,$(PRECOMPILED_HEADERS),$(word 2,$(subst >, ,$x)))
+# Add precompiled headers as dependencies for corresponding source files. The rest is handled automatically.
 $(foreach x,$(PRECOMPILED_HEADERS),$(foreach y,$(filter $(subst *,%,$(subst |, ,$(word 1,$(subst >, ,$x)))),$(SOURCES)),$(eval $(OBJECT_DIR)/$y.o: $(OBJECT_DIR)/$(word 2,$(subst >, ,$x)).gch)))
 ifeq ($(strip $(ALLOW_PCH)),1)
 # Register dependency files for precompiled headers.
@@ -301,6 +303,12 @@ endif
 override file_local_flags =
 $(foreach x,$(subst |, ,$(subst $(space),<,$(FILE_SPECIFIC_FLAGS))),$(foreach y,$(filter $(subst *,%,$(subst <, ,$(word 1,$(subst >, ,$x)))),$(SOURCES)),\
 																	  $(eval $(OBJECT_DIR)/$y.o: override file_local_flags += $(strip $(subst <, ,$(word 2,$(subst >, ,$x)))))))
+
+
+# --- RULES FOR CREATING FOLDERS ---
+override files_requiring_folders = $(OUTPUT_FILE_EXT) $(objects) $(pch_headers)
+$(foreach x,$(files_requiring_folders),$(eval $x: | $(dir $x)))
+$(foreach x,$(sort $(dir $(files_requiring_folders))),$(eval $x: ; @$(call mkdir, $x)))
 
 
 # --- TARGETS ---
@@ -339,7 +347,6 @@ __generic_build: $(OUTPUT_FILE_EXT)
 # Note that object files come before linker flags.
 $(OUTPUT_FILE_EXT): $(objects)
 	$(info [Linking] $(OUTPUT_FILE_EXT))
-	@$(call mkdir,$(dir $@))
 	@$($(LINKER_MODE)_LINKER) $(objects) $(LDFLAGS) -o $@
 	$(if $(POST_BUILD_COMMANDS),$(info [Finishing]))
 	$(POST_BUILD_COMMANDS)
@@ -350,23 +357,19 @@ $(OUTPUT_FILE_EXT): $(objects)
 # * C sources
 $(OBJECT_DIR)/%.c.o: %.c
 	$(info [C] $<)
-	@$(call mkdir,$(dir $@))
 	@$(strip $(C_COMPILER) -MMD -MP $(call add_pch_to_flags,$(CFLAGS),$(filter %.gch,$^)) $(file_local_flags) $< -c -o $@)
 # * C++ sources
 $(OBJECT_DIR)/%.cpp.o: %.cpp
 	$(info [C++] $<)
-	@$(call mkdir,$(dir $@))
 	@$(strip $(CXX_COMPILER) -MMD -MP $(call add_pch_to_flags,$(CXXFLAGS),$(filter %.gch,$^)) $(file_local_flags) $< -c -o $@)
 ifeq ($(strip $(ALLOW_PCH)),1)
 # * C precompiled headers
 $(OBJECT_DIR)/%.h.gch: %.h
 	$(info [C header] $<)
-	@$(call mkdir,$(dir $@))
 	@$(strip $(C_COMPILER) -MMD -MP $(CFLAGS) $(file_local_flags) $< -c -o $@)
 # * C++ precompiled headers
 $(OBJECT_DIR)/%.hpp.gch: %.hpp
 	$(info [C++ header] $<)
-	@$(call mkdir,$(dir $@))
 	@$(strip $(CXX_COMPILER) -MMD -MP $(CXXFLAGS) $(file_local_flags) $< -c -o $@)
 else
 # * C precompiled headers (skip)
@@ -379,7 +382,6 @@ endif
 # * Windows resources
 $(OBJECT_DIR)/%.rc.o: %.rc
 	$(info [Resource] $<)
-	@$(call mkdir,$(dir $@))
 	@$(WINDRES) $(WINDRES_FLAGS) -i $< -o $@
 
 # Helpers for generating compile_commands.json
