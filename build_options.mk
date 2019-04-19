@@ -27,7 +27,7 @@ release: override CXXFLAGS += -DNDEBUG -O3
 release: override LDFLAGS += -O3 -s -mwindows
 
 # File-specific flags
-obj/lib/%.cpp.o: override CXXFLAGS += -O3
+FILE_SPECIFIC_FLAGS = lib/*.cpp > -O3
 
 # Precompiled headers
 PRECOMPILED_HEADERS = src/game/*.cpp>src/game/master.hpp

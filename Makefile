@@ -21,12 +21,12 @@
 #    override SOURCE_DIRS += src lib   <- All *.c/*.cpp/*.rc files from these directories will be compiled and linked.
 #    override SOURCES += icon.rc   <- As well as these files.
 #
-#    OBJECT_DIR ?= obj   <- Objects will be placed here.
+#    OBJECT_DIR = obj   <- Objects will be placed here.
 #
-#    OUTPUT_FILE ?= bin/ball-game   <- Name for the resulting binary. On Windows ".exe" is appended automatically.
+#    OUTPUT_FILE = bin/ball-game   <- Name for the resulting binary. On Windows ".exe" is appended automatically.
 #
 #       <- Compiler flags
-#    CXXFLAGS ?= -Wall -Wextra -pedantic-errors -std=c++2a   <- Those can be easily overriden by user.
+#    CXXFLAGS = -Wall -Wextra -pedantic-errors -std=c++2a   <- Those can be easily overriden by user.
 #    LDFLAGS =
 #       <- Important compiler flags (those are not affected by setting `*FLAGS` variables from outside)
 #    override CXXFLAGS += -include src/utils/common.h -include src/program/parachute.h -Ilib/include -Isrc   <- Those are harder to override, define important flags this way.
@@ -39,12 +39,11 @@
 #    release: override CXXFLAGS += -DNDEBUG -O3
 #    release: override LDFLAGS += -O3 -s -mwindows
 #
-#       <- File-specific flags. You can apply flags to several flags by using `%` as a wildcard symbol.
-#    obj/lib/glfl.cpp.o: override CXXFLAGS += -O3
-#    obj/lib/implementation.cpp.o: override CXXFLAGS += -O3
+#       <- File-specific flags. See definition of `FILE_SPECIFIC_FLAGS` below for explanation.
+#    FILE_SPECIFIC_FLAGS = lib/*.cpp > -03
 #
 #       <- Precompiled heders. See definition of `PRECOMPILED_HEADERS` below for explanation.
-#    PRECOMPILED_HEADERS ?= src/game/*.cpp>src/game/master.hpp
+#    PRECOMPILED_HEADERS = src/game/*.cpp>src/game/master.hpp
 #
 # Other undocumented variables might exist.
 #
@@ -57,6 +56,7 @@
 # --- DEFINITIONS ---
 
 # Some constants.
+override space := $(strip) $(strip)
 override comma := ,
 override dollar := $
 override define lf :=
@@ -110,6 +110,7 @@ override silence = >NUL 2>NUL || (exit 0)
 override rmfile = del /F /Q $(subst /,\,$1) $(silence)
 override rmdir = rd /S /Q $(subst /,\,$1) $(silence)
 override mkdir = mkdir >NUL 2>NUL $(subst /,\,$1) $(silence)
+override touch = type nul >>$1 2>NUL || (exit 0)
 override echo = echo $(subst <,^<,$(subst >,^>,$1))
 override native_path = $(subst /,\,$1)
 override cur_dir := $(subst \,/,$(shell echo %CD%))
@@ -118,6 +119,7 @@ override silence = >/dev/null 2>/dev/null || true
 override rmfile = rm -f $1 $(silence)
 override rmdir = rm -rf $1 $(silence)
 override mkdir = mkdir -p $1 $(silence)
+override touch = touch $1 $(silence)
 override echo = echo "$(subst ",\",$(subst \,\\,$1))"
 override native_path = $1
 ifeq ($(HOST_OS),windows)
@@ -187,16 +189,28 @@ LINKER_MODE = CXX # C or CXX
 ALLOW_PCH = 1 # 0 or 1
 
 PRECOMPILED_HEADERS =
-# `PRECOMPILED_HEADERS` must be a space-separated list of precompiled header entries.
+# Controls recompiled headers. Must be a space-separated list.
 # Each entry is written as `patterns>header`, where `header` is a header file name (without `.gch`)
-# and `patterns` is a `|`-separated list of file patterns (using `*` as the wildcard character).
+# and `patterns` is a `|`-separated list of file names or name patterns (using `*` as a wildcard character).
 # Files that match a pattern will use this precompiled header.
 # Example: `PRECOMPILED_HEADERS = src/game/*.cpp|src/states/*.cpp>src/pch.hpp lib/*.c>lib/common.h`.
-# If `ALLOW_PCH` == 0, then headers are not precompiled, but still included using compiler flags.
+# If `ALLOW_PCH` == 0, then headers are not precompiled, but are still included using compiler flags.
+
+FILE_SPECIFIC_FLAGS =
+# Applies additional flags to specific files. Must be a `|`-separated list.
+# Each entry is written as `patterns>flags`, where `patterns` is a space-separated list of file names or
+# name patterns (using `*` as a wildcard character) and `flags` is a space-separated list of flags.
+# Example: `FILE_SPECIFIC_FLAGS = lib/*.cpp > -03 -ffast-math | src/game/main.cpp > -O0`.
 
 
 # --- INCLUDE PROJECT CONFIG ---
 -include build_options.mk
+
+
+# --- COMBINE FLAGS ---
+override CFLAGS += $(CFLAGS_EXTRA)
+override CXXFLAGS += $(CXXFLAGS_EXTRA)
+override FILE_SPECIFIC_FLAGS += $(FILE_SPECIFIC_FLAGS_EXTRA)
 
 
 # --- LOCATE FILES ---
@@ -212,20 +226,20 @@ override dep_files = $(patsubst %.o,%.d,$(filter %.c.o %.cpp.o,$(objects)))
 
 
 # --- HANDLE PRECOMPILED HEADERS ---
-ifeq ($(strip $(ALLOW_PCH)),1)
 # Here we add precompiled headers as dependencies for corresponding source files. The rest is handled automatically
 $(foreach x,$(PRECOMPILED_HEADERS),$(foreach y,$(filter $(subst *,%,$(subst |, ,$(word 1,$(subst >, ,$x)))),$(SOURCES)),$(eval $(OBJECT_DIR)/$y.o: $(OBJECT_DIR)/$(word 2,$(subst >, ,$x)).gch)))
+ifeq ($(strip $(ALLOW_PCH)),1)
 override dep_files += $(foreach x,$(PRECOMPILED_HEADERS),$(OBJECT_DIR)/$(word 2,$(subst >, ,$x)).d)
-override include_pch = -include $(patsubst %.gch,%,$1)
+override add_pch_to_flags = $(if $2,$(filter-out -include|%,$(subst -include ,-include|,$(strip $1))) -include $(patsubst %.gch,%,$2),$1)
 else
-override include_pch = -include $(patsubst $(OBJECT_DIR)/%.gch,%,$1)
+override add_pch_to_flags = $1 $(if $2,-include $(patsubst $(OBJECT_DIR)/%.gch,%,$2))
 endif
 
 
-# --- COMBINE FLAGS ---
-override CFLAGS += $(CFLAGS_EXTRA)
-override CXXFLAGS += $(CXXFLAGS_EXTRA)
-
+# --- HANDLE FILE-SPECIFIC FLAGS ---
+override file_local_flags =
+$(foreach x,$(subst |, ,$(subst $(space),<,$(FILE_SPECIFIC_FLAGS))),$(foreach y,$(filter $(subst *,%,$(subst <, ,$(word 1,$(subst >, ,$x)))),$(SOURCES)),\
+																	  $(eval $(OBJECT_DIR)/$y.o: override file_local_flags += $(strip $(subst <, ,$(word 2,$(subst >, ,$x)))))))
 
 # --- TARGETS ---
 
@@ -244,27 +258,36 @@ $(OUTPUT_FILE_EXT): $(objects)
 	@$(call echo,[Done])
 
 # Internal targets that build the source files.
-# Note that flags come before the files.
+# Note that flags come before the files. Note that file-specific flags aren't passed to `add_pch_to_flags`, to prevent removal of `-include` from them
 # * C sources
 $(OBJECT_DIR)/%.c.o: %.c
 	@$(call echo,[C] $<)
 	@$(call mkdir,$(dir $@))
-	@$(C_COMPILER) -MMD -MP $(foreach f,$(filter %.gch,$^),$(call include_pch,$f)) $(CFLAGS) $< -c -o $@
+	@$(strip $(C_COMPILER) -MMD -MP $(call add_pch_to_flags,$(CFLAGS),$(filter %.gch,$^)) $(file_local_flags) $< -c -o $@)
 # * C++ sources
 $(OBJECT_DIR)/%.cpp.o: %.cpp
 	@$(call echo,[C++] $<)
 	@$(call mkdir,$(dir $@))
-	@$(CXX_COMPILER) -MMD -MP $(foreach f,$(filter %.gch,$^),$(call include_pch,$f)) $(CXXFLAGS) $< -c -o $@
+	@$(strip $(CXX_COMPILER) -MMD -MP $(call add_pch_to_flags,$(CXXFLAGS),$(filter %.gch,$^)) $(file_local_flags) $< -c -o $@)
+ifeq ($(strip $(ALLOW_PCH)),1)
 # * C precompiled headers
 $(OBJECT_DIR)/%.h.gch: %.h
 	@$(call echo,[C header] $<)
 	@$(call mkdir,$(dir $@))
-	@$(C_COMPILER) -MMD -MP $(CFLAGS) $< -c -o $@
+	@$(strip $(C_COMPILER) -MMD -MP $(CFLAGS) $(file_local_flags) $< -c -o $@)
 # * C++ precompiled headers
 $(OBJECT_DIR)/%.hpp.gch: %.hpp
 	@$(call echo,[C++ header] $<)
 	@$(call mkdir,$(dir $@))
-	@$(CXX_COMPILER) -MMD -MP $(CXXFLAGS) $< -c -o $@
+	@$(strip $(CXX_COMPILER) -MMD -MP $(CXXFLAGS) $(file_local_flags) $< -c -o $@)
+else
+# * C precompiled headers (skip)
+$(OBJECT_DIR)/%.h.gch: %.h
+	@$(call touch,$@)
+# * C++ precompiled headers (skip)
+$(OBJECT_DIR)/%.hpp.gch: %.hpp
+	@$(call touch,$@)
+endif
 # * Windows resources
 $(OBJECT_DIR)/%.rc.o: %.rc
 	@$(call echo,[Resource] $<)
@@ -284,8 +307,9 @@ EXCLUDE_FILES =
 EXCLUDE_DIRS =
 override EXCLUDE_FILES += $(foreach dir,$(EXCLUDE_DIRS), $(call rwildcard,$(dir),*.c *.cpp *.h *.hpp))
 override include_files = $(filter-out $(EXCLUDE_FILES), $(SOURCES))
-override file_headers = $(foreach x,$(PRECOMPILED_HEADERS),$(if $(filter $(subst *,%,$(subst |, ,$(word 1,$(subst >, ,$x)))),$1),-include $(word 2,$(subst >, ,$x))))
-override file_command = && $(call echo,{"directory": "."$(comma) "file": "$(cur_dir)/$3"$(comma) "command": "$(strip $1 $(call file_headers,$3) $2 $3)"}$(comma)) >>compile_commands.json
+override get_file_headers = $(foreach x,$(PRECOMPILED_HEADERS),$(if $(filter $(subst *,%,$(subst |, ,$(word 1,$(subst >, ,$x)))),$1),-include $(word 2,$(subst >, ,$x))))
+override get_file_local_flags = $(foreach x,$(subst |, ,$(subst $(space),<,$(FILE_SPECIFIC_FLAGS))),$(if $(filter $(subst *,%,$(subst <, ,$(word 1,$(subst >, ,$x)))),$1),$(subst <, ,$(word 2,$(subst >, ,$x)))))
+override file_command = && $(call echo,{"directory": "."$(comma) "file": "$(cur_dir)/$3"$(comma) "command": "$(strip $1 $2 $(call get_file_headers,$3) $(call get_file_local_flags,$3) $3)"}$(comma)) >>compile_commands.json
 override all_commands = $(foreach f,$(filter %.c,$(include_files)),$(call file_command,$(C_COMPILER),$(CFLAGS),$f)) \
 						$(foreach f,$(filter %.cpp,$(include_files)),$(call file_command,$(CXX_COMPILER),$(CXXFLAGS),$f))
 override all_stub_commands = $(foreach file,$(EXCLUDE_FILES),$(call file_command,,,$(file)))

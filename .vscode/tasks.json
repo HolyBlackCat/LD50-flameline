@@ -27,7 +27,7 @@
         {
             "label": "Update project",
             "type": "shell",
-            "command": "mingw32-make commands_fixed EXCLUDE_DIRS=lib",
+            "command": "mingw32-make commands_fixed EXCLUDE_DIRS=lib gen",
             "presentation": {"echo": true, "reveal": "always", "focus": false, "panel": "shared", "showReuseMessage": false, "clear": true},
         },
         {
