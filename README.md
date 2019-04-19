@@ -10,6 +10,4 @@ It's licensed under **ZLIB license**, so feel free to use it.
 
 ---
 
-Currently we're targeting GCC 8.x and Clang 7.0.x.
-
-MSVC is not supported.
+Currently we're targeting Clang 8.0.0. GCC 8.x is also supported. MSVC is not supported.
