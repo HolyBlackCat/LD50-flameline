@@ -117,6 +117,7 @@ override mkdir = mkdir >NUL 2>NUL $(subst /,\,$1) $(silence)
 override touch = type nul >>$1 2>NUL || (exit 0)
 override echo = echo $(subst <,^<,$(subst >,^>,$1))
 override native_path = $(subst /,\,$1)
+override dir_target_name = $(patsubst %\,%,$(subst /,\,$1))
 override cur_dir := $(subst \,/,$(shell echo %CD%))
 else
 override silence = >/dev/null 2>/dev/null || true
@@ -126,6 +127,7 @@ override mkdir = mkdir -p $1 $(silence)
 override touch = touch $1 $(silence)
 override echo = echo "$(subst ",\",$(subst \,\\,$1))"
 override native_path = $1
+override dir_target_name = $1
 ifeq ($(HOST_OS),windows)
 # We're probably on MSYS2 or Cygwin or something similar.
 override cur_dir := $(shell cygpath -m $(dollar)PWD)
@@ -228,35 +230,52 @@ FILE_SPECIFIC_FLAGS :=
 
 # Prevent env variables from overriding `target`.
 mode :=
+override mode := $(strip $(mode))
 
 # Try loading saved mode name
 override current_mode :=
 -include .current_mode.mk
+override current_mode := $(strip $(current_mode))
 $(if $(current_mode),$(if $(call mode_exists,$(current_mode)),,$(error Invalid mode name specified in `.current_mode.mk`. Delete that file and try again)))
 
-# Target: Make sure a valid mode is selected. Save current mode to the config file if necessary.
+# Internal: Make sure a valid mode is selected. Save current mode to the config file if necessary.
+# Note that mingw32-make doesn't seem to have `else if[n]eq` conditionals, so we have to use the `__else` hack.
 .PHONY: __check_mode
-__check_mode:
-ifeq ($(strip $(mode)),)
-ifeq ($(strip $(current_mode)),)
+# If no mode is selected.
+ifeq ($(or $(mode),$(current_mode)),)
 __check_mode:
 	$(error No build mode selected.\
 		$(lf)Add `mode=...` to the flags. Selected mode will be remembered and used by default until changed.\
 		$(lf)You can also do `make use mode=...` to change mode without doing anything else)
-endif
+override __else := 0
 else
-ifneq ($(strip $(mode)),$(strip $(current_mode)))
-# Check if specified target is valid
+override __else := 1
+endif
+ifeq ($(__else),1)
+ifeq ($(mode),)
+# If using the saved mode.
 __check_mode:
-	$(if $(call mode_exists,$(mode)),,$(error Invalid build mode specified.\
-		$(lf)Expected one of: $(mode_list)))
-	@$(call echo,override current_mode := $(mode)) >.current_mode.mk
-	$(info [Info] Changed build mode to: $(mode))
-override current_mode := $(mode)
+	$(info [Mode] $(current_mode))
+override __else := 0
+else
+override __else := 1
 endif
 endif
 
-# Target: Make sure no mode is specified in the flags. (Use this for targets that don't need to know build mode.)
+# If mode was specified with a flag.
+ifeq ($(__else),1)
+__check_mode:
+	$(if $(call mode_exists,$(mode)),,$(error Invalid build mode specified.\
+		$(lf)Expected one of: $(mode_list)))
+ifneq ($(mode),$(current_mode)) # File update is necessary.
+	@$(call echo,override current_mode := $(mode))>.current_mode.mk
+endif
+	$(info [Mode] $(strip $(old_mode) -> $(mode)))
+override old_mode := $(current_mode)
+override current_mode := $(mode)
+endif
+
+# Internal: Make sure no mode is specified in the flags. (Use this for targets that don't need to know build mode.)
 .PHONY:
 __no_mode_needed:
 	$(if $(mode),$(error This operation doesn't require a build mode))
@@ -283,8 +302,8 @@ override dep_files := $(patsubst %.o,%.d,$(filter %.c.o %.cpp.o,$(objects)))
 
 
 # --- HANDLE PRECOMPILED HEADERS ---
-# List of all precompiled headers.
-override pch_headers := $(foreach x,$(PRECOMPILED_HEADERS),$(word 2,$(subst >, ,$x)))
+# List of all precompiled header files.
+override compiled_headers := $(foreach x,$(PRECOMPILED_HEADERS),$(OBJECT_DIR)/$(word 2,$(subst >, ,$x)).gch)
 # Add precompiled headers as dependencies for corresponding source files. The rest is handled automatically.
 $(foreach x,$(PRECOMPILED_HEADERS),$(foreach y,$(filter $(subst *,%,$(subst |, ,$(word 1,$(subst >, ,$x)))),$(SOURCES)),$(eval $(OBJECT_DIR)/$y.o: $(OBJECT_DIR)/$(word 2,$(subst >, ,$x)).gch)))
 ifeq ($(strip $(ALLOW_PCH)),1)
@@ -305,9 +324,9 @@ $(foreach x,$(subst |, ,$(subst $(space),<,$(FILE_SPECIFIC_FLAGS))),$(foreach y,
 
 
 # --- RULES FOR CREATING FOLDERS ---
-override files_requiring_folders = $(OUTPUT_FILE_EXT) $(objects) $(pch_headers)
-$(foreach x,$(files_requiring_folders),$(eval $x: | $(dir $x)))
-$(foreach x,$(sort $(dir $(files_requiring_folders))),$(eval $x: ; @$(call mkdir, $x)))
+override files_requiring_folders = $(OUTPUT_FILE_EXT) $(objects) $(compiled_headers)
+$(foreach x,$(files_requiring_folders),$(eval $x: | $(call dir_target_name,$(dir $x))))
+$(foreach x,$(sort $(dir $(files_requiring_folders))),$(eval $(call dir_target_name,$x): ; @$(call mkdir, $x)))
 
 
 # --- TARGETS ---
@@ -338,11 +357,11 @@ clean_mode: __check_mode
 	@$(call rmfile,$(OUTPUT_FILE_EXT))
 	$(info [Done])
 
-# Internal: generic build. This is used by `__mode_*` targets.
+# Internal: Generic build. This is used by `__mode_*` targets.
 .PHONY: __generic_build
 __generic_build: $(OUTPUT_FILE_EXT)
 
-# Internal: actually build the executable.
+# Internal: Actually build the executable.
 # Note that object files come before linker flags.
 $(OUTPUT_FILE_EXT): $(objects)
 	$(info [Linking] $(OUTPUT_FILE_EXT))
@@ -387,7 +406,7 @@ $(OBJECT_DIR)/%.rc.o: %.rc
 # Note that we avoid using `:=` here because those aren't used often.
 EXCLUDE_FILES =
 EXCLUDE_DIRS =
-override EXCLUDE_FILES += $(foreach dir,$(EXCLUDE_DIRS), $(call rwildcard,$(dir),*.c *.cpp *.h *.hpp))
+override EXCLUDE_FILES += $(foreach d,$(EXCLUDE_DIRS), $(call rwildcard,$d,*.c *.cpp *.h *.hpp))
 override include_files = $(filter-out $(EXCLUDE_FILES), $(SOURCES))
 override get_file_headers = $(foreach x,$(PRECOMPILED_HEADERS),$(if $(filter $(subst *,%,$(subst |, ,$(word 1,$(subst >, ,$x)))),$1),-include $(word 2,$(subst >, ,$x))))
 override get_file_local_flags = $(foreach x,$(subst |, ,$(subst $(space),<,$(FILE_SPECIFIC_FLAGS))),$(if $(filter $(subst *,%,$(subst <, ,$(word 1,$(subst >, ,$x)))),$1),$(subst <, ,$(word 2,$(subst >, ,$x)))))
