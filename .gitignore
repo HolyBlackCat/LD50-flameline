@@ -5,4 +5,4 @@
 *.depend
 *.layout
 compile_commands.json
-.current_target.mk
+.current_mode.mk

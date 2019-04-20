@@ -251,9 +251,10 @@ override __else := 0
 else
 override __else := 1
 endif
+
+# If using a saved mode.
 ifeq ($(__else),1)
 ifeq ($(mode),)
-# If using the saved mode.
 __check_mode:
 	$(info [Mode] $(current_mode))
 override __else := 0
@@ -267,10 +268,15 @@ ifeq ($(__else),1)
 __check_mode:
 	$(if $(call mode_exists,$(mode)),,$(error Invalid build mode specified.\
 		$(lf)Expected one of: $(mode_list)))
-ifneq ($(mode),$(current_mode)) # File update is necessary.
+ifneq ($(mode),$(current_mode)) # Specified mode differs from the saved one, file update is necessary.
 	@$(call echo,override current_mode := $(mode))>.current_mode.mk
 endif
 	$(info [Mode] $(strip $(old_mode) -> $(mode)))
+
+ifneq ($(mode),$(current_mode)) # Specified mode differs from the saved one.
+override mode_changed := 1
+endif
+
 override old_mode := $(current_mode)
 override current_mode := $(mode)
 endif
@@ -369,6 +375,15 @@ $(OUTPUT_FILE_EXT): $(objects)
 	$(if $(POST_BUILD_COMMANDS),$(info [Finishing]))
 	$(POST_BUILD_COMMANDS)
 	$(info [Done])
+
+# Make sure the executable is rebuilt correctly if build mode changes.
+ifneq ($(strip $(mode_changed)),)
+.PHONY: __phony_empty
+__phony_empty:
+$(OUTPUT_FILE_EXT): __phony_empty
+else
+$(OUTPUT_FILE_EXT): .current_mode.mk
+endif
 
 # Internal targets that build the source files.
 # Note that flags come before the files. Note that file-specific flags aren't passed to `add_pch_to_flags`, to prevent removal of `-include` from them.
