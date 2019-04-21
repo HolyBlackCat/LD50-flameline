@@ -6,11 +6,6 @@
 #include <sstream>
 #include <utility>
 
-#define FMT_STRING_ALIAS 1
-#include <fmt/format.h>
-#include <fmt/ostream.h>
-using namespace fmt::literals;
-
 #include "utils/unicode.h"
 
 namespace Strings
