@@ -2,11 +2,19 @@
 
 It's a relatively simple C++ engine for personal purposes.
 
-It uses SDL2 for window management, OpenGL for graphics, and OpenAL for audio.
+Libraries used:
 
-It also comes with custom macro-based relfection, custom JSON parser and several other features.
+* SDL2 for window management,
 
-It's licensed under **ZLIB license**, so feel free to use it.
+* OpenGL for graphics,
+
+* OpenAL for audio.
+
+* FMT for text formatting.
+
+The engine comes comes with custom macro-based relfection, custom JSON parser and several other features.
+
+It's licensed under **ZLIB license**. Feel free to use it.
 
 ---
 

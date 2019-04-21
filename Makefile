@@ -1,56 +1,70 @@
 # This file is an universal makefile for simple C/C++ executable projects.
 #
-# Notable make targets include:
-#    Whatever build mode targets you define (see below).
-#    generic_build     - The base for your custom targets. Has no special flags.
-#    clean             - Speaks for itself.
-#    commands          - Generate `compile_commands.json` from all source files, excluding files listed in `EXCLUDE_FILES` and all files from directories listed in `EXCLUDE_DIRS`.
-#    commands_fixed    - Same as `commands`, but also purposefully generates broken rules for excluded files. Using this rule while excluding all sources
-#                          not under your control (such as library headers) might improve experience when using clangd (e.g. as a vscode plugin), since
-#                          it prevents any clang-tidy warnings from appearing in excluded files. Sadly it also prevents clangd from working with excluded files at all.
-#    current           - Builds currently selected target. This is useful for IDE integration.
-#    set_current       - Selects a target based on the value of `TARGET`. The setting is saved in `.current_mode.mk`.
-#    set_current_clean - Same as `set_current`, but also cleans the repo.
+#
+# ---- COMPILING
+#
+# -- CONFIGURATION
+#
+# This makefile doesn't contain any project-specific details.
+# Project configuration (i.e. sources and compiler settings) is stored in `project_config.mk`.
+#
+# Machine-specific configuration (i.e. what compiler to use) is stored in `.local_config.mk`.
+# If `.local_config.mk` is absent, you will be asked to create it.
+# Make sure it contains valid compiler paths before building.
+#
+# -- WINDOWS SUPPORT
+#
+# Windows builds are supported, but not with MSVC compiler.
+# You need to use GCC or Clang. (You can get them from MSYS2.)
+# You can either use native windows shell with `mingw32-make`, or MSYS2 shell with `make`.
+#
+# -- USAGE TL;DR
+#
+# If `.local_config.mk` doesn't exist, create it.
+# Copy following into it:
+#
+#     C_COMPILER = gcc
+#     CXX_COMPILER = g++
+#     C_LINKER = gcc
+#     CXX_LINKER = g++
+#
+# If your compiler is not in `PATH`, you'll need to specify complete paths instead.
+# Use Clang instead of GCC if you want to.
+#
+# Then run `make mode=release`. If this project doesn't support 'release'
+# build mode, you'll be given a list of the available modes to pick from.
+#
+# -- USAGE
+#
+# This makefile uses a concept of 'build modes'.
+# A build mode is essentially a named set of compiler settings, such as 'debug', 'release', and so on.
+# See `project_config.mk` for the list of available modes for this project (look
+# for `$(call new_mode, ...)` mode declarations).
+#
+# Object files and precompiled headers for each mode are stored separately,  which allows switching
+# between modes quickly. But this doesn't apply to the resulting executable, so it will always be
+# relinked when you build after changing the mode.
+#
+# Targets marked with `[M]` are affected by the selected build mode. Those targets can be
+# invoked with `mode=...` (`...` = mode name) to selected a specific mode.
+# Last used mode is remembered (saved to `.current_mode.mk`) and is used by default until changed again.
+# If you haven't selected a mode yet, failure to specify `mode=...` is a error.
+# Targets NOT marked with `[M]` are not affected by current build mode and don't
+# accept `mode=...` flag.
+#
+# [M] * `make`                - Same as `make build`.
+# [M] * `make build`          - Builds the project using current build mode.
+# [M] * `make use`            - Switches to a different build mode without doing anything else. `mode=...` has to be specified.
+# [M] * `make clean_mode`     - Deletes object files and precompiled headers for the current build mode. The executable is not deleted.
+#     * `make clean`          - Deletes all object files, precompiled headers, and the executable.
+#     * `make commands`       - Generate `compile_commands.json`. Mode-specific flags are ignored.
+#     * `make commands_fixed` - Generate `compile_commands.json` with deliberately broken commands for some files.
+#                               When using VS Code with Clangd, this helps to disable Clangd for specific files to avoid unwanted warnings.
+#                               See commends on the declaration of `commands_fixed` for usage details.
+#     * `make clean_commands` - Delete `compile_commands.json`.
 #
 #
-#
-# It requires a GCC-like compiler with support for `-MMD -MP` flags.
-# You need to have a separate file called `project_config.mk` in the same directory, which has to contain some high-level build options.
-# An example of such file is provided below:
-#
-#    override SOURCE_DIRS += src lib   <- All *.c/*.cpp/*.rc files from these directories will be compiled and linked.
-#    override SOURCES += icon.rc   <- As well as these files.
-#
-#    OBJECT_DIR = obj   <- Objects will be placed here.
-#
-#    OUTPUT_FILE = bin/ball-game   <- Name for the resulting binary. On Windows ".exe" is appended automatically.
-#
-#       <- Compiler flags
-#    CXXFLAGS = -Wall -Wextra -pedantic-errors -std=c++2a   <- Those can be easily overriden by user.
-#    LDFLAGS =
-#       <- Important compiler flags (those are not affected by setting `*FLAGS` variables from outside)
-#    override CXXFLAGS += -include src/utils/common.h -include src/program/parachute.h -Ilib/include -Isrc   <- Those are harder to override, define important flags this way.
-#    override LDFLAGS += -Llib -lmingw32 -lSDL2main -lSDL2.dll -lfreetype -lopenal32 -lvorbisfile -lvorbisenc -lvorbis -logg -lbz2 -lz
-#
-#       <- Build targets. The first target becomes the default `make` target.
-#    $(call new_target,debug)
-#    debug: override CXXFLAGS += -g -D_GLIBCXX_ASSERTIONS   <- Target-specific flags.
-#    $(call new_target,release)
-#    release: override CXXFLAGS += -DNDEBUG -O3
-#    release: override LDFLAGS += -O3 -s -mwindows
-#
-#       <- File-specific flags. See definition of `FILE_SPECIFIC_FLAGS` below for explanation.
-#    FILE_SPECIFIC_FLAGS = lib/*.cpp > -03
-#
-#       <- Precompiled heders. See definition of `PRECOMPILED_HEADERS` below for explanation.
-#    PRECOMPILED_HEADERS = src/game/*.cpp>src/game/master.hpp
-#
-# Other undocumented variables might exist.
-#
-# Machine-local config (such as compiler paths) is stored in `.local_config.mk`.
-# You will be asked to create this file and add specific variables to it if they're missing.
-#
-# You might want to add `.*.mk` to your `.gitignore`.
+# End of documentation.
 
 
 # --- DEFAULT TARGET ---
@@ -73,6 +87,7 @@ endef
 # Recursively searches a directory for all files matching a pattern.
 # The first parameter is a directory, the second is a pattern.
 # Example usage: SOURCES = $(call rwildcard, src, *.c *.cpp)
+# This implementation differs from the original. It was changed to correctly handle directory names without trailing `/`.
 override rwildcard=$(foreach d,$(wildcard $1/*),$(call rwildcard,$d,$2) $(filter $(subst *,%,$2),$d))
 
 
@@ -231,6 +246,7 @@ FILE_SPECIFIC_FLAGS :=
 # Prevent env variables from overriding `target`.
 mode :=
 override mode := $(strip $(mode))
+override mode_list := $(strip $(mode_list))
 
 # Try loading saved mode name
 override current_mode :=
@@ -246,7 +262,8 @@ ifeq ($(or $(mode),$(current_mode)),)
 __check_mode:
 	$(error No build mode selected.\
 		$(lf)Add `mode=...` to the flags. Selected mode will be remembered and used by default until changed.\
-		$(lf)You can also do `make use mode=...` to change mode without doing anything else)
+		$(lf)You can also do `make use mode=...` to change mode without doing anything else.\
+		$(lf)Supported modes are: $(mode_list))
 override __else := 0
 else
 override __else := 1
@@ -355,12 +372,11 @@ clean: __no_mode_needed
 	@$(call rmfile,$(OUTPUT_FILE_EXT))
 	$(info [Done])
 
-# Public: clean files for the current build mode.
+# Public: clean files for the current build mode, not including the executable.
 .PHONY: clean_mode
 clean_mode: __check_mode
 	$(info [Cleaning] $(current_mode))
 	@$(call rmdir,$(OBJECT_DIR))
-	@$(call rmfile,$(OUTPUT_FILE_EXT))
 	$(info [Done])
 
 # Internal: Generic build. This is used by `__mode_*` targets.

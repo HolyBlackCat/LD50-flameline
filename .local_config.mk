@@ -1,5 +1,8 @@
 C_COMPILER = clang
 CXX_COMPILER = clang++
+
+# C_LINKER = clang
+# CXX_LINKER = clang++
 C_LINKER = Z:/Lander/LLVM/bin/clang -target w64-x86_64-windows-gnu -fuse-ld=lld
 CXX_LINKER = Z:/Lander/LLVM/bin/clang++ -target w64-x86_64-windows-gnu -fuse-ld=lld
 
