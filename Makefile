@@ -174,10 +174,7 @@ $(error No linker specified.\
 	$(lf)\
 	$(lf)If you're using Clang, consider using LLD linker to improve linking times. See comments in the makefile for details)
 # To use LLD linker, append `-fuse-ld=lld` to `*_LINKER` variables.
-# If you're using LLD on Windows, note following:
-# * MSYS2's LLD appears to be broken as of now (often hangs when run), so you need to install the official binaries. Specify
-#     path to the official clang/clang++ binary in `C/CXX_LINKER`, along with `-target ...` flag with a target matching whatever target MSYS2's `clang --version` outputs.
-# * LLD will generate `<exec_name>.lib` file alongside the resulting binary. Add following to `.local_config.mk` to automatically delete it:
+# If you're using LLD on Windows, LLD will generate `<exec_name>.lib` file alongside the resulting binary. Add following to `.local_config.mk` to automatically delete it:
 #
 #     ifeq ($(TARGET_OS),windows)
 #     POST_BUILD_COMMANDS = @$(call rmfile,$(OUTPUT_FILE).lib)
