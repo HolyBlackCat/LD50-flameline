@@ -15,8 +15,9 @@ namespace Dynamic
      * You can't modify objects through `const Dyn<T>` (unlike std::unique_ptr).
      *
      * How to construct:
-     *     Dyn<MyClass> x = nullptr; // Allocates nothing.
-     *     Dyn<MyClass> y(...); // Creates an object using an appropriate constructor. `Dyn<MyClass> y;` is allowed and uses the default constructor of `MyClass`.
+     *     Dyn<MyClass> x; // Allocates nothing.
+     *     Dyn<MyClass> x = nullptr; // Same as above.
+     *     Dyn<MyClass> y(Dynamic::make, ...); // Creates an object using an appropriate constructor.
      *     Dyn<MyBase> z = Dyn<MyBase>::make<MyDerived>(...); // Creates an object of a possibly derived type. If `MyBase == MyDerived`, it has the same effect as the line above.
      *     // `auto` can be used in the last case.
      *     // Conversion from `Dyn<Derived>` to `Dyn<Base>` is not supported.
@@ -65,8 +66,8 @@ namespace Dynamic
      *         auto x = Dyn<A,MyFuncs<A>>::make();
      *         auto y = Dyn<A,MyFuncs<A>>::make<B>();
      *
-     *         x.funcs().call_foo(x); // prints foo(A)
-     *         y.funcs().call_foo(y); // prints foo(B)
+     *         x.dynamic().call_foo(x); // prints foo(A)
+     *         y.dynamic().call_foo(y); // prints foo(B)
      *     }
      */
 
@@ -127,13 +128,15 @@ namespace Dynamic
     };
 
 
-    template <typename T> struct DefaultFuncs
+    template <typename T> struct DefaultData
     {
         template <typename D> constexpr void _make() {}
     };
 
 
-    template <typename T, typename UserFuncs = DefaultFuncs<T>>
+    inline constexpr struct make_t {} make;
+
+    template <typename T, typename UserData = DefaultData<T>>
     class Storage : impl::copyable_if<std::is_copy_constructible_v<T>>
     {
         static_assert(!std::is_const_v<T> && !std::is_volatile_v<T>, "The template parameter has to have no cv-qualifiers.");
@@ -204,13 +207,13 @@ namespace Dynamic
                 const T *base() const {return data.base;}
             };
 
-            struct Table : UserFuncs
+            struct Table : UserData
             {
                 Unique (*_copy)(Param<const T>);
 
                 template <typename D> constexpr void _make()
                 {
-                    UserFuncs::template _make<D>();
+                    UserData::template _make<D>();
 
                     if constexpr (is_copyable)
                     {
@@ -251,7 +254,7 @@ namespace Dynamic
                 }
             }
 
-            template <typename D, typename ...P> static Low make(P &&... params)
+            template <typename D, typename ...P> static Low make(D **out_ptr, P &&... params)
             {
                 static_assert(!std::is_const_v<D> && !std::is_volatile_v<D>, "The template parameter has to have no cv-qualifiers.");
                 static_assert(std::is_base_of_v<T, D>, "The template parameter has to be equal to T or to be derived from T.");
@@ -263,6 +266,10 @@ namespace Dynamic
                 Low ret;
                 ret.data.pointers = Unique::template make<D>(std::forward<P>(params)...);
                 ret.data.table = &table_storage<D>;
+
+                if (out_ptr)
+                    *out_ptr = reinterpret_cast<D *>(ret.data.pointers.bytes());
+
                 return ret;
             }
 
@@ -275,16 +282,24 @@ namespace Dynamic
         Low low;
 
       public:
-        Storage(decltype(nullptr)) {}
+        Storage(decltype(nullptr) = nullptr) {}
 
         template <typename ...P, typename = decltype(T(std::declval<P>()...), void())>
-        Storage(P &&... params) : low(Low::template make<T>(std::forward<P>(params)...)) {}
+        Storage(make_t, P &&... params) : low(Low::template make<T>(nullptr, std::forward<P>(params)...)) {}
+
+        template <typename D = T, typename ...P, typename = decltype(D(std::declval<P>()...), void())>
+        D &assign(P &&... params)
+        {
+            D *ret;
+            low = Low::template make<D>(&ret, std::forward<P>(params)...);
+            return *ret;
+        }
 
         template <typename D = T, typename ...P, typename = decltype(D(std::declval<P>()...), void())>
         [[nodiscard]] static Storage make(P &&... params)
         {
-            Storage ret = nullptr;
-            ret.low = Low::template make<D>(std::forward<P>(params)...);
+            Storage ret;
+            ret.low = Low::template make<D>(nullptr, std::forward<P>(params)...);
             return ret;
         }
 
@@ -303,11 +318,11 @@ namespace Dynamic
         [[nodiscard]]       unsigned char *bytes()       {return low.data.pointers.bytes();}
         [[nodiscard]] const unsigned char *bytes() const {return low.data.pointers.bytes();}
 
-        [[nodiscard]] const UserFuncs &funcs() const {return *low.data.table;}
+        [[nodiscard]] const UserData &dynamic() const {return *low.data.table;}
 
         [[nodiscard]] operator Param<      T>()       {return low;};
         [[nodiscard]] operator Param<const T>() const {return low;};
     };
 }
 
-template <typename T, typename UserFuncs = Dynamic::DefaultFuncs<T>> using Dyn = Dynamic::Storage<T, UserFuncs>;
+template <typename T, typename UserData = Dynamic::DefaultData<T>> using Dyn = Dynamic::Storage<T, UserData>;
