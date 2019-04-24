@@ -96,9 +96,15 @@ override rwildcard=$(foreach d,$(wildcard $1/*),$(call rwildcard,$d,$2) $(filter
 # Host OS.
 ifeq ($(OS),Windows_NT)
 HOST_OS ?= windows
-override host_win_unix = $1
 else
 HOST_OS ?= unix
+endif
+
+ifeq ($(HOST_OS),windows)
+override host_extension_exe := .exe
+override host_win_unix = $1
+else
+override host_extension_exe :=
 override host_win_unix = $2
 endif
 
@@ -106,36 +112,40 @@ endif
 TARGET_OS ?= $(HOST_OS)
 
 ifeq ($(TARGET_OS),windows)
-override extension_exe = .exe
+override extension_exe := .exe
 override target_win_unix = $1
 else
-override extension_exe =
+override extension_exe :=
 override target_win_unix = $2
 endif
 
 # Host shell.
 ifeq ($(shell echo "foo"),"foo")
 HOST_SHELL ?= windows
-override shell_win_unix = $1
 else
 HOST_SHELL ?= unix
+endif
+
+ifeq ($(HOST_SHELL),windows)
+override shell_win_unix = $1
+else
 override shell_win_unix = $2
 endif
 
 # Shell-specific functions.
 # Example usage: $(call rmfile, bin/out.exe)
 ifeq ($(HOST_SHELL),windows)
-override silence = >NUL 2>NUL || (exit 0)
+override silence := >NUL 2>NUL || (exit 0)
 override rmfile = del /F /Q $(subst /,\,$1) $(silence)
 override rmdir = rd /S /Q $(subst /,\,$1) $(silence)
-override mkdir = mkdir >NUL 2>NUL $(subst /,\,$1) $(silence)
-override touch = type nul >>$1 2>NUL || (exit 0)
+override mkdir = mkdir $(subst /,\,$1) $(silence)
+override touch = type nul >>$1 2>NUL || (exit 0)# Sic!
 override echo = echo $(subst <,^<,$(subst >,^>,$1))
 override native_path = $(subst /,\,$1)
 override dir_target_name = $(patsubst %\,%,$(subst /,\,$1))
 override cur_dir := $(subst \,/,$(shell echo %CD%))
 else
-override silence = >/dev/null 2>/dev/null || true
+override silence := >/dev/null 2>/dev/null || true
 override rmfile = rm -f $1 $(silence)
 override rmdir = rm -rf $1 $(silence)
 override mkdir = mkdir -p $1 $(silence)
@@ -306,6 +316,7 @@ override common_object_dir := $(OBJECT_DIR)
 override OBJECT_DIR := $(OBJECT_DIR)/$(current_mode)
 override CFLAGS += $(CFLAGS_EXTRA)
 override CXXFLAGS += $(CXXFLAGS_EXTRA)
+override LDFLAGS += $(LDFLAGS_EXTRA)
 override FILE_SPECIFIC_FLAGS += $(FILE_SPECIFIC_FLAGS_EXTRA)
 
 

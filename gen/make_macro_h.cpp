@@ -1,3 +1,4 @@
+#include <cstdlib>
 #include <cstring>
 #include <fstream>
 #include <functional>
@@ -6,6 +7,9 @@
 #include <sstream>
 #include <type_traits>
 #include <vector>
+
+#pragma GCC diagnostic ignored "-Wpragmas" // Silence GCC warning about the next line disabling a warning that GCC doesn't have.
+#pragma GCC diagnostic ignored "-Wstring-plus-int" // Silence clang warning about `1+R"()"` pattern.
 
 #define VERSION "1.0.2"
 
@@ -17,7 +21,7 @@ namespace data
 
 namespace impl
 {
-    std::ofstream output_file("macro.h");
+    std::ofstream output_file;
 
     std::stringstream ss;
     const std::stringstream::fmtflags stdfmt = ss.flags();
@@ -27,6 +31,27 @@ namespace impl
     int section_depth = 0;
 
     constexpr const char *indentation_string = "    ";
+
+    void init(int argc, char **argv)
+    {
+        if (argc < 2)
+        {
+            std::cout << "Expected output file name.";
+            std::exit(-1);
+        }
+        if (argc > 2)
+        {
+            std::cout << "Invalid usage.";
+            std::exit(-1);
+        }
+
+        output_file.open(argv[1]);
+        if (!output_file)
+        {
+            std::cout << "Unable to open `" << argv[1] << "`.\n";
+            std::exit(-1);
+        }
+    }
 }
 
 template <typename ...P> [[nodiscard]] std::string make_str(const P &... params)
@@ -101,10 +126,9 @@ void next_line()
     output("\n");
 }
 
-int main()
+int main(int argc, char **argv)
 {
-    if (!impl::output_file)
-        return -1;
+    impl::init(argc, argv);
 
     { // Header
         output(1+R"(

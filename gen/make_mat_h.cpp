@@ -1,3 +1,4 @@
+#include <cstdlib>
 #include <cstring>
 #include <fstream>
 #include <functional>
@@ -8,33 +9,36 @@
 
 #define VERSION "3.1.5"
 
+#pragma GCC diagnostic ignored "-Wpragmas" // Silence GCC warning about the next line disabling a warning that GCC doesn't have.
+#pragma GCC diagnostic ignored "-Wstring-plus-int" // Silence clang warning about `1+R"()"` pattern.
+
 namespace data
 {
     const struct {std::string tag, name;} type_list[]
     {
-        "b",   "bool",
-        "c",   "char",
-        "uc",  "unsigned char",
-        "sc",  "signed char",
-        "s",   "short",
-        "us",  "unsigned short",
-        "i",   "int",
-        "u",   "unsigned int",
-        "l",   "long",
-        "ul",  "unsigned long",
-        "ll",  "long long",
-        "ull", "unsigned long long",
-        "f",   "float",
-        "d",   "double",
-        "ld",  "long double",
-        "i8",  "int8_t",
-        "u8",  "uint8_t",
-        "i16", "int16_t",
-        "u16", "uint16_t",
-        "i32", "int32_t",
-        "u32", "uint32_t",
-        "i64", "int64_t",
-        "u64", "uint64_t",
+        {"b",   "bool"},
+        {"c",   "char"},
+        {"uc",  "unsigned char"},
+        {"sc",  "signed char"},
+        {"s",   "short"},
+        {"us",  "unsigned short"},
+        {"i",   "int"},
+        {"u",   "unsigned int"},
+        {"l",   "long"},
+        {"ul",  "unsigned long"},
+        {"ll",  "long long"},
+        {"ull", "unsigned long long"},
+        {"f",   "float"},
+        {"d",   "double"},
+        {"ld",  "long double"},
+        {"i8",  "int8_t"},
+        {"u8",  "uint8_t"},
+        {"i16", "int16_t"},
+        {"u16", "uint16_t"},
+        {"i32", "int32_t"},
+        {"u32", "uint32_t"},
+        {"i64", "int64_t"},
+        {"u64", "uint64_t"},
     };
     constexpr int type_list_len = std::extent_v<decltype(type_list)>;
 
@@ -42,8 +46,8 @@ namespace data
     constexpr int fields_alt_count = 2;
     const std::string fields_alt[fields_alt_count][4]
     {
-        fields[0], fields[1], fields[2], fields[3],
-        "r","g","b","a",
+        {fields[0], fields[1], fields[2], fields[3]},
+        {"r","g","b","a"},
         // "s","t","p","q", // Who uses this anyway.
     };
 
@@ -52,7 +56,7 @@ namespace data
 
 namespace impl
 {
-    std::ofstream output_file("mat.h");
+    std::ofstream output_file;
 
     std::stringstream ss;
     const std::stringstream::fmtflags stdfmt = ss.flags();
@@ -62,6 +66,27 @@ namespace impl
     int section_depth = 0;
 
     constexpr const char *indentation_string = "    ", *indentation_string_labels = "  ";
+
+    void init(int argc, char **argv)
+    {
+        if (argc < 2)
+        {
+            std::cout << "Expected output file name.";
+            std::exit(-1);
+        }
+        if (argc > 2)
+        {
+            std::cout << "Invalid usage.";
+            std::exit(-1);
+        }
+
+        output_file.open(argv[1]);
+        if (!output_file)
+        {
+            std::cout << "Unable to open `" << argv[1] << "`.\n";
+            std::exit(-1);
+        }
+    }
 }
 
 template <typename ...P> [[nodiscard]] std::string make_str(const P &... params)
@@ -137,10 +162,9 @@ void next_line()
     output("\n");
 }
 
-int main()
+int main(int argc, char **argv)
 {
-    if (!impl::output_file)
-        return -1;
+    impl::init(argc, argv);
 
     { // Header
         output(1+R"(
