@@ -73,4 +73,18 @@ namespace Meta
     {
         return cexpr_generate_array_from_seq(std::make_integer_sequence<decltype(N), N>{}, std::forward<F>(func));
     }
+
+
+    template <bool C> struct copyable_if {};
+
+    template <> struct copyable_if<0>
+    {
+        copyable_if() = default;
+        ~copyable_if() = default;
+        copyable_if(copyable_if &&) = default;
+        copyable_if &operator=(copyable_if &&) = default;
+
+        copyable_if(const copyable_if &) = delete;
+        copyable_if &operator=(const copyable_if &) = delete;
+    };
 }
