@@ -355,7 +355,7 @@ namespace Interface
         return data.mode;
     }
 
-    void Window::ProcessEvents()
+    void Window::ProcessEvents(std::vector<std::function<bool(SDL_Event &)>> hooks)
     {
         data.tick_counter++;
 
@@ -366,6 +366,12 @@ namespace Interface
         SDL_Event event;
         while (SDL_PollEvent(&event))
         {
+            for (auto &hook : hooks)
+            {
+                if (!hook(event))
+                    continue;
+            }
+
             switch (event.type)
             {
               case SDL_QUIT:

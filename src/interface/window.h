@@ -1,5 +1,6 @@
 #pragma once
 
+#include <functional>
 #include <memory>
 #include <string>
 #include <utility>
@@ -114,7 +115,7 @@ namespace Interface
         void SetMode(FullscreenMode new_mode); // If the window is not resizable, then `borderless_fullscreen` (which requires a window resize) acts as `fullscreen`.
         FullscreenMode Mode() const;
 
-        void ProcessEvents();
+        void ProcessEvents(std::vector<std::function<bool(SDL_Event &)>> hooks = {}); // If a hook returns `false`, the current event is discarded.
         void SwapBuffers();
 
         // Those counters start from 1.

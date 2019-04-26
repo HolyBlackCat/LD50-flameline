@@ -3,6 +3,7 @@
 #include <iostream>
 
 #include "graphics/complete.h"
+#include "interface/gui.h"
 #include "interface/window.h"
 #include "program/exit.h"
 #include "utils/clock.h"

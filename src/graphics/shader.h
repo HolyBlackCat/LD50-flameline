@@ -81,7 +81,7 @@ namespace Graphics
             GLSL ES lacks default precision for float inside of fragment shaders.
         */
 
-        std::string common_header = "#version 330 compatibility";
+        std::string common_header = "#version 150 compatibility";
         std::string vertex_header = "/* vertex */";
         std::string fragment_header = "/* fragment */";
 
