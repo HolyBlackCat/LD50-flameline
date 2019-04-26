@@ -101,22 +101,24 @@ HOST_OS ?= unix
 endif
 
 ifeq ($(HOST_OS),windows)
-override host_extension_exe := .exe
 override host_win_unix = $1
+override host_extension_exe := .exe
+override host_native_path = $(subst /,\,$1)
 else
-override host_extension_exe :=
 override host_win_unix = $2
+override host_extension_exe :=
+override host_native_path = $1
 endif
 
 # Target OS.
 TARGET_OS ?= $(HOST_OS)
 
 ifeq ($(TARGET_OS),windows)
-override extension_exe := .exe
 override target_win_unix = $1
+override extension_exe := .exe
 else
-override extension_exe :=
 override target_win_unix = $2
+override extension_exe :=
 endif
 
 # Host shell.
@@ -139,6 +141,7 @@ override silence := >NUL 2>NUL || (exit 0)
 override rmfile = del /F /Q $(subst /,\,$1) $(silence)
 override rmdir = rd /S /Q $(subst /,\,$1) $(silence)
 override mkdir = mkdir $(subst /,\,$1) $(silence)
+override move = move /Y $(subst /,\,$1) $(subst /,\,$2) $(silence)
 override touch = type nul >>$1 2>NUL || (exit 0)# Sic!
 override echo = echo $(subst <,^<,$(subst >,^>,$1))
 override native_path = $(subst /,\,$1)
@@ -149,6 +152,7 @@ override silence := >/dev/null 2>/dev/null || true
 override rmfile = rm -f $1 $(silence)
 override rmdir = rm -rf $1 $(silence)
 override mkdir = mkdir -p $1 $(silence)
+override move = mv -f $1 $2 $(silence)
 override touch = touch $1 $(silence)
 override echo = echo "$(subst ",\",$(subst \,\\,$1))"
 override native_path = $1

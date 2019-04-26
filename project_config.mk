@@ -31,3 +31,11 @@ FILE_SPECIFIC_FLAGS := lib/*.cpp > -O3
 
 # Precompiled headers
 PRECOMPILED_HEADERS := src/game/*.cpp>src/game/master.hpp
+
+# Code generation
+GEN_CXXFLAGS := -std=c++2a -Wall -Wextra -pedantic-errors
+override generators_dir := gen
+override generated_headers := src/utils/mat.h src/utils/macro.h
+override generate_file = $(call host_native_path,$1) : $(generators_dir)/make_$(subst .,_,$(notdir $1)).cpp ; \
+	@+$(MAKE) -f gen/Makefile _gen_dir=$(generators_dir) _gen_target_file=$1 --no-print-directory
+$(foreach f,$(generated_headers),$(eval $(call generate_file,$f)))
