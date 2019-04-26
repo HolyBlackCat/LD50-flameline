@@ -19,16 +19,16 @@ override tmp_file := $(common_object_dir)/$(basename $(notdir $(target))).tmp$(s
 .DEFAULT_GOAL := generate
 .PHONY: generate
 generate: $(tmp_file)
-	$(info [Generating] $(target) [Validating] $<)
+	@$(call echo,[Generating] $(target) [Validating] $<)
 	@$(CXX_COMPILER) $(CXXFLAGS) -fsyntax-only -x c++-header $<
 	@$(call move,$<,$(target))
-	$(info [Generating] $(target) [Done])
+	@$(call echo,[Generating] $(target) [Done])
 
 $(tmp_file): $(generator_binary)
-	$(info [Generating] $(target) [Running] $<)
+	@$(call echo,[Generating] $(target) [Running] $<)
 	@$(call native_path,./$<) $@
 	@$(call rmfile,$<)
 
 $(generator_binary): $(generator_source)
-	$(info [Generating] $(target) [C++] $<)
+	@$(call echo,[Generating] $(target) [C++] $<)
 	@$(CXX_LINKER) $(GEN_CXXFLAGS) $< -o $@
