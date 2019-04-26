@@ -64,9 +64,7 @@ namespace Interface
         {
             if (data.context)
             {
-                if (IsActive())
-                    ImGui::SetCurrentContext(0);
-
+                // We don't need to deactivate the context here, ImGui does it automatically if necessary.
                 ImGui_ImplOpenGL3_Shutdown();
                 ImGui_ImplSDL2_Shutdown();
                 ImGui::DestroyContext(data.context);

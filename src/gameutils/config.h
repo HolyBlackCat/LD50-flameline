@@ -39,7 +39,7 @@ template <typename T> class Config
             {
                 // Try parsing normally.
                 auto refl = Refl::Interface(object);
-                refl.from_string(file.construct_string().c_str());
+                refl.from_string(file.string());
 
                 // Success, we're done.
                 return;
@@ -53,7 +53,7 @@ template <typename T> class Config
                 try
                 {
                     auto refl = Refl::Interface(object);
-                    refl.from_string(file.construct_string().c_str(), Refl::partial);
+                    refl.from_string(file.string(), Refl::partial);
                     partial_parsing_ok = 1;
                 }
                 catch (...) {}

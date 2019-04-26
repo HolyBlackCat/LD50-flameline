@@ -1,16 +1,66 @@
+const ivec2 screen_size(480, 270);
+Interface::Window window("Delta", screen_size * 2, Interface::windowed, ADJUST_G(Interface::WindowSettings{}, min_size = screen_size));
+Graphics::DummyVertexArray dummy_vao;
+
+const Graphics::ShaderConfig shader_config = Graphics::ShaderConfig::Core();
+Interface::ImGuiController gui_controller(shader_config.common_header);
+
+TextureAtlas texture_atlas(ivec2(2048), "assets/_images", "assets/atlas.png", "assets/atlas.refl");
+Graphics::Texture texture_main = Graphics::Texture().Wrap(Graphics::clamp).Interpolation(Graphics::nearest).SetData(texture_atlas.GetImage());
+Render r = ADJUST_G(Render(0x2000, shader_config), SetTexture(texture_main), SetMatrix(fmat4::ortho(screen_size/ivec2(-2,2), screen_size/ivec2(2,-2), -1, 1)));
+AdaptiveViewport adaptive_viewport(shader_config, screen_size);
+
+Input::Mouse mouse;
+
+namespace States
+{
+    struct Base : Meta::polymorphic<Base>
+    {
+        virtual void Tick() = 0;
+        virtual void Render() const = 0;
+        virtual ~Base() = default;
+    };
+
+    Poly::Storage<Base> current_state;
+
+    struct Game : Base
+    {
+        void Tick() override
+        {
+            ImGui::ShowDemoWindow();
+        }
+
+        void Render() const override
+        {
+            Graphics::SetClearColor(fvec3(0));
+            Graphics::Clear();
+
+            r.BindShader();
+
+            r.iquad(mouse.pos(), ivec2(32)).center().rotate(window.Ticks() / 100.).color(fvec3(0,0.5,1));
+
+            r.Finish();
+        }
+    };
+}
 
 int main()
 {
-    ivec2 window_size(800, 600);
+    { // Initialize
+        ImGui::StyleColorsDark();
 
-    Interface::WindowSettings window_settings;
-    window_settings.min_size = window_size / 2;
+        Graphics::Blending::Enable();
+        Graphics::Blending::FuncNormalPre();
+    }
 
-    Interface::Window window("Delta", window_size, Interface::windowed, window_settings);
+    auto Resize = [&]
+    {
+        mouse.SetMatrix((linear_mapping<fvec2>(ivec2(), window.Size(), screen_size/-2, screen_size/2).matrix()));
+        adaptive_viewport.Update();
+    };
+    Resize();
 
-    Graphics::ShaderConfig shader_config = Graphics::ShaderConfig::Core();
-    Interface::ImGuiController gui_controller(shader_config.common_header);
-    ImGui::StyleColorsDark();
+    States::current_state = Poly::make_derived<States::Game>;
 
     Metronome metronome(60);
     Clock::DeltaTimer delta_timer;
@@ -24,20 +74,21 @@ int main()
 
             if (window.Resized())
             {
+                Resize();
                 Graphics::Viewport(window.Size());
-                std::cout << "Resized.\n";
             }
             if (window.ExitRequested())
                 Program::Exit();
 
             gui_controller.PreTick();
-            // Tick
-            ImGui::ShowDemoWindow();
+            States::current_state->Tick();
         }
 
-        Graphics::Clear();
         gui_controller.PreRender();
-        // Render
+        adaptive_viewport.BeginFrame();
+        States::current_state->Render();
+        adaptive_viewport.FinishFrame();
+        Graphics::CheckErrors();
         gui_controller.PostRender();
 
         window.SwapBuffers();

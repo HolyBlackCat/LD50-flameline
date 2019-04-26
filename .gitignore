@@ -2,3 +2,4 @@
 obj/**
 compile_commands.json
 .current_mode.mk
+**/imgui.ini
