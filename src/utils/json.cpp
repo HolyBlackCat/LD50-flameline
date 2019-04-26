@@ -266,6 +266,9 @@ Json Json::ParseLow(const char *&cur, int allowed_depth)
                         Program::Error("Expected `,`.");
                     cur++;
                     ParseSkipWhitespace(cur);
+
+                    if (*cur == ']')
+                        break;
                 }
 
                 if (*cur == '\0')
@@ -307,6 +310,9 @@ Json Json::ParseLow(const char *&cur, int allowed_depth)
                         Program::Error("Expected `,`.");
                     cur++;
                     ParseSkipWhitespace(cur);
+
+                    if (*cur == '}')
+                        break;
                 }
 
                 if (*cur == '\0')
