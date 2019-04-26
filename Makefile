@@ -453,9 +453,9 @@ override EXCLUDE_FILES += $(foreach d,$(EXCLUDE_DIRS), $(call rwildcard,$d,*.c *
 override include_files = $(filter-out $(EXCLUDE_FILES), $(SOURCES))
 override get_file_headers = $(foreach x,$(PRECOMPILED_HEADERS),$(if $(filter $(subst *,%,$(subst |, ,$(word 1,$(subst >, ,$x)))),$1),-include $(word 2,$(subst >, ,$x))))
 override get_file_local_flags = $(foreach x,$(subst |, ,$(subst $(space),<,$(FILE_SPECIFIC_FLAGS))),$(if $(filter $(subst *,%,$(subst <, ,$(word 1,$(subst >, ,$x)))),$1),$(subst <, ,$(word 2,$(subst >, ,$x)))))
-override file_command = && $(call echo,{"directory": "."$(comma) "file": "$(cur_dir)/$3"$(comma) "command": "$(strip $1 $2 $(call get_file_headers,$3) $(call get_file_local_flags,$3) $3)"}$(comma)) >>compile_commands.json
-override all_commands = $(foreach f,$(filter %.c,$(include_files)),$(call file_command,$(C_COMPILER),$(CFLAGS),$f)) \
-						$(foreach f,$(filter %.cpp,$(include_files)),$(call file_command,$(CXX_COMPILER),$(CXXFLAGS),$f))
+override file_command = && $(call echo,{"directory": "."$(comma) "file": "$(cur_dir)/$3"$(comma) "command": "$(strip $1 $2 $(call get_file_headers,$3) $3)"}$(comma)) >>compile_commands.json
+override all_commands = $(foreach f,$(filter %.c,$(include_files)),$(call file_command,$(C_COMPILER),$(CFLAGS) $(call get_file_local_flags,$3),$f)) \
+						$(foreach f,$(filter %.cpp,$(include_files)),$(call file_command,$(CXX_COMPILER),$(CXXFLAGS) $(call get_file_local_flags,$3),$f))
 override all_stub_commands = $(foreach file,$(EXCLUDE_FILES),$(call file_command,,,$(file)))
 
 # Public: generate `compile_commands.json`.
