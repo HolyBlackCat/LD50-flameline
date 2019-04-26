@@ -18,7 +18,7 @@ namespace Poly
      *     Poly::Storage<MyClass> x; // Allocates nothing.
      *     Poly::Storage<MyClass> x = nullptr; // Same as above.
      *     Poly::Storage<MyClass> x(Poly::make, ...); // Creates an object using an appropriate constructor.
-     *     Poly::Storage<MyBase> x(Poly::make_type<MyDerived>, ...); // Creates an object of a possibly derived type. If `MyBase == MyDerived`, it has the same effect as the line above.
+     *     Poly::Storage<MyBase> x(Poly::make_derived<MyDerived>, ...); // Creates an object of a possibly derived type. If `MyBase == MyDerived`, it has the same effect as the line above.
      *     Poly::Storage<MyBase> x = Poly::Storage<MyBase>::make<MyDerived>(...); // Same as above. If the template argument for `make` absent, the type defaults to the base class.
      *     Poly::Storage<MyBase> x = x.make<MyDerived>(...); // Same as above.
      *
@@ -120,20 +120,31 @@ namespace Poly
 
     template <typename T> struct DefaultData
     {
+        /* Optional flags:
+         *
+         * `using _use_fake_copying_if_needed = void;`
+         *     Forces `class Storage` to be copyable even if the template parameter is not copyable.
+         *     Actual attempt to copy it should cause a segfault.
+         */
+
         template <typename D> constexpr void _make() {}
     };
+
+    template <typename T> using DetectDataFlag_fake_copying = typename T::_use_fake_copying_if_needed;
+
 
     template <typename T, typename D> inline static constexpr T type_erasure_data_storage = []{T ret{}; ret.template _make<D>(); return ret;}();
 
 
     inline constexpr struct make_t {} make;
 
-    template <typename T> struct make_type_t {};
-    template <typename T> inline constexpr make_type_t<T> make_type;
+    template <typename T> struct make_derived_t {};
+    template <typename T> inline constexpr make_derived_t<T> make_derived;
 
 
     template <typename T, typename UserData = DefaultData<T>>
-    class Storage : Meta::copyable_if<std::is_copy_constructible_v<T>>
+    class Storage
+        : Meta::copyable_if<std::is_copy_constructible_v<T> || Meta::is_detected<DetectDataFlag_fake_copying, UserData>>
     {
         static_assert(!std::is_const_v<T> && !std::is_volatile_v<T>, "The template parameter has to have no cv-qualifiers.");
         static_assert(std::is_class_v<T>, "The template parameter has to be a structure or a class.");
@@ -141,6 +152,7 @@ namespace Poly
 
       public:
         static constexpr bool is_copyable = std::is_copy_constructible_v<T>;
+        static constexpr bool is_fake_copyable = !is_copyable && Meta::is_detected<DetectDataFlag_fake_copying, UserData>;
 
       private:
         struct Low
@@ -282,7 +294,7 @@ namespace Poly
         Storage(make_t, P &&... params) : low(Low::template make<T>(nullptr, std::forward<P>(params)...)) {}
 
         template <typename D, typename ...P, typename = decltype(D(std::declval<P>()...), void())>
-        Storage(make_type_t<D>, P &&... params) : low(Low::template make<D>(nullptr, std::forward<P>(params)...)) {}
+        Storage(make_derived_t<D>, P &&... params) : low(Low::template make<D>(nullptr, std::forward<P>(params)...)) {}
 
         template <typename D = T, typename ...P, typename = decltype(D(std::declval<P>()...), void())>
         D &assign(P &&... params)

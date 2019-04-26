@@ -87,4 +87,15 @@ namespace Meta
         copyable_if(const copyable_if &) = delete;
         copyable_if &operator=(const copyable_if &) = delete;
     };
+
+
+    template <typename Base> struct polymorphic // Use this as a CRTP base.
+    {
+        constexpr polymorphic() noexcept = default;
+        constexpr polymorphic(const polymorphic &) noexcept = default;
+        constexpr polymorphic(polymorphic &&) noexcept = default;
+        polymorphic &operator=(const polymorphic &) noexcept = default;
+        polymorphic &operator=(polymorphic &&) noexcept = default;
+        virtual ~polymorphic() = default;
+    };
 }
