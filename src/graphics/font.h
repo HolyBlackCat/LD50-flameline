@@ -19,6 +19,7 @@ namespace Graphics
             int advance = 0;
         };
 
+      private:
         int ascent = 0;
         int descent = 0;
         int line_skip = 0;
