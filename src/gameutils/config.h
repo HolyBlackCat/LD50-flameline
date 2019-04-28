@@ -4,9 +4,11 @@
 #include <string>
 #include <utility>
 
+#include "interface/gui.h"
 #include "interface/messagebox.h"
 #include "program/errors.h"
 #include "reflection/complete.h"
+#include "utils/mat.h"
 #include "utils/memory_file.h"
 
 template <typename T> class Config
@@ -14,6 +16,88 @@ template <typename T> class Config
     T object = {};
 
     std::string file_name;
+
+    bool was_modified_in_gui = 0;
+
+    template <typename X> void DisplayGuiLow(X &object, std::string name)
+    {
+        static_assert(Refl::is_reflected<X>, "This type is not reflected.");
+        using refl_t = Refl::Interface<X>;
+        auto refl = refl_t(object);
+
+        if constexpr (std::is_same_v<X, int>)
+        {
+            if (ImGui::InputInt(name.c_str(), &object))
+                was_modified_in_gui = 1;
+        }
+        else if constexpr (std::is_same_v<X, ivec2>)
+        {
+            if (ImGui::InputInt2(name.c_str(), &object.x))
+                was_modified_in_gui = 1;
+        }
+        else if constexpr (std::is_same_v<X, ivec3>)
+        {
+            if (ImGui::InputInt3(name.c_str(), &object.x))
+                was_modified_in_gui = 1;
+        }
+        else if constexpr (std::is_same_v<X, ivec4>)
+        {
+            if (ImGui::InputInt4(name.c_str(), &object.x))
+                was_modified_in_gui = 1;
+        }
+        else if constexpr (std::is_same_v<X, float>)
+        {
+            if (ImGui::InputFloat(name.c_str(), &object))
+                was_modified_in_gui = 1;
+        }
+        else if constexpr (std::is_same_v<X, fvec2>)
+        {
+            if (ImGui::InputFloat2(name.c_str(), &object.x))
+                was_modified_in_gui = 1;
+        }
+        else if constexpr (std::is_same_v<X, fvec3>)
+        {
+            if (ImGui::InputFloat3(name.c_str(), &object.x))
+                was_modified_in_gui = 1;
+        }
+        else if constexpr (std::is_same_v<X, fvec4>)
+        {
+            if (ImGui::InputFloat4(name.c_str(), &object.x))
+                was_modified_in_gui = 1;
+        }
+        else if constexpr (std::is_same_v<X, double>)
+        {
+            if (ImGui::InputDouble(name.c_str(), &object))
+                was_modified_in_gui = 1;
+        }
+        else if constexpr (std::is_same_v<X, std::string>)
+        {
+            if (ImGui::InputTextMultiline(name.c_str(), &object))
+                was_modified_in_gui = 1;
+        }
+        else if constexpr (std::is_same_v<X, bool>)
+        {
+            if (ImGui::Checkbox(name.c_str(), &object))
+                was_modified_in_gui = 1;
+        }
+        else if constexpr (refl_t::is_structure)
+        {
+            if (ImGui::CollapsingHeader(name.c_str()))
+            {
+                ImGui::Indent();
+                refl.for_each_field([&](auto index)
+                {
+                    constexpr int i = index.value;
+                    DisplayGuiLow(refl.template field_value<i>(), refl.field_name(i));
+                });
+                ImGui::Unindent();
+            }
+        }
+        else
+        {
+            ImGui::TextDisabled("%s", name.c_str());
+        }
+    }
 
   public:
     Config(decltype(nullptr)) {}
@@ -75,7 +159,7 @@ template <typename T> class Config
         std::string obj_string = refl.to_string(4);
         try
         {
-            MemoryFile::Save(file_name, (uint8_t *)obj_string.data(), (uint8_t *)obj_string.data() + obj_string.size());
+            MemoryFile::Save(file_name, (std::uint8_t *)obj_string.data(), (std::uint8_t *)obj_string.data() + obj_string.size());
         }
         catch (...) {}
     }
@@ -93,5 +177,43 @@ template <typename T> class Config
         {
             Interface::MessageBox(Interface::MessageBoxType::warning, "Unable to load config", e.what());
         }
+    }
+    void Save() const
+    {
+        auto refl = Refl::Interface(object);
+        std::string obj_string = refl.to_string(4);
+        try
+        {
+            MemoryFile::Save(file_name, (std::uint8_t *)obj_string.data(), (std::uint8_t *)obj_string.data() + obj_string.size());
+        }
+        catch (...) {}
+    }
+
+    void DisplayGui()
+    {
+        if (ImGui::Begin(Str("Config: ", file_name).c_str()))
+        {
+            auto refl = Refl::Interface<T>(object);
+
+            ImGui::PushItemWidth(iround(ImGui::GetWindowContentRegionWidth() * 0.4));
+            refl.for_each_field([&](auto index)
+            {
+                constexpr int i = index.value;
+                DisplayGuiLow(refl.template field_value<i>(), refl.field_name(i));
+            });
+            ImGui::PopItemWidth();
+        }
+        ImGui::End();
+    }
+
+    Config(const Config &) = default;
+    Config(Config &&) noexcept = default;
+    Config &operator=(const Config &) = default;
+    Config &operator=(Config &&) noexcept = default;
+
+    ~Config()
+    {
+        if (was_modified_in_gui)
+            Save();
     }
 };
