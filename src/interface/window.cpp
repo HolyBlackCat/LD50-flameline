@@ -74,7 +74,7 @@ namespace Interface
             instance = this;
     }
 
-    Window &Window::operator=(Window &&other) noexcept
+    Window &Window::operator=(Window other) noexcept
     {
         std::swap(data, other.data);
         if (instance == &other)
