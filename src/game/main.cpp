@@ -7,8 +7,9 @@ Interface::ImGuiController gui_controller(shader_config.common_header);
 
 TextureAtlas texture_atlas(ivec2(2048), "assets/_images", "assets/atlas.png", "assets/atlas.refl");
 Graphics::Texture texture_main = Graphics::Texture().Wrap(Graphics::clamp).Interpolation(Graphics::nearest).SetData(texture_atlas.GetImage());
-Render r = ADJUST_G(Render(0x2000, shader_config), SetTexture(texture_main), SetMatrix(fmat4::ortho(screen_size/ivec2(-2,2), screen_size/ivec2(2,-2), -1, 1)));
+
 AdaptiveViewport adaptive_viewport(shader_config, screen_size);
+Render r = ADJUST_G(Render(0x2000, shader_config), SetTexture(texture_main), SetMatrix(adaptive_viewport.GetDetails().MatrixCentered()));
 
 Input::Mouse mouse;
 
@@ -55,8 +56,8 @@ int main()
 
     auto Resize = [&]
     {
-        mouse.SetMatrix((linear_mapping<fvec2>(ivec2(), window.Size(), screen_size/-2, screen_size/2).matrix()));
         adaptive_viewport.Update();
+        mouse.SetMatrix(adaptive_viewport.GetDetails().MouseMatrixCentered());
     };
     Resize();
 
