@@ -79,7 +79,7 @@ namespace Graphics
     {
         using res_alloc_t = ResourceAllocator<int>;
 
-        static res_alloc_t &Allocator() // Not sure if it's necessary, but the intent of wrapping it into a function is prevent the static init order fiasco.
+        static res_alloc_t &Allocator() // Wrapped into a function to prevent the static init order fiasco.
         {
             static res_alloc_t ret(64);
             return ret;
@@ -87,7 +87,7 @@ namespace Graphics
 
         struct Data
         {
-            int index = res_alloc_t::none;
+            int index = -1;
             GLuint handle = 0;
         };
 
@@ -104,9 +104,9 @@ namespace Graphics
 
         TexUnit()
         {
-            data.index = Allocator().Alloc();
-            if (!*this)
+            if (Allocator().RemainingCapacity() == 0)
                 Program::Error("No free texture units.");
+            data.index = Allocator().Allocate();
         }
         explicit TexUnit(GLuint handle) : TexUnit()
         {
@@ -126,12 +126,13 @@ namespace Graphics
 
         ~TexUnit()
         {
-            Allocator().Free(data.index); // Freeing an invalid index is a no-op.
+            if (*this)
+                Allocator().Free(data.index);
         }
 
         explicit operator bool() const
         {
-            return data.index != res_alloc_t::none;
+            return data.index != -1;
         }
 
         int Index() const

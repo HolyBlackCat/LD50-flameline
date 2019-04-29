@@ -4,96 +4,149 @@
 #include <numeric>
 #include <type_traits>
 #include <utility>
+#include <vector>
 
 #include "program/errors.h"
 
-template <typename Res = int, typename Index = int> class ResourceAllocator
+template <typename T = int>
+class ResourceAllocator
 {
-    static_assert(std::is_integral_v<Res> && std::is_integral_v<Index>, "Only integral types are supported.");
+  public:
+    using type = T;
 
-    Index pos = 0;
-    std::vector<Res> resources;
-    std::vector<Index> indices;
+//   private:
+    static_assert(std::is_integral_v<type>, "The template parameter must be integral.");
 
-    using ResIterator = typename decltype(resources)::const_iterator;
+    struct Data
+    {
+        type pos = 0;
+        std::vector<type> values, indices;
+
+        Data(type size = 0) : values(size), indices(size) {}
+    };
+    Data data;
+
+    void ReserveMore()
+    {
+        // Make sure this handles `Capacity() == 0` correctly.
+        Reserve(Capacity() * 3 / 2 + 1);
+    }
 
   public:
-    inline static constexpr Res none = -1;
+    using ResIterator = typename decltype(data.values)::const_iterator;
 
-    ResourceAllocator(Index size = 0)
+    ResourceAllocator(type size = 0) : data(size)
     {
-        Resize(size);
+        std::iota(data.values.begin(), data.values.end(), type(0));
+        std::iota(data.indices.begin(), data.indices.end(), type(0));
     }
 
-    void Resize(Index size) // Frees all resources.
+    ResourceAllocator(const ResourceAllocator &other) : data(other.data) {}
+    ResourceAllocator(ResourceAllocator &&other) noexcept : data(std::exchange(other.data, {})) {}
+    ResourceAllocator &operator=(ResourceAllocator other) noexcept
     {
-        if (size < 0 || size == none) // `size == none` is for unsigned types.
-            Program::Error("Invalid resource allocator size.");
-
-        // We use temporary objects for strong exception guarantee.
-        std::vector<Res> new_resources(size);
-        std::vector<Index> new_indices(size);
-
-        pos = 0;
-        resources = std::move(new_resources);
-        indices = std::move(new_indices);
-
-        std::iota(resources.begin(), resources.end(), Res(0));
-        std::iota(indices.begin(), indices.end(), Index(0));
+        std::swap(data, other.data);
+        return *this;
     }
 
-    Index Size() const
+    type Capacity() const
     {
-        return resources.size();
+        return data.values.size();
     }
-    Index ObjectsAllocated() const
+    type ObjectsAllocated() const
     {
-        return pos;
+        return data.pos;
+    }
+    type RemainingCapacity() const
+    {
+        return Capacity() - ObjectsAllocated();
     }
 
-    Res Alloc() // Returns `none` on failure.
+    void Reserve(type new_capacity) // This can only increase capacity.
     {
-        if (pos >= Size())
-            return none;
-        return resources[pos++];
+        if (new_capacity <= Capacity())
+            return;
+
+        ResourceAllocator new_object;
+
+        auto lambda = [&](auto member_ptr)
+        {
+            auto &old_vec = data.*member_ptr;
+            auto &new_vec = new_object.data.*member_ptr;
+
+            new_vec.reserve(new_capacity);
+            new_vec.insert(new_vec.end(), old_vec.begin(), old_vec.end());
+            new_vec.insert(new_vec.end(), new_capacity - Capacity(), 0);
+
+            std::iota(new_vec.begin() + Capacity(), new_vec.end(), Capacity());
+        };
+
+        new_object.data.pos = data.pos;
+        lambda(&Data::values);
+        lambda(&Data::indices);
+
+        *this = std::move(new_object);
     }
-    bool Free(Res res) // Returns 0 if the object wasn't allocated before.
+
+    bool IsAllocated(type object) const
     {
-        if (res < 0 || res >= Size())
+        if (object < 0 || object >= Capacity())
             return 0;
-        pos--;
-        Res last_res = resources[pos];
-        std::swap(resources[indices[res]], resources[pos]);
-        std::swap(indices[res], indices[last_res]);
-        return 1;
-    }
-    void FreeEverything()
-    {
-        pos = 0; // It's ф completely safe thing to do.
+        return data.indices[object] < ObjectsAllocated();
     }
 
-    ResIterator BeginAll() const
+    type Allocate() // Allocates an object. Increases capacity if necessary.
     {
-        return resources.begin();
+        if (data.pos >= Capacity())
+            ReserveMore();
+
+        return data.values[data.pos++];
     }
-    ResIterator EndAll() const
+
+    type AllocateObject(type object) // Attempts to allocate a specific object, throws on failure. Increases capacity if necessary.
     {
-        return resources.end();
+        if (IsAllocated(object))
+            Program::Error("Attempt to allocate object `", object, "` that is already allocated.");
+
+        Reserve(object + 1);
+
+        type last_index = data.pos++;
+        type this_index = data.indices[object];
+        type last_value = data.values[last_index];
+        type this_value = object;
+
+        std::swap(data.values[this_index], data.values[last_index]);
+        std::swap(data.indices[this_value], data.indices[last_value]);
     }
-    ResIterator BeginAllocated() const
+
+    void Free(type object) // Frees an object. Throws if `object` wasn't allocated.
     {
-        return resources.begin();
+        if (!IsAllocated(object))
+            Program::Error("Attempt to free object `", object, "` that wasn't allocated.");
+
+        type last_index = --data.pos;
+        type this_index = data.indices[object];
+        type last_value = data.values[last_index];
+        type this_value = object;
+
+        std::swap(data.values[this_index], data.values[last_index]);
+        std::swap(data.indices[this_value], data.indices[last_value]);
     }
-    ResIterator EndAllocated() const
+
+    void FreeAllObjects() // Frees all objects while maintaining capacity.
     {
-        return resources.begin() + pos;
+        data.pos = 0;
     }
-    ResIterator BeginFree() const
+
+    template <typename F> void ForEachAllocatedObject(F &&func) // `func` is `void func(type)`.
     {
-        return resources.begin() + pos;
+        for (type i = 0; i < ObjectsAllocated(); i++)
+            func(std::as_const(data.indices[i]));
     }
-    ResIterator EndFree() const
+
+    template <typename F> void ForEachFreeObject(F &&func) // `func` is `void func(type)`.
     {
-        return resources.end();
+        for (type i = ObjectsAllocated(); i < Capacity(); i++)
+            func(std::as_const(data.indices[i]));
     }
 };
