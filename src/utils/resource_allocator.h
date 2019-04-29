@@ -14,7 +14,7 @@ class ResourceAllocator
   public:
     using type = T;
 
-//   private:
+  private:
     static_assert(std::is_integral_v<type>, "The template parameter must be integral.");
 
     struct Data
@@ -117,6 +117,8 @@ class ResourceAllocator
 
         std::swap(data.values[this_index], data.values[last_index]);
         std::swap(data.indices[this_value], data.indices[last_value]);
+
+        return this_value;
     }
 
     void Free(type object) // Frees an object. Throws if `object` wasn't allocated.
