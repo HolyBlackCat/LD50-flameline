@@ -26,8 +26,8 @@ class Render
     Render(decltype(nullptr));
     Render(int queue_size, const Graphics::ShaderConfig &config);
 
-    Render(Render &&);
-    Render &operator=(Render &&);
+    Render(Render &&) noexcept;
+    Render &operator=(Render &&) noexcept;
     ~Render();
 
     explicit operator bool() const;

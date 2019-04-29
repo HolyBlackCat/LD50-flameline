@@ -99,8 +99,8 @@ class AdaptiveViewport
     AdaptiveViewport(const Graphics::ShaderConfig &shader_config);
     AdaptiveViewport(const Graphics::ShaderConfig &shader_config, ivec2 new_size);
 
-    AdaptiveViewport(AdaptiveViewport &&);
-    AdaptiveViewport &operator=(AdaptiveViewport &&);
+    AdaptiveViewport(AdaptiveViewport &&) noexcept;
+    AdaptiveViewport &operator=(AdaptiveViewport &&) noexcept;
     ~AdaptiveViewport();
 
     void SetSize(ivec2 new_size); // Needs Update() to take effect. Before that the state is indeterminate.

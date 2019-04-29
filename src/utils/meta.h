@@ -79,13 +79,13 @@ namespace Meta
 
     template <> struct copyable_if<0>
     {
-        copyable_if() = default;
-        ~copyable_if() = default;
-        copyable_if(copyable_if &&) = default;
-        copyable_if &operator=(copyable_if &&) = default;
+        copyable_if() noexcept = default;
+        ~copyable_if() noexcept = default;
+        copyable_if(copyable_if &&) noexcept = default;
+        copyable_if &operator=(copyable_if &&) noexcept = default;
 
-        copyable_if(const copyable_if &) = delete;
-        copyable_if &operator=(const copyable_if &) = delete;
+        copyable_if(const copyable_if &) noexcept = delete;
+        copyable_if &operator=(const copyable_if &) noexcept = delete;
     };
 
 
