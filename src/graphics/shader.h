@@ -358,7 +358,8 @@ namespace Graphics
         {
             if (Bound())
                 Unbind(); // GL doesn't auto-unbind shaders on deletion, and keeps them alive as long as they're bound.
-            glDeleteProgram(data.handle); // Deleting 0 is a no-op.
+            if (data.handle)
+                glDeleteProgram(data.handle); // Deleting 0 is a no-op, but GL could be unloaded at this point.
         }
 
         Shader(Shader &&other) noexcept : data(std::exchange(other.data, {})) {}

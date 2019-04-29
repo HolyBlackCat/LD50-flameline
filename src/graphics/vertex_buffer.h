@@ -165,7 +165,8 @@ namespace Graphics
         {
             if (StorageBound())
                 Buffers::ForgetBoundBuffer(); // GL unbinds the buffer automatically.
-            glDeleteBuffers(1, &data.handle); // Deleting 0 is a no-op.
+            if (data.handle)
+                glDeleteBuffers(1, &data.handle); // Deleting 0 is a no-op, but GL could be unloaded at this point.
         }
 
         explicit operator bool() const

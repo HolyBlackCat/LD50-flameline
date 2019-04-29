@@ -61,7 +61,8 @@ namespace Graphics
         ~TexObject()
         {
             // Deleting a texture unbinds it.
-            glDeleteTextures(1, &data.handle); // Deleting 0 is a no-op.
+            if (data.handle)
+                glDeleteTextures(1, &data.handle); // Deleting 0 is a no-op, but GL could be unloaded at this point.
         }
 
         explicit operator bool() const
