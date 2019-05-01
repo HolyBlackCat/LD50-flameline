@@ -15,12 +15,12 @@ template <int D, typename T> class MultiArray
 {
   public:
     static constexpr int dimensions = D;
-    static_assert(dimensions > 0, "Attempt to create multiarray with 0 dimensions.");
-    static_assert(dimensions <= 4, "Multiarrays with more than 4 dimensions are not supported.");
+    static_assert(dimensions >= 2, "Arrays with less than 2 dimensions are not supported.");
+    static_assert(dimensions <= 4, "Arrays with more than 4 dimensions are not supported.");
 
     using type = T;
     using index_t = std::ptrdiff_t;
-    using index_vec_t = std::conditional_t<dimensions == 1, index_t, vec<D, index_t>>;
+    using index_vec_t = vec<D, index_t>;
 
   private:
     index_vec_t size_vec;
