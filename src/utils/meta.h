@@ -89,13 +89,26 @@ namespace Meta
     };
 
 
-    template <typename Base> struct polymorphic // Use this as a CRTP base.
+    template <typename Base> struct stationary // Use this as a CRTP base.
     {
-        constexpr polymorphic() noexcept = default;
-        constexpr polymorphic(const polymorphic &) noexcept = default;
-        constexpr polymorphic(polymorphic &&) noexcept = default;
-        polymorphic &operator=(const polymorphic &) noexcept = default;
-        polymorphic &operator=(polymorphic &&) noexcept = default;
-        virtual ~polymorphic() = default;
+        // Here we use CRTP to make sure the empty base class optimization is never defeated.
+        constexpr stationary() noexcept = default;
+        stationary(const stationary &) = delete;
+        stationary(stationary &&) = delete;
+        stationary &operator=(const stationary &) = delete;
+        stationary &operator=(stationary &&) = delete;
+        ~stationary() = default;
+    };
+
+
+    template <typename Base> struct with_virtual_destructor // Use this as a CRTP base.
+    {
+        // The idea behind using CRTP is avoid connecting unrelated classes via a common base. I think we need to avoid that.
+        constexpr with_virtual_destructor() noexcept = default;
+        constexpr with_virtual_destructor(const with_virtual_destructor &) noexcept = default;
+        constexpr with_virtual_destructor(with_virtual_destructor &&) noexcept = default;
+        with_virtual_destructor &operator=(const with_virtual_destructor &) noexcept = default;
+        with_virtual_destructor &operator=(with_virtual_destructor &&) noexcept = default;
+        virtual ~with_virtual_destructor() = default;
     };
 }
