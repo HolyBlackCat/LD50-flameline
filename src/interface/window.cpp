@@ -366,11 +366,19 @@ namespace Interface
         SDL_Event event;
         while (SDL_PollEvent(&event))
         {
+            bool drop_event = 0;
+
             for (auto &hook : hooks)
             {
                 if (!hook(event))
-                    continue;
+                {
+                    drop_event = 1;
+                    break;
+                }
             }
+
+            if (drop_event)
+                continue;
 
             switch (event.type)
             {

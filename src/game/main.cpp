@@ -37,7 +37,7 @@ namespace States
 
             r.BindShader();
 
-            r.iquad(mouse.pos(), ivec2(32)).center().rotate(window.Ticks() / 100.).color(fvec3(0,0.5,1));
+            r.iquad(mouse.pos(), ivec2(32)).center().rotate(window.Ticks() / 100.).color(mouse.left.down() ? fvec3(1,0.5,0) : fvec3(0,0.5,1));
 
             r.Finish();
         }
