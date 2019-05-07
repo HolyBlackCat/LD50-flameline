@@ -3,7 +3,7 @@ Interface::Window window("Delta", screen_size * 2, Interface::windowed, ADJUST_G
 Graphics::DummyVertexArray dummy_vao;
 
 const Graphics::ShaderConfig shader_config = Graphics::ShaderConfig::Core();
-Interface::ImGuiController gui_controller(Interface::ImGuiController::Backend::opengl_modern, shader_config.common_header);
+Interface::ImGuiController gui_controller(ADJUST_G(Interface::ImGuiController::Config{}, backend = Interface::ImGuiController::Backend::opengl_modern, shader_header = shader_config.common_header));
 
 TextureAtlas texture_atlas(ivec2(2048), "assets/_images", "assets/atlas.png", "assets/atlas.refl");
 Graphics::Texture texture_main = Graphics::Texture().Wrap(Graphics::clamp).Interpolation(Graphics::nearest).SetData(texture_atlas.GetImage());

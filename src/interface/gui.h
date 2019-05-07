@@ -1,5 +1,6 @@
 #pragma once
 
+#include <memory>
 #include <utility>
 
 #include <imgui.h>
@@ -17,28 +18,39 @@ namespace Interface
     class ImGuiController
     {
       public:
-        enum class Backend
+        enum Backend
         {
             opengl_fixed_function,
             opengl_modern,
+        };
+
+        struct Config
+        {
+            Backend backend = opengl_modern;
+            std::string shader_header; // Ignored if backend doesn't use shaders.
+            std::string store_state_in_file = "imgui.ini"; // Set to empty string to not store state.
         };
 
       private:
         struct Data
         {
             ImGuiContext *context = 0;
+
             bool frame_started = 0;
             bool frame_rendered = 0;
-            Backend backend = Backend::opengl_modern;
+
+            Backend backend = opengl_modern;
+            // We need `unique_ptr` because ImGui stores the file name in the context as `const char *`, so the string has to remain valid even if the controller is moved.
+            std::unique_ptr<std::string> state_file_name;
         };
         Data data;
 
       public:
         ImGuiController() {}
 
-        ImGuiController(Backend backend, std::string shader_header, bool save_gui_state = 1) // `shader_header` is ignored if the selected backend doesn't use shaders.
+        ImGuiController(const Config &config)
         {
-            data.backend = backend;
+            data.backend = config.backend;
 
             // Initialize ImGui.
             IMGUI_CHECKVERSION();
@@ -53,24 +65,24 @@ namespace Interface
             FINALLY_ON_THROW( ImGui_ImplSDL2_Shutdown(); )
 
             bool backend_ok = 0;
-            switch (backend)
+            switch (data.backend)
             {
-              case Backend::opengl_fixed_function:
+              case opengl_fixed_function:
                 backend_ok = ImGui_ImplOpenGL2_Init();
                 break;
-              case Backend::opengl_modern:
-                backend_ok = ImGui_ImplOpenGL3_Init(shader_header.c_str());
+              case opengl_modern:
+                backend_ok = ImGui_ImplOpenGL3_Init(config.shader_header.c_str());
                 break;
             }
             if (!backend_ok)
                 Program::Error("Unable to initialize ImGui OpenGL backend.");
             FINALLY_ON_THROW(
-                switch (backend)
+                switch (data.backend)
                 {
-                  case Backend::opengl_fixed_function:
+                  case opengl_fixed_function:
                     ImGui_ImplOpenGL2_Shutdown();
                     break;
-                  case Backend::opengl_modern:
+                  case opengl_modern:
                     ImGui_ImplOpenGL3_Shutdown();
                     break;
                 }
@@ -79,9 +91,16 @@ namespace Interface
             // Activate context.
             Activate();
 
-            // Disable saving GUI state to file if necessary.
-            if (!save_gui_state)
+            // Set file name.
+            if (config.store_state_in_file.empty())
+            {
                 ImGui::GetIO().IniFilename = 0;
+            }
+            else
+            {
+                data.state_file_name = std::make_unique<std::string>(config.store_state_in_file);
+                ImGui::GetIO().IniFilename = data.state_file_name->c_str();
+            }
         }
 
         ImGuiController(ImGuiController &&other) noexcept : data(std::exchange(other.data, {})) {}
@@ -99,10 +118,10 @@ namespace Interface
 
                 switch (data.backend)
                 {
-                  case Backend::opengl_fixed_function:
+                  case opengl_fixed_function:
                     ImGui_ImplOpenGL2_Shutdown();
                     break;
-                  case Backend::opengl_modern:
+                  case opengl_modern:
                     ImGui_ImplOpenGL3_Shutdown();
                     break;
                 }
@@ -165,10 +184,10 @@ namespace Interface
 
             switch (data.backend)
             {
-              case Backend::opengl_fixed_function:
+              case opengl_fixed_function:
                 ImGui_ImplOpenGL2_NewFrame();
                 break;
-              case Backend::opengl_modern:
+              case opengl_modern:
                 ImGui_ImplOpenGL3_NewFrame();
                 break;
             }
@@ -197,10 +216,10 @@ namespace Interface
 
                 switch (data.backend)
                 {
-                  case Backend::opengl_fixed_function:
+                  case opengl_fixed_function:
                     ImGui_ImplOpenGL2_RenderDrawData(ImGui::GetDrawData());
                     break;
-                  case Backend::opengl_modern:
+                  case opengl_modern:
                     ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
                     break;
                 }
