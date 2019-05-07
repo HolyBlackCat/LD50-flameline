@@ -56,7 +56,6 @@
 
 #include "program/errors.h"
 #include <GLFL/glfl.h>
-#undef GL_SAMPLER_BINDING
 
 #if defined(_MSC_VER) && !defined(_CRT_SECURE_NO_WARNINGS)
 #define _CRT_SECURE_NO_WARNINGS
@@ -64,44 +63,20 @@
 
 #include "imgui.h"
 #include "imgui_impl_opengl3.h"
+
 #include <stdio.h>
+
 #if defined(_MSC_VER) && _MSC_VER <= 1500 // MSVC 2008 or earlier
 #include <stddef.h>     // intptr_t
 #else
 #include <stdint.h>     // intptr_t
 #endif
+
 #if defined(__APPLE__)
 #include "TargetConditionals.h"
 #endif
 
-// Auto-detect GL version
-#if !defined(IMGUI_IMPL_OPENGL_ES2) && !defined(IMGUI_IMPL_OPENGL_ES3)
-#if (defined(__APPLE__) && TARGET_OS_IOS) || (defined(__ANDROID__))
-#define IMGUI_IMPL_OPENGL_ES3       // iOS, Android  -> GL ES 3, "#version 300 es"
-#elif defined(__EMSCRIPTEN__)
-#define IMGUI_IMPL_OPENGL_ES2       // Emscripten    -> GL ES 2, "#version 100"
-#endif
-#endif
 
-#if defined(IMGUI_IMPL_OPENGL_ES2)
-#include <GLES2/gl2.h>
-#elif defined(IMGUI_IMPL_OPENGL_ES3)
-#include <GLES3/gl3.h>  // Use GL ES 3
-#else
-// About Desktop OpenGL function loaders:
-//  Modern desktop OpenGL doesn't have a standard portable header file to load OpenGL function pointers.
-//  Helper libraries are often used for this purpose! Here we are supporting a few common ones (gl3w, glew, glad).
-//  You may use another loader/header of your choice (glext, glLoadGen, etc.), or chose to manually implement your own.
-// #if defined(IMGUI_IMPL_OPENGL_LOADER_GL3W)
-// #include <GL/gl3w.h>
-// #elif defined(IMGUI_IMPL_OPENGL_LOADER_GLEW)
-// #include <GL/glew.h>
-// #elif defined(IMGUI_IMPL_OPENGL_LOADER_GLAD)
-// #include <glad/glad.h>
-// #else
-// #include IMGUI_IMPL_OPENGL_LOADER_CUSTOM
-// #endif
-#endif
 
 // OpenGL Data
 static char         g_GlslVersionString[32] = "";
@@ -117,17 +92,9 @@ bool    ImGui_ImplOpenGL3_Init(const char* glsl_version)
     ImGuiIO& io = ImGui::GetIO();
     io.BackendRendererName = "imgui_impl_opengl3";
 
-    // Store GLSL version string so we can refer to it later in case we recreate shaders. Note: GLSL version is NOT the same as GL version. Leave this to NULL if unsure.
-#if defined(IMGUI_IMPL_OPENGL_ES2)
-    if (glsl_version == NULL)
-        glsl_version = "#version 100";
-#elif defined(IMGUI_IMPL_OPENGL_ES3)
-    if (glsl_version == NULL)
-        glsl_version = "#version 300 es";
-#else
-    if (glsl_version == NULL)
-        glsl_version = "#version 130";
-#endif
+    if (!glsl_version)
+        Program::Error("Shader version not specified.");
+
     IM_ASSERT((int)strlen(glsl_version) + 2 < IM_ARRAYSIZE(g_GlslVersionString));
     strcpy(g_GlslVersionString, glsl_version);
     strcat(g_GlslVersionString, "\n");
@@ -162,16 +129,22 @@ void    ImGui_ImplOpenGL3_RenderDrawData(ImDrawData* draw_data)
     glActiveTexture(GL_TEXTURE0);
     GLint last_program; glGetIntegerv(GL_CURRENT_PROGRAM, &last_program);
     GLint last_texture; glGetIntegerv(GL_TEXTURE_BINDING_2D, &last_texture);
-#ifdef GL_SAMPLER_BINDING
-    GLint last_sampler; glGetIntegerv(GL_SAMPLER_BINDING, &last_sampler);
-#endif
+    #ifdef GL_SAMPLER_BINDING
+    GLint last_sampler;
+    if (glBindSampler)
+        glGetIntegerv(GL_SAMPLER_BINDING, &last_sampler);
+    #endif
     GLint last_array_buffer; glGetIntegerv(GL_ARRAY_BUFFER_BINDING, &last_array_buffer);
-#ifndef IMGUI_IMPL_OPENGL_ES2
-    GLint last_vertex_array; glGetIntegerv(GL_VERTEX_ARRAY_BINDING, &last_vertex_array);
-#endif
-#ifdef GL_POLYGON_MODE
-    GLint last_polygon_mode[2]; glGetIntegerv(GL_POLYGON_MODE, last_polygon_mode);
-#endif
+    #ifndef GL_VERTEX_ARRAY_BINDING
+    GLint last_vertex_array;
+    if (glBindVertexArray)
+        glGetIntegerv(GL_VERTEX_ARRAY_BINDING, &last_vertex_array);
+    #endif
+    #ifdef GL_POLYGON_MODE
+    GLint last_polygon_mode[2];
+    if (glPolygonMode)
+        glGetIntegerv(GL_POLYGON_MODE, last_polygon_mode);
+    #endif
     GLint last_viewport[4]; glGetIntegerv(GL_VIEWPORT, last_viewport);
     GLint last_scissor_box[4]; glGetIntegerv(GL_SCISSOR_BOX, last_scissor_box);
     GLenum last_blend_src_rgb; glGetIntegerv(GL_BLEND_SRC_RGB, (GLint*)&last_blend_src_rgb);
@@ -185,11 +158,15 @@ void    ImGui_ImplOpenGL3_RenderDrawData(ImDrawData* draw_data)
     GLboolean last_enable_depth_test = glIsEnabled(GL_DEPTH_TEST);
     GLboolean last_enable_scissor_test = glIsEnabled(GL_SCISSOR_TEST);
     bool clip_origin_lower_left = true;
-#if defined(GL_CLIP_ORIGIN) && !defined(__APPLE__)
-    GLenum last_clip_origin = 0; glGetIntegerv(GL_CLIP_ORIGIN, (GLint*)&last_clip_origin); // Support for GL 4.5's glClipControl(GL_UPPER_LEFT)
-    if (last_clip_origin == GL_UPPER_LEFT)
-        clip_origin_lower_left = false;
-#endif
+    #if defined(GL_CLIP_ORIGIN) && !defined(__APPLE__)
+    GLenum last_clip_origin = 0;
+    if (glClipControl)
+    {
+        glGetIntegerv(GL_CLIP_ORIGIN, (GLint*)&last_clip_origin); // Support for GL 4.5's glClipControl(GL_UPPER_LEFT)
+        if (last_clip_origin == GL_UPPER_LEFT)
+            clip_origin_lower_left = false;
+    }
+    #endif
 
     // Setup render state: alpha-blending enabled, no face culling, no depth testing, scissor enabled, polygon fill
     glEnable(GL_BLEND);
@@ -198,9 +175,10 @@ void    ImGui_ImplOpenGL3_RenderDrawData(ImDrawData* draw_data)
     glDisable(GL_CULL_FACE);
     glDisable(GL_DEPTH_TEST);
     glEnable(GL_SCISSOR_TEST);
-#ifdef GL_POLYGON_MODE
-    glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
-#endif
+    #ifdef GL_POLYGON_MODE
+    if (glPolygonMode)
+        glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+    #endif
 
     // Setup viewport, orthographic projection matrix
     // Our visible imgui space lies from draw_data->DisplayPos (top left) to draw_data->DisplayPos+data_data->DisplaySize (bottom right). DisplayMin is typically (0,0) for single viewport apps.
@@ -219,17 +197,21 @@ void    ImGui_ImplOpenGL3_RenderDrawData(ImDrawData* draw_data)
     glUseProgram(g_ShaderHandle);
     glUniform1i(g_AttribLocationTex, 0);
     glUniformMatrix4fv(g_AttribLocationProjMtx, 1, GL_FALSE, &ortho_projection[0][0]);
-#ifdef GL_SAMPLER_BINDING
-    glBindSampler(0, 0); // We use combined texture/sampler state. Applications using GL 3.3 may set that otherwise.
-#endif
+    #ifdef GL_SAMPLER_BINDING
+    if (glBindSampler)
+        glBindSampler(0, 0); // We use combined texture/sampler state. Applications using GL 3.3 may set that otherwise.
+    #endif
 
-#ifndef IMGUI_IMPL_OPENGL_ES2
+    #ifndef GL_VERTEX_ARRAY_BINDING
     // Recreate the VAO every time
     // (This is to easily allow multiple GL contexts. VAO are not shared among GL contexts, and we don't track creation/deletion of windows so we don't have an obvious key to use to cache them.)
     GLuint vao_handle = 0;
-    glGenVertexArrays(1, &vao_handle);
-    glBindVertexArray(vao_handle);
-#endif
+    if (glBindVertexArray)
+    {
+        glGenVertexArrays(1, &vao_handle);
+        glBindVertexArray(vao_handle);
+    }
+    #endif
     glBindBuffer(GL_ARRAY_BUFFER, g_VboHandle);
     glEnableVertexAttribArray(g_AttribLocationPosition);
     glEnableVertexAttribArray(g_AttribLocationUV);
@@ -287,20 +269,23 @@ void    ImGui_ImplOpenGL3_RenderDrawData(ImDrawData* draw_data)
             idx_buffer_offset += pcmd->ElemCount * sizeof(ImDrawIdx);
         }
     }
-#ifndef IMGUI_IMPL_OPENGL_ES2
-    glDeleteVertexArrays(1, &vao_handle);
-#endif
+    #ifndef GL_VERTEX_ARRAY_BINDING
+    if (glBindVertexArray)
+        glDeleteVertexArrays(1, &vao_handle);
+    #endif
 
     // Restore modified GL state
     glUseProgram(last_program);
     glBindTexture(GL_TEXTURE_2D, last_texture);
-#ifdef GL_SAMPLER_BINDING
-    glBindSampler(0, last_sampler);
-#endif
+    #ifdef GL_SAMPLER_BINDING
+    if (glBindSampler)
+        glBindSampler(0, last_sampler);
+    #endif
     glActiveTexture(last_active_texture);
-#ifndef IMGUI_IMPL_OPENGL_ES2
-    glBindVertexArray(last_vertex_array);
-#endif
+    #ifndef GL_VERTEX_ARRAY_BINDING
+    if (glBindVertexArray)
+        glBindVertexArray(last_vertex_array);
+    #endif
     glBindBuffer(GL_ARRAY_BUFFER, last_array_buffer);
     glBlendEquationSeparate(last_blend_equation_rgb, last_blend_equation_alpha);
     glBlendFuncSeparate(last_blend_src_rgb, last_blend_dst_rgb, last_blend_src_alpha, last_blend_dst_alpha);
@@ -308,9 +293,10 @@ void    ImGui_ImplOpenGL3_RenderDrawData(ImDrawData* draw_data)
     if (last_enable_cull_face) glEnable(GL_CULL_FACE); else glDisable(GL_CULL_FACE);
     if (last_enable_depth_test) glEnable(GL_DEPTH_TEST); else glDisable(GL_DEPTH_TEST);
     if (last_enable_scissor_test) glEnable(GL_SCISSOR_TEST); else glDisable(GL_SCISSOR_TEST);
-#ifdef GL_POLYGON_MODE
-    glPolygonMode(GL_FRONT_AND_BACK, (GLenum)last_polygon_mode[0]);
-#endif
+    #ifdef GL_POLYGON_MODE
+    if (glPolygonMode)
+        glPolygonMode(GL_FRONT_AND_BACK, (GLenum)last_polygon_mode[0]);
+    #endif
     glViewport(last_viewport[0], last_viewport[1], (GLsizei)last_viewport[2], (GLsizei)last_viewport[3]);
     glScissor(last_scissor_box[0], last_scissor_box[1], (GLsizei)last_scissor_box[2], (GLsizei)last_scissor_box[3]);
 }
@@ -330,9 +316,10 @@ bool ImGui_ImplOpenGL3_CreateFontsTexture()
     glBindTexture(GL_TEXTURE_2D, g_FontTexture);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-#ifdef GL_UNPACK_ROW_LENGTH
-    glPixelStorei(GL_UNPACK_ROW_LENGTH, 0);
-#endif
+    #ifdef GL_UNPACK_ROW_LENGTH
+    if (glPixelStorei)
+        glPixelStorei(GL_UNPACK_ROW_LENGTH, 0);
+    #endif
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, pixels);
 
     // Store our identifier
@@ -409,10 +396,11 @@ bool    ImGui_ImplOpenGL3_CreateDeviceObjects()
     GLint last_texture, last_array_buffer;
     glGetIntegerv(GL_TEXTURE_BINDING_2D, &last_texture);
     glGetIntegerv(GL_ARRAY_BUFFER_BINDING, &last_array_buffer);
-#ifndef IMGUI_IMPL_OPENGL_ES2
+    #ifndef GL_VERTEX_ARRAY_BINDING
     GLint last_vertex_array;
-    glGetIntegerv(GL_VERTEX_ARRAY_BINDING, &last_vertex_array);
-#endif
+    if (glBindVertexArray)
+        glGetIntegerv(GL_VERTEX_ARRAY_BINDING, &last_vertex_array);
+    #endif
 
     // Parse GLSL version string
     int glsl_version = 130;
@@ -576,9 +564,10 @@ bool    ImGui_ImplOpenGL3_CreateDeviceObjects()
     // Restore modified GL state
     glBindTexture(GL_TEXTURE_2D, last_texture);
     glBindBuffer(GL_ARRAY_BUFFER, last_array_buffer);
-#ifndef IMGUI_IMPL_OPENGL_ES2
-    glBindVertexArray(last_vertex_array);
-#endif
+    #ifndef GL_VERTEX_ARRAY_BINDING
+    if (glBindVertexArray)
+        glBindVertexArray(last_vertex_array);
+    #endif
 
     return true;
 }
