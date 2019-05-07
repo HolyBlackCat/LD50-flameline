@@ -27,7 +27,7 @@ $(mode_flags) CXXFLAGS += -DNDEBUG -O3
 $(mode_flags) LDFLAGS += -O3 -s -mwindows
 
 # File-specific flags
-FILE_SPECIFIC_FLAGS := lib/*.cpp > -O3
+FILE_SPECIFIC_FLAGS := lib/implementation.cpp lib/glfl.cpp > -g0 -O3
 
 # Precompiled headers
 PRECOMPILED_HEADERS := src/game/*.cpp>src/game/master.hpp
