@@ -15,11 +15,10 @@ Input::Mouse mouse;
 
 namespace States
 {
-    struct Base : Meta::polymorphic<Base>
+    struct Base : Meta::with_virtual_destructor<Base>
     {
         virtual void Tick() = 0;
         virtual void Render() const = 0;
-        virtual ~Base() = default;
     };
 
     Poly::Storage<Base> current_state;
