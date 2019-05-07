@@ -3,6 +3,7 @@
 #include <utility>
 
 #include <imgui.h>
+#include <imgui_impl_opengl2.h>
 #include <imgui_impl_opengl3.h>
 #include <imgui_impl_sdl.h>
 #include <imgui_stdlib.h>
@@ -15,20 +16,30 @@ namespace Interface
 {
     class ImGuiController
     {
+      public:
+        enum class Backend
+        {
+            opengl_fixed_function,
+            opengl_modern,
+        };
+
+      private:
         struct Data
         {
             ImGuiContext *context = 0;
             bool frame_started = 0;
             bool frame_rendered = 0;
+            Backend backend = Backend::opengl_modern;
         };
         Data data;
 
       public:
         ImGuiController() {}
 
-        // Don't forget to set theme with `ImGui::StyleColors*()` after creating the controller.
-        ImGuiController(std::string shader_header, bool save_gui_state = 1)
+        ImGuiController(Backend backend, std::string shader_header, bool save_gui_state = 1) // `shader_header` is ignored if the selected backend doesn't use shaders.
         {
+            data.backend = backend;
+
             // Initialize ImGui.
             IMGUI_CHECKVERSION();
 
@@ -38,12 +49,32 @@ namespace Interface
             FINALLY_ON_THROW( ImGui::DestroyContext(data.context); )
 
             if (!ImGui_ImplSDL2_InitForOpenGL(Window::Get().Handle(), Window::Get().Context()))
-                Program::Error("Unable to initialize ImGui SDL2 attachment.");
+                Program::Error("Unable to initialize ImGui SDL2 backend.");
             FINALLY_ON_THROW( ImGui_ImplSDL2_Shutdown(); )
 
-            if (!ImGui_ImplOpenGL3_Init(shader_header.c_str()))
-                Program::Error("Unable to initialize ImGui OpenGL attachment.");
-            FINALLY_ON_THROW( ImGui_ImplOpenGL3_Shutdown(); )
+            bool backend_ok = 0;
+            switch (backend)
+            {
+              case Backend::opengl_fixed_function:
+                backend_ok = ImGui_ImplOpenGL2_Init();
+                break;
+              case Backend::opengl_modern:
+                backend_ok = ImGui_ImplOpenGL3_Init(shader_header.c_str());
+                break;
+            }
+            if (!backend_ok)
+                Program::Error("Unable to initialize ImGui OpenGL backend.");
+            FINALLY_ON_THROW(
+                switch (backend)
+                {
+                  case Backend::opengl_fixed_function:
+                    ImGui_ImplOpenGL2_Shutdown();
+                    break;
+                  case Backend::opengl_modern:
+                    ImGui_ImplOpenGL3_Shutdown();
+                    break;
+                }
+            )
 
             // Activate context.
             Activate();
@@ -65,8 +96,19 @@ namespace Interface
             if (data.context)
             {
                 // We don't need to deactivate the context here, ImGui does it automatically if necessary.
-                ImGui_ImplOpenGL3_Shutdown();
+
+                switch (data.backend)
+                {
+                  case Backend::opengl_fixed_function:
+                    ImGui_ImplOpenGL2_Shutdown();
+                    break;
+                  case Backend::opengl_modern:
+                    ImGui_ImplOpenGL3_Shutdown();
+                    break;
+                }
+
                 ImGui_ImplSDL2_Shutdown();
+
                 ImGui::DestroyContext(data.context);
             }
         }
@@ -121,7 +163,16 @@ namespace Interface
             if (data.frame_started)
                 ImGui::EndFrame();
 
-            ImGui_ImplOpenGL3_NewFrame();
+            switch (data.backend)
+            {
+              case Backend::opengl_fixed_function:
+                ImGui_ImplOpenGL2_NewFrame();
+                break;
+              case Backend::opengl_modern:
+                ImGui_ImplOpenGL3_NewFrame();
+                break;
+            }
+
             ImGui_ImplSDL2_NewFrame(Window::Get().Handle());
             ImGui::NewFrame();
 
@@ -143,7 +194,16 @@ namespace Interface
             if (data.frame_rendered)
             {
                 // We never set `frame_rendered` back to 0. It's sole purpose is to avoid segfault on the first frame.
-                ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+
+                switch (data.backend)
+                {
+                  case Backend::opengl_fixed_function:
+                    ImGui_ImplOpenGL2_RenderDrawData(ImGui::GetDrawData());
+                    break;
+                  case Backend::opengl_modern:
+                    ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+                    break;
+                }
             }
         }
     };
