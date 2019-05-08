@@ -57,7 +57,7 @@ namespace Graphics
                 // We don't unload the library if this constructor throws after this point.
             }
 
-            data.file = std::move(file); // Memofy files are ref-counted, but moving won't hurt.
+            data.file = std::move(file); // Memory files are ref-counted, but moving won't hurt.
 
             FT_Open_Args args{};
             args.flags = FT_OPEN_MEMORY;
@@ -98,7 +98,7 @@ namespace Graphics
                         size_list += Str(this_size.x, 'x', this_size.y);
                 }
 
-                Program::Error("Bitmap font ", data.file.name(), "`", index != 0 ? Str("[",index,"]") : "", " doesn't support size ", requested_size, ".",
+                Program::Error("Bitmap font `", data.file.name(), "`", index != 0 ? Str("[",index,"]") : "", " doesn't support size ", requested_size, ".",
                                size_list.empty() ? "" : Str("\nAvailable sizes are: ", size_list, "."));
             }
 
@@ -121,7 +121,7 @@ namespace Graphics
             }
         }
 
-        static void UnloadLibrary() // Use this to unload freetype. This function throws if you have opened fonts. When
+        static void UnloadLibrary() // Use this to unload freetype. This function throws if you have opened fonts.
         {
             if (open_font_count > 0)
                 Program::Error("Unable to unload FreeType: ", open_font_count, " fonts are still in use.");
