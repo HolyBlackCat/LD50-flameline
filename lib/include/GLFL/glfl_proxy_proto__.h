@@ -70,8 +70,8 @@ namespace glfl
                     n /= 16;
                 }
                 ret = "0x" + ret;
-                if (int(obj) < 0)
-                    ret += " (" + std::to_string(int(obj)) + ")";
+                if (intptr_t(obj) < 0)
+                    ret += " (" + std::to_string(intptr_t(obj)) + ")";
                 return ret;
             }
             template <typename T> std::string bitfield_to_string(T obj)
@@ -153,7 +153,7 @@ namespace glfl
                 (void)index;
                 using dummy_array = int[];
                 int pos = 0;
-                dummy_array{0, (print((std::string("        ") + get_function_info(index).param_names[pos] + " = " + to_string(params, get_function_info(index).param_types[pos])).c_str()), pos++, 0)...};
+                (void)dummy_array{0, (print((std::string("        ") + get_function_info(index).param_names[pos] + " = " + to_string(params, get_function_info(index).param_types[pos])).c_str()), pos++, 0)...};
             }
 
             template <typename T> void print_result(int index, const T &value)
@@ -204,7 +204,9 @@ namespace glfl
                         incr_call_count();
                     }
                     else
+                    {
                         error("NOT LOADED");
+                    }
                 }
             };
         }
