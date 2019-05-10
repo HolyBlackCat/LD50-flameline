@@ -1,15 +1,15 @@
 const ivec2 screen_size(480, 270);
-Interface::Window window("Delta", screen_size * 2, Interface::windowed, ADJUST_G(Interface::WindowSettings{}, min_size = screen_size));
+Interface::Window window("Delta", screen_size * 2, Interface::windowed, Interface::WindowSettings{} with_(min_size = screen_size));
 Graphics::DummyVertexArray dummy_vao;
 
 const Graphics::ShaderConfig shader_config = Graphics::ShaderConfig::Core();
-Interface::ImGuiController gui_controller(ADJUST_G(Interface::ImGuiController::Config{}, backend = Interface::ImGuiController::Backend::opengl_modern, shader_header = shader_config.common_header));
+Interface::ImGuiController gui_controller(Poly::derived<Interface::ImGuiController::GraphicsBackend_Modern>, Interface::ImGuiController::Config{} with_(shader_header = shader_config.common_header));
 
 TextureAtlas texture_atlas(ivec2(2048), "assets/_images", "assets/atlas.png", "assets/atlas.refl");
 Graphics::Texture texture_main = Graphics::Texture().Wrap(Graphics::clamp).Interpolation(Graphics::nearest).SetData(texture_atlas.GetImage());
 
 AdaptiveViewport adaptive_viewport(shader_config, screen_size);
-Render r = ADJUST_G(Render(0x2000, shader_config), SetTexture(texture_main), SetMatrix(adaptive_viewport.GetDetails().MatrixCentered()));
+Render r = Render(0x2000, shader_config) with_(SetTexture(texture_main), SetMatrix(adaptive_viewport.GetDetails().MatrixCentered()));
 
 Input::Mouse mouse;
 
