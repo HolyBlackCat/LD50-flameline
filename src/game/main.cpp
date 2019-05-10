@@ -49,6 +49,11 @@ int main()
     { // Initialize
         ImGui::StyleColorsDark();
 
+        // Load various small fonts
+        gui_controller.LoadFont("assets/Monokat_6x12.ttf", 12.0f);
+        gui_controller.LoadDefaultFont();
+        gui_controller.RenderFontsWithFreetype();
+
         Graphics::Blending::Enable();
         Graphics::Blending::FuncNormalPre();
     }
