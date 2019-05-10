@@ -12,6 +12,7 @@
 // - v0.56: (2018/06/08) added support for ImFontConfig::GlyphMinAdvanceX, GlyphMaxAdvanceX.
 // - v0.60: (2019/01/10) re-factored to match big update in STB builder. fixed texture height waste. fixed redundant glyphs when merging. support for glyph padding.
 // - v0.61: (2019/01/15) added support for imgui allocators + added FreeType only override function SetAllocatorFunctions().
+// - v0.62: (2019/02/09) added a flag to disable font antialiasing.
 
 // Gamma Correct Blending:
 //  FreeType assumes blending in linear space rather than gamma space.
@@ -109,6 +110,7 @@ namespace
         FT_Face         Face;
         unsigned int    UserFlags;          // = ImFontConfig::RasterizerFlags
         FT_Int32        LoadFlags;
+        FT_Render_Mode  RenderMode;
     };
 
     // From SDL_ttf: Handy routines for converting from fixed point
@@ -141,6 +143,11 @@ namespace
             LoadFlags |= FT_LOAD_TARGET_MONO;
         else
             LoadFlags |= FT_LOAD_TARGET_NORMAL;
+
+        if (UserFlags & ImGuiFreeType::Monochrome)
+            RenderMode = FT_RENDER_MODE_MONO;
+        else
+            RenderMode = FT_RENDER_MODE_NORMAL;
 
         return true;
     }
@@ -208,9 +215,7 @@ namespace
     const FT_Bitmap* FreeTypeFont::RenderGlyphAndGetInfo(GlyphInfo* out_glyph_info)
     {
         FT_GlyphSlot slot = Face->glyph;
-        bool monochrome = UserFlags & ImGuiFreeType::Monochrome;
-
-        FT_Error error = FT_Render_Glyph(slot, monochrome ? FT_RENDER_MODE_MONO : FT_RENDER_MODE_NORMAL);
+        FT_Error error = FT_Render_Glyph(slot, RenderMode);
         if (error != 0)
             return NULL;
 
