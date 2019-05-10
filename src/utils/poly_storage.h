@@ -136,10 +136,10 @@ namespace Poly
     template <typename T, typename D> inline static constexpr T type_erasure_data_storage = []{T ret{}; ret.template _make<D>(); return ret;}();
 
 
-    inline constexpr struct make_t {} make;
+    inline constexpr struct base_tag {} base;
 
-    template <typename T> struct make_derived_t {};
-    template <typename T> inline constexpr make_derived_t<T> make_derived;
+    template <typename T> struct derived_tag {};
+    template <typename T> inline constexpr derived_tag<T> derived;
 
 
     template <typename T, typename UserData = DefaultData<T>>
@@ -291,10 +291,10 @@ namespace Poly
         Storage(decltype(nullptr) = nullptr) {}
 
         template <typename ...P, typename = decltype(T(std::declval<P>()...), void())>
-        Storage(make_t, P &&... params) : low(Low::template make<T>(nullptr, std::forward<P>(params)...)) {}
+        Storage(base_tag, P &&... params) : low(Low::template make<T>(nullptr, std::forward<P>(params)...)) {}
 
         template <typename D, typename ...P, typename = decltype(D(std::declval<P>()...), void())>
-        Storage(make_derived_t<D>, P &&... params) : low(Low::template make<D>(nullptr, std::forward<P>(params)...)) {}
+        Storage(derived_tag<D>, P &&... params) : low(Low::template make<D>(nullptr, std::forward<P>(params)...)) {}
 
         template <typename D = T, typename ...P, typename = decltype(D(std::declval<P>()...), void())>
         D &assign(P &&... params)

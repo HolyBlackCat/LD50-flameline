@@ -60,7 +60,7 @@ int main()
     };
     Resize();
 
-    States::current_state = Poly::make_derived<States::Game>;
+    States::current_state = Poly::derived<States::Game>;
 
     Metronome metronome(60);
     Clock::DeltaTimer delta_timer;
