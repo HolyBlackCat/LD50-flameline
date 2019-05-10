@@ -14,6 +14,9 @@
 #pragma once
 
 //---- Define assertion handler. Defaults to calling assert().
+#include "program/errors.h"
+// We don't disable those even in release builds for extra safety.
+#define IM_ASSERT(expr) (bool(expr) ? void() : ::Program::HardError("ImGui assertion failed: `" #expr "`."))
 //#define IM_ASSERT(_EXPR)  MyAssert(_EXPR)
 //#define IM_ASSERT(_EXPR)  ((void)(_EXPR))     // Disable asserts
 
