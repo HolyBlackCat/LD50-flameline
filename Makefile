@@ -229,6 +229,7 @@ OUTPUT_FILE_EXT = $(OUTPUT_FILE)$(extension_exe) # Output filename with extensio
 OBJECT_DIR := obj
 CFLAGS := -std=c11 -Wall -Wextra -pedantic-errors -g
 CXXFLAGS := -std=c++17 -Wall -Wextra -pedantic-errors -g
+WINDRES_FLAGS := -O res
 LDFLAGS :=
 LINKER_MODE := CXX # C or CXX
 ALLOW_PCH := 1 # 0 or 1
