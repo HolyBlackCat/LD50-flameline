@@ -182,10 +182,14 @@ namespace Interface
             return data.context && data.context == ImGui::GetCurrentContext();
         }
 
-        auto EventHook() // Use this with `Window::ProcessEvents()`.
+        enum HookMode {block_events, pass_events};
+
+        auto EventHook(HookMode mode = block_events) // Use this with `Window::ProcessEvents()`.
         {
-            return [this](SDL_Event &event)
+            return [this, mode](SDL_Event &event) -> bool
             {
+                bool false_if_blocking = mode != block_events;
+
                 // Remember currently acitve context and activate this one instead.
                 ImGuiContext *old_context = ImGui::GetCurrentContext();
                 FINALLY( ImGui::SetCurrentContext(old_context); )
@@ -199,12 +203,12 @@ namespace Interface
                 // Discard keyboard events if the keyboard is captured.
                 // Note that we don't discard `SDL_KEYUP` to prevent keys from getting stuck.
                 if (ImGui::GetIO().WantCaptureKeyboard && (event.type == SDL_KEYDOWN || event.type == SDL_TEXTINPUT || event.type == SDL_TEXTEDITING))
-                    return 0;
+                    return false_if_blocking;
 
                 // Discard mouse events if the mouse is captured.
                 // Note that we don't discard `SDL_MOUSEBUTTONUP` to prevent mouse buttons from getting stuck.
                 if (ImGui::GetIO().WantCaptureMouse && (event.type == SDL_MOUSEBUTTONDOWN || event.type == SDL_MOUSEWHEEL))
-                    return 0;
+                    return false_if_blocking;
 
                 return 1;
             };
@@ -292,7 +296,7 @@ namespace Interface
             config.FontDataOwnedByAtlas = 0;
             ImFont *ret = ImGui::GetIO().Fonts->AddFontFromMemoryTTF(const_cast<std::uint8_t *>(file.data()), file.size(), size, &config, glyph_ranges);
             if (!ret)
-                Program::Error("ImGui is unable to load a font.");
+                Program::Error("ImGui is unable to load font: `", file.name(), "`.");
 
             data.font_storage.push_back(std::move(file));
             return ret;
