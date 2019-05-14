@@ -86,7 +86,7 @@ class MemoryFile
         size++; // 1 extra byte for the null-terminator.
 
         ret.ref->storage = std::make_unique<uint8_t[]>(size);
-        if (size > 0 && !std::fread(ret.ref->storage.get(), size-1, 1, file)) // `-1` leaves a free byte for the null-terminator.
+        if (size > 1 && !std::fread(ret.ref->storage.get(), size-1, 1, file)) // `-1` leaves a free byte for the null-terminator.
             Program::Error("Unable to read from file `", file_name, "`.");
         ret.ref->storage[size-1] = '\0';
 
