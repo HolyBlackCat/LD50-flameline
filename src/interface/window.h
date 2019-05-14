@@ -86,6 +86,8 @@ namespace Interface
             bool keyboard_focus = 0, mouse_focus = 0;
 
             std::vector<InputTimes> input_times;
+
+            std::vector<std::string> dropped_files, dropped_strings;
         };
 
         Data data;
@@ -126,8 +128,8 @@ namespace Interface
         bool Resized() const;
         bool ExitRequested() const;
 
-        bool HasKeyboardFocus() const; // Returns 1 if the window active.
-        bool HasMouseFocus() const; // Returns 1 if the window if hovered.
+        bool HasKeyboardFocus() const; // Returns 1 if the window is active.
+        bool HasMouseFocus() const; // Returns 1 if the window is hovered.
 
         std::string TextInput() const;
 
@@ -138,5 +140,8 @@ namespace Interface
 
         void HideCursor(bool hide = 1);
         void RelativeMouseMode(bool relative = 1);
+
+        const std::vector<std::string> &DroppedFiles(); // Files dragged onto the window at the last tick.
+        const std::vector<std::string> &DroppedStrings(); // Text dragged onto the window at the last tick.
     };
 }
