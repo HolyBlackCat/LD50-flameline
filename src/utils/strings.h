@@ -32,11 +32,11 @@ namespace Strings
         return str.compare(0, prefix.size(), prefix) == 0;
     }
 
-    [[nodiscard]] inline bool EndsWith(std::string_view str, std::string_view prefix)
+    [[nodiscard]] inline bool EndsWith(std::string_view str, std::string_view suffix)
     {
-        if (str.size() < prefix.size()) // We don't want `str.size() - prefix.size()` to overflow.
+        if (str.size() < suffix.size()) // We don't want `str.size() - suffix.size()` to overflow.
             return 0;
-        return str.compare(str.size() - prefix.size(), prefix.size(), prefix) == 0;
+        return str.compare(str.size() - suffix.size(), suffix.size(), suffix) == 0;
     }
 
     enum class UseUnicode : bool {};
