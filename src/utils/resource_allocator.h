@@ -103,7 +103,7 @@ class ResourceAllocator
         return data.values[data.pos++];
     }
 
-    type AllocateObject(type object) // Attempts to allocate a specific object, throws on failure. Increases capacity if necessary.
+    void AllocateObject(type object) // Attempts to allocate a specific object, throws on failure. Increases capacity if necessary.
     {
         if (IsAllocated(object))
             Program::Error("Attempt to allocate object `", object, "` that is already allocated.");
@@ -117,8 +117,6 @@ class ResourceAllocator
 
         std::swap(data.values[this_index], data.values[last_index]);
         std::swap(data.indices[this_value], data.indices[last_value]);
-
-        return this_value;
     }
 
     void Free(type object) // Frees an object. Throws if `object` wasn't allocated.
@@ -140,15 +138,31 @@ class ResourceAllocator
         data.pos = 0;
     }
 
+    type GetAllocatedObject(type pos) const // pos < ObjectsAllocated()
+    {
+        if (pos < 0 || pos >= ObjectsAllocated())
+            Program::Error("Allocated object index is out of range.");
+
+        return data.indices[pos];
+    }
+
+    type GetFreeObject(type pos) const // pos < RemainingCapacity()
+    {
+        if (pos < 0 || pos >= RemainingCapacity()())
+            Program::Error("Free object index is out of range.");
+
+        return data.indices[ObjectsAllocated() + pos];
+    }
+
     template <typename F> void ForEachAllocatedObject(F &&func) // `func` is `void func(type)`.
     {
         for (type i = 0; i < ObjectsAllocated(); i++)
-            func(std::as_const(data.indices[i]));
+            func(GetAllocatedObject(i));
     }
 
     template <typename F> void ForEachFreeObject(F &&func) // `func` is `void func(type)`.
     {
-        for (type i = ObjectsAllocated(); i < Capacity(); i++)
-            func(std::as_const(data.indices[i]));
+        for (type i = 0; i < RemainingCapacity(); i++)
+            func(GetFreeObject(i));
     }
 };
