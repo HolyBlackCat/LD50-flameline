@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cmath>
 #include <cstddef>
 
 #include "utils/clock.h"
@@ -86,7 +87,7 @@ class Metronome
         if (new_frame)
             accumulator += delta;
 
-        if (abs(int64_t(accumulator - tick_len)) < tick_len * comp_th)
+        if (std::abs(int64_t(accumulator - tick_len)) < tick_len * comp_th)
         {
             int dir;
             if (comp_dir)
