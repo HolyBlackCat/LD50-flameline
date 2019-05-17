@@ -63,7 +63,7 @@ class MemoryFile
         ret.ref->begin = ret.ref->storage.get();
         ret.ref->end = ret.ref->begin + size;
 
-        ret.ref->name = Str("Copy of ", size, " bytes from 0x", std::hex, begin);
+        ret.ref->name = Str("Copy of ", size-1, " bytes from 0x", std::hex, begin);
         return ret;
     }
     [[nodiscard]] static MemoryFile file(std::string file_name)
@@ -115,7 +115,8 @@ class MemoryFile
     }
     [[nodiscard]] std::size_t size() const
     {
-        return end() - begin();
+
+        return end() - begin() - is_null_terminated();
     }
 
     [[nodiscard]] const uint8_t *begin() const
@@ -166,7 +167,7 @@ class MemoryFile
         if (!ref)
             return 0;
 
-        if (size() == 0)
+        if (begin() == end()) // We can't use `size() == 0` here because `size()` returns size without '\0' (also because it uses `is_null_terminated()`).
             return 0;
 
         return char(end()[-1]) == '\0';
