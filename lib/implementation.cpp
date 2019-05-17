@@ -1,8 +1,6 @@
 #include "program/errors.h"
 
 #define STB_IMAGE_IMPLEMENTATION
-#define STBI_ONLY_PNG
-#define STBI_ONLY_TGA
 #define STBI_ASSERT(expr) DebugAssert("Somewhere in STB Image.", expr)
 #include <stb_image.h>
 
