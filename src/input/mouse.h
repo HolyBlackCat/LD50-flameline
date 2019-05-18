@@ -90,6 +90,10 @@ namespace Input
         Button right  = Button(Input::mouse_right);
         Button x1     = Button(Input::mouse_x1);
         Button x2     = Button(Input::mouse_x2);
+        Button wheel_up    = Button(Input::mouse_wheel_up);
+        Button wheel_down  = Button(Input::mouse_wheel_down);
+        Button wheel_left  = Button(Input::mouse_wheel_left);
+        Button wheel_right = Button(Input::mouse_wheel_right);
 
         void HideCursor(bool hide = 1)
         {
