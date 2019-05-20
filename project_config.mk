@@ -9,7 +9,7 @@ OUTPUT_FILE := bin/imp-re
 LINKER_MODE := CXX
 
 # Flags
-CXXFLAGS := -Wall -Wextra -pedantic-errors -std=c++2a
+CXXFLAGS := -Wall -Wextra -pedantic-errors -std=c++2a -frelaxed-template-template-args
 LDFLAGS :=
 # Important flags
 override CXXFLAGS += -include src/utils/common.h -include src/program/parachute.h -Ilib/include -Isrc
