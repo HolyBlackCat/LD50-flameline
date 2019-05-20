@@ -1830,8 +1830,6 @@ int main(int argc, char **argv)
 
     output("using namespace Math::Export;\n");
 
-    next_line();
-
     if (!impl::output_file)
         return -1;
 }
