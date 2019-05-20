@@ -25,6 +25,11 @@
 #define MA_IMPL_CALL(macro, ...) macro(__VA_ARGS__) // For implementation use
 #define MA_IMPL_CALL_A(macro, ...) macro(__VA_ARGS__) // For implementation use
 
+#define MA_VA_FIRST(...) MA_VA_FIRST_impl(__VA_ARGS__,)
+#define MA_VA_FIRST_impl(x, ...) x
+
+#define MA_VA_NO_FIRST(x, ...) __VA_ARGS__
+
 #define MA_SEQ_FIRST(seq) MA_SEQ_FIRST_impl seq )
 #define MA_SEQ_FIRST_impl(...) __VA_ARGS__ MA_NULL(
 
@@ -508,4 +513,3 @@
 #define MA_SEQ_FOR_EACH_A_impl_62(macro, sep, data, seq) MA_IMPL_CALL_A(macro, 61, data, MA_SEQ_FIRST(seq)) sep() MA_SEQ_FOR_EACH_A_impl_61(macro, sep, data, MA_SEQ_NO_FIRST(seq))
 #define MA_SEQ_FOR_EACH_A_impl_63(macro, sep, data, seq) MA_IMPL_CALL_A(macro, 62, data, MA_SEQ_FIRST(seq)) sep() MA_SEQ_FOR_EACH_A_impl_62(macro, sep, data, MA_SEQ_NO_FIRST(seq))
 #define MA_SEQ_FOR_EACH_A_impl_64(macro, sep, data, seq) MA_IMPL_CALL_A(macro, 63, data, MA_SEQ_FIRST(seq)) sep() MA_SEQ_FOR_EACH_A_impl_63(macro, sep, data, MA_SEQ_NO_FIRST(seq))
-

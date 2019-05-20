@@ -181,6 +181,17 @@ int main(int argc, char **argv)
 
         next_line();
 
+        { // Variadic access
+            output(1+R"(
+                #define MA_VA_FIRST(...) MA_VA_FIRST_impl(__VA_ARGS__,)
+                #define MA_VA_FIRST_impl(x, ...) x
+
+                #define MA_VA_NO_FIRST(x, ...) __VA_ARGS__
+            )");
+        }
+
+        next_line();
+
         { // Sequence access
             output(1+R"(
                 #define MA_SEQ_FIRST(seq) MA_SEQ_FIRST_impl seq )
@@ -287,8 +298,6 @@ int main(int argc, char **argv)
             }
         }
     }
-
-    next_line();
 
     if (!impl::output_file)
         return -1;
