@@ -83,16 +83,20 @@
  *
  *     OnPlatform(GCC)( std::cout << "I'm on GCC!\n"; )
  *     NotOnPlatform(GCC)( std::cout << "I'm not on GCC!\n"; )
+ *     bool is_on_gcc = IsOnPlatform(GCC);
+ *     bool is_on_gcc = IsOnPlatform(GCC);
  *
  */
-#define OnPlatform(flag)    PLATFORM_IMPL_IF_ELSE(flag, PLATFORM_IMPL_IDENTITY, PLATFORM_IMPL_NULL)
-#define NotOnPlatform(flag) PLATFORM_IMPL_IF_ELSE(flag, PLATFORM_IMPL_NULL, PLATFORM_IMPL_IDENTITY)
+#define OnPlatform(flag)      PLATFORM_IMPL_CONDITION(flag, PLATFORM_IMPL_IDENTITY, PLATFORM_IMPL_NULL)
+#define NotOnPlatform(flag)   PLATFORM_IMPL_CONDITION(flag, PLATFORM_IMPL_NULL, PLATFORM_IMPL_IDENTITY)
+#define IsOnPlatform(flag)    PLATFORM_IMPL_CONDITION(flag, true, false)
+#define IsNotOnPlatform(flag) PLATFORM_IMPL_CONDITION(flag, false, true)
 
-#define PLATFORM_IMPL_IF_ELSE(flag, equal, not_equal) PLATFORM_IMPL_IF_ELSE_A(PLATFORM_IMPL_CAT(PLATFORM_IMPL_CAT(PLATFORM_IMPL_COMMA_, PLATFORM_IMPL_CAT(PLATFORM_, flag)),END), equal, not_equal)
-#define PLATFORM_IMPL_IF_ELSE_A(cond, equal, not_equal) PLATFORM_IMPL_IF_ELSE_B(cond, equal, not_equal,)
-#define PLATFORM_IMPL_IF_ELSE_B(a, b, c, ...) c
+#define PLATFORM_IMPL_CONDITION(flag, equal, not_equal) PLATFORM_IMPL_CONDITION_A(PLATFORM_IMPL_CAT(PLATFORM_IMPL_CAT(PLATFORM_IMPL_COMMA_, PLATFORM_IMPL_CAT(PLATFORM_, flag)),END), equal, not_equal)
+#define PLATFORM_IMPL_CONDITION_A(cond, equal, not_equal) PLATFORM_IMPL_CONDITION_B(cond, equal, not_equal,)
+#define PLATFORM_IMPL_CONDITION_B(a, b, c, ...) c
 #define PLATFORM_IMPL_COMMA_END ,
-#define PLATFORM_IMPL_COMMA_1END , // We need this for convenience, since `-D` flag defines macros as `1`..
+#define PLATFORM_IMPL_COMMA_1END , // We need this for convenience, since `-D` flag defines macros as `1`.
 #define PLATFORM_IMPL_CAT(a, b) PLATFORM_IMPL_CAT_(a, b)
 #define PLATFORM_IMPL_CAT_(a, b) a##b
 #define PLATFORM_IMPL_IDENTITY(...) __VA_ARGS__
