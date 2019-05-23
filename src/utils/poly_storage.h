@@ -17,8 +17,8 @@ namespace Poly
      * How to construct:
      *     Poly::Storage<MyClass> x; // Allocates nothing.
      *     Poly::Storage<MyClass> x = nullptr; // Same as above.
-     *     Poly::Storage<MyClass> x(Poly::make, ...); // Creates an object using an appropriate constructor.
-     *     Poly::Storage<MyBase> x(Poly::make_derived<MyDerived>, ...); // Creates an object of a possibly derived type. If `MyBase == MyDerived`, it has the same effect as the line above.
+     *     Poly::Storage<MyClass> x(Poly::base, ...); // Creates an object using an appropriate constructor.
+     *     Poly::Storage<MyBase> x(Poly::derived<MyDerived>, ...); // Creates an object of a possibly derived type. If `MyBase == MyDerived`, it has the same effect as the line above.
      *     Poly::Storage<MyBase> x = Poly::Storage<MyBase>::make<MyDerived>(...); // Same as above. If the template argument for `make` absent, the type defaults to the base class.
      *     Poly::Storage<MyBase> x = x.make<MyDerived>(...); // Same as above.
      *
@@ -198,7 +198,8 @@ namespace Poly
                 {
                     if (data.bytes)
                     {
-                        data.base->~T();
+                        // Note that qualifying the destructor call with `T::` silences a clang warning about calling a non-virtual destructor of an abstract class, if we use such class as the template parameter.
+                        data.base->T::~T();
                         delete[] data.bytes;
                     }
                 }
