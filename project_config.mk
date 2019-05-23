@@ -12,8 +12,8 @@ LINKER_MODE := CXX
 CXXFLAGS := -Wall -Wextra -pedantic-errors -std=c++2a -frelaxed-template-template-args
 LDFLAGS :=
 # Important flags
-override CXXFLAGS += -include src/utils/common.h -include src/program/parachute.h -Ilib/include -Isrc
-override LDFLAGS += -Llib -lmingw32 -lSDL2main -lSDL2.dll -lfreetype -lopenal32 -lvorbisfile -lvorbisenc -lvorbis -logg -lbz2 -lz -lfmt
+override CXXFLAGS += -include src/utils/common.h -include src/program/parachute.h -Ilib/include -Ilib/x86_64-w64-mingw32/include -Isrc
+override LDFLAGS += -Llib/x86_64-w64-mingw32 -lmingw32 -lSDL2main -lSDL2.dll -lfreetype -lopenal32 -lvorbisfile -lvorbisenc -lvorbis -logg -lbz2 -lz -lfmt
 
 # Build modes
 $(call new_mode,debug)
