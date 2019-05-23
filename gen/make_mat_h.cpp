@@ -7,7 +7,7 @@
 #include <sstream>
 #include <type_traits>
 
-#define VERSION "3.1.5"
+#define VERSION "3.1.6"
 
 #pragma GCC diagnostic ignored "-Wpragmas" // Silence GCC warning about the next line disabling a warning that GCC doesn't have.
 #pragma GCC diagnostic ignored "-Wstring-plus-int" // Silence clang warning about `1+R"()"` pattern.
@@ -453,36 +453,6 @@ int main(int argc, char **argv)
 
                             // Abs
                             output("[[nodiscard]] constexpr vec abs() const {return vec(", Fields(", ", "std::abs(", ")"), ");}\n");
-                        }
-
-                        { // Copy with modified members
-                            struct Operator
-                            {
-                                std::string name, str;
-                            };
-                            const Operator operators[]{{"set",""},{"add","+"},{"sub","-"},{"mul","*"},{"div","/"}};
-
-                            for (const auto &op : operators)
-                            for (int i = 0; i < data::fields_alt_count; i++)
-                            {
-                                for (int j = 0; j < w; j++)
-                                {
-                                    bool op_set = op.str == "";
-                                    output(" template <typename N> [[nodiscard]] constexpr ",(op_set ? "vec" : "auto")," ",op.name,"_",data::fields_alt[i][j],"(N n) const {return ",
-                                           (op_set ? "vec" : make_str("vec",w,"<decltype(x",op.str,"n)>")),"(");
-                                    for (int k = 0; k < w; k++)
-                                    {
-                                        if (k != 0)
-                                            output(", ");
-                                        if (k == j)
-                                            output(op_set ? "n" : data::fields_alt[i][k] + op.str + "n");
-                                        else
-                                            output(data::fields_alt[i][k]);
-                                    }
-                                    output(");}");
-                                }
-                                next_line();
-                            }
                         }
 
                         { // Resize

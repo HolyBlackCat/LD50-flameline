@@ -117,7 +117,7 @@ namespace Graphics
             for (int y = 0; y < other.Size().y; y++)
             {
                 auto source_address = &other.UnsafeAt(ivec2(0,y));
-                std::copy(source_address, source_address + other.Size().x, &UnsafeAt(pos.add_y(y)));
+                std::copy(source_address, source_address + other.Size().x, &UnsafeAt(ivec2(pos.x, y + pos.y)));
             }
         }
     };
