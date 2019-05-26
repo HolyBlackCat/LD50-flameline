@@ -9,6 +9,7 @@
 #include "reflection/complete.h"
 #include "utils/finally.h"
 #include "utils/mat.h"
+#include "utils/meta.h"
 
 namespace Graphics
 {
@@ -64,11 +65,12 @@ namespace Graphics
 
         // First, binds storage for the same handle if necessary. Then sets attribute pointers if T is reflected, otherwise disables all attributes.
         // BindDraw(0) is a special case. It disables all attributes, and thus strips draw binding from currently bound buffer (if any).
-        template <typename T> static void BindDraw(GLuint handle)
+        // `attributes` is effectively unused. We need it to compute attribute offsets.
+        template <typename T> static void BindDraw(GLuint handle, const T &attributes)
         {
             if (handle == 0) // Null handle is a special case.
             {
-                // Note that we disable attributes unconditionally. We can't insert `if (bind_draw != 0)` here.
+                // Note that we disable attributes unconditionally. We don't want to insert `if (binding_draw != 0)` here.
                 SetActiveAttribCount(0);
                 binding_draw = 0;
                 return;
@@ -89,21 +91,43 @@ namespace Graphics
 
             if constexpr (is_reflected)
             {
-                using refl = Refl::Interface<T>;
+                using refl_t = Refl::Interface<const T>;
+                refl_t refl(attributes);
 
-                int offset = 0, attrib = 0;
+                int attrib_index = 0;
 
-                refl::for_each_field([&](auto index)
+                refl_t::for_each_field([&](auto index)
                 {
                     constexpr int i = index.value;
-                    using field_type = typename refl::template field_type<i>;
-                    static_assert(std::is_same_v<Math::vec_base_t<field_type>, float>, "Non-float attributes are not supported.");
-                    glVertexAttribPointer(attrib++, Math::vec_size_v<field_type>, GL_FLOAT, 0, sizeof(T), (void *)(uintptr_t)offset);
-                    offset += sizeof(field_type);
-                });
+                    using field_type = typename refl_t::template field_type<i>;
+                    using base_type = Math::vec_base_t<field_type>;
 
-                if (offset != int(sizeof(T)))
-                    Program::Error("Unexpected padding in attribute structure.");
+                    GLint type_enum;
+
+                    if constexpr (std::is_same_v<base_type, char>)
+                        type_enum = (std::is_signed_v<char> ? GL_BYTE : GL_UNSIGNED_BYTE);
+                    else if constexpr (std::is_same_v<base_type, signed char>)
+                        type_enum = GL_BYTE;
+                    else if constexpr (std::is_same_v<base_type, unsigned char>)
+                        type_enum = GL_UNSIGNED_BYTE;
+                    else if constexpr (std::is_same_v<base_type, short>)
+                        type_enum = GL_SHORT;
+                    else if constexpr (std::is_same_v<base_type, unsigned short>)
+                        type_enum = GL_UNSIGNED_SHORT;
+                    #ifdef GL_INT
+                    else if constexpr (std::is_same_v<base_type, int>)
+                        type_enum = GL_INT;
+                    else if constexpr (std::is_same_v<base_type, unsigned int>)
+                        type_enum = GL_UNSIGNED_INT;
+                    #endif
+                    else if constexpr (std::is_same_v<base_type, float>)
+                        type_enum = GL_FLOAT;
+                    else
+                        static_assert(Meta::value<false, T, decltype(index)>, "Attributes of this type are not supported.");
+
+                    uintptr_t offset = reinterpret_cast<const char *>(&refl.template field_value<i>()) - reinterpret_cast<const char *>(&attributes);
+                    glVertexAttribPointer(attrib_index++, Math::vec_size_v<field_type>, type_enum, 0, sizeof(T), (void *)offset);
+                });
             }
 
             binding_draw = handle;
@@ -194,15 +218,15 @@ namespace Graphics
             return data.handle && data.handle == Buffers::StorageBinding();
         }
 
-        void BindDraw() const // If element type is not reflected, disables all attributes.
+        void BindDraw(const T &attributes = {}) const // If element type is not reflected, disables all attributes. `attributes` is effectively unused. We need it to compute attribute offsets.
         {
             if (!*this)
                 return;
-            Buffers::BindDraw<T>(data.handle);
+            Buffers::BindDraw(data.handle, attributes);
         }
         static void UnbindDraw() // Disables all attributes. If any buffer is currently bound, this results in stripping draw binding from it.
         {
-            Buffers::BindDraw<void>(0);
+            Buffers::BindDraw(0, nullptr);
         }
         [[nodiscard]] bool DrawBound() const
         {
