@@ -249,7 +249,7 @@ namespace Graphics
         }
 
 
-        Shader(decltype(nullptr)) {}
+        Shader() {}
 
         Shader(std::string name, const ShaderConfig &cfg, std::string vert_source, std::string frag_source, const std::vector<std::string> &attributes = {})
         {

@@ -33,22 +33,22 @@ void main()
 })";
 
     Details details;
-    Graphics::Shader shader = nullptr;
+    Graphics::Shader shader;
     ShaderUniforms shader_uni;
-    Graphics::TexObject fbuf_tex = nullptr, fbuf_tex_intermediate = nullptr;
-    Graphics::TexUnit tex_unit = nullptr;
-    Graphics::FrameBuffer fbuf = nullptr, fbuf_intermediate = nullptr;
-    Graphics::VertexBuffer<ShaderAttribs> vertex_buf = nullptr;
+    Graphics::TexObject fbuf_tex, fbuf_tex_intermediate;
+    Graphics::TexUnit tex_unit;
+    Graphics::FrameBuffer fbuf, fbuf_intermediate;
+    Graphics::VertexBuffer<ShaderAttribs> vertex_buf;
 };
 
-AdaptiveViewport::AdaptiveViewport(decltype(nullptr)) {}
+AdaptiveViewport::AdaptiveViewport() {}
 
 AdaptiveViewport::AdaptiveViewport(const Graphics::ShaderConfig &shader_config) : data(std::make_unique<Data>())
 {
     data->shader = Graphics::Shader("Adaptive viewport identity shader", shader_config, Graphics::ShaderPreferences{}, Meta::tag<Data::ShaderAttribs>{}, data->shader_uni, Data::shader_vert_src, Data::shader_frag_src);
-    data->fbuf_tex = Graphics::TexObject();
-    data->fbuf_tex_intermediate = Graphics::TexObject();
-    data->tex_unit = Graphics::TexUnit();
+    data->fbuf_tex = nullptr;
+    data->fbuf_tex_intermediate = nullptr;
+    data->tex_unit = nullptr;
     data->shader_uni.texture = data->tex_unit;
     data->tex_unit.Attach(data->fbuf_tex).Wrap(Graphics::clamp).Interpolation(Graphics::nearest);
     data->tex_unit.Attach(data->fbuf_tex_intermediate).Wrap(Graphics::clamp).Interpolation(Graphics::linear);

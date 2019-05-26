@@ -57,7 +57,7 @@ namespace Audio
         using ref = Source &&;
 
       public:
-        Source(decltype(nullptr)) {}
+        Source() {}
 
         Source(const Audio::Buffer &buffer)
         {

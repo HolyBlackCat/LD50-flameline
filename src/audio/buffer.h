@@ -20,9 +20,9 @@ namespace Audio
         Data data;
 
       public:
-        Buffer(decltype(nullptr)) {}
+        Buffer() {}
 
-        Buffer()
+        Buffer(decltype(nullptr))
         {
             alGenBuffers(1, &data.handle);
             if (!data.handle)

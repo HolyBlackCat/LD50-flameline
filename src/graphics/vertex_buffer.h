@@ -163,9 +163,9 @@ namespace Graphics
       public:
         static constexpr bool is_reflected = Refl::is_reflected<T>;
 
-        VertexBuffer(decltype(nullptr)) {}
+        VertexBuffer() {}
 
-        VertexBuffer()
+        VertexBuffer(decltype(nullptr))
         {
             glGenBuffers(1, &data.handle);
             if (!data.handle)
@@ -275,19 +275,5 @@ namespace Graphics
         {
             Draw(p, 0, Size());
         }
-    };
-
-    struct DummyVertexArray // Good for core profile
-    {
-        DummyVertexArray()
-        {
-            GLuint vao;
-            glGenVertexArrays(1, &vao);
-            if (!vao)
-                Program::Error("Unable to create the dummy vertex array object.");
-            glBindVertexArray(vao);
-        }
-        DummyVertexArray(const DummyVertexArray &) = delete;
-        DummyVertexArray &operator=(const DummyVertexArray &) = delete;
     };
 }

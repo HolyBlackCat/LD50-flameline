@@ -36,8 +36,6 @@ namespace Clock
     {
         uint64_t time = 0;
       public:
-        DeltaTimer(decltype(nullptr)) {}
-
         DeltaTimer() : time(Time()) {} // Don't call before SDL initialization.
 
         uint64_t operator()()

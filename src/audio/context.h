@@ -24,9 +24,9 @@ namespace Audio
         Data data;
 
       public:
-        Context(decltype(nullptr)) {}
+        Context() {}
 
-        Context()
+        Context(decltype(nullptr))
         {
             constexpr int required_major = 1, required_minor = 1;
 

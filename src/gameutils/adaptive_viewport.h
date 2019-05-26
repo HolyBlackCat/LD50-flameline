@@ -94,7 +94,7 @@ class AdaptiveViewport
         }
     };
 
-    AdaptiveViewport(decltype(nullptr));
+    AdaptiveViewport();
 
     AdaptiveViewport(const Graphics::ShaderConfig &shader_config);
     AdaptiveViewport(const Graphics::ShaderConfig &shader_config, ivec2 new_size);

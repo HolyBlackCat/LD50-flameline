@@ -39,7 +39,7 @@ namespace Graphics
         Data data;
 
       public:
-        FontFile(decltype(nullptr)) {}
+        FontFile() {}
 
         // File is copied into the font, since FreeType requires original data to be available when the font is used. (Since files are ref-counted, file contents aren't copied.)
         // `size` is measured in pixels. Normally you only provide height, but you can also provide width. In this case, `[x,0]` and `[0,x]` are equivalent to `[x,x]` due to how FreeType operates.

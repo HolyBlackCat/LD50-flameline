@@ -48,9 +48,9 @@ void main()
     gl_FragColor.a *= v_factors.z;
 })";
 
-    Graphics::RenderQueue<Attribs, 3> queue = nullptr; // Note that the queue has to be the first field.
+    Graphics::RenderQueue<Attribs, 3> queue; // Note that the queue has to be the first field.
     Uniforms uni;
-    Graphics::Shader shader = nullptr;
+    Graphics::Shader shader;
 
     Data(int queue_size, const Graphics::ShaderConfig &config) : queue(queue_size), shader("Main", config, Graphics::ShaderPreferences{}, Meta::tag<Attribs>{}, uni, vertex_source, fragment_source) {}
 };
@@ -60,7 +60,7 @@ void *Render::GetRenderQueuePtr()
     return &data->queue;
 }
 
-Render::Render(decltype(nullptr)) {}
+Render::Render() {}
 
 Render::Render(int queue_size, const Graphics::ShaderConfig &config)
 {

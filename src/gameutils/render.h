@@ -23,7 +23,7 @@ class Render
     void *GetRenderQueuePtr();
 
   public:
-    Render(decltype(nullptr));
+    Render();
     Render(int queue_size, const Graphics::ShaderConfig &config);
 
     Render(Render &&) noexcept;

@@ -8,7 +8,6 @@
 #include <type_traits>
 #include <utility>
 
-#include "clock.h"
 #include "robust_compare.h"
 
 template <typename DefaultInt = int, typename DefaultReal = float>
@@ -186,9 +185,9 @@ class Random
     generator_t gen;
 
   public:
-    Random(decltype(nullptr)) {}
+    Random() {}
 
-    Random(seed_t seed = seed_t(Clock::Time())) : gen(seed) {}
+    Random(seed_t seed) : gen(seed) {}
 
     void set_seed(seed_t seed)
     {

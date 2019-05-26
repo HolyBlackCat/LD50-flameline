@@ -2,9 +2,10 @@
 
 #include "graphics/blending.h"
 #include "graphics/clear.h"
+#include "graphics/dummy_vertex_array.h"
 #include "graphics/errors.h"
-#include "graphics/font.h"
 #include "graphics/font_file.h"
+#include "graphics/font.h"
 #include "graphics/framebuffer.h"
 #include "graphics/image.h"
 #include "graphics/render_queue.h"

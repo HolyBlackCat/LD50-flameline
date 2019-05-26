@@ -100,7 +100,7 @@ template <typename T> class Config
     }
 
   public:
-    Config(decltype(nullptr)) {}
+    Config() {}
 
     explicit Config(const T &object) : object(object) {}
     explicit Config(T &&object) : object(std::move(object)) {}

@@ -52,9 +52,9 @@ namespace Graphics
         };
 
       public:
-        FrameBuffer(decltype(nullptr)) {}
+        FrameBuffer() {}
 
-        FrameBuffer()
+        FrameBuffer(decltype(nullptr))
         {
             glGenFramebuffers(1, &data.handle);
             if (!data.handle)

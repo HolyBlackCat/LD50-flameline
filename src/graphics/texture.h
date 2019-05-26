@@ -40,9 +40,9 @@ namespace Graphics
         Data data;
 
       public:
-        TexObject(decltype(nullptr)) {}
+        TexObject() {}
 
-        TexObject()
+        TexObject(decltype(nullptr))
         {
             glGenTextures(1, &data.handle);
             if (!data.handle)
@@ -97,13 +97,13 @@ namespace Graphics
         inline static int active_index = 0;
 
       public:
-        TexUnit(decltype(nullptr))
+        TexUnit()
         {
             // We need to create the allocator even in the null constructor to dodge the destruction order fiasco.
             Allocator();
         }
 
-        TexUnit()
+        TexUnit(decltype(nullptr))
         {
             if (Allocator().RemainingCapacity() == 0)
                 Program::Error("No free texture units.");
@@ -259,14 +259,14 @@ namespace Graphics
 
     class Texture
     {
-        TexObject object = nullptr;
-        TexUnit unit = nullptr;
+        TexObject object;
+        TexUnit unit;
         ivec2 size = ivec2(0);
 
       public:
-        Texture(decltype(nullptr)) {}
+        Texture() {}
 
-        Texture() : object(), unit()
+        Texture(decltype(nullptr)) : object(nullptr), unit(nullptr)
         {
             unit.Attach(object);
         }
