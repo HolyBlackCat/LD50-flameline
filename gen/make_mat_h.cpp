@@ -7,7 +7,7 @@
 #include <sstream>
 #include <type_traits>
 
-#define VERSION "3.1.6"
+#define VERSION "3.1.7"
 
 #pragma GCC diagnostic ignored "-Wpragmas" // Silence GCC warning about the next line disabling a warning that GCC doesn't have.
 #pragma GCC diagnostic ignored "-Wstring-plus-int" // Silence clang warning about `1+R"()"` pattern.
@@ -1752,6 +1752,8 @@ int main(int argc, char **argv)
                 using std::uint64_t;
                 using std::size_t;
                 using std::ptrdiff_t;
+                using std::intptr_t;
+                using std::uintptr_t;
 
                 using std::sqrt;
                 using std::cos;
@@ -1761,6 +1763,7 @@ int main(int argc, char **argv)
                 using std::asin;
                 using std::atan;
                 using std::atan2;
+                using std::pow;
             )");
         });
     });
