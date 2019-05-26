@@ -36,9 +36,9 @@ namespace Audio
         }
 
         Buffer(Buffer &&other) noexcept : data(std::exchange(other.data, {})) {}
-        Buffer &operator=(Buffer other) noexcept
+        Buffer &operator=(Buffer &&other) noexcept
         {
-            std::swap(data, other.data);
+            data = std::exchange(other.data, {});
             return *this;
         }
 

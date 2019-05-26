@@ -147,9 +147,9 @@ namespace Interface
         }
 
         ImGuiController(ImGuiController &&other) noexcept : data(std::exchange(other.data, {})) {}
-        ImGuiController &operator=(ImGuiController other) noexcept
+        ImGuiController &operator=(ImGuiController &&other) noexcept
         {
-            std::swap(data, other.data);
+            data = std::exchange(other.data, {});
             return *this;
         }
 

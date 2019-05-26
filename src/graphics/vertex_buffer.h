@@ -179,9 +179,9 @@ namespace Graphics
         }
 
         VertexBuffer(VertexBuffer &&other) noexcept : data(std::exchange(other.data, {})) {}
-        VertexBuffer &operator=(VertexBuffer other) noexcept // Note the pass by value to utilize copy&swap idiom.
+        VertexBuffer &operator=(VertexBuffer &&other) noexcept
         {
-            std::swap(data, other.data);
+            data = std::exchange(other.data, {});
             return *this;
         }
 
