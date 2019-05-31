@@ -25,6 +25,13 @@ namespace Meta
     template <typename A, typename ...B> using void_type = type<void, A, B...>;
 
 
+    template <typename... Ts>
+    struct overload : Ts... { using Ts::operator()...; };
+
+    template <typename... Ts>
+    overload(Ts...) -> overload<Ts...>;
+
+
     namespace impl
     {
         template <typename DummyVoid, template <typename...> typename A, typename ...B> struct is_detected : std::false_type {};
