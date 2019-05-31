@@ -173,7 +173,7 @@ namespace Graphics
             // Not needed because there is no code below this point:
             // FINALLY_ON_THROW( glDeleteBuffers(1, &handle); )
         }
-        VertexBuffer(int count, const T *source = 0, Usage usage = static_draw) : VertexBuffer() // Binds storage.
+        VertexBuffer(int count, const T *source = 0, Usage usage = static_draw) : VertexBuffer(nullptr) // Binds storage.
         {
             SetData(count, source, usage);
         }

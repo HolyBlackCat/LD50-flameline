@@ -109,11 +109,11 @@ namespace Graphics
                 Program::Error("No free texture units.");
             data.index = Allocator().Allocate();
         }
-        explicit TexUnit(GLuint handle) : TexUnit()
+        explicit TexUnit(GLuint handle) : TexUnit(nullptr)
         {
             AttachHandle(handle);
         }
-        explicit TexUnit(const TexObject &texture) : TexUnit()
+        explicit TexUnit(const TexObject &texture) : TexUnit(nullptr)
         {
             Attach(texture);
         }

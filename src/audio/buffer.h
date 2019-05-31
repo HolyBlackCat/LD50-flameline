@@ -30,7 +30,7 @@ namespace Audio
             // Not needed because there is no code below this point:
             // FINALLY_ON_THROW( alDeleteBuffers(1, &value); )
         }
-        Buffer(const Sound &sound) : Buffer()
+        Buffer(const Sound &sound) : Buffer(nullptr)
         {
             SetData(sound);
         }

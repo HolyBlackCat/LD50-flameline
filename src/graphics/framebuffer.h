@@ -62,11 +62,11 @@ namespace Graphics
             // Not needed because there is no code below this point:
             // FINALLY_ON_THROW( glDeleteFramebuffers(1, &data.handle); )
         }
-        FrameBuffer(Attachment att) : FrameBuffer()
+        FrameBuffer(Attachment att) : FrameBuffer(nullptr)
         {
             Attach(att);
         }
-        FrameBuffer(const std::vector<Attachment> &att) : FrameBuffer()
+        FrameBuffer(const std::vector<Attachment> &att) : FrameBuffer(nullptr)
         {
             Attach(att);
         }
