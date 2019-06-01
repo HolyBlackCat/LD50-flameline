@@ -61,6 +61,8 @@ namespace Audio
 
         Source(const Audio::Buffer &buffer)
         {
+            DebugAssert("Attempt to use a null audio buffer.", buffer);
+
             // Create the source.
             data.object = std::make_shared<Object>();
             if (data.object->handle)

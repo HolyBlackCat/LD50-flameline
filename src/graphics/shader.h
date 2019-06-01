@@ -386,6 +386,7 @@ namespace Graphics
 
         void Bind() const
         {
+            DebugAssert("Attempt to use a null shader.", *this);
             if (!*this)
                 return;
             BindHandle(data.handle);

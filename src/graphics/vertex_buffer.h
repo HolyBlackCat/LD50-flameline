@@ -31,10 +31,10 @@ namespace Graphics
         stream_draw  = GL_STREAM_DRAW,
     };
 
-    class Buffers
+    class VertexBuffers
     {
-        Buffers() = delete;
-        ~Buffers() = delete;
+        VertexBuffers() = delete;
+        ~VertexBuffers() = delete;
 
         // Only one buffer can be bound at a time. Optionally it can be draw-bound at the same time.
         inline static GLuint binding = 0;
@@ -188,7 +188,7 @@ namespace Graphics
         ~VertexBuffer()
         {
             if (StorageBound())
-                Buffers::ForgetBoundBuffer(); // GL unbinds the buffer automatically.
+                VertexBuffers::ForgetBoundBuffer(); // GL unbinds the buffer automatically.
             if (data.handle)
                 glDeleteBuffers(1, &data.handle); // Deleting 0 is a no-op, but GL could be unloaded at this point.
         }
@@ -205,32 +205,34 @@ namespace Graphics
 
         void BindStorage() const
         {
+            DebugAssert("Attempt to use a null vertex buffer.", *this);
             if (!*this)
                 return;
-            Buffers::BindStorage(data.handle);
+            VertexBuffers::BindStorage(data.handle);
         }
         static void UnbindStorage() // Removes draw binding as well. Doesn't disable any attributes for performance reasons.
         {
-            Buffers::BindStorage(0);
+            VertexBuffers::BindStorage(0);
         }
         [[nodiscard]] bool StorageBound() const
         {
-            return data.handle && data.handle == Buffers::StorageBinding();
+            return data.handle && data.handle == VertexBuffers::StorageBinding();
         }
 
         void BindDraw(const T &attributes = {}) const // If element type is not reflected, disables all attributes. `attributes` is effectively unused. We need it to compute attribute offsets.
         {
+            DebugAssert("Attempt to use a null vertex buffer.", *this);
             if (!*this)
                 return;
-            Buffers::BindDraw(data.handle, attributes);
+            VertexBuffers::BindDraw(data.handle, attributes);
         }
         static void UnbindDraw() // Disables all attributes. If any buffer is currently bound, this results in stripping draw binding from it.
         {
-            Buffers::BindDraw(0, nullptr);
+            VertexBuffers::BindDraw(0, nullptr);
         }
         [[nodiscard]] bool DrawBound() const
         {
-            return data.handle && data.handle == Buffers::DrawBinding();
+            return data.handle && data.handle == VertexBuffers::DrawBinding();
         }
 
         int Size() const // This size is measured in elements, not bytes.
@@ -240,6 +242,7 @@ namespace Graphics
 
         void SetData(int count, const T *source = 0, Usage usage = static_draw) // Binds storage.
         {
+            DebugAssert("Attempt to use a null vertex buffer.", *this);
             if (!*this)
                 return;
             BindStorage();
@@ -253,6 +256,7 @@ namespace Graphics
         }
         void SetDataPartBytes(int offset, int bytes, const uint8_t *source) // Binds storage.
         {
+            DebugAssert("Attempt to use a null vertex buffer.", *this);
             if (!*this)
                 return;
             BindStorage();
@@ -262,6 +266,7 @@ namespace Graphics
         void Draw(DrawMode p, int from, int count) // Binds for drawing.
         {
             static_assert(is_reflected, "Element type of this buffer is not reflected, unable to draw.");
+            DebugAssert("Attempt to use a null vertex buffer.", *this);
             if (!*this)
                 return;
             BindDraw();

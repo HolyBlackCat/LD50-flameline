@@ -150,6 +150,7 @@ namespace Graphics
         }
         void Activate()
         {
+            DebugAssert("Attempt to use a null texture unit.", *this);
             if (!*this)
                 return;
             ActivateIndex(data.index);
@@ -161,6 +162,7 @@ namespace Graphics
 
         TexUnit &&AttachHandle(GLuint handle)
         {
+            DebugAssert("Attempt to use a null texture unit.", *this);
             if (!*this)
                 return std::move(*this);
 
@@ -180,9 +182,19 @@ namespace Graphics
             return std::move(*this);
         }
 
+        GLuint AttachedHandle() const
+        {
+            return data.handle;
+        }
+        bool HasAttachedHandle() const
+        {
+            return bool(data.handle);
+        }
+
         TexUnit &&Interpolation(InterpolationMode mode)
         {
-            if (!data.handle)
+            DebugAssert("Attempt to use a texture unit without an attached texture.", HasAttachedHandle());
+            if (!HasAttachedHandle())
                 return std::move(*this);
 
             Activate();
@@ -198,7 +210,8 @@ namespace Graphics
 
         TexUnit &&WrapX(WrapMode mode)
         {
-            if (!data.handle)
+            DebugAssert("Attempt to use a texture unit without an attached texture.", HasAttachedHandle());
+            if (!HasAttachedHandle())
                 return std::move(*this);
 
             Activate();
@@ -207,7 +220,8 @@ namespace Graphics
         }
         TexUnit &&WrapY(WrapMode mode)
         {
-            if (!data.handle)
+            DebugAssert("Attempt to use a texture unit without an attached texture.", HasAttachedHandle());
+            if (!HasAttachedHandle())
                 return std::move(*this);
 
             Activate();
@@ -228,7 +242,8 @@ namespace Graphics
         }
         TexUnit &&SetData(GLenum internal_format, GLenum format, GLenum type, ivec2 size, const uint8_t *pixels = 0)
         {
-            if (!data.handle)
+            DebugAssert("Attempt to use a texture unit without an attached texture.", HasAttachedHandle());
+            if (!HasAttachedHandle())
                 return std::move(*this);
 
             Activate();
@@ -237,6 +252,7 @@ namespace Graphics
         }
         TexUnit &&SetData(const Image &image)
         {
+            DebugAssert("Attempt to use a null image.", image);
             SetData(image.Size(), image.Data());
             return std::move(*this);
         }
@@ -248,7 +264,8 @@ namespace Graphics
         }
         TexUnit &&SetDataPart(GLenum format, GLenum type, ivec2 pos, ivec2 size, const uint8_t *pixels)
         {
-            if (!data.handle)
+            DebugAssert("Attempt to use a texture unit without an attached texture.", HasAttachedHandle());
+            if (!HasAttachedHandle())
                 return std::move(*this);
 
             Activate();
@@ -295,20 +312,20 @@ namespace Graphics
 
         Texture &&SetData(ivec2 new_size, const uint8_t *pixels = 0)
         {
-            size = new_size;
             unit.SetData(size, pixels);
+            size = new_size;
             return std::move(*this);
         }
         Texture &&SetData(GLenum internal_format, GLenum format, GLenum type, ivec2 new_size, const uint8_t *pixels = 0)
         {
-            size = new_size;
             unit.SetData(internal_format, format, type, size, pixels);
+            size = new_size;
             return std::move(*this);
         }
         Texture &&SetData(const Image &image)
         {
-            size = image.Size();
             unit.SetData(image);
+            size = image.Size();
             return std::move(*this);
         }
 

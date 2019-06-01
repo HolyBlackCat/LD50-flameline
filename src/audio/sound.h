@@ -47,6 +47,11 @@ namespace Audio
                 Program::Error("Expected `", file.name(), "` to be ", (desired_channel_count == mono ? "mono" : "stereo"));
         }
 
+        explicit operator bool() const
+        {
+            return SampleCount() > 0;
+        }
+
         Channels ChannelCount() const
         {
             return channel_count;
