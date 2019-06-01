@@ -52,8 +52,8 @@ AdaptiveViewport::AdaptiveViewport(const Graphics::ShaderConfig &shader_config) 
     data->shader_uni.texture = data->tex_unit;
     data->tex_unit.Attach(data->fbuf_tex).Wrap(Graphics::clamp).Interpolation(Graphics::nearest);
     data->tex_unit.Attach(data->fbuf_tex_intermediate).Wrap(Graphics::clamp).Interpolation(Graphics::linear);
-    data->fbuf = Graphics::FrameBuffer().Attach(data->fbuf_tex);
-    data->fbuf_intermediate = Graphics::FrameBuffer().Attach(data->fbuf_tex_intermediate);
+    data->fbuf = Graphics::FrameBuffer(nullptr).Attach(data->fbuf_tex);
+    data->fbuf_intermediate = Graphics::FrameBuffer(nullptr).Attach(data->fbuf_tex_intermediate);
 
     constexpr float margin = 0.01;
     constexpr int vertex_count = 3;
