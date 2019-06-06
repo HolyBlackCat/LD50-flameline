@@ -31,8 +31,9 @@ template <int D, typename T> class MultiArray
     {
         DebugAssert("Invalid multiarray size.", size_vec.min() >= 0);
     }
-    template <index_t ...I> MultiArray(Meta::value_list<I...>, std::array<type, index_vec_t(I...).prod()> data) : size_vec(I...), storage(data.begin(), data.end())
+    template <typename A, A ...I> MultiArray(Meta::value_list<I...>, std::array<type, index_vec_t(I...).prod()> data) : size_vec(I...), storage(data.begin(), data.end())
     {
+        static_assert(std::is_integral_v<A>, "Indices must be integral.");
         static_assert(((I >= 0) && ...), "Invalid multiarray size.");
     }
 
@@ -61,7 +62,19 @@ template <int D, typename T> class MultiArray
 
         return storage[index];
     }
-    [[nodiscard]] type &clamp_at(index_vec_t pos)
+    [[nodiscard]] type &throwing_at(index_vec_t pos)
+    {
+        if (!pos_in_range(pos))
+            Program::Error("Multiarray index ", pos, " is out of range. The array size is ", size_vec, ".");
+        return unsafe_at(pos);
+    }
+    [[nodiscard]] type &nonthrowing_at(index_vec_t pos)
+    {
+        if (!pos_in_range(pos))
+            Program::HardError("Multiarray index ", pos, " is out of range. The array size is ", size_vec, ".");
+        return unsafe_at(pos);
+    }
+    [[nodiscard]] type &clamped_at(index_vec_t pos)
     {
         clamp_var(pos, 0, size_vec-1);
         return unsafe_at(pos);
@@ -89,9 +102,17 @@ template <int D, typename T> class MultiArray
     {
         return const_cast<MultiArray *>(this)->unsafe_at(pos);
     }
-    [[nodiscard]] const type &clamp_at(index_vec_t pos) const
+    [[nodiscard]] const type &throwing_at(index_vec_t pos) const
     {
-        return const_cast<MultiArray *>(this)->clamp_at(pos);
+        return const_cast<MultiArray *>(this)->throwing_at(pos);
+    }
+    [[nodiscard]] const type &nonthrowing_at(index_vec_t pos) const
+    {
+        return const_cast<MultiArray *>(this)->nonthrowing_at(pos);
+    }
+    [[nodiscard]] const type &clamped_at(index_vec_t pos) const
+    {
+        return const_cast<MultiArray *>(this)->clamped_at(pos);
     }
     [[nodiscard]] type try_get(index_vec_t pos) const
     {
