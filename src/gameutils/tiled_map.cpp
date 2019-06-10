@@ -25,6 +25,9 @@ namespace Tiled
 
     TileLayer LoadTileLayer(Json::View source)
     {
+        if (!source)
+            Program::Error("Tile map layer doesn't exist.");
+
         if (source["type"].GetString() != "tilelayer")
             Program::Error("Expected `", source["name"].GetString(), "` to be a tile layer.");
 
@@ -46,6 +49,9 @@ namespace Tiled
 
     PointLayer LoadPointLayer(Json::View source)
     {
+        if (!source)
+            Program::Error("Point map layer doesn't exist.");
+
         if (source["type"].GetString() != "objectgroup")
             Program::Error("Expected `", source["name"].GetString(), "` to be an object layer.");
 
