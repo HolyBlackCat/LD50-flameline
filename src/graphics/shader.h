@@ -164,7 +164,7 @@ namespace Graphics
 
         template <typename T> static std::string AppendAttributesToSource(const std::string &source, const ShaderConfig &cfg, const ShaderPreferences &pref)
         {
-            if constexpr (std::is_void_v<T> || std::is_same_v<T, None_t>)
+            if constexpr (std::is_same_v<std::remove_cv_t<T>, None_t>)
             {
                 return source;
             }
@@ -192,7 +192,7 @@ namespace Graphics
 
         template <typename T> static std::string AppendUniformsToSource(const std::string &source, const ShaderConfig &cfg, const ShaderPreferences &pref, bool is_vertex)
         {
-            if constexpr (std::is_void_v<T> || std::is_same_v<T, None_t>)
+            if constexpr (std::is_same_v<std::remove_cv_t<T>, None_t>)
             {
                 return source;
             }
@@ -230,7 +230,7 @@ namespace Graphics
 
         template <typename T> static std::vector<std::string> MakeAttributeList(const ShaderPreferences &pref)
         {
-            if constexpr (std::is_void_v<T> || std::is_same_v<T, None_t>)
+            if constexpr (std::is_same_v<std::remove_cv_t<T>, None_t>)
             {
                 return {};
             }
@@ -338,7 +338,7 @@ namespace Graphics
             : Shader(name, cfg, AppendUniformsToSource<UniformsT>(AppendAttributesToSource<AttributesT>(vert_source, cfg, pref), cfg, pref, 1),
                       AppendUniformsToSource<UniformsT>(frag_source, cfg, pref, 0), MakeAttributeList<AttributesT>(pref))
         {
-            if constexpr (std::is_void_v<UniformsT> || std::is_same_v<UniformsT, None_t>)
+            if constexpr (std::is_same_v<std::remove_cv_t<UniformsT>, None_t>)
             {
                 (void)uniforms;
             }
