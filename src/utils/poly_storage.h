@@ -19,7 +19,7 @@ namespace Poly
      *     Poly::Storage<MyClass> x = nullptr; // Same as above.
      *     Poly::Storage<MyClass> x(Poly::base, ...); // Creates an object using an appropriate constructor.
      *     Poly::Storage<MyBase> x(Poly::derived<MyDerived>, ...); // Creates an object of a possibly derived type. If `MyBase == MyDerived`, it has the same effect as the line above.
-     *     Poly::Storage<MyBase> x = Poly::Storage<MyBase>::make<MyDerived>(...); // Same as above. If the template argument for `make` absent, the type defaults to the base class.
+     *     Poly::Storage<MyBase> x = Poly::Storage<MyBase>::make<MyDerived>(...); // Same as above. If the template argument for `make` is absent, the type defaults to the base class.
      *     Poly::Storage<MyBase> x = x.make<MyDerived>(...); // Same as above.
      *
      * You can also assign to an existing object via `.assign<MyDerived>(...)`. The template parameter is optional. A reference to the resulting derived object is returned.
