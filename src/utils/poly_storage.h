@@ -1,5 +1,7 @@
 #pragma once
 
+#include <cassert>
+#include <stdexcept>
 #include <type_traits>
 #include <utility>
 
@@ -29,10 +31,12 @@ namespace Poly
      *
      * How to access contents:
      *     bool(obj) // Checks if pointer is not null
-     *     obj.get() // Obtain a pointer
+     *     obj.base() // Obtain a reference
      *     *obj // Obtain a reference
      *     obj->foo // Access a member
-     *     obj.bytes() // Obtains a `unsigned char *` to the actual stored class, instead of it's base specified in the template parameter.
+     *     obj.bytes() // Obtains a `unsigned char *` to the actual stored class (rather than its base specified in the template parameter).
+     *     obj.derived<MyDerived>() // Obtains a reference to the stored class. If the stored type differs from what you specified, an assertion is triggered (in release builds you'll have a segfault instead).
+     *     obj.derived_or_throw<MyDerived() // Same as above, but throws on failure.
      *
      * How to do std::visit-like stuff:
      *     struct A {virtual ~A() {}};
@@ -54,13 +58,13 @@ namespace Poly
      *
      *     template <typename BaseT> struct MyFuncs
      *     {
-     *         void (*call_foo)(Poly::Param<BaseT>);
+     *         void (*call_foo)(Poly::Storage<A, MyFuncs> &); // You could use a const reference as well.
      *
      *         template <typename DerivedT> constexpr void _make()
      *         {
-     *             call_foo = [](Poly::Param<BaseT> param)
+     *             call_foo = [](Poly::Storage<A, MyFuncs> &param)
      *             {
-     *                 foo(param.template get<DerivedT>());
+     *                 foo(param.template derived<DerivedT>());
      *             };
      *         }
      *     };
@@ -74,48 +78,6 @@ namespace Poly
      *         y.dynamic().call_foo(y); // prints foo(B)
      *     }
      */
-
-
-    template <typename T> class Param
-    {
-        static_assert(std::is_class_v<T>, "The template parameter has to be a class.");
-        static_assert(!std::is_volatile_v<T>, "The template parameter can't be `volatile`.");
-
-        static constexpr bool is_const = std::is_const_v<T>;
-        template <typename A> using maybe_const = std::conditional_t<is_const, const A, A>;
-
-        maybe_const<T> *base = 0;
-        maybe_const<void> *bytes = 0;
-
-        Param(maybe_const<T> *base, maybe_const<void> *bytes) : base(base), bytes(bytes) {}
-
-      public:
-        [[nodiscard]] static Param construct_from_raw_pointers(maybe_const<T> *base, maybe_const<void> *bytes)
-        {
-            return {base, bytes};
-        }
-
-        [[nodiscard]] maybe_const<T> &get_base() const
-        {
-            return *base;
-        }
-
-        // The template parameter can't have
-        // `D` have to be the exact type of derived class, obtained from the template parameter of `_make()` of your function set.
-        // Alternatively, `D` can be equal to `T`, stripped of cv-qualifiers. In this case, it's equivalent to `get_base()`.
-        // If `D` is not derived from `T`, a `static_assert` will be triggered.
-        // If `D` is derived from `T` but doesn't satisfy the conditions above, the behavior is undefined.
-        template <typename D> [[nodiscard]] maybe_const<D> &get() const
-        {
-            static_assert(!std::is_const_v<D> && !std::is_volatile_v<D>, "The template parameter can't have cv-qualifiers. They will be copied from the template parameter of the enclosing class.");
-            static_assert(std::is_base_of_v<T, D>, "Invalid parameter access."); // Note that `is_base_of_v<T, T> == true`.
-
-            if constexpr (std::is_same_v<T, D>)
-                return get_base();
-            else
-                return *static_cast<maybe_const<D> *>(bytes);
-        }
-    };
 
 
     template <typename T> struct DefaultData
@@ -218,7 +180,7 @@ namespace Poly
 
             struct Table : UserData
             {
-                Unique (*_copy)(Param<const T>);
+                Unique (*_copy)(const Storage::Low &);
 
                 template <typename D> constexpr void _make()
                 {
@@ -226,9 +188,9 @@ namespace Poly
 
                     if constexpr (is_copyable)
                     {
-                        _copy = [](Param<const T> param) -> Unique
+                        _copy = [](const Storage::Low &param) -> Unique
                         {
-                            return Unique::template make<D>(param.template get<D>());
+                            return Unique::template make<D>(param.template derived_or_assert<D>());
                         };
                     }
                     else
@@ -282,13 +244,40 @@ namespace Poly
 
             explicit operator bool() const {return bool(data.pointers);}
 
-            operator Param<      T>()       {return Param<      T>::construct_from_raw_pointers(data.pointers.base(), data.pointers.bytes());};
-            operator Param<const T>() const {return Param<const T>::construct_from_raw_pointers(data.pointers.base(), data.pointers.bytes());};
+            template <typename D> bool contains() const
+            {
+                static_assert(std::is_base_of_v<T, D>, "This type is not derived from the base.");
+                static_assert(!std::is_const_v<D> && !std::is_volatile_v<D>, "The template parameter has to have no cv-qualifiers.");
+                return data.table == &type_erasure_data_storage<Table, D>;
+            }
+
+            template <typename D> D &derived_or_throw()
+            {
+                return const_cast<D &>(std::as_const(*this).template derived_or_throw<D>());
+            }
+            template <typename D> const D &derived_or_throw() const
+            {
+                if (!contains<D>())
+                    throw std::runtime_error("Invalid `Poly::Storage` access.");
+                return reinterpret_cast<const D &>(data.pointers.bytes());
+            }
+
+            template <typename D> D &derived_or_assert()
+            {
+                return const_cast<D &>(std::as_const(*this).template derived_or_assert<D>());
+            }
+            template <typename D> const D &derived_or_assert() const
+            {
+                assert(contains<D>() && "Invalid Poly::Storage access.");
+                return *reinterpret_cast<const D *>(data.pointers.bytes());
+            }
         };
 
         Low low;
 
       public:
+        using base_type = T;
+
         Storage(decltype(nullptr) = nullptr) {}
 
         template <typename ...P, typename = decltype(T(std::declval<P>()...), void())>
@@ -315,14 +304,14 @@ namespace Poly
 
         [[nodiscard]] explicit operator bool() const {return bool(low);}
 
-        [[nodiscard]]       T *get()       {return low.data.pointers.base();}
-        [[nodiscard]] const T *get() const {return low.data.pointers.base();}
+        [[nodiscard]]       T &base()       {return *low.data.pointers.base();}
+        [[nodiscard]] const T &base() const {return *low.data.pointers.base();}
 
-        [[nodiscard]]       T &operator*()       {return *get();}
-        [[nodiscard]] const T &operator*() const {return *get();}
+        [[nodiscard]]       T &operator*()       {return base();}
+        [[nodiscard]] const T &operator*() const {return base();}
 
-        [[nodiscard]]       T *operator->()       {return get();}
-        [[nodiscard]] const T *operator->() const {return get();}
+        [[nodiscard]]       T *operator->()       {return &base();}
+        [[nodiscard]] const T *operator->() const {return &base();}
 
         // Unlike `get()`, this returns the actual pointer to the class even if multiple inheritance is present.
         [[nodiscard]]       unsigned char *bytes()       {return low.data.pointers.bytes();}
@@ -330,7 +319,13 @@ namespace Poly
 
         [[nodiscard]] const UserData &dynamic() const {return *low.data.table;}
 
-        [[nodiscard]] operator Param<      T>()       {return low;};
-        [[nodiscard]] operator Param<const T>() const {return low;};
+        template <typename D>
+        [[nodiscard]] bool contains() const {return low.template contains<D>();}
+
+        template <typename D> [[nodiscard]]       D &derived()       {return low.template derived_or_assert<D>();}
+        template <typename D> [[nodiscard]] const D &derived() const {return low.template derived_or_assert<D>();}
+
+        template <typename D> [[nodiscard]]       D &derived_or_throw()       {return low.template derived_or_throw<D>();}
+        template <typename D> [[nodiscard]] const D &derived_or_throw() const {return low.template derived_or_throw<D>();}
     };
 }
