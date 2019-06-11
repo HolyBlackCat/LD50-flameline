@@ -74,9 +74,9 @@ namespace Interface
             instance = this;
     }
 
-    Window &Window::operator=(Window &&other) noexcept
+    Window &Window::operator=(Window other) noexcept
     {
-        data = std::exchange(other.data, {});
+        std::swap(data, other.data);
         if (instance == &other)
             instance = this;
         return *this;

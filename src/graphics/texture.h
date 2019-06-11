@@ -52,9 +52,9 @@ namespace Graphics
         }
 
         TexObject(TexObject &&other) noexcept : data(std::exchange(other.data, {})) {}
-        TexObject &operator=(TexObject &&other) noexcept
+        TexObject &operator=(TexObject other) noexcept
         {
-            data = std::exchange(other.data, {});
+            std::swap(data, other.data);
             return *this;
         }
 
@@ -119,9 +119,9 @@ namespace Graphics
         }
 
         TexUnit(TexUnit &&other) noexcept : data(std::exchange(other.data, {})) {}
-        TexUnit &operator=(TexUnit &&other) noexcept
+        TexUnit &operator=(TexUnit other) noexcept
         {
-            data = std::exchange(other.data, {});
+            std::swap(data, other.data);
             return *this;
         }
 

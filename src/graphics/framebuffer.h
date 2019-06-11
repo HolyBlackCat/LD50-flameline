@@ -69,9 +69,9 @@ namespace Graphics
         }
 
         FrameBuffer(FrameBuffer &&other) noexcept : data(std::exchange(other.data, {})) {}
-        FrameBuffer &operator=(FrameBuffer &&other) noexcept
+        FrameBuffer &operator=(FrameBuffer other) noexcept
         {
-            data = std::exchange(other.data, {});
+            std::swap(data, other.data);
             return *this;
         }
 

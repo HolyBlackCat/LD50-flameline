@@ -106,9 +106,9 @@ namespace Graphics
         }
 
         FontFile(FontFile &&other) noexcept : data(std::exchange(other.data, {})) {}
-        FontFile &operator=(FontFile &&other) noexcept
+        FontFile &operator=(FontFile other) noexcept
         {
-            data = std::exchange(other.data, {});
+            std::swap(data, other.data);
             return *this;
         }
 

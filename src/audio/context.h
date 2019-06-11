@@ -66,9 +66,9 @@ namespace Audio
             if (instance == &other)
                 instance = this;
         }
-        Context &operator=(Context &&other) noexcept
+        Context &operator=(Context other) noexcept
         {
-            data = std::exchange(other.data, {});
+            std::swap(data, other.data);
             if (instance == &other)
                 instance = this;
             return *this;

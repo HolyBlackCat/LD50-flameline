@@ -93,10 +93,10 @@ class Render
         }
       public:
         Quad_t(Quad_t &&other) noexcept : queue(std::exchange(other.queue, {})), data(std::move(other.data)) {}
-        Quad_t &operator=(Quad_t &&other) noexcept
+        Quad_t &operator=(Quad_t other)
         {
-            queue = std::exchange(other.queue, {});
-            data = std::move(other.data);
+            std::swap(queue, other.queue);
+            std::swap(data, other.data);
             return *this;
         }
 
@@ -304,10 +304,10 @@ class Render
         }
       public:
         Triangle_t(Triangle_t &&other) noexcept : queue(std::exchange(other.queue, {})), data(std::move(other.data)) {}
-        Triangle_t &operator=(Triangle_t &&other) noexcept
+        Triangle_t &operator=(Triangle_t other)
         {
-            queue = std::exchange(other.queue, {});
-            data = std::move(other.data);
+            std::swap(queue, other.queue);
+            std::swap(data, other.data);
             return *this;
         }
 
@@ -448,10 +448,10 @@ class Render
         }
       public:
         Text_t(Text_t &&other) noexcept : renderer(std::exchange(other.renderer, {})), data(std::move(other.data)) {}
-        Text_t &operator=(Text_t &&other) noexcept
+        Text_t &operator=(Text_t other)
         {
-            renderer = std::exchange(other.renderer, {});
-            data = std::move(other.data);
+            std::swap(renderer, other.renderer);
+            std::swap(data, other.data);
             return *this;
         }
 

@@ -363,9 +363,9 @@ namespace Graphics
         }
 
         Shader(Shader &&other) noexcept : data(std::exchange(other.data, {})) {}
-        Shader &operator=(Shader &&other) noexcept
+        Shader &operator=(Shader other) noexcept // Note the pass by value to utilize copy&swap idiom.
         {
-            data = std::exchange(other.data, {});
+            std::swap(data, other.data);
             return *this;
         }
 
