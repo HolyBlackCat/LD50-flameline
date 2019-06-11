@@ -28,11 +28,11 @@ namespace Macro
       public:
         constexpr WithExprTyped(F &&lambda) : lambda(std::move(lambda)) {}
 
-        template <typename P> friend auto operator->*(P &&param, WithExprTyped &&expr)
+        template <typename P> friend T operator->*(P &&param, WithExprTyped &&expr)
         {
             T object(std::forward<P>(param));
             expr.lambda(object);
-            return object;
+            return static_cast<T>(object);
         }
     };
 
