@@ -25,11 +25,25 @@ namespace Meta
     template <typename A, typename ...B> using void_type = type<void, A, B...>;
 
 
-    template <typename... Ts>
-    struct overload : Ts... { using Ts::operator()...; };
+    template <typename ...P> struct overload : P... { using P::operator()...; };
+    template <typename ...P> overload(P...) -> overload<P...>;
 
-    template <typename... Ts>
-    overload(Ts...) -> overload<Ts...>;
+
+    namespace impl
+    {
+        template <typename A, typename B> struct copy_qualifiers {using type = B;};
+        template <typename A, typename B> struct copy_qualifiers<const          A, B> {using type = const          B;};
+        template <typename A, typename B> struct copy_qualifiers<      volatile A, B> {using type =       volatile B;};
+        template <typename A, typename B> struct copy_qualifiers<const volatile A, B> {using type = const volatile B;};
+    }
+
+    template <typename A, typename B> using copy_qualifiers = typename impl::copy_qualifiers<A, B>::type;
+
+
+    template <typename Base, typename T> decltype(auto) base(T &&derived)
+    {
+        return *static_cast<copy_qualifiers<T &&, Base> *>(&derived);
+    }
 
 
     namespace impl
