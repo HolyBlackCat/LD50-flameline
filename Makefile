@@ -175,18 +175,30 @@ POST_BUILD_COMMANDS =
 -include .local_config.mk
 
 # Default settings with lower priority than env variables
-WINDRES ?= windres
+# Note that error messages below are triggered lazily, only when the corresponding variables are used.
+C_COMPILER ?= $(error No C compiler specified.\
+			  $(lf)Define `C_COMPILER` in `.local_config.mk` or directly when invoking `make`)
 
-ifeq (,$(or $(C_COMPILER), $(CXX_COMPILER)))
-$(error No compiler specified.\
-	$(lf)Define `C_COMPILER` and/or `CXX_COMPILER` in `.local_config.mk` or directly when invoking `make`)
-endif
-ifeq (,$(or $(C_LINKER), $(CXX_LINKER)))
-$(error No linker specified.\
-	$(lf)Define `C_LINKER` and/or `CXX_LINKER` in `.local_config.mk` or directly when invoking `make`.\
-	$(lf)Normally they should be equal to `C_COMPILER` and `CXX_COMPILER`.\
-	$(lf)\
-	$(lf)If you're using Clang, consider using LLD linker to improve linking times. See comments in the makefile for details)
+CXX_COMPILER ?= $(error No C++ compiler specified.\
+				$(lf)Define `CXX_COMPILER` in `.local_config.mk` or directly when invoking `make`)
+
+C_LINKER ?= $(error No C linker specified.\
+        	$(lf)Define `C_LINKER` in `.local_config.mk` or directly when invoking `make`.\
+        	$(lf)Normally it should be equal to `C_COMPILER`.\
+        	$(lf)\
+        	$(lf)If you're using Clang, consider using LLD linker to improve linking times. See comments in the makefile for details)
+
+CXX_LINKER ?= $(error No C++ linker specified.\
+        	  $(lf)Define `CXX_LINKER` in `.local_config.mk` or directly when invoking `make`.\
+        	  $(lf)Normally it should be equal to `CXX_COMPILER`.\
+        	  $(lf)\
+        	  $(lf)If you're using Clang, consider using LLD linker to improve linking times. See comments in the makefile for details)
+
+WINDRES ?= $(error No Windres executable specified.\
+		   $(lf)Define `WINDRES` in `.local_config.mk` or directly when invoking `make`)
+
+# Using LLD linker with Clang
+#
 # To use LLD linker, append `-fuse-ld=lld` to `*_LINKER` variables.
 # If you're using LLD on Windows, LLD will generate `<exec_name>.lib` file alongside the resulting binary. Add following to `.local_config.mk` to automatically delete it:
 #
@@ -194,7 +206,6 @@ $(error No linker specified.\
 #     POST_BUILD_COMMANDS = @$(call rmfile,$(OUTPUT_FILE).lib)
 #     endif
 #
-endif
 
 
 # --- CONFIG FUNCTIONS ---
