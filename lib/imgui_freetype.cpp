@@ -12,7 +12,7 @@
 // - v0.56: (2018/06/08) added support for ImFontConfig::GlyphMinAdvanceX, GlyphMaxAdvanceX.
 // - v0.60: (2019/01/10) re-factored to match big update in STB builder. fixed texture height waste. fixed redundant glyphs when merging. support for glyph padding.
 // - v0.61: (2019/01/15) added support for imgui allocators + added FreeType only override function SetAllocatorFunctions().
-// - v0.62: (2019/02/09) added a flag to disable font antialiasing.
+// - v0.62: (2019/02/09) added RasterizerFlags::Monochrome flag to disable font anti-aliasing (combine with ::MonoHinting for best results!)
 
 // Gamma Correct Blending:
 //  FreeType assumes blending in linear space rather than gamma space.
@@ -256,33 +256,23 @@ namespace
             }
         case FT_PIXEL_MODE_MONO: // Monochrome image, 1 bit per pixel. The bits in each byte are ordered from MSB to LSB.
             {
-                uint8_t colors[2];
-                if (multiply_table == NULL)
-                {
-                    colors[0] = 0;
-                    colors[1] = 255;
-                }
-                else
-                {
-                    colors[0] = multiply_table[0];
-                    colors[1] = multiply_table[255];
-                }
-
+                uint8_t color0 = multiply_table ? multiply_table[0] : 0;
+                uint8_t color1 = multiply_table ? multiply_table[255] : 255;
                 for (uint32_t y = 0; y < h; y++, src += src_pitch, dst += dst_pitch)
                 {
+                    uint8_t bits = 0;
                     const uint8_t* bits_ptr = src;
-                    uint8_t bits;
                     for (uint32_t x = 0; x < w; x++, bits <<= 1)
                     {
                         if ((x & 7) == 0)
                             bits = *bits_ptr++;
-                        dst[x] = colors[bool(bits & 128)];
+                        dst[x] = (bits & 0x80) ? color1 : color0;
                     }
                 }
                 break;
             }
         default:
-            IM_ASSERT(0 && "FreeTypeFont::BlitGlyph(): Unknown bitmap format.");
+            IM_ASSERT(0 && "FreeTypeFont::BlitGlyph(): Unknown bitmap pixel mode!");
         }
     }
 }
