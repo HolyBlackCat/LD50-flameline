@@ -68,6 +68,8 @@ namespace Interface
             SDL_Window *handle = 0;
             SDL_GLContext context = 0;
 
+            std::string title;
+
             ivec2 size = ivec2(0);
             VSync vsync = VSync::unspecified;
             bool resizable = 0;
@@ -98,7 +100,7 @@ namespace Interface
         Window &operator=(Window other) noexcept;
         ~Window();
 
-        Window(std::string name, ivec2 size, FullscreenMode mode = windowed, const WindowSettings &settings = {});
+        Window(std::string title, ivec2 size, FullscreenMode mode = windowed, const WindowSettings &settings = {});
 
         static SDL_Window *GetHandleOrNull(); // Unlike `Get()`, this doesn't throw if there is no window.
 
@@ -107,7 +109,8 @@ namespace Interface
         SDL_Window *Handle() const;
         SDL_GLContext Context() const;
 
-        void SetTitle(std::string new_name);
+        void SetTitle(std::string new_title);
+        std::string Title() const;
 
         ivec2 Size() const;
 

@@ -93,7 +93,7 @@ namespace Interface
         }
     }
 
-    Window::Window(std::string name, ivec2 size, FullscreenMode mode, const WindowSettings &settings)
+    Window::Window(std::string title, ivec2 size, FullscreenMode mode, const WindowSettings &settings)
     {
         constexpr const char *extra_error_details =
             OnPlatform(PC)
@@ -191,7 +191,7 @@ namespace Interface
             window_flags |= SDL_WINDOW_RESIZABLE;
 
         // Create the window
-        data.handle = SDL_CreateWindow(name.c_str(), pos.x, pos.y, size.x, size.y, window_flags);
+        data.handle = SDL_CreateWindow(title.c_str(), pos.x, pos.y, size.x, size.y, window_flags);
         if (!data.handle)
             Program::Error("Unable to create a window with following properties:\n", settings.Summary(), extra_error_details);
         FINALLY_ON_THROW( SDL_DestroyWindow(data.handle); )
@@ -261,6 +261,9 @@ namespace Interface
         // Save resizability flag
         data.resizable = !settings.fixed_size;
 
+        // Save title
+        data.title = std::move(title);
+
         // Set fullscreen mode
         if (mode != windowed)
             SetMode(mode); // This sets `data.mode`.
@@ -306,9 +309,17 @@ namespace Interface
         return data.context;
     }
 
-    void Window::SetTitle(std::string new_name)
+    void Window::SetTitle(std::string new_title)
     {
-        SDL_SetWindowTitle(data.handle, new_name.c_str());
+        if (new_title == data.title)
+            return;
+        SDL_SetWindowTitle(data.handle, new_title.c_str());
+        data.title = new_title;
+    }
+
+    std::string Window::Title() const
+    {
+        return data.title;
     }
 
     ivec2 Window::Size() const
