@@ -54,7 +54,7 @@ class Render
 
         using ref = Quad_t &&;
 
-        void *queue = 0; // Actually the type should be `Graphics::RenderQueue<Attribs, 3> *`, but we don't include "graphics/render_queue.h" for better compilation times.
+        void *queue = 0; // Actually the type should be `Graphics::SimpleRenderQueue<Attribs, 3> *`, but we don't include "graphics/simple_render_queue.h" for better compilation times.
 
         struct Data
         {
@@ -273,7 +273,7 @@ class Render
 
         using ref = Triangle_t &&;
 
-        void *queue = 0; // Actually the type should be `Graphics::RenderQueue<Attribs, 3> *`, but we don't include "graphics/render_queue.h" for better compilation times.
+        void *queue = 0; // Actually the type should be `Graphics::SimpleRenderQueue<Attribs, 3> *`, but we don't include "graphics/simple_render_queue.h" for better compilation times.
 
         struct Data
         {

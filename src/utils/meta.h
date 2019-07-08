@@ -29,28 +29,6 @@ namespace Meta
     template <typename ...P> overload(P...) -> overload<P...>;
 
 
-    template <typename T> struct reset_on_move
-    {
-        T value = {};
-
-        reset_on_move() {}
-        reset_on_move(const T &new_value) : value(new_value) {}
-        reset_on_move(T &&new_value) : value(std::move(new_value)) {}
-        reset_on_move(reset_on_move &&other) noexcept : value(std::exchange(other.value, {})) {}
-        reset_on_move &operator=(reset_on_move other) noexcept
-        {
-            std::swap(value, other.value);
-            return *this;
-        }
-
-        [[nodiscard]]       T &operator*()       {return value;}
-        [[nodiscard]] const T &operator*() const {return value;}
-
-        [[nodiscard]]       T *operator->()       {return &value;}
-        [[nodiscard]] const T *operator->() const {return &value;}
-    };
-
-
     namespace impl
     {
         template <typename A, typename B> struct copy_qualifiers {using type = B;};

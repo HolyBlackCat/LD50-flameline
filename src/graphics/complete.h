@@ -9,7 +9,7 @@
 #include "graphics/framebuffer.h"
 #include "graphics/image.h"
 #include "graphics/index_buffer.h"
-#include "graphics/render_queue.h"
+#include "graphics/simple_render_queue.h"
 #include "graphics/shader.h"
 #include "graphics/text.h"
 #include "graphics/texture.h"

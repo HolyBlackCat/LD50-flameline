@@ -48,7 +48,7 @@ void main()
     gl_FragColor.a *= v_factors.z;
 })";
 
-    Graphics::RenderQueue<Attribs, 3> queue; // Note that the queue has to be the first field.
+    Graphics::SimpleRenderQueue<Attribs, 3> queue; // Note that the queue has to be the first field.
     Uniforms uni;
     Graphics::Shader shader;
 

@@ -10,7 +10,7 @@
 
 namespace Graphics
 {
-    template <typename T, int N> class RenderQueue
+    template <typename T, int N> class SimpleRenderQueue
     {
         static_assert(Graphics::VertexBuffer<T>::is_reflected, "The type must be reflected.");
         static_assert(N >= 1 && N <= 3, "N must be 1 (points), 2 (lines), or 3 (triangles).");
@@ -31,8 +31,8 @@ namespace Graphics
         }
 
       public:
-        RenderQueue() {}
-        RenderQueue(int size) : size(size), storage(std::make_unique<T[]>(size * N)), buffer(size * N, 0, Graphics::stream_draw) {}
+        SimpleRenderQueue() {}
+        SimpleRenderQueue(int size) : size(size), storage(std::make_unique<T[]>(size * N)), buffer(size * N, 0, Graphics::stream_draw) {}
 
         explicit operator bool()
         {
