@@ -6,6 +6,8 @@
 #include <numeric>
 #include <vector>
 
+#include "graphics/index_buffer.h"
+#include "graphics/vertex_buffer.h"
 #include "program/errors.h"
 #include "utils/meta.h"
 
@@ -54,6 +56,31 @@ namespace Graphics
                 DebugAssert("Vertex index is out of range.", this_index < vertex_count);
                 indices.push_back(base_index + this_index);
             }
+        }
+    };
+
+    template <typename V, typename I = std::uint16_t>
+    class IndexedGeometry
+    {
+        DrawMode mode = triangles;
+        VertexBuffer<V> vertex_buffer;
+        IndexBuffer<I> index_buffer;
+
+      public:
+        IndexedGeometry() {}
+        IndexedGeometry(const IndexedVertexData<V, I> &vertex_data, DrawMode mode, Usage usage = static_draw)
+            : mode(mode), vertex_buffer(vertex_data.vertices.size(), vertex_data.vertices.data(), usage), index_buffer(vertex_data.indices.size(), vertex_data.indices.data(), usage)
+        {}
+
+        explicit operator bool() const
+        {
+            return bool(vertex_buffer);
+        }
+
+        void Draw()
+        {
+            vertex_buffer.BindDraw();
+            index_buffer.Draw(mode);
         }
     };
 }
