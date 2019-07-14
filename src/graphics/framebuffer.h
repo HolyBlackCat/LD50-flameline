@@ -170,5 +170,40 @@ namespace Graphics
 
             return std::move(*this);
         }
+
+        FrameBuffer &&CheckStatus() // Throws if the framebuffer is incomplete.
+        {
+            DebugAssert("Attempt to use a null framebuffer.", *this);
+            if (!*this)
+                return std::move(*this);
+
+            GLuint old_binding = binding;
+            Bind();
+            FINALLY( BindHandle(old_binding); )
+
+            switch (glCheckFramebufferStatus(GL_DRAW_FRAMEBUFFER))
+            {
+              case GL_FRAMEBUFFER_COMPLETE:
+                return std::move(*this);
+              case GL_FRAMEBUFFER_UNDEFINED:
+                Program::Error("Bad framebuffer status: Undefined.");
+              case GL_FRAMEBUFFER_INCOMPLETE_ATTACHMENT:
+                Program::Error("Bad framebuffer status: Incomplete (attachment).");
+              case GL_FRAMEBUFFER_INCOMPLETE_MISSING_ATTACHMENT:
+                Program::Error("Bad framebuffer status: Incomplete (missing attachment).");
+              case GL_FRAMEBUFFER_INCOMPLETE_DRAW_BUFFER:
+                Program::Error("Bad framebuffer status: Incomplete (draw buffer).");
+              case GL_FRAMEBUFFER_INCOMPLETE_READ_BUFFER:
+                Program::Error("Bad framebuffer status: Incomplete (read buffer).");
+              case GL_FRAMEBUFFER_UNSUPPORTED:
+                Program::Error("Bad framebuffer status: Incomplete (unsupported).");
+              case GL_FRAMEBUFFER_INCOMPLETE_MULTISAMPLE:
+                Program::Error("Bad framebuffer status: Incomplete (multisample).");
+              case GL_FRAMEBUFFER_INCOMPLETE_LAYER_TARGETS:
+                Program::Error("Bad framebuffer status: Incomplete (layer targets).");
+              default:
+                Program::Error("Bad framebuffer status: Unknown.");
+            }
+        }
     };
 }
