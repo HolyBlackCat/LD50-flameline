@@ -18,4 +18,4 @@ It's licensed under **ZLIB license**. Feel free to use it.
 
 ---
 
-Currently we're targeting Clang 8.0.0. GCC 8.x is also supported. MSVC is not supported.
+Currently we're targeting Clang 8.0.0. GCC 8.x/9.x is also supported. MSVC is not supported.
