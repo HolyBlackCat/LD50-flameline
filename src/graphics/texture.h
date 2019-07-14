@@ -237,7 +237,7 @@ namespace Graphics
 
         TexUnit &&SetData(ivec2 size, const uint8_t *pixels = 0)
         {
-            SetData(OnPlatform(PC)(GL_RGBA8) OnPlatform(MOBILE)(GL_RGBA), GL_RGBA, GL_UNSIGNED_BYTE, size, pixels);
+            SetData(GL_RGBA8, GL_RGBA, GL_UNSIGNED_BYTE, size, pixels);
             return std::move(*this);
         }
         TexUnit &&SetData(GLenum internal_format, GLenum format, GLenum type, ivec2 size, const uint8_t *pixels = 0)
@@ -312,13 +312,13 @@ namespace Graphics
 
         Texture &&SetData(ivec2 new_size, const uint8_t *pixels = 0)
         {
-            unit.SetData(size, pixels);
+            unit.SetData(new_size, pixels);
             size = new_size;
             return std::move(*this);
         }
         Texture &&SetData(GLenum internal_format, GLenum format, GLenum type, ivec2 new_size, const uint8_t *pixels = 0)
         {
-            unit.SetData(internal_format, format, type, size, pixels);
+            unit.SetData(internal_format, format, type, new_size, pixels);
             size = new_size;
             return std::move(*this);
         }
