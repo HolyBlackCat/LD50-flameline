@@ -349,13 +349,19 @@ override dep_files := $(patsubst %.o,%.d,$(filter %.c.o %.cpp.o,$(objects)))
 
 
 # --- HANDLE PRECOMPILED HEADERS ---
+# A raw list of all precompiled header entries. You can iterate over it, then use following functions to extract data from each element.
+override pch_all_entries = $(subst |, ,$(subst $(space),<,$(PRECOMPILED_HEADERS)))
+# Extract all file patterns from a precompiled header entry.
+override pch_entry_file_patterns = $(subst *,%,$(subst <, ,$(word 1,$(subst >, ,$1))))
+# Extract header name from a precompiled header entry.
+override pch_entry_header = $(strip $(subst <, ,$(word 2,$(subst >, ,$1))))
 # List of all precompiled header files.
-override compiled_headers := $(foreach x,$(PRECOMPILED_HEADERS),$(OBJECT_DIR)/$(word 2,$(subst >, ,$x)).gch)
+override compiled_headers := $(foreach x,$(pch_all_entries),$(OBJECT_DIR)/$(call pch_entry_header,$x).gch)
 # Add precompiled headers as dependencies for corresponding source files. The rest is handled automatically.
-$(foreach x,$(PRECOMPILED_HEADERS),$(foreach y,$(filter $(subst *,%,$(subst |, ,$(word 1,$(subst >, ,$x)))),$(SOURCES)),$(eval $(OBJECT_DIR)/$y.o: $(OBJECT_DIR)/$(word 2,$(subst >, ,$x)).gch)))
+$(foreach x,$(pch_all_entries),$(foreach y,$(filter $(call pch_entry_file_patterns,$x),$(SOURCES)),$(eval $(OBJECT_DIR)/$y.o: $(OBJECT_DIR)/$(call pch_entry_header,$x).gch)))
 ifeq ($(strip $(ALLOW_PCH)),1)
 # Register dependency files for precompiled headers.
-override dep_files += $(foreach x,$(PRECOMPILED_HEADERS),$(OBJECT_DIR)/$(word 2,$(subst >, ,$x)).d)
+override dep_files += $(foreach x,$(pch_all_entries),$(OBJECT_DIR)/$(call pch_entry_header,$x).d)
 # This function processes compiler flags for files. If this file uses a PCH, all `-include` flags are removed and the PCH is included instead.
 override add_pch_to_flags = $(if $2,$(filter-out -include|%,$(subst -include ,-include|,$(strip $1))) -include $(patsubst %.gch,%,$2),$1)
 else
@@ -463,7 +469,7 @@ EXCLUDE_FILES =
 EXCLUDE_DIRS =
 override EXCLUDE_FILES += $(foreach d,$(EXCLUDE_DIRS), $(call rwildcard,$d,*.c *.cpp *.h *.hpp))
 override include_files = $(filter-out $(EXCLUDE_FILES), $(SOURCES))
-override get_file_headers = $(foreach x,$(PRECOMPILED_HEADERS),$(if $(filter $(subst *,%,$(subst |, ,$(word 1,$(subst >, ,$x)))),$1),-include $(word 2,$(subst >, ,$x))))
+override get_file_headers = $(foreach x,$(pch_all_entries),$(if $(filter $(call pch_entry_file_patterns,$x),$1),-include $(call pch_entry_header,$x)))
 override get_file_local_flags = $(foreach x,$(subst |, ,$(subst $(space),<,$(FILE_SPECIFIC_FLAGS))),$(if $(filter $(subst *,%,$(subst <, ,$(word 1,$(subst >, ,$x)))),$1),$(subst <, ,$(word 2,$(subst >, ,$x)))))
 override file_command = && $(call echo,{"directory": "$(cur_dir)"$(comma) "file": "$(cur_dir)/$3"$(comma) "command": "$(strip $1 $2 $(call get_file_headers,$3) $3)"}$(comma)) >>compile_commands.json
 override all_commands = $(foreach f,$(filter %.c,$(include_files)),$(call file_command,$(C_COMPILER),$(CFLAGS) $(call get_file_local_flags,$3),$f)) \
