@@ -56,6 +56,7 @@
 # [M] * `make build`          - Builds the project using current build mode.
 # [M] * `make use`            - Switches to a different build mode without doing anything else. `mode=...` has to be specified.
 # [M] * `make clean_mode`     - Deletes object files and precompiled headers for the current build mode. The executable is not deleted.
+# [M] * `make clean_pch`      - Deletes precompiled headers for the current build mode. The executable is not deleted.
 #     * `make clean`          - Deletes all object files, precompiled headers, and the executable.
 #     * `make commands`       - Generate `compile_commands.json`. Mode-specific flags are ignored.
 #     * `make commands_fixed` - Generate `compile_commands.json` with deliberately broken commands for some files.
@@ -397,7 +398,7 @@ build: __check_mode __mode_$(current_mode)
 # Public: clean everything.
 .PHONY: clean
 clean: __no_mode_needed
-	@$(call echo,[Cleaning] <everything>)
+	@$(call echo,[Cleaning] everything)
 	@$(call rmdir,$(common_object_dir))
 	@$(call rmfile,$(OUTPUT_FILE_EXT))
 	@$(call echo,[Done])
@@ -405,8 +406,13 @@ clean: __no_mode_needed
 # Public: clean files for the current build mode, not including the executable.
 .PHONY: clean_mode
 clean_mode: __check_mode
-	@$(call echo,[Cleaning] $(current_mode))
+	@$(call echo,[Cleaning])
 	@$(call rmdir,$(OBJECT_DIR))
+	@$(call echo,[Done])
+
+.PHONY: clean_pch
+clean_pch: __check_mode
+	@$(call echo,[Cleaning] PCH) $(foreach x,$(compiled_headers),&& ($(call rmfile,$x)))
 	@$(call echo,[Done])
 
 # Internal: Generic build. This is used by `__mode_*` targets.

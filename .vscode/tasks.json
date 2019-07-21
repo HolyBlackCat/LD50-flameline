@@ -54,6 +54,13 @@
             "presentation": {"echo": true, "reveal": "always", "focus": false, "panel": "shared", "showReuseMessage": false, "clear": true},
         },
         {
+            "label": "⧁ Reset PCH",
+            "type": "shell",
+            "windows": {"command": "mingw32-make clean_pch"},
+            "linux": {"command": "make clean_pch"},
+            "presentation": {"echo": true, "reveal": "always", "focus": false, "panel": "shared", "showReuseMessage": false, "clear": true},
+        },
+        {
             "label": "⦻ Rebuild",
             "type": "shell",
             "windows": {"command": "mingw32-make clean_mode && mingw32-make -j4"},
@@ -63,7 +70,6 @@
         {
             "label": "⧮ Clean",
             "type": "shell",
-            "command": "mingw32-make clean_mode",
             "windows": {"command": "mingw32-make clean_mode"},
             "linux": {"command": "make clean_mode"},
             "presentation": {"echo": true, "reveal": "always", "focus": false, "panel": "shared", "showReuseMessage": false, "clear": true},
