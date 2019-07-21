@@ -14,7 +14,7 @@
 namespace Graphics
 {
     template <typename V, typename I = std::uint16_t>
-    class IndexedGeometryConsumer : Meta::with_virtual_destructor<IndexedGeometryConsumer<V, I>>
+    class GeometryConsumer : Meta::with_virtual_destructor<GeometryConsumer<V, I>>
     {
         static_assert(std::is_same_v<I, std::uint8_t> || std::is_same_v<I, std::uint16_t> || std::is_same_v<I, std::uint32_t>, "Invalid index type.");
 
@@ -29,7 +29,7 @@ namespace Graphics
     };
 
     template <typename V, typename I = std::uint16_t>
-    class IndexedVertexData : public IndexedGeometryConsumer<V, I>
+    class VertexData : public GeometryConsumer<V, I>
     {
       public:
         std::vector<V> vertices;
@@ -60,15 +60,15 @@ namespace Graphics
     };
 
     template <typename V, typename I = std::uint16_t>
-    class IndexedGeometry
+    class Geometry
     {
         DrawMode mode = triangles;
         VertexBuffer<V> vertex_buffer;
         IndexBuffer<I> index_buffer;
 
       public:
-        IndexedGeometry() {}
-        IndexedGeometry(const IndexedVertexData<V, I> &vertex_data, DrawMode mode, Usage usage = static_draw)
+        Geometry() {}
+        Geometry(const VertexData<V, I> &vertex_data, DrawMode mode, Usage usage = static_draw)
             : mode(mode), vertex_buffer(vertex_data.vertices.size(), vertex_data.vertices.data(), usage), index_buffer(vertex_data.indices.size(), vertex_data.indices.data(), usage)
         {}
 
