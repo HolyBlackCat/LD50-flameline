@@ -8,8 +8,8 @@
 # This makefile doesn't contain any project-specific details.
 # Project configuration (i.e. sources and compiler settings) is stored in `project_config.mk`.
 #
-# Machine-specific configuration (i.e. what compiler to use) is stored in `.local_config.mk`.
-# If `.local_config.mk` is absent, you will be asked to create it.
+# Machine-specific configuration (i.e. what compiler to use) is stored in `local_config.mk`.
+# If `local_config.mk` is absent, you will be asked to create it.
 # Make sure it contains valid compiler paths before building.
 #
 # -- WINDOWS SUPPORT
@@ -20,7 +20,7 @@
 #
 # -- USAGE TL;DR
 #
-# If `.local_config.mk` doesn't exist, create it.
+# If `local_config.mk` doesn't exist, create it.
 # Copy following into it:
 #
 #     C_COMPILER = gcc
@@ -172,35 +172,35 @@ endif
 POST_BUILD_COMMANDS =
 
 # Include the config
--include .local_config.mk
+-include local_config.mk
 
 # Default settings with lower priority than env variables
 # Note that error messages below are triggered lazily, only when the corresponding variables are used.
 C_COMPILER ?= $(error No C compiler specified.\
-			  $(lf)Define `C_COMPILER` in `.local_config.mk` or directly when invoking `make`)
+			  $(lf)Define `C_COMPILER` in `local_config.mk` or directly when invoking `make`)
 
 CXX_COMPILER ?= $(error No C++ compiler specified.\
-				$(lf)Define `CXX_COMPILER` in `.local_config.mk` or directly when invoking `make`)
+				$(lf)Define `CXX_COMPILER` in `local_config.mk` or directly when invoking `make`)
 
 C_LINKER ?= $(error No C linker specified.\
-        	$(lf)Define `C_LINKER` in `.local_config.mk` or directly when invoking `make`.\
+        	$(lf)Define `C_LINKER` in `local_config.mk` or directly when invoking `make`.\
         	$(lf)Normally it should be equal to `C_COMPILER`.\
         	$(lf)\
         	$(lf)If you're using Clang, consider using LLD linker to improve linking times. See comments in the makefile for details)
 
 CXX_LINKER ?= $(error No C++ linker specified.\
-        	  $(lf)Define `CXX_LINKER` in `.local_config.mk` or directly when invoking `make`.\
+        	  $(lf)Define `CXX_LINKER` in `local_config.mk` or directly when invoking `make`.\
         	  $(lf)Normally it should be equal to `CXX_COMPILER`.\
         	  $(lf)\
         	  $(lf)If you're using Clang, consider using LLD linker to improve linking times. See comments in the makefile for details)
 
 WINDRES ?= $(error No Windres executable specified.\
-		   $(lf)Define `WINDRES` in `.local_config.mk` or directly when invoking `make`)
+		   $(lf)Define `WINDRES` in `local_config.mk` or directly when invoking `make`)
 
 # Using LLD linker with Clang
 #
 # To use LLD linker, append `-fuse-ld=lld` to `*_LINKER` variables.
-# If you're using LLD on Windows, LLD will generate `<exec_name>.lib` file alongside the resulting binary. Add following to `.local_config.mk` to automatically delete it:
+# If you're using LLD on Windows, LLD will generate `<exec_name>.lib` file alongside the resulting binary. Add following to `local_config.mk` to automatically delete it:
 #
 #     ifeq ($(TARGET_OS),windows)
 #     POST_BUILD_COMMANDS = @$(call rmfile,$(OUTPUT_FILE).lib)
