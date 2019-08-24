@@ -137,33 +137,39 @@ endif
 
 # Shell-specific functions.
 # Example usage: $(call rmfile, bin/out.exe)
+override silence = >$(dev_null) 2>$(dev_null) || $(success)
 ifeq ($(HOST_SHELL),windows)
-override silence := >NUL 2>NUL || (exit 0)
+# - Utilities
+override dev_null := NUL
+override success := (exit 0)
+# - Shell commands
 override rmfile = del /F /Q $(subst /,\,$1) $(silence)
 override rmdir = rd /S /Q $(subst /,\,$1) $(silence)
 override mkdir = mkdir $(subst /,\,$1) $(silence)
 override move = move /Y $(subst /,\,$1) $(subst /,\,$2) $(silence)
 override touch = type nul >>$1 2>NUL || (exit 0)# Sic!
 override echo = echo $(subst <,^<,$(subst >,^>,$1))
+override echo_lf := echo.
+override pause := pause
+# - Functions
 override native_path = $(subst /,\,$1)
 override dir_target_name = $(patsubst %\,%,$(subst /,\,$1))
-override cur_dir := $(subst \,/,$(shell echo %CD%))
 else
-override silence := >/dev/null 2>/dev/null || true
+# - Utilities
+override dev_null := /dev/null
+override success := true
+# - Shell commands
 override rmfile = rm -f $1 $(silence)
 override rmdir = rm -rf $1 $(silence)
 override mkdir = mkdir -p $1 $(silence)
 override move = mv -f $1 $2 $(silence)
 override touch = touch $1 $(silence)
-override echo = echo "$(subst ",\",$(subst \,\\,$1))"
+override echo = echo '$(subst ','"'"',$1)'
+override echo_lf := echo
+override pause := read -s -n 1 -p "Press any key to continue . . ." && echo
+# - Functions
 override native_path = $1
 override dir_target_name = $1
-ifeq ($(HOST_OS),windows)
-# We're probably on MSYS2 or Cygwin or something similar.
-override cur_dir := $(shell cygpath -m $(dollar)PWD)
-else
-override cur_dir := $(PWD)
-endif
 endif
 
 
@@ -477,7 +483,7 @@ override EXCLUDE_FILES += $(foreach d,$(EXCLUDE_DIRS), $(call rwildcard,$d,*.c *
 override include_files = $(filter-out $(EXCLUDE_FILES), $(SOURCES))
 override get_file_headers = $(foreach x,$(pch_all_entries),$(if $(filter $(call pch_entry_file_patterns,$x),$1),-include $(call pch_entry_header,$x)))
 override get_file_local_flags = $(foreach x,$(subst |, ,$(subst $(space),<,$(FILE_SPECIFIC_FLAGS))),$(if $(filter $(subst *,%,$(subst <, ,$(word 1,$(subst >, ,$x)))),$1),$(subst <, ,$(word 2,$(subst >, ,$x)))))
-override file_command = && $(call echo,{"directory": "$(cur_dir)"$(comma) "file": "$(cur_dir)/$3"$(comma) "command": "$(strip $1 $2 $(call get_file_headers,$3) $3)"}$(comma)) >>compile_commands.json
+override file_command = && $(call echo,{"directory": "$(CURDIR)"$(comma) "file": "$(CURDIR)/$3"$(comma) "command": "$(strip $1 $2 $(call get_file_headers,$3) $3)"}$(comma)) >>compile_commands.json
 override all_commands = $(foreach f,$(filter %.c,$(include_files)),$(call file_command,$(C_COMPILER),$(CFLAGS) $(call get_file_local_flags,$3),$f)) \
 						$(foreach f,$(filter %.cpp,$(include_files)),$(call file_command,$(CXX_COMPILER),$(CXXFLAGS) $(call get_file_local_flags,$3),$f))
 override all_stub_commands = $(foreach file,$(EXCLUDE_FILES),$(call file_command,,,$(file)))
