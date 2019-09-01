@@ -3,7 +3,7 @@
 #include <cstdint>
 #include <utility>
 
-#include <AL/al.h>
+#include <al.h>
 
 #include "audio/sound.h"
 #include "program/errors.h"

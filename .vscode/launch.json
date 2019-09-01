@@ -5,30 +5,12 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Debug",
-            "type": "cppdbg",
+            "name": "Debug (win)",
+            "type": "gdb",
             "request": "launch",
-            "program": "${workspaceFolder}/bin/imp-re",
-            "args": [],
-            "stopAtEntry": false,
-            "cwd": "${workspaceFolder}/bin",
-            "environment": [],
-            "externalConsole": true,
-            "MIMode": "gdb",
-            "windows": {"miDebuggerPath": "gdb.exe",},
-            "linux": {"miDebuggerPath": "gdb",},
-            "setupCommands": [
-                {
-                    "description": "Catch exceptions",
-                    "text": "-exec catch throw",
-                    "ignoreFailures": true
-                },
-                {
-                    "description": "Enable pretty-printing for gdb",
-                    "text": "-enable-pretty-printing",
-                    "ignoreFailures": true
-                },
-            ]
-        }
+            "target": "./imp-re.exe",
+            "cwd": "${workspaceRoot}/bin",
+            "valuesFormatting": "parseText",
+        },
     ]
 }

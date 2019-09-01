@@ -1,6 +1,6 @@
 #pragma once
 
-#include <AL/al.h>
+#include <al.h>
 
 #include "utils/mat.h"
 

@@ -3,8 +3,8 @@
 #include <tuple>
 #include <utility>
 
-#include <AL/al.h>
-#include <AL/alc.h>
+#include <al.h>
+#include <alc.h>
 
 #include "audio/source.h"
 #include "program/errors.h"

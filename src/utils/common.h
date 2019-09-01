@@ -2,6 +2,9 @@
 
 #define SDL_MAIN_HANDLED
 
+#ifndef ENTRY_POINT
+#define ENTRY_POINT main
+#endif
 
 /* How to override a platform flag?
  *
@@ -60,7 +63,7 @@
 
 // Byte order detection
 
-#include <SDL2/SDL_endian.h>
+#include <SDL_endian.h>
 
 #ifndef OVERRIDE_ENDIANNESS
 #  if SDL_BYTEORDER == SDL_BIG_ENDIAN

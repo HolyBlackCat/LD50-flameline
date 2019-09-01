@@ -8,12 +8,16 @@ OBJECT_DIR := obj
 OUTPUT_FILE := bin/imp-re
 LINKER_MODE := CXX
 
+# Dependency set name
+LIBRARY_PACK_NAME := imp-re_deps_v1.0
+USED_PACKAGES := sdl2 openal freetype2 ogg vorbis vorbisenc vorbisfile zlib
+
 # Flags
 CXXFLAGS := -Wall -Wextra -pedantic-errors -std=c++2a
 LDFLAGS :=
 # Important flags
-override CXXFLAGS += -include src/utils/common.h -include src/program/parachute.h -Ilib/include -Ilib/x86_64-w64-mingw32/include -Isrc
-override LDFLAGS += -Llib/x86_64-w64-mingw32 -lmingw32 -lSDL2main -lSDL2.dll -lfreetype -lopenal32 -lvorbisfile -lvorbisenc -lvorbis -logg -lbz2 -lz -lfmt
+override CXXFLAGS += -include src/utils/common.h -include src/program/parachute.h -Isrc -Ilib/include $(subst -Dmain,-DENTRY_POINT,$(sort $(deps_compiler_flags)))
+override LDFLAGS += $(filter-out -mwindows,$(deps_linker_flags))
 
 # Build modes
 $(call new_mode,debug)
@@ -24,7 +28,10 @@ $(mode_flags) CXXFLAGS += -g -D_GLIBCXX_DEBUG
 
 $(call new_mode,release)
 $(mode_flags) CXXFLAGS += -DNDEBUG -O3
-$(mode_flags) LDFLAGS += -O3 -s -mwindows
+$(mode_flags) LDFLAGS += -O3 -s
+ifeq ($(TARGET_OS),windows)
+$(mode_flags) LDFLAGS += -mwindows
+endif
 
 # File-specific flags
 FILE_SPECIFIC_FLAGS := lib/implementation.cpp lib/glfl.cpp > -g0 -O3

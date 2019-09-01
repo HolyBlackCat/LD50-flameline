@@ -6,7 +6,7 @@
 #include <utility>
 #include <vector>
 
-#include <SDL2/SDL.h>
+#include <SDL.h>
 
 #include "input/enum.h"
 #include "utils/mat.h"

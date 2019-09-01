@@ -4,7 +4,7 @@
 #include <memory>
 #include <unordered_set>
 
-#include <AL/al.h>
+#include <al.h>
 
 #include "audio/buffer.h"
 #include "utils/mat.h"

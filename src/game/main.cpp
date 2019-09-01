@@ -44,7 +44,7 @@ namespace States
     };
 }
 
-int main()
+int ENTRY_POINT(int, char **)
 {
     { // Initialize
         ImGui::StyleColorsDark();
