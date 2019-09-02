@@ -22,7 +22,7 @@
  */
 
 
-// Platform type detection
+// Platform category detection
 
 #ifndef OVERRIDE_PLATFORM
 #  if defined ANDROID || defined __ANDROID__
@@ -33,15 +33,17 @@
 #endif
 
 
-// Platform type detection
+// PC OS detection
 
 #ifndef OVERRIDE_PLATFORM
-#  if defined _WIN32 // It should be defined for x64 Windows as well.
-#    define PLATFORM_WINDOWS 1
-#  elif defined __APPLE__
-#    define PLATFORM_MACOS 1
-#  else
-#    define PLATFORM_LINUX 1
+#  ifdef PLATFORM_PC
+#    if defined _WIN32 // It should be defined for x64 Windows as well.
+#      define PLATFORM_WINDOWS 1
+#    elif defined __APPLE__
+#      define PLATFORM_MACOS 1
+#    else
+#      define PLATFORM_LINUX 1
+#    endif
 #  endif
 #endif
 
@@ -73,6 +75,14 @@
 #  else
 #    error Invalid endianness.
 #  endif
+#endif
+
+// Those seem to end up defined on Linux somehow, and break `OnPlatform(*_ENDIAN)(...)`.
+#ifdef BIG_ENDIAN
+#  undef BIG_ENDIAN
+#endif
+#ifdef LITTLE_ENDIAN
+#  undef LITTLE_ENDIAN
 #endif
 
 

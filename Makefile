@@ -683,7 +683,7 @@ __generic_build: | $(STARTUP_SCRIPT_PATH)
 $(STARTUP_SCRIPT_PATH): | $(OUTPUT_FILE_EXT)
 	@$(call echo,[Deps] Generating startup script)
 	@$(call echo,#!/bin/sh) >$(STARTUP_SCRIPT_PATH)
-	@$(call echo,LD_LIBRARY_PATH = $$(pwd)/$$(basedir $$0):$$(LD_LIBRARY_PATH) $$(pwd)/$$(basedir $$0)/$(OUTPUT_FILE_EXT)) >>$(STARTUP_SCRIPT_PATH)
+	@$(call echo,export "LD_LIBRARY_PATH=$$(pwd)/$$(dirname $$0):$$LD_LIBRARY_PATH" && cd $$(pwd)/$$(dirname $$0) && ./$(notdir $(OUTPUT_FILE_EXT))) >>$(STARTUP_SCRIPT_PATH)
 	@chmod +x $(STARTUP_SCRIPT_PATH)
 endif
 
@@ -694,6 +694,10 @@ override library_pack_path := $(LIBRARY_PACK_DIR)/$(LIBRARY_PACK_NAME)
 # Same as $(PKGCONFIG), but with some commands to set proper library paths.
 # Using `=` here instead of `:=`, because this variable isn't required very often.
 override pkgconfig_with_path = $(call set_env,PKG_CONFIG_PATH,) && $(call set_env,PKG_CONFIG_LIBDIR,$(library_pack_path)/lib/pkgconfig) && $(PKGCONFIG)
+
+# Runs `pkgconfig_with_path` with $1 (--cflags or --libs) as flags, and sanitizes the results.
+# Any `-rpath` flags are removed.
+override run_pkgconfig = $(strip $(foreach x,$(call safe_shell,$(pkgconfig_with_path) --define-prefix $1 $(USED_PACKAGES)),$(if $(findstring -rpath,$x),,$x)))
 
 
 # Check if we should update the dependencies.
@@ -712,8 +716,8 @@ $(lib_pack_info_file):
 	$(if $(wildcard $(library_pack_path)),,$(error Prebuilt dependencies not found in `$(library_pack_path)`))
 	$(erase_dynamic_libraries)
 	$(call safe_shell_exec,$(call echo,override deps_library_pack_name := $(LIBRARY_PACK_NAME)) >$@)
-	$(call safe_shell_exec,$(call echo,override deps_compiler_flags := $(call safe_shell,$(pkgconfig_with_path) --define-prefix --cflags $(USED_PACKAGES))) >>$@)
-	$(call safe_shell_exec,$(call echo,override deps_linker_flags := $(call safe_shell,$(pkgconfig_with_path) --define-prefix --libs $(USED_PACKAGES))) >>$@)
+	$(call safe_shell_exec,$(call echo,override deps_compiler_flags := $(call run_pkgconfig,--cflags)) >>$@)
+	$(call safe_shell_exec,$(call echo,override deps_linker_flags := $(call run_pkgconfig,--libs)) >>$@)
 	$(call safe_shell_exec,$(call echo,override deps_packages := $(USED_PACKAGES)) >>$@)
 	$(eval include $(lib_pack_info_file))
 	$(info [Deps] Packages used:)
@@ -728,7 +732,8 @@ $(lib_pack_info_file):
 ifeq ($(dynamic_libraries),)
 
 override deps_entry_dir = $(subst >, ,$(word 1,$(subst <, ,$1)))
-override deps_entry_name = $(subst >, ,$(word 2,$(subst <, ,$1)))
+override deps_entry_name_long = $(subst >, ,$(word 2,$(subst <, ,$1)))
+override deps_entry_name = $(call deps_entry_name_long,$(word 1,$(subst .so,.so ,$1)))
 override deps_entry_summary = $(call deps_entry_dir,$1) >> $(call deps_entry_name,$1)
 
 # A list of dynamic libraries found in the library pack.
@@ -762,7 +767,7 @@ __dynamic_libs: | $(OUTPUT_FILE_EXT)
 	$(info [Deps] Following libraries will be copied to `$(dir $(OUTPUT_FILE_EXT))`:)
 	$(foreach x,$(_local_std_libs),$(info [Deps] - [standard] $(call deps_entry_summary,$x)))
 	$(foreach x,$(_local_other_libs),$(info [Deps] - [external] $(call deps_entry_summary,$x)))
-	@$(foreach x,$(_local_std_libs) $(_local_other_libs),$(call copy,$(call deps_entry_dir,$x)$(call deps_entry_name,$x),$(dir $(OUTPUT_FILE_EXT))) &&) $(call echo,[Deps] Copying completed)
+	@$(foreach x,$(_local_std_libs) $(_local_other_libs),$(call copy,$(call deps_entry_dir,$x)$(call deps_entry_name_long,$x),$(dir $(OUTPUT_FILE_EXT))) &&) $(call echo,[Deps] Copying completed)
 
 endif
 
