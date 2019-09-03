@@ -46,14 +46,13 @@
 # Last used mode is remembered (saved to `.current_mode.mk`) and is used by default until changed again.
 # If you haven't selected a mode yet, failure to specify `mode=...` is a error.
 # Targets NOT marked with `[M]` are not affected by current build mode and don't accept the `mode=...` flag.
-##
+#
 # [M] * `make`                - Same as `make build`.
 # [M] * `make build`          - Builds the project using current build mode.
 # [M] * `make use`            - Switches to a different build mode without doing anything else. `mode=...` has to be specified.
 # [M] * `make clean_mode`     - Deletes object files and precompiled headers for the current build mode. The executable is not deleted.
 # [M] * `make clean_pch`      - Deletes precompiled headers for the current build mode. The executable is not deleted.
-#     * `make clean`          - Deletes all object files, precompiled headers, and the executable. If we're on Linux and dependency management
-#                               is enabled, also clean the startup script (see below).
+#     * `make clean`          - Deletes all object files, precompiled headers, and the executable.
 #     * `make commands`       - Generate `compile_commands.json`. Mode-specific flags are ignored.
 #     * `make commands_fixed` - Generate `compile_commands.json` with deliberately broken commands for some files.
 #                               When using VS Code with Clangd, this helps to disable Clangd for specific files to avoid unwanted warnings.
@@ -66,8 +65,6 @@
 # will be checked, and some information about them will be collected.
 # Then, at the end of the build sequence, dynamic libraries used by the application (the standard ones,and the ones coming from the library
 # pack, as determined by `LDD`) will be copied to the build directory.
-# Additionally, if you're on Linux, a startup script is generated in the build directory. It's the intended way to start the resulting application.
-# It adds the current directory (containing dynamic libraries) to LD_LIBRARY_PATH, and then runs the executable.
 #
 # If you enable dependency management, several additional targets are enabled:
 #
@@ -88,6 +85,13 @@
 
 # --- DEFAULT TARGET ---
 build:
+
+
+# --- CHECK IF MAKE WAS RESTARTED ---
+$(if $(MAKE_RESTARTS),$(eval override make_was_restarted := yes))
+ifneq ($(make_was_restarted),)
+$(info --------)
+endif
 
 
 # --- DEFINITIONS ---
@@ -157,12 +161,12 @@ TARGET_OS ?= $(HOST_OS)
 ifeq ($(TARGET_OS),windows)
 override target_win_linux = $1
 override extension_exe := .exe
-override extension_dll := .dll
+override pattern_dll := *.dll
 override directory_dll := bin
 else
 override target_win_linux = $2
 override extension_exe :=
-override extension_dll := .so
+override pattern_dll := *.so*
 override directory_dll := lib
 endif
 
@@ -213,7 +217,7 @@ override copy = cp -f '$1' '$2'
 override touch = touch '$1'
 override echo = echo '$(subst ','"'"',$1)'
 override echo_lf := echo
-override pause := read -s -n 1 -p "Press any key to continue . . ." && echo
+override pause := read -s -n 1 -p 'Press any key to continue . . .' && echo
 override set_env = export "$1=$2"
 # - Functions
 override native_path = $1
@@ -260,21 +264,19 @@ PKGCONFIG := pkg-config
 
 ifeq ($(TARGET_OS),windows)
 WINDRES := windres
+LDD := ntldd -R
+PATCHELF = $(error Attempt to use `patchelf`, but we're not on Linux)
 else
 WINDRES = $(error Attempt to use `windres`, but we're not on Windows)
-endif
-
-ifeq ($(TARGET_OS),windows)
-LDD := ntldd -R
-else
 LDD := ldd
+PATCHELF := patchelf
 endif
 
 # Following variables have no effect if dependency management is disabled:
 # [
 LIBRARY_PACK_DIR := ../_dependencies
 # Will look for dependencies in this directory.
-STD_LIB_NAME_PATTERNS := libgcc libstdc++ libc++ pthread librt
+STD_LIB_NAME_PATTERNS := libgcc libstdc++ libc++
 # If one of those strings is present in a dynamic library name, that library is considered to be a part of the standard library.
 BANNED_LIBRARY_PATH_PATTERNS :=
 ifeq ($(TARGET_OS),windows)
@@ -345,15 +347,10 @@ LIBRARY_PACK_NAME :=
 
 # Following variables have no effect if dependency management is disabled:
 # [
-STARTUP_SCRIPT := _start
-# This is used only on linux.
-# A shell script with this name will be created in the same directory as $(OUTPUT_FILE).
-# Running this script will start the executable with a proper LD_LIBRARY_PATH, which allows
-# us to use shared libraries from the same directory as the executable itself.
-STARTUP_SCRIPT_PATH = $(dir $(OUTPUT_FILE_EXT))/$(STARTUP_SCRIPT)
-# Normally you don't need to adjust this manually. Note that we can't use `:=` here.
 USED_PACKAGES :=
 # Used pkg-config packages from the library pack.
+USED_EXTERNAL_PACKAGES :=
+# Used external pkg-config packages.
 # ]
 
 
@@ -365,6 +362,7 @@ override lib_pack_info_file := $(OBJECT_DIR)/library_pack_info.mk
 # --- INCLUDE LIBRARY PACK INFO FILE ---
 override deps_library_pack_name :=
 override deps_packages :=
+override deps_external_packages :=
 override deps_compiler_flags :=
 override deps_linker_flags :=
 -include $(lib_pack_info_file)
@@ -518,12 +516,9 @@ build: __check_mode __mode_$(current_mode)
 # Public: clean most files.
 .PHONY: clean
 clean: __no_mode_needed
-	@$(call echo,[Cleaning] Everything)
+	@$(call echo,[Cleaning] All)
 	@$(call rmdir,$(common_object_dir))
 	@$(call rmfile,$(OUTPUT_FILE_EXT))
-ifneq ($(strip $(LIBRARY_PACK_NAME)),)
-	@$(call rmfile,$(STARTUP_SCRIPT_PATH))
-endif
 	@$(call echo,[Done])
 
 # Public: clean files for the current build mode, including precompiled headers but not including the executable.
@@ -644,7 +639,7 @@ clean_commands: __no_mode_needed
 # --- OPTIONAL LIBRARY MANAGEMENT ---
 
 # A list of dynamic libraries currently sitting in the build directory.
-override dynamic_libraries := $(wildcard $(dir $(OUTPUT_FILE_EXT))/*$(extension_dll))
+override dynamic_libraries := $(wildcard $(dir $(OUTPUT_FILE_EXT))/*$(pattern_dll))
 override erase_dynamic_libraries = $(if $(dynamic_libraries),@$(success) $(foreach x,$(dynamic_libraries),&& $(call rmfile,$x)))
 
 # Public: erase dynamic libraries that were copied from the prebuilt dependencies.
@@ -667,7 +662,7 @@ clean_deps: __no_mode_needed
 # Yes, this is effectively an empty target. As long as it's mentioned in `targets_requiring_deps_info`, it does the job.
 .PHONY: find_deps
 find_deps: __no_mode_needed
-	$(if $(MAKE_RESTARTS),@$(call echo,[Done]))
+	$(if $(make_was_restarted),@$(call echo,[Done]))
 
 
 override targets_requiring_deps_info := build commands commands_fixed find_deps
@@ -676,28 +671,28 @@ override targets_requiring_deps_info := build commands commands_fixed find_deps
 ifneq ($(dependency_management_enabled),)
 ifneq ($(strip $(if $(MAKECMDGOALS),$(filter $(targets_requiring_deps_info),$(MAKECMDGOALS)),yes)),)# Don't update dependencies unless necessary.
 
-
-# Generate a startup script (right after building the executable)
-ifeq ($(strip $(TARGET_OS)),linux)
-__generic_build: | $(STARTUP_SCRIPT_PATH)
-$(STARTUP_SCRIPT_PATH): | $(OUTPUT_FILE_EXT)
-	@$(call echo,[Deps] Generating startup script)
-	@$(call echo,#!/bin/sh) >$(STARTUP_SCRIPT_PATH)
-	@$(call echo,export "LD_LIBRARY_PATH=$$(pwd)/$$(dirname $$0):$$LD_LIBRARY_PATH" && cd $$(pwd)/$$(dirname $$0) && ./$(notdir $(OUTPUT_FILE_EXT))) >>$(STARTUP_SCRIPT_PATH)
-	@chmod +x $(STARTUP_SCRIPT_PATH)
-endif
-
-
 # A path to the library pack.
-override library_pack_path := $(LIBRARY_PACK_DIR)/$(LIBRARY_PACK_NAME)
+override library_pack_path = $(LIBRARY_PACK_DIR)/$(LIBRARY_PACK_NAME)
+
+#
+override library_pack_archive_pattern = ./$(LIBRARY_PACK_NAME)_*.tar.gz
+override library_pack_archive_pattern_display = $(subst *,<platform>,$(library_pack_archive_pattern))
 
 # Same as $(PKGCONFIG), but with some commands to set proper library paths.
 # Using `=` here instead of `:=`, because this variable isn't required very often.
 override pkgconfig_with_path = $(call set_env,PKG_CONFIG_PATH,) && $(call set_env,PKG_CONFIG_LIBDIR,$(library_pack_path)/lib/pkgconfig) && $(PKGCONFIG)
 
-# Runs `pkgconfig_with_path` with $1 (--cflags or --libs) as flags, and sanitizes the results.
-# Any `-rpath` flags are removed.
-override run_pkgconfig = $(strip $(foreach x,$(call safe_shell,$(pkgconfig_with_path) --define-prefix $1 $(USED_PACKAGES)),$(if $(findstring -rpath,$x),,$x)))
+# `run_pkgconfig` - runs pkg-config with $1 (--cflags or --libs) as flags, and sanitizes the results.
+override banned_pkgconfig_flag_patterns := -rpath --enable-new-dtags
+override run_pkgconfig_low = $(if $(strip $2),$(foreach x,$(call safe_shell,$1 $2 --define-prefix),$(if $(call contains_any_of,$(banned_pkgconfig_flag_patterns),$x),,$x)))
+override run_pkgconfig = $(strip $(call run_pkgconfig_low,$(pkgconfig_with_path) $1,$(USED_PACKAGES)) $(call run_pkgconfig_low,$(PKGCONFIG) $1,$(USED_EXTERNAL_PACKAGES)))
+
+# Extra library pack flags.
+override extra_pkgconfig_compiler_flags :=
+override extra_pkgconfig_linker_flags :=
+ifeq ($(TARGET_OS),linux)
+override extra_pkgconfig_linker_flags := -Wl,-rpath='$$ORIGIN'
+endif
 
 
 # Check if we should update the dependencies.
@@ -707,25 +702,41 @@ endif
 ifneq ($(strip $(USED_PACKAGES)),$(strip $(deps_packages)))
 $(lib_pack_info_file): __force_this_target
 endif
+ifneq ($(strip $(USED_EXTERNAL_PACKAGES)),$(strip $(deps_external_packages)))
+$(lib_pack_info_file): __force_this_target
+endif
+
+# Make sure everything is rebuilt if dependency information is updated.
+$(OUTPUT_FILE_EXT) $(objects) $(compiled_headers): | $(lib_pack_info_file)
 
 
 # Generate the library pack info.
 # Note that `deps_packages` is the last variable. If `pkg-config` fails, the file won't contain this variable, which will cause it to be regenerated.
 $(lib_pack_info_file):
 	$(info [Deps] Updating dependency information...)
-	$(if $(wildcard $(library_pack_path)),,$(error Prebuilt dependencies not found in `$(library_pack_path)`))
+	$(if $(wildcard $(library_pack_path)),,\
+		$(eval override _local_archive_path := $(wildcard $(library_pack_archive_pattern)))\
+		$(if $(filter 1,$(words $(_local_archive_path))),\
+			$(info [Deps] Unpacking `$(_local_archive_path)`...)\
+				$(call safe_shell_exec,$(call mkdir,$(library_pack_path)) && tar -C $(LIBRARY_PACK_DIR) -xf $(_local_archive_path)),\
+			$(error Prebuilt dependencies not found in `$(library_pack_path)`.\
+    			$(lf)I can install them for you; I need `$(library_pack_archive_pattern_display)` in the current directory)))
 	$(erase_dynamic_libraries)
 	$(call safe_shell_exec,$(call echo,override deps_library_pack_name := $(LIBRARY_PACK_NAME)) >$@)
-	$(call safe_shell_exec,$(call echo,override deps_compiler_flags := $(call run_pkgconfig,--cflags)) >>$@)
-	$(call safe_shell_exec,$(call echo,override deps_linker_flags := $(call run_pkgconfig,--libs)) >>$@)
+	$(call safe_shell_exec,$(call echo,override deps_compiler_flags := $(subst $$,$$$$,$(call run_pkgconfig,--cflags) $(extra_pkgconfig_compiler_flags))) >>$@)
+	$(call safe_shell_exec,$(call echo,override deps_linker_flags := $(subst $$,$$$$,$(call run_pkgconfig,--libs) $(extra_pkgconfig_linker_flags))) >>$@)
 	$(call safe_shell_exec,$(call echo,override deps_packages := $(USED_PACKAGES)) >>$@)
+	$(call safe_shell_exec,$(call echo,override deps_external_packages := $(USED_EXTERNAL_PACKAGES)) >>$@)
 	$(eval include $(lib_pack_info_file))
 	$(info [Deps] Packages used:)
 	$(info [Deps]   $(deps_packages))
+	$(info [Deps] External packages used:)
+	$(info [Deps]   $(deps_external_packages))
 	$(info [Deps] Compiler flags:)
 	$(info [Deps]   $(deps_compiler_flags))
 	$(info [Deps] Linker flags:)
 	$(info [Deps]   $(deps_linker_flags))
+	$(info [Deps] Suggesting a clean rebuild!)
 
 
 # Copy dynamic libraries (right after building the executable)
@@ -737,15 +748,15 @@ override deps_entry_name = $(call deps_entry_name_long,$(word 1,$(subst .so,.so 
 override deps_entry_summary = $(call deps_entry_dir,$1) >> $(call deps_entry_name,$1)
 
 # A list of dynamic libraries found in the library pack.
-override available_libs := $(notdir $(wildcard $(library_pack_path)/$(directory_dll)/*$(extension_dll)))
+override available_libs = $(notdir $(wildcard $(library_pack_path)/$(directory_dll)/*$(pattern_dll)))
 
 ifeq ($(TARGET_OS),linux)
-override ldd_with_path := $(call set_env,LD_LIBRARY_PATH,$(library_pack_path)/$(directory_dll):$$LD_LIBRARY_PATH) && $(LDD)
+override ldd_with_path = $(call set_env,LD_LIBRARY_PATH,$(library_pack_path)/$(directory_dll):$$LD_LIBRARY_PATH) && $(LDD)
 else
 ifeq ($(HOST_SHELL),windows)
-override ldd_with_path := $(call set_env,PATH,$(call native_path,$(library_pack_path)/$(directory_dll));%PATH%) && $(LDD)
+override ldd_with_path = $(call set_env,PATH,$(call native_path,$(library_pack_path)/$(directory_dll));%PATH%) && $(LDD)
 else
-override ldd_with_path := $(call set_env,PATH,$(call native_path,$(library_pack_path)/$(directory_dll));$$PATH) && $(LDD)
+override ldd_with_path = $(call set_env,PATH,$(call native_path,$(library_pack_path)/$(directory_dll));$$PATH) && $(LDD)
 endif
 endif
 
@@ -767,7 +778,20 @@ __dynamic_libs: | $(OUTPUT_FILE_EXT)
 	$(info [Deps] Following libraries will be copied to `$(dir $(OUTPUT_FILE_EXT))`:)
 	$(foreach x,$(_local_std_libs),$(info [Deps] - [standard] $(call deps_entry_summary,$x)))
 	$(foreach x,$(_local_other_libs),$(info [Deps] - [external] $(call deps_entry_summary,$x)))
-	@$(foreach x,$(_local_std_libs) $(_local_other_libs),$(call copy,$(call deps_entry_dir,$x)$(call deps_entry_name_long,$x),$(dir $(OUTPUT_FILE_EXT))) &&) $(call echo,[Deps] Copying completed)
+	$(foreach x,$(_local_std_libs) $(_local_other_libs),$(call safe_shell_exec,$(call copy,$(call deps_entry_dir,$x)$(call deps_entry_name_long,$x),$(dir $(OUTPUT_FILE_EXT)))))
+	$(info [Deps] Copying completed)
+ifeq ($(TARGET_OS),linux)
+	$(info [Deps] Patching libraries... (adjusting rpath))
+	$(eval override _local_libs_to_patch := $(foreach x,$(_local_std_libs) $(_local_other_libs),$(dir $(OUTPUT_FILE_EXT))$(call deps_entry_name_long,$x)))
+	$(foreach x,$(_local_libs_to_patch),\
+		$(call safe_shell_exec,$(PATCHELF) --set-rpath \
+			'$(subst <, ,$(subst $(space),:,$(strip $$ORIGIN \
+				$(foreach x,$(subst :, ,$(subst $(space),<,$(call safe_shell,$(PATCHELF) --print-rpath $x))),$(if $(call contains_any_of,$(dollar)ORIGIN $(dollar)(ORIGIN),$x),,$x))\
+			)))' $x\
+		)\
+	)
+	$(info [Deps] Patching completed)
+endif
 
 endif
 

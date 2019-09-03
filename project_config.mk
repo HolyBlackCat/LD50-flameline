@@ -10,7 +10,14 @@ LINKER_MODE := CXX
 
 # Dependency set name
 LIBRARY_PACK_NAME := imp-re_deps_v1.0
-USED_PACKAGES := sdl2 openal freetype2 ogg vorbis vorbisenc vorbisfile zlib
+USED_PACKAGES := openal freetype2 ogg vorbis vorbisenc vorbisfile zlib
+USED_EXTERNAL_PACKAGES :=
+ifeq ($(TARGET_OS),windows)
+USED_PACKAGES += sdl2
+else
+USED_EXTERNAL_PACKAGES := sdl2
+endif
+
 
 # Flags
 CXXFLAGS := -Wall -Wextra -pedantic-errors -std=c++2a
