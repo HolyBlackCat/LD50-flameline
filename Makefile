@@ -276,7 +276,7 @@ endif
 # [
 LIBRARY_PACK_DIR := ../_dependencies
 # Will look for dependencies in this directory.
-STD_LIB_NAME_PATTERNS := libgcc libstdc++ libc++
+STD_LIB_NAME_PATTERNS := libgcc libstdc++ libc++ winpthread
 # If one of those strings is present in a dynamic library name, that library is considered to be a part of the standard library.
 BANNED_LIBRARY_PATH_PATTERNS :=
 ifeq ($(TARGET_OS),windows)
