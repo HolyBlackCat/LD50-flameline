@@ -50,7 +50,9 @@ int ENTRY_POINT(int, char **)
         ImGui::StyleColorsDark();
 
         // Load various small fonts
-        gui_controller.LoadFont("assets/Monokat_6x12.ttf", 12.0f);
+        auto monochrome_font_flags = ImGuiFreeType::Monochrome | ImGuiFreeType::MonoHinting;
+
+        gui_controller.LoadFont("assets/Monokat_6x12.ttf", 12.0f, adjust(ImFontConfig{}, RasterizerFlags = monochrome_font_flags));
         gui_controller.LoadDefaultFont();
         gui_controller.RenderFontsWithFreetype();
 
