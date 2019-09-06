@@ -5,208 +5,330 @@
 #include <cstdint>
 #include <memory>
 #include <numeric>
+#include <type_traits>
 #include <vector>
 
 #include "graphics/index_buffer.h"
 #include "graphics/vertex_buffer.h"
 #include "program/errors.h"
+#include "utils/check.h"
 #include "utils/meta.h"
 
-namespace Graphics
+namespace Graphics::Geom
 {
-    template <typename T> inline constexpr bool is_valid_index_type_v = std::is_same_v<T, std::uint8_t> || std::is_same_v<T, std::uint16_t> || std::is_same_v<T, std::uint32_t>;
+    template <typename V>
+    class ProviderIndexless : Meta::with_virtual_destructor<ProviderIndexless<V>>
+    {
+      public:
+        using vertex_t = V;
+
+      protected:
+        virtual void GetVerticesFlatLow(std::size_t begin, std::size_t end, vertex_t *dest) const = 0;
+
+      public:
+        virtual std::size_t VertexCountFlat() const = 0;
+
+        void GetVerticesFlat(std::size_t begin, std::size_t end, vertex_t *dest) const
+        {
+            DebugAssert("Invalid vertex range.", begin <= end && end <= VertexCountFlat());
+            GetVerticesFlatLow(begin, end, dest);
+        }
+    };
+
+    template <typename V, typename I>
+    class Provider : public ProviderIndexless<V>
+    {
+        static_assert(is_valid_index_type_v<I>, "Invalid index type.");
+
+      public:
+        using typename ProviderIndexless<V>::vertex_t;
+        using index_t = I;
+
+      protected:
+        virtual void GetVerticesLow(std::size_t begin, std::size_t end, vertex_t *dest) const = 0;
+        virtual void GetIndicesLow(std::size_t begin, std::size_t end, index_t *dest, index_t base_index) const = 0;
+
+      public:
+        virtual std::size_t VertexCount() const = 0;
+        virtual std::size_t IndexCount() const = 0;
+
+        void GetVertices(std::size_t begin, std::size_t end, vertex_t *dest) const
+        {
+            DebugAssert("Invalid vertex range.", begin <= end && end <= VertexCount());
+            GetVerticesLow(begin, end, dest);
+        }
+        void GetIndices(std::size_t begin, std::size_t end, index_t *dest, index_t base_index) const
+        {
+            DebugAssert("Invalid index range.", begin <= end && end <= IndexCount());
+            GetIndicesLow(begin, end, dest, base_index);
+        }
+    };
+
 
     template <typename V>
-    class GeometryProviderIndexless : Meta::with_virtual_destructor<GeometryProviderIndexless<V>>
+    class ViewIndexless : public ProviderIndexless<V>
     {
-      public:
-        using vertex_t = V;
-
-        virtual explicit operator bool() const = 0;
-
-        virtual std::size_t Indexless_VertexCount() const = 0;
-        virtual const vertex_t &Indexless_GetVertex(std::size_t pos) const = 0;
-    };
-
-    template <typename V, typename I>
-    class GeometryProviderIndexed : Meta::with_virtual_destructor<GeometryProviderIndexed<V, I>>
-    {
-        static_assert(is_valid_index_type_v<I>, "Invalid index type.");
+        using Base = ProviderIndexless<V>;
 
       public:
-        using vertex_t = V;
-        using index_t = I;
-
-        virtual explicit operator bool() const = 0;
-
-        virtual std::size_t Indexed_VertexCount() const = 0;
-        virtual std::size_t Indexed_IndexCount() const = 0;
-        virtual const vertex_t &Indexed_GetVertex(std::size_t pos) const = 0;
-        virtual index_t Indexed_GetIndex(std::size_t pos) const = 0;
-    };
-
-
-    template <typename V, typename I>
-    class GeometryProvider final : public GeometryProviderIndexless<V>, public GeometryProviderIndexed<V, I>
-    {
-        static_assert(is_valid_index_type_v<I>, "Invalid index type.");
-
-      public:
-        using vertex_t = V;
-        using index_t = I;
+        using typename Base::vertex_t;
 
       private:
         const vertex_t *vertex_ptr = nullptr;
         std::size_t vertex_count = 0;
 
-        const index_t *index_ptr = nullptr; // Can be null if the data is indexless.
-        std::size_t index_count = 0; // Ignored if `index_ptr` is null.
-
-        bool IsIndexless() const
+      protected:
+        void GetVerticesFlatLow(std::size_t begin, std::size_t end, vertex_t *dest) const override
         {
-            return index_ptr == nullptr;
+            std::copy(vertex_ptr + begin, vertex_ptr + end, dest);
         }
 
       public:
-        GeometryProvider() {}
+        ViewIndexless() {}
+        ViewIndexless(const vertex_t *vertex_ptr, std::size_t vertex_count)
+            : vertex_ptr(vertex_ptr), vertex_count(vertex_count)
+        {}
 
-        // Indexless constructor
-        GeometryProvider(const vertex_t *vertex_ptr, std::size_t vertex_count)
-            : vertex_ptr(vertex_ptr), vertex_count(vertex_count) {}
-
-        // Indexed constructor
-        GeometryProvider(const vertex_t *vertex_ptr, std::size_t vertex_count, const index_t *index_ptr, std::size_t index_count)
-            : vertex_ptr(vertex_ptr), vertex_count(vertex_count), index_ptr(index_ptr), index_count(index_count) {}
-
-        // Indexless interface
-        std::size_t Indexless_VertexCount() const override
-        {
-            return IsIndexless() ? vertex_count : index_count;
-        }
-        const vertex_t &Indexless_GetVertex(std::size_t pos) const override
-        {
-            if (IsIndexless())
-            {
-                DebugAssert("Vertex position is out of range.", pos < vertex_count);
-                return vertex_ptr[pos];
-            }
-            else
-            {
-                DebugAssert("Vertex position is out of range.", pos < index_count);
-                DebugAssert("Vertex index is out of range.", index_ptr[pos] < vertex_count);
-                return vertex_ptr[index_ptr[pos]];
-            }
-        }
-
-        // Indexed interface
-        std::size_t Indexed_VertexCount() const override
+        std::size_t VertexCountFlat() const override
         {
             return vertex_count;
-        }
-        std::size_t Indexed_IndexCount() const override
-        {
-            return IsIndexless() ? vertex_count : index_count;
-        }
-        const vertex_t &Indexed_GetVertex(std::size_t pos) const override
-        {
-            DebugAssert("Vertex position is out of range.", pos < vertex_count);
-            return vertex_ptr[pos];
-        }
-        index_t Indexed_GetIndex(std::size_t pos) const override
-        {
-            if (IsIndexless())
-            {
-                DebugAssert("Vertex index position is out of range.", pos < vertex_count);
-                return pos;
-            }
-            else
-            {
-                DebugAssert("Vertex index position is out of range.", pos < index_count);
-                DebugAssert("Vertex index is out of range.", index_ptr[pos] < vertex_count);
-                return index_ptr[pos];
-            }
-        }
-    };
-
-
-    template <typename V>
-    class GeometryConsumerIndexless : Meta::with_virtual_destructor<GeometryConsumerIndexless<V>>
-    {
-      public:
-        using vertex_t = V;
-        using provider_t = GeometryProviderIndexless<V>;
-
-        virtual void Insert(const provider_t &provider) = 0;
-        virtual void Flush() {}
-
-        GeometryConsumerIndexless &operator<<(const provider_t &provider)
-        {
-            Insert(provider);
-            return *this;
         }
     };
 
     template <typename V, typename I>
-    class GeometryConsumerIndexed : Meta::with_virtual_destructor<GeometryConsumerIndexed<V, I>>
+    class ViewNonIndexBased : public Provider<V, I>
     {
         static_assert(is_valid_index_type_v<I>, "Invalid index type.");
+        using Base = Provider<V, I>;
 
       public:
-        using vertex_t = V;
-        using index_t = I;
-        using provider_t = GeometryProviderIndexed<V, I>;
+        using typename Base::vertex_t;
+        using typename Base::index_t;
 
-        virtual void Insert(const provider_t &provider) = 0;
-        virtual void Flush() {}
+      private:
+        ViewIndexless<V> source;
 
-        GeometryConsumerIndexed &operator<<(const provider_t &provider)
+      protected:
+        void GetVerticesFlatLow(std::size_t begin, std::size_t end, vertex_t *dest) const override
         {
-            Insert(provider);
-            return *this;
+            source.GetVerticesFlatLow(begin, end, dest);
+        }
+        void GetVerticesLow(std::size_t begin, std::size_t end, vertex_t *dest) const override
+        {
+            source.GetVerticesFlatLow(begin, end, dest);
+        }
+        void GetIndicesLow(std::size_t begin, std::size_t end, index_t *dest, index_t base_index) const override
+        {
+            DebugAssert("Vertex index is too large for this type.", (end - begin - 1) + base_index <= std::numeric_limits<index_t>::max());
+            std::iota(dest, dest + (end - begin), index_t(begin + base_index));
+        }
+
+      public:
+        ViewNonIndexBased() {}
+        ViewNonIndexBased(const vertex_t *vertex_ptr, std::size_t vertex_count)
+            : source(vertex_ptr, vertex_count)
+        {}
+
+        std::size_t VertexCountFlat() const override
+        {
+            return source.VertexCountFlat();
+        }
+        std::size_t VertexCount() const override
+        {
+            return source.VertexCountFlat();
+        }
+        std::size_t IndexCount() const override
+        {
+            return source.VertexCountFlat();
+        }
+    };
+
+    template <typename V, typename I>
+    class View : public Provider<V, I>
+    {
+        static_assert(is_valid_index_type_v<I>, "Invalid index type.");
+        using Base = Provider<V, I>;
+
+      public:
+        using typename Base::vertex_t;
+        using typename Base::index_t;
+
+      private:
+        const index_t *vertex_ptr = nullptr;
+        std::size_t vertex_count = 0;
+        const index_t *index_ptr = nullptr;
+        std::size_t index_count = 0;
+
+      protected:
+        void GetVerticesFlatLow(std::size_t begin, std::size_t end, vertex_t *dest) const override
+        {
+            source.GetVerticesFlatLow(begin, end, dest);
+        }
+        void GetVerticesLow(std::size_t begin, std::size_t end, vertex_t *dest) const override
+        {
+            std::copy(vertex_ptr + begin, vertex_ptr + end, dest);
+        }
+        void GetIndicesLow(std::size_t begin, std::size_t end, index_t *dest, index_t base_index) const override
+        {
+            #error here
+            std::tra(index_ptr + begin, index_ptr + end, dest);
+        }
+
+      public:
+        View() {}
+        View(const vertex_t *vertex_ptr, std::size_t vertex_count, const vertex_t *index_ptr, std::size_t index_count)
+            : vertex_ptr(vertex_ptr), vertex_count(vertex_count), index_ptr(index_ptr), index_count(index_count)
+        {}
+
+        std::size_t VertexCountFlat() const override
+        {
+            return index_count;
+        }
+        std::size_t VertexCount() const override
+        {
+            return vertex_count;
+        }
+        std::size_t IndexCount() const override
+        {
+            return index_count;
+        }
+
+
+
+
+        void GetVerticesFlat(std::size_t begin, std::size_t end, vertex_t *dest) const override
+        {
+            DebugAssert("Invalid vertex range.", begin <= end && end <= index_count);
+            for (std::size_t i = begin; i < end; i++)
+            {
+                index_t index = index_ptr[i]
+                DebugAssert("Invalid vertex index.", index < vertex_count);
+                *dest++ = vertex_ptr[index];
+            }
+        }
+
+        std::size_t VertexCount() const override
+        {
+            return vertex_count;
+        }
+        std::size_t IndexCount() const override
+        {
+            return index_count;
+        }
+        void GetVertices(std::size_t begin, std::size_t end, vertex_t *dest) const override
+        {
+            source.GetVertices(begin, end, dest);
+        }
+        void GetIndices(std::size_t begin, std::size_t end, index_t *dest, index_t base_index) const override
+        {
+            DebugAssert("Invalid index range.", begin <= end && end <= index_count);
+            DebugAssert("Vertex index is too large for this type.", (end - begin - 1) + base_index <= std::numeric_limits<index_t>::max());
+            std::iota(dest + begin, dest + end, index_t(begin));
         }
     };
 
 
-    template <typename V>
-    class VertexDataIndexless : public GeometryConsumerIndexless<V>
+    template <typename T, CHECK(std::is_base_of_v<GenericProvider, T>)>
+    class AdapterIndexless : public ProviderIndexless<typename T::vertex_t>
     {
-        using base = GeometryConsumerIndexless<V>;
+        static_assert(!std::is_const_v<T>);
+
+        const T &source;
 
       public:
-        using typename base::vertex_t;
-        using typename base::index_t;
-        using typename base::provider_t;
+        using vertex_t = typename T::vertex_t;
+
+        AdapterIndexless(const T &source) : source(source) {}
+
+        std::size_t VertexCount() const override
+        {
+            return source.IndexCount();
+        }
+        const vertex_t &GetVertex(std::size_t pos) const override
+        {
+            return source.GetVertex(source.GetIndex(pos));
+        }
+    };
+
+    template <typename T>
+    auto AsIndexless(const Provider<V, I> &source)
+    {
+        return AdapterIndexless<V>(source);
+    }
+
+    template <typename I, typename T, CHECK(std::is_base_of_v<GenericProviderIndexless, T>)>
+    class AdapterIndexed : public Provider<typename T::vertex_t, I>
+    {
+        static_assert(!std::is_const_v<T>);
+
+        const T &source;
+
+      public:
+        using vertex_t = typename T::vertex_t;
+        using index_t = I;
+
+        AdapterIndexed(const T &source) : source(source) {}
+
+        std::size_t VertexCount() const override
+        {
+            return source.VertexCount();
+        }
+        std::size_t IndexCount() const override
+        {
+            return source.VertexCount();
+        }
+        const vertex_t &GetVertex(std::size_t pos) const override
+        {
+            return source.GetVertex(pos);
+        }
+        index_t GetIndex(std::size_t pos) const override
+        {
+            return index_t(pos);
+        }
+    };
+
+    template <typename I, typename T>
+    auto AsIndexed(const T &source)
+    {
+        #error fix me and my sibling
+        return AdapterIndexed<I, ProviderIndexless<V>>(source);
+    }
+
+
+    template <typename V>
+    class DataIndexless
+    {
+      public:
+        using vertex_t = V;
 
         std::vector<vertex_t> vertices;
 
-        void Insert(const provider_t &provider) override
+        void Insert(const ProviderIndexless<V> &provider)
         {
-            DebugAssert(provider, "Null vertex data provider.");
-
             std::size_t added_vertex_count = provider.Indexless_VertexCount();
             vertices.reserve(vertices.size() + added_vertex_count);
             for (std::size_t i = 0; i < added_vertex_count; i++)
                 vertices.push_back(provider.Indexless_GetVertex(i));
         }
+
+        operator ViewIndexless<V>() const
+        {
+            return ViewIndexless<V>(vertices.data(), vertices.size());
+        }
     };
 
     template <typename V, typename I>
-    class VertexDataIndexed : public GeometryConsumerIndexed<V, I>
+    class DataIndexed
     {
-        using base = GeometryConsumerIndexed<V, I>;
-
       public:
-        using typename base::vertex_t;
-        using typename base::index_t;
-        using typename base::provider_t;
+        using vertex_t = V;
+        using index_t = I;
 
         std::vector<vertex_t> vertices;
         std::vector<index_t> indices;
 
-        void Insert(const provider_t &provider) override
+        void Insert(const Provider<V, I> &provider)
         {
-            DebugAssert(provider, "Null vertex data provider.");
-
             std::size_t added_vertex_count = provider.Indexed_VertexCount();
             vertices.reserve(vertices.size() + added_vertex_count);
             for (std::size_t i = 0; i < added_vertex_count; i++)
@@ -217,18 +339,23 @@ namespace Graphics
             for (std::size_t i = 0; i < added_index_count; i++)
                 indices.push_back(provider.Indexed_GetIndex(i));
         }
+
+        operator View<V, I>() const
+        {
+            return View<V, I>(vertices.data(), vertices.size(), indices.data(), indices.size());
+        }
     };
 
 
     template <typename V>
-    class GeometryIndexless
+    class BufferIndexless
     {
         DrawMode mode = triangles;
         VertexBuffer<V> vertex_buffer;
 
       public:
-        GeometryIndexless() {}
-        GeometryIndexless(const VertexDataIndexless<V> &vertex_data, DrawMode mode, Usage usage = static_draw)
+        BufferIndexless() {}
+        BufferIndexless(const DataIndexless<V> &vertex_data, DrawMode mode, Usage usage = static_draw)
             : mode(mode), vertex_buffer(vertex_data.vertices.size(), vertex_data.vertices.data(), usage)
         {}
 
@@ -244,7 +371,7 @@ namespace Graphics
     };
 
     template <typename V, typename I>
-    class GeometryIndexed
+    class BufferIndexed
     {
         static_assert(is_valid_index_type_v<I>, "Invalid index type.");
 
@@ -253,8 +380,8 @@ namespace Graphics
         IndexBuffer<I> index_buffer;
 
       public:
-        GeometryIndexed() {}
-        GeometryIndexed(const VertexDataIndexed<V, I> &vertex_data, DrawMode mode, Usage usage = static_draw)
+        BufferIndexed() {}
+        BufferIndexed(const DataIndexed<V, I> &vertex_data, DrawMode mode, Usage usage = static_draw)
             : mode(mode), vertex_buffer(vertex_data.vertices.size(), vertex_data.vertices.data(), usage), index_buffer(vertex_data.indices.size(), vertex_data.indices.data(), usage)
         {}
 
@@ -265,8 +392,21 @@ namespace Graphics
 
         void Draw()
         {
-            vertex_buffer.BindDraw();
-            index_buffer.Draw(mode);
+            index_buffer.Draw(vertex_buffer, mode);
         }
+    };
+
+
+    enum Primitive
+    {
+        points    = DrawMode::points,
+        lines     = DrawMode::lines,
+        triangles = DrawMode::triangles,
+    };
+
+    template <typename V, Primitive P>
+    class QueueIndexless
+    {
+
     };
 }

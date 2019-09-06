@@ -1,3 +1,5 @@
+#include <graphics/geometry.h>
+
 const ivec2 screen_size(480, 270);
 Interface::Window window("Delta", screen_size * 2, Interface::windowed, adjust_(Interface::WindowSettings{}, min_size = screen_size));
 Graphics::DummyVertexArray dummy_vao = nullptr;
@@ -44,8 +46,16 @@ namespace States
     };
 }
 
+ReflectStruct(Attribs, (
+    (fvec2)(pos)(={}),
+))
+
 int ENTRY_POINT(int, char **)
 {
+    Graphics::Geom::DataIndexless<Attribs> a;
+    Graphics::Geom::DataIndexed<Attribs, uint16_t> b;
+    b = Graphics::Geom::AsIndexed<uint16_t>(a);
+
     { // Initialize
         ImGui::StyleColorsDark();
 

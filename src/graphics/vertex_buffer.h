@@ -66,7 +66,8 @@ namespace Graphics
         // First, binds storage for the same handle if necessary. Then sets attribute pointers if T is reflected, otherwise disables all attributes.
         // BindDraw(0) is a special case. It disables all attributes, and thus strips draw binding from currently bound buffer (if any).
         // `attributes` is effectively unused. We need it to compute attribute offsets.
-        template <typename T> static void BindDraw(GLuint handle, const T &attributes)
+        template <typename T>
+        static void BindDraw(GLuint handle, const T &attributes)
         {
             if (handle == 0) // Null handle is a special case.
             {
@@ -149,7 +150,8 @@ namespace Graphics
         }
     };
 
-    template <typename T> class VertexBuffer
+    template <typename T>
+    class VertexBuffer
     {
         static_assert(!std::is_void_v<T>, "Element type can't be void. Use uint8_t instead.");
 
@@ -263,22 +265,22 @@ namespace Graphics
             glBufferSubData(GL_ARRAY_BUFFER, offset, bytes, source);
         }
 
-        void Draw(DrawMode p, int offset, int count) const // Binds for drawing.
+        void Draw(DrawMode m, int offset, int count) const // Binds for drawing.
         {
             static_assert(is_reflected, "Element type of this buffer is not reflected, unable to draw.");
             DebugAssert("Attempt to use a null vertex buffer.", *this);
             if (!*this)
                 return;
             BindDraw();
-            glDrawArrays(p, offset, count);
+            glDrawArrays(m, offset, count);
         }
-        void Draw(DrawMode p, int count) const // Binds for drawing.
+        void Draw(DrawMode m, int count) const // Binds for drawing.
         {
-            Draw(p, 0, count);
+            Draw(m, 0, count);
         }
-        void Draw(DrawMode p) const // Binds for drawing.
+        void Draw(DrawMode m) const // Binds for drawing.
         {
-            Draw(p, 0, Size());
+            Draw(m, 0, Size());
         }
     };
 }
