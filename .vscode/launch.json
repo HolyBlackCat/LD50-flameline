@@ -11,6 +11,7 @@
             "target": "./imp-re.exe",
             "cwd": "${workspaceRoot}/bin",
             "valuesFormatting": "parseText",
+            "terminal": "",
         },
     ]
 }
