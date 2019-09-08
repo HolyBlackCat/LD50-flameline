@@ -6,6 +6,7 @@
 #include <memory>
 #include <numeric>
 #include <type_traits>
+#include <utility>
 #include <vector>
 
 #include "graphics/index_buffer.h"
@@ -111,11 +112,11 @@ namespace Graphics::Geom
       protected:
         void GetVerticesFlatLow(std::size_t begin, std::size_t end, vertex_t *dest) const override
         {
-            source.GetVerticesFlatLow(begin, end, dest);
+            source.GetVerticesFlat(begin, end, dest);
         }
         void GetVerticesLow(std::size_t begin, std::size_t end, vertex_t *dest) const override
         {
-            source.GetVerticesFlatLow(begin, end, dest);
+            source.GetVerticesFlat(begin, end, dest);
         }
         void GetIndicesLow(std::size_t begin, std::size_t end, index_t *dest, index_t base_index) const override
         {
@@ -125,9 +126,8 @@ namespace Graphics::Geom
 
       public:
         ViewNonIndexBased() {}
-        ViewNonIndexBased(const vertex_t *vertex_ptr, std::size_t vertex_count)
-            : source(vertex_ptr, vertex_count)
-        {}
+        ViewNonIndexBased(const vertex_t *vertex_ptr, std::size_t vertex_count) : source(vertex_ptr, vertex_count) {}
+        ViewNonIndexBased(const ViewIndexless<V> &source) : source(source) {}
 
         std::size_t VertexCountFlat() const override
         {
@@ -154,7 +154,7 @@ namespace Graphics::Geom
         using typename Base::index_t;
 
       private:
-        const index_t *vertex_ptr = nullptr;
+        const vertex_t *vertex_ptr = nullptr;
         std::size_t vertex_count = 0;
         const index_t *index_ptr = nullptr;
         std::size_t index_count = 0;
@@ -162,7 +162,12 @@ namespace Graphics::Geom
       protected:
         void GetVerticesFlatLow(std::size_t begin, std::size_t end, vertex_t *dest) const override
         {
-            source.GetVerticesFlatLow(begin, end, dest);
+            for (std::size_t i = begin; i < end; i++)
+            {
+                std::size_t index = index_ptr[i];
+                DebugAssert("Invalid vertex index.", index < vertex_count);
+                *dest++ = vertex_ptr[index];
+            }
         }
         void GetVerticesLow(std::size_t begin, std::size_t end, vertex_t *dest) const override
         {
@@ -170,13 +175,12 @@ namespace Graphics::Geom
         }
         void GetIndicesLow(std::size_t begin, std::size_t end, index_t *dest, index_t base_index) const override
         {
-            #error here
-            std::tra(index_ptr + begin, index_ptr + end, dest);
+            std::transform(index_ptr + begin, index_ptr + end, dest, [=](index_t index){return index + base_index;});
         }
 
       public:
         View() {}
-        View(const vertex_t *vertex_ptr, std::size_t vertex_count, const vertex_t *index_ptr, std::size_t index_count)
+        View(const vertex_t *vertex_ptr, std::size_t vertex_count, const index_t *index_ptr, std::size_t index_count)
             : vertex_ptr(vertex_ptr), vertex_count(vertex_count), index_ptr(index_ptr), index_count(index_count)
         {}
 
@@ -192,107 +196,7 @@ namespace Graphics::Geom
         {
             return index_count;
         }
-
-
-
-
-        void GetVerticesFlat(std::size_t begin, std::size_t end, vertex_t *dest) const override
-        {
-            DebugAssert("Invalid vertex range.", begin <= end && end <= index_count);
-            for (std::size_t i = begin; i < end; i++)
-            {
-                index_t index = index_ptr[i]
-                DebugAssert("Invalid vertex index.", index < vertex_count);
-                *dest++ = vertex_ptr[index];
-            }
-        }
-
-        std::size_t VertexCount() const override
-        {
-            return vertex_count;
-        }
-        std::size_t IndexCount() const override
-        {
-            return index_count;
-        }
-        void GetVertices(std::size_t begin, std::size_t end, vertex_t *dest) const override
-        {
-            source.GetVertices(begin, end, dest);
-        }
-        void GetIndices(std::size_t begin, std::size_t end, index_t *dest, index_t base_index) const override
-        {
-            DebugAssert("Invalid index range.", begin <= end && end <= index_count);
-            DebugAssert("Vertex index is too large for this type.", (end - begin - 1) + base_index <= std::numeric_limits<index_t>::max());
-            std::iota(dest + begin, dest + end, index_t(begin));
-        }
     };
-
-
-    template <typename T, CHECK(std::is_base_of_v<GenericProvider, T>)>
-    class AdapterIndexless : public ProviderIndexless<typename T::vertex_t>
-    {
-        static_assert(!std::is_const_v<T>);
-
-        const T &source;
-
-      public:
-        using vertex_t = typename T::vertex_t;
-
-        AdapterIndexless(const T &source) : source(source) {}
-
-        std::size_t VertexCount() const override
-        {
-            return source.IndexCount();
-        }
-        const vertex_t &GetVertex(std::size_t pos) const override
-        {
-            return source.GetVertex(source.GetIndex(pos));
-        }
-    };
-
-    template <typename T>
-    auto AsIndexless(const Provider<V, I> &source)
-    {
-        return AdapterIndexless<V>(source);
-    }
-
-    template <typename I, typename T, CHECK(std::is_base_of_v<GenericProviderIndexless, T>)>
-    class AdapterIndexed : public Provider<typename T::vertex_t, I>
-    {
-        static_assert(!std::is_const_v<T>);
-
-        const T &source;
-
-      public:
-        using vertex_t = typename T::vertex_t;
-        using index_t = I;
-
-        AdapterIndexed(const T &source) : source(source) {}
-
-        std::size_t VertexCount() const override
-        {
-            return source.VertexCount();
-        }
-        std::size_t IndexCount() const override
-        {
-            return source.VertexCount();
-        }
-        const vertex_t &GetVertex(std::size_t pos) const override
-        {
-            return source.GetVertex(pos);
-        }
-        index_t GetIndex(std::size_t pos) const override
-        {
-            return index_t(pos);
-        }
-    };
-
-    template <typename I, typename T>
-    auto AsIndexed(const T &source)
-    {
-        #error fix me and my sibling
-        return AdapterIndexed<I, ProviderIndexless<V>>(source);
-    }
 
 
     template <typename V>
@@ -303,12 +207,17 @@ namespace Graphics::Geom
 
         std::vector<vertex_t> vertices;
 
+        DataIndexless() {}
+        DataIndexless(std::vector<vertex_t> vertices) : vertices(std::move(vertices)) {}
+
         void Insert(const ProviderIndexless<V> &provider)
         {
-            std::size_t added_vertex_count = provider.Indexless_VertexCount();
-            vertices.reserve(vertices.size() + added_vertex_count);
-            for (std::size_t i = 0; i < added_vertex_count; i++)
-                vertices.push_back(provider.Indexless_GetVertex(i));
+            if (std::size_t added_vertex_count = provider.VertexCountFlat())
+            {
+                std::size_t old_vertex_count = vertices.size();
+                vertices.resize(vertices.size() + added_vertex_count);
+                provider.GetVerticesFlat(0, added_vertex_count, &vertices[old_vertex_count]);
+            }
         }
 
         operator ViewIndexless<V>() const
@@ -318,8 +227,10 @@ namespace Graphics::Geom
     };
 
     template <typename V, typename I>
-    class DataIndexed
+    class Data
     {
+        static_assert(is_valid_index_type_v<I>, "Invalid index type.");
+
       public:
         using vertex_t = V;
         using index_t = I;
@@ -327,17 +238,29 @@ namespace Graphics::Geom
         std::vector<vertex_t> vertices;
         std::vector<index_t> indices;
 
+        Data() {}
+
+        Data(std::vector<vertex_t> vertices, std::vector<index_t> indices) : vertices(vertices), indices(indices)
+        {
+            DebugAssert("Some indices provided for a geometry are out of range.", std::all_of(indices.begin(), indices.end(), [&](index_t index){return index < vertices.size();}));
+        }
+
         void Insert(const Provider<V, I> &provider)
         {
-            std::size_t added_vertex_count = provider.Indexed_VertexCount();
-            vertices.reserve(vertices.size() + added_vertex_count);
-            for (std::size_t i = 0; i < added_vertex_count; i++)
-                vertices.push_back(provider.Indexed_GetVertex(i));
+            std::size_t old_vertex_count = vertices.size();
 
-            std::size_t added_index_count = provider.Indexed_IndexCount();
-            indices.reserve(indices.size() + added_index_count);
-            for (std::size_t i = 0; i < added_index_count; i++)
-                indices.push_back(provider.Indexed_GetIndex(i));
+            if (std::size_t added_vertex_count = provider.VertexCount())
+            {
+                vertices.resize(vertices.size() + added_vertex_count);
+                provider.GetVertices(0, added_vertex_count, &vertices[old_vertex_count]);
+            }
+
+            if (std::size_t added_index_count = provider.IndexCount())
+            {
+                std::size_t old_index_count = indices.size();
+                indices.resize(indices.size() + added_index_count);
+                provider.GetIndices(0, added_index_count, &indices[old_index_count], old_vertex_count);
+            }
         }
 
         operator View<V, I>() const
@@ -354,9 +277,11 @@ namespace Graphics::Geom
         VertexBuffer<V> vertex_buffer;
 
       public:
+        using vertex_t = V;
+
         BufferIndexless() {}
-        BufferIndexless(const DataIndexless<V> &vertex_data, DrawMode mode, Usage usage = static_draw)
-            : mode(mode), vertex_buffer(vertex_data.vertices.size(), vertex_data.vertices.data(), usage)
+        BufferIndexless(const DataIndexless<V> &data, DrawMode mode, Usage usage = static_draw)
+            : mode(mode), vertex_buffer(data.vertices.size(), data.vertices.data(), usage)
         {}
 
         explicit operator bool() const
@@ -364,14 +289,14 @@ namespace Graphics::Geom
             return bool(vertex_buffer);
         }
 
-        void Draw()
+        void Draw() const
         {
             vertex_buffer.Draw(mode);
         }
     };
 
     template <typename V, typename I>
-    class BufferIndexed
+    class Buffer
     {
         static_assert(is_valid_index_type_v<I>, "Invalid index type.");
 
@@ -380,9 +305,12 @@ namespace Graphics::Geom
         IndexBuffer<I> index_buffer;
 
       public:
-        BufferIndexed() {}
-        BufferIndexed(const DataIndexed<V, I> &vertex_data, DrawMode mode, Usage usage = static_draw)
-            : mode(mode), vertex_buffer(vertex_data.vertices.size(), vertex_data.vertices.data(), usage), index_buffer(vertex_data.indices.size(), vertex_data.indices.data(), usage)
+        using vertex_t = V;
+        using index_t = I;
+
+        Buffer() {}
+        Buffer(const Data<V, I> &data, DrawMode mode, Usage usage = static_draw)
+            : mode(mode), vertex_buffer(data.vertices.size(), data.vertices.data(), usage), index_buffer(data.indices.size(), data.indices.data(), usage)
         {}
 
         explicit operator bool() const
@@ -390,7 +318,7 @@ namespace Graphics::Geom
             return bool(vertex_buffer);
         }
 
-        void Draw()
+        void Draw() const
         {
             index_buffer.Draw(vertex_buffer, mode);
         }
@@ -399,14 +327,233 @@ namespace Graphics::Geom
 
     enum Primitive
     {
-        points    = DrawMode::points,
-        lines     = DrawMode::lines,
-        triangles = DrawMode::triangles,
+        points    = 1,
+        lines     = 2,
+        triangles = 3,
     };
 
     template <typename V, Primitive P>
     class QueueIndexless
     {
+        std::vector<V> vertices;
+        VertexBuffer<V> vertex_buffer;
+        std::size_t vertex_pos = 0; // The amount of non-garbage vertices stored at the beginning of `vertices`. Vertices are inserted at this position.
 
+      public:
+        using vertex_t = V;
+
+        static constexpr Primitive primitive = P;
+
+        static constexpr DrawMode draw_mode = []
+        {
+            switch (primitive)
+            {
+                case points:    return DrawMode::points;
+                case lines:     return DrawMode::lines;
+                case triangles: return DrawMode::triangles;
+            }
+        }();
+
+        QueueIndexless() {}
+
+        QueueIndexless(std::size_t primitive_capacity)
+            : vertices(primitive_capacity * int(P)), vertex_buffer(primitive_capacity * int(P), nullptr, dynamic_draw)
+        {
+            DebugAssert("Invalid render queue capacity.", primitive_capacity > 0);
+        }
+
+        explicit operator bool() const
+        {
+            return bool(vertex_buffer);
+        }
+
+        std::size_t VertexCapacity() const
+        {
+            return vertices.size();
+        }
+        std::size_t UsedVertexCapacity() const
+        {
+            return vertex_pos;
+        }
+        std::size_t RemainingVertexCapacity() const
+        {
+            return VertexCapacity() - UsedVertexCapacity();
+        }
+
+        void Insert(const ProviderIndexless<V> &provider)
+        {
+            std::size_t vertices_provided = provider.VertexCountFlat();
+            if (vertices_provided == 0)
+                return;
+            DebugAssert("Inserted vertex count is not a multiple of the primitive size.", vertices_provided % int(P) == 0);
+
+            if (RemainingVertexCapacity() == 0)
+                Flush();
+
+            std::size_t vertices_inserted = 0;
+            while (1)
+            {
+                std::size_t segment_size = std::min(vertices_provided - vertices_inserted, RemainingVertexCapacity());
+                provider.GetVerticesFlat(vertices_inserted, vertices_inserted + segment_size, vertices.data() + vertex_pos);
+
+                vertices_inserted += segment_size;
+                vertex_pos += segment_size;
+
+                if (vertices_inserted == vertices_provided)
+                    break;
+                else
+                    Flush();
+            }
+        }
+
+        void Abort()
+        {
+            vertex_pos = 0;
+        }
+
+        void Flush()
+        {
+            if (vertex_pos == 0)
+                return;
+            vertex_buffer.SetDataPart(0, vertex_pos, vertices.data());
+            vertex_buffer.Draw(draw_mode, vertex_pos);
+            vertex_pos = 0;
+        }
+    };
+
+    template <typename V, typename I, Primitive P>
+    class Queue
+    {
+        std::vector<V> vertices;
+        VertexBuffer<V> vertex_buffer;
+        std::size_t vertex_pos = 0; // The amount of non-garbage vertices stored at the beginning of `vertices`. Vertices are inserted at this position.
+        std::size_t vertex_pos_uploaded = 0; // The amount of vertices from `vertices` currently uploaded to `vertex_buffer`. Can't be larger than `vertex_pos`.
+
+        std::vector<I> indices; // The amount of non-garbage indices stored at the beginning of `indices`. Vertices are inserted at this position.
+        IndexBuffer<I> index_buffer;
+        std::size_t index_pos = 0;
+
+        void FlushIndices()
+        {
+            if (index_pos == 0)
+                return;
+
+            if (vertex_pos_uploaded < vertex_pos)
+            {
+                vertex_buffer.SetDataPart(vertex_pos_uploaded, vertex_pos - vertex_pos_uploaded, vertices.data() + vertex_pos_uploaded);
+                vertex_pos_uploaded = vertex_pos;
+            }
+
+            index_buffer.SetDataPart(0, index_pos, indices.data());
+            index_buffer.Draw(vertex_buffer, draw_mode, index_pos);
+            index_pos = 0;
+        }
+
+      public:
+        using vertex_t = V;
+        using index_t = I;
+
+        static constexpr Primitive primitive = P;
+
+        static constexpr DrawMode draw_mode = []
+        {
+            switch (primitive)
+            {
+                case points:    return DrawMode::points;
+                case lines:     return DrawMode::lines;
+                case triangles: return DrawMode::triangles;
+            }
+        }();
+
+        Queue() {}
+
+        Queue(std::size_t vertex_capacity, std::size_t primitive_index_capacity)
+            : vertices(vertex_capacity), vertex_buffer(vertex_capacity, nullptr, dynamic_draw),
+            indices(primitive_index_capacity * int(P)), index_buffer(primitive_index_capacity * int(P), nullptr, dynamic_draw)
+        {
+            DebugAssert("Invalid render queue capacity.", vertex_capacity >= int(P) && primitive_index_capacity > 0);
+            DebugAssert("Render queue capacity is too large for this index type.", vertex_capacity - 1 <= std::numeric_limits<index_t>::max());
+        }
+
+        explicit operator bool() const
+        {
+            return bool(vertex_buffer);
+        }
+
+        std::size_t VertexCapacity() const
+        {
+            return vertices.size();
+        }
+        std::size_t UsedVertexCapacity() const
+        {
+            return vertex_pos;
+        }
+        std::size_t RemainingVertexCapacity() const
+        {
+            return VertexCapacity() - UsedVertexCapacity();
+        }
+
+        std::size_t IndexCapacity() const
+        {
+            return indices.size();
+        }
+        std::size_t UsedIndexCapacity() const
+        {
+            return index_pos;
+        }
+        std::size_t RemainingIndexCapacity() const
+        {
+            return IndexCapacity() - UsedIndexCapacity();
+        }
+
+        void Insert(const Provider<V, I> &provider)
+        {
+            std::size_t indices_provided = provider.IndexCount();
+            if (indices_provided == 0)
+                return;
+            DebugAssert("Inserted index count is not a multiple of the primitive size.", indices_provided % int(P) == 0);
+
+            std::size_t vertices_provided = provider.VertexCount();
+            if (vertices_provided > VertexCapacity())
+                Program::Error("Unable to insert geometry into a render queue: too many vertices.");
+
+            if (vertices_provided > RemainingVertexCapacity())
+                Flush();
+
+            index_t base_index = vertex_pos;
+
+            provider.GetVertices(0, vertices_provided, vertices.data() + vertex_pos);
+            vertex_pos += vertices_provided;
+
+            std::size_t indices_inserted = 0;
+            while (1)
+            {
+                std::size_t segment_size = std::min(indices_provided - indices_inserted, RemainingIndexCapacity());
+                provider.GetIndices(indices_inserted, indices_inserted + segment_size, indices.data() + index_pos, base_index);
+
+                indices_inserted += segment_size;
+                index_pos += segment_size;
+
+                if (indices_inserted == indices_provided)
+                    break;
+                else
+                    FlushIndices();
+            }
+        }
+
+        void Abort()
+        {
+            vertex_pos = 0;
+            vertex_pos_uploaded = 0;
+            index_pos = 0;
+        }
+
+        void Flush()
+        {
+            FlushIndices();
+
+            vertex_pos = 0;
+            vertex_pos_uploaded = 0;
+        }
     };
 }

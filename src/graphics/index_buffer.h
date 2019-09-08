@@ -170,21 +170,21 @@ namespace Graphics
         }
 
         template <typename V>
-        void Draw(const VertexBuffer<V> &buffer, DrawMode m, int offset, int count) // Binds this buffer (and well as the passed vertex buffer).
+        void Draw(const VertexBuffer<V> &buffer, DrawMode m, int offset, int count) const // Binds this buffer (and well as the passed vertex buffer).
         {
             buffer.BindDraw();
             DrawFromBoundBuffer(m, offset, count);
         }
 
         template <typename V>
-        void Draw(const VertexBuffer<V> &buffer, DrawMode m, int count) // Binds this buffer (and well as the passed vertex buffer).
+        void Draw(const VertexBuffer<V> &buffer, DrawMode m, int count) const // Binds this buffer (and well as the passed vertex buffer).
         {
             buffer.BindDraw();
             DrawFromBoundBuffer(m, count);
         }
 
         template <typename V>
-        void Draw(const VertexBuffer<V> &buffer, DrawMode m) // Binds this buffer (and well as the passed vertex buffer).
+        void Draw(const VertexBuffer<V> &buffer, DrawMode m) const // Binds this buffer (and well as the passed vertex buffer).
         {
             buffer.BindDraw();
             DrawFromBoundBuffer(m);
