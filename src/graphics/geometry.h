@@ -1,6 +1,7 @@
 #pragma once
 
 #include <algorithm>
+#include <array>
 #include <cstddef>
 #include <cstdint>
 #include <memory>
@@ -67,7 +68,30 @@ namespace Graphics::Geom
 
 
     template <typename V>
-    class ViewIndexless : public ProviderIndexless<V>
+    class ArrayProviderIndexless : public ProviderIndexless<V>
+    {
+      public:
+        using typename ProviderIndexless<V>::vertex_t;
+
+        const vertex_t *VertexPointerFlat() const = 0;
+    };
+
+    template <typename V, typename I>
+    class ArrayProvider : public Provider<V, I>
+    {
+        static_assert(is_valid_index_type_v<I>, "Invalid index type.");
+
+      public:
+        using typename Provider<V, I>::vertex_t;
+        using typename Provider<V, I>::index_t;
+
+        const vertex_t *VertexPointer() const = 0;
+        const index_t *IndexPointer() const = 0;
+    };
+
+
+    template <typename V>
+    class ViewIndexless : public ArrayProviderIndexless<V>
     {
         using Base = ProviderIndexless<V>;
 
@@ -93,6 +117,11 @@ namespace Graphics::Geom
         std::size_t VertexCountFlat() const override
         {
             return vertex_count;
+        }
+
+        const vertex_t *VertexPointerFlat() const override
+        {
+            return vertex_ptr;
         }
     };
 
@@ -144,7 +173,7 @@ namespace Graphics::Geom
     };
 
     template <typename V, typename I>
-    class View : public Provider<V, I>
+    class View : public ArrayProvider<V, I>
     {
         static_assert(is_valid_index_type_v<I>, "Invalid index type.");
         using Base = Provider<V, I>;
@@ -196,6 +225,15 @@ namespace Graphics::Geom
         {
             return index_count;
         }
+
+        const vertex_t *VertexPointer() const override
+        {
+            return vertex_ptr;
+        }
+        const index_t *IndexPointer() const override
+        {
+            return index_ptr;
+        }
     };
 
 
@@ -240,7 +278,7 @@ namespace Graphics::Geom
 
         Data() {}
 
-        Data(std::vector<vertex_t> vertices, std::vector<index_t> indices) : vertices(vertices), indices(indices)
+        Data(std::vector<vertex_t> vertices, std::vector<index_t> indices) : vertices(std::move(vertices)), indices(std::move(indices))
         {
             DebugAssert("Some indices provided for a geometry are out of range.", std::all_of(indices.begin(), indices.end(), [&](index_t index){return index < vertices.size();}));
         }
@@ -270,6 +308,46 @@ namespace Graphics::Geom
     };
 
 
+    template <typename V, std::size_t VN>
+    class DataFixedSizeIndexless
+    {
+      public:
+        using vertex_t = V;
+
+        std::array<vertex_t, VN> vertices;
+
+        DataFixedSizeIndexless() {}
+        DataFixedSizeIndexless(std::array<vertex_t, VN> vertices) : vertices(std::move(vertices)) {}
+
+        operator ViewIndexless<V>() const
+        {
+            return ViewIndexless<V>(vertices.data(), vertices.size());
+        }
+    };
+
+    template <typename V, std::size_t VN, typename I, std::size_t IN>
+    class DataFixedSize
+    {
+        static_assert(is_valid_index_type_v<I>, "Invalid index type.");
+
+      public:
+        using vertex_t = V;
+        using index_t = I;
+
+        std::array<vertex_t, VN> vertices;
+        std::array<index_t, IN> indices;
+
+        DataFixedSize() {}
+        DataFixedSize(std::array<vertex_t, VN> vertices, std::array<index_t, IN> indices)
+            : vertices(std::move(vertices)), indices(std::move(indices)) {}
+
+        operator View<V, I>() const
+        {
+            return View<V, I>(vertices.data(), vertices.size(), indices.data(), indices.size());
+        }
+    };
+
+
     template <typename V>
     class BufferIndexless
     {
@@ -280,8 +358,8 @@ namespace Graphics::Geom
         using vertex_t = V;
 
         BufferIndexless() {}
-        BufferIndexless(const DataIndexless<V> &data, DrawMode mode, Usage usage = static_draw)
-            : mode(mode), vertex_buffer(data.vertices.size(), data.vertices.data(), usage)
+        BufferIndexless(const ArrayProviderIndexless<V> &data, DrawMode mode, Usage usage = static_draw)
+            : mode(mode), vertex_buffer(data.VertexCountFlat(), data.VertexPointerFlat(), usage)
         {}
 
         explicit operator bool() const
@@ -309,8 +387,8 @@ namespace Graphics::Geom
         using index_t = I;
 
         Buffer() {}
-        Buffer(const Data<V, I> &data, DrawMode mode, Usage usage = static_draw)
-            : mode(mode), vertex_buffer(data.vertices.size(), data.vertices.data(), usage), index_buffer(data.indices.size(), data.indices.data(), usage)
+        Buffer(const ArrayProvider<V, I> &data, DrawMode mode, Usage usage = static_draw)
+            : mode(mode), vertex_buffer(data.VertexCount(), data.VertexPointer(), usage), index_buffer(data.IndexCount(), data.IndexPointer(), usage)
         {}
 
         explicit operator bool() const
