@@ -18,6 +18,7 @@ namespace Graphics::Renderers
             // factors.y: 0 - use color.a as alpha, 255 - use alpha from texture
             // factors.z: 0 - additive blending, 255 - regular blending
 
+            // Note that fields are declared in a weird order to improve packing.
             Reflect(Vertex)
             (
                 (fvec2)(pos)(={}),
@@ -28,32 +29,26 @@ namespace Graphics::Renderers
 
             Vertex() {}
 
-            Vertex(fvec2 pos, fvec4 color, fvec2 texcoord, fvec3 factors)
-                : pos(pos), texcoord(texcoord), color(iround(::clamp(color) * 255)), factors(iround(::clamp(factors) * 255))
+            Vertex(fvec2 pos, u8vec4 color, fvec2 texcoord, u8vec3 factors)
+                : pos(pos), texcoord(texcoord), color(color), factors(factors)
             {}
 
-            [[nodiscard]] static Vertex Raw(fvec2 pos, u8vec4 color, fvec2 texcoord, u8vec3 factors)
+            [[nodiscard]] static Vertex Raw(fvec2 pos, fvec4 color, fvec2 texcoord, fvec3 factors)
             {
-                Vertex ret;
-                ret.pos = pos;
-                ret.texcoord = texcoord;
-                ret.color = color;
-                ret.factors = factors;
+                return Vertex(pos, iround(::clamp(color) * 255), texcoord, iround(::clamp(factors) * 255));
             }
-
 
             [[nodiscard]] static Vertex Color(fvec2 pos, fvec3 color, float alpha = 1, float beta = 1)
             {
-                #error write those functions
-                return {pos, color.to_vec4(alpha), fvec2(0), fvec3(0, 0, beta)};
+                return Raw(pos, color.to_vec4(alpha), fvec2(0), fvec3(0, 0, beta));
             }
-            [[nodiscard]] static Vertex ColoredTexture(fvec2 pos, fvec2 texcoord, fvec3 color, float alpha = 1, float beta = 1)
+            [[nodiscard]] static Vertex Texture(fvec2 pos, fvec2 texcoord, float alpha = 1, float beta = 1)
             {
-                return {pos, color.to_vec4(0), texcoord, fvec3(0, alpha, beta)};
+                return Raw(pos, fvec4(0), texcoord, fvec3(0, alpha, beta));
             }
-            [[nodiscard]] static Vertex Colored(fvec2 pos, fvec4 color, float beta = 1)
+            [[nodiscard]] static Vertex ColoredTexture(fvec2 pos, float mixing_factor, fvec3 color, fvec2 texcoord, float alpha = 1, float beta = 1) // mixing_factor: 0 - color, 1 - texture
             {
-                return {pos, color, fvec2(0), fvec3(0, 0, beta)};
+                return Raw(pos, color.to_vec4(0), texcoord, fvec3(mixing_factor, alpha, beta));
             }
         };
 
@@ -92,18 +87,6 @@ namespace Graphics::Renderers
             shader.Bind();
             queue.Insert(provider);
             return *this;
-        }
-
-
-
-
-        [[nodiscard]] static VertexData SolidColor(fvec4 color, float beta = 1)
-        {
-            return {color, fvec3(0, 0, beta)};
-        }
-        [[nodiscard]] static VertexData ColoredTexture(fvec4 color, float beta = 1)
-        {
-            return {color.to_vec4(1), fvec3(0, )};
         }
     };
 }
