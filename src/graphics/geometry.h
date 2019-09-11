@@ -18,6 +18,8 @@
 
 namespace Graphics::Geom
 {
+    // Generic interface for vertex containers
+
     template <typename V>
     class ProviderIndexless : Meta::with_virtual_destructor<ProviderIndexless<V>>
     {
@@ -67,6 +69,8 @@ namespace Graphics::Geom
     };
 
 
+    // Generic interface for vertex containers with contiguous storage
+
     template <typename V>
     class ArrayProviderIndexless : public ProviderIndexless<V>
     {
@@ -89,6 +93,8 @@ namespace Graphics::Geom
         const index_t *IndexPointer() const = 0;
     };
 
+
+    // Implementations of `ArrayProvider[Indexless]` pointing to existing storage
 
     template <typename V>
     class ViewIndexless : public ArrayProviderIndexless<V>
@@ -237,6 +243,8 @@ namespace Graphics::Geom
     };
 
 
+    // Vectors of vertices convertible to `ArrayProvider[Indexless]`
+
     template <typename V>
     class DataIndexless
     {
@@ -308,6 +316,8 @@ namespace Graphics::Geom
     };
 
 
+    // Fixed-size arrays of vertices convertible to `ArrayProvider[Indexless]`
+
     template <typename V, std::size_t VN>
     class DataFixedSizeIndexless
     {
@@ -347,6 +357,8 @@ namespace Graphics::Geom
         }
     };
 
+
+    // Drawable buffers that can be constructed from `ArrayProvider[Indexless]`
 
     template <typename V>
     class BufferIndexless
@@ -402,6 +414,8 @@ namespace Graphics::Geom
         }
     };
 
+
+    // Rendering queues, accepting geometry from `Provider[Indexless]`
 
     enum Primitive
     {
