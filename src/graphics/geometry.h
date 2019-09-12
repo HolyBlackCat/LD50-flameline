@@ -77,7 +77,7 @@ namespace Graphics::Geom
       public:
         using typename ProviderIndexless<V>::vertex_t;
 
-        const vertex_t *VertexPointerFlat() const = 0;
+        virtual const vertex_t *VertexPointerFlat() const = 0;
     };
 
     template <typename V, typename I>
@@ -89,8 +89,8 @@ namespace Graphics::Geom
         using typename Provider<V, I>::vertex_t;
         using typename Provider<V, I>::index_t;
 
-        const vertex_t *VertexPointer() const = 0;
-        const index_t *IndexPointer() const = 0;
+        virtual const vertex_t *VertexPointer() const = 0;
+        virtual const index_t *IndexPointer() const = 0;
     };
 
 
@@ -307,6 +307,11 @@ namespace Graphics::Geom
                 indices.resize(indices.size() + added_index_count);
                 provider.GetIndices(0, added_index_count, &indices[old_index_count], old_vertex_count);
             }
+        }
+
+        void Insert(const ProviderIndexless<V> &provider)
+        {
+            Insert(ViewNonIndexBased<V, I>(provider));
         }
 
         operator View<V, I>() const
@@ -631,6 +636,11 @@ namespace Graphics::Geom
                 else
                     FlushIndices();
             }
+        }
+
+        void Insert(const ProviderIndexless<V> &provider)
+        {
+            Insert(ViewNonIndexBased<V, I>(provider));
         }
 
         void Abort()
