@@ -1,6 +1,8 @@
 #pragma once
 
+#include <algorithm>
 #include <memory>
+#include <string>
 #include <utility>
 
 #include <imgui.h>
@@ -98,7 +100,8 @@ namespace Interface
 
             bool frame_started = 0;
             bool frame_rendered = 0;
-            bool need_graphics_backend_reload = 0;
+
+            std::vector<std::function<void()>> execute_before_next_frame;
 
             Poly::Storage<GraphicsBackend> graphics_backend;
             // We need `unique_ptr` because ImGui stores the file name in the context as `const char *`, so the string has to remain valid even if the controller is moved.
@@ -172,8 +175,8 @@ namespace Interface
 
         void Activate()
         {
-            if (!data.context)
-                Program::Error("Attempt to use a null ImGui context.");
+            if (!*this)
+                Program::Error("Attempt to use a null ImGui controller.");
             ImGui::SetCurrentContext(data.context);
         }
 
@@ -221,14 +224,9 @@ namespace Interface
             Activate();
 
             if (data.frame_started)
-                ImGui::EndFrame();
-
-            if (data.need_graphics_backend_reload)
             {
-                if (!data.graphics_backend->Reload())
-                    Program::Error("Unable to reload ImGui OpenGL backend.");
-
-                data.need_graphics_backend_reload = 0;
+                ImGui::EndFrame();
+                data.frame_started = 0;
             }
 
             data.graphics_backend->NewFrame();
@@ -260,16 +258,24 @@ namespace Interface
 
             if (data.frame_rendered)
             {
-                // We never set `frame_rendered` back to 0. It's sole purpose is to avoid segfault on the first frame.
+                // Here we don't reset `frame_rendered` back to 0. Its sole purpose is to avoid segfault on the first frame.
                 data.graphics_backend->RenderFrame(ImGui::GetDrawData());
             }
         }
 
-        // Reload graphics backend at the beginning of next frame.
-        // Good for applying different font settings.
+        // Reload graphics backend.
+        // Good for updating font settings.
+        // Call this after rendering a frame, but before ticking.
         void ReloadGraphics()
         {
-            data.need_graphics_backend_reload = 1;
+            if (!*this)
+                Program::Error("Attempt to use a null ImGui controller.");
+
+            if (data.frame_started)
+                Program::Error("Unable to reload ImGui graphics backend now, frame rendering is in process.");
+
+            if (!data.graphics_backend->Reload())
+                Program::Error("Unable to reload ImGui graphics backend.");
         }
 
         // Load the default font.
@@ -321,6 +327,106 @@ namespace Interface
             Activate();
 
             ImGuiFreeType::BuildFontAtlas(ImGui::GetIO().Fonts, global_flags);
+        }
+
+        // Returns UTF8 code for a zero-width space.
+        static const char *ZeroWidthSpace()
+        {
+            return "\xe2\x80\x8b";
+        }
+
+        // Adds a zero-width space after each '#' in the string.
+        // ImGui treats "##" and "###" in widget titles in a special manner, use this function to prevent that.
+        // Don't forget to add zero-width space to the character ranges when loading your fonts.
+        static std::string EscapeStringForWidgetName(std::string source)
+        {
+            std::string ret;
+            ret.reserve(source.size() + std::count(source.begin(), source.end(), '#'));
+            for (char ch : source)
+            {
+                ret += ch;
+                if (ch == '#')
+                    ret += ZeroWidthSpace();
+            }
+            return ret;
+        }
+    };
+
+    // A helper class to configure your fonts interactively.
+    class ImGuiFreetypeFontConfigurator
+    {
+      public:
+        using load_fonts_func_t = std::function<void(Interface::ImGuiController &controller, int font_size, int freetype_flags)>;
+
+      private:
+        Interface::ImGuiController *controller = nullptr;
+        int font_size = 16;
+        int freetype_flags = 0;
+        load_fonts_func_t load_fonts_func;
+
+        bool should_reload = false;
+
+      public:
+        ImGuiFreetypeFontConfigurator() {}
+
+        // Calls the callback immediately. Also saves it, and calls it whenever font settings change.
+        // Example callback:
+        //     controller.LoadFont("assets/SourceSansPro-Regular.ttf", font_size, adjust(ImFontConfig{}, RasterizerFlags = freetype_flags));
+        //     controller.LoadDefaultFont();
+        //     controller.RenderFontsWithFreetype();
+        ImGuiFreetypeFontConfigurator(Interface::ImGuiController &controller_ref, int font_size, ImGuiFreeType::RasterizerFlags default_flags, load_fonts_func_t new_func)
+            : controller(&controller_ref), font_size(font_size), freetype_flags(default_flags), load_fonts_func(std::move(new_func))
+        {
+            load_fonts_func(*controller, font_size, freetype_flags);
+        }
+
+        explicit operator bool() const
+        {
+            return bool(controller);
+        }
+
+        // Draws the gui.
+        void ShowWindow()
+        {
+            DebugAssert("Attempt to use a null instance of ImGuiFreetypeFontConfigurator.", *this);
+            if (!*this)
+                return;
+
+            constexpr const char *flag_names[] = {"No hinting", "No auto-hint", "Force auto-hint", "Light hinting", "Mono hinting", "Bold", "Oblique", "Monochrome"};
+
+            if (ImGui::Begin("Font config"))
+            {
+                if (ImGui::InputInt("Font size", &font_size, 1, 4))
+                    should_reload = true;
+
+                int this_flag = 1;
+                for (const auto &flag_name : flag_names)
+                {
+                    bool checkbox = freetype_flags & this_flag;
+                    if (ImGui::Checkbox(flag_name, &checkbox))
+                        should_reload = true;
+
+                    freetype_flags = (freetype_flags & ~this_flag) | (this_flag * checkbox);
+
+                    this_flag <<= 1;
+                }
+            }
+
+            ImGui::End();
+        }
+
+        // Updates font settings.
+        // Call this before the tick loop, or after rendering.
+        void UpdateFontsIfNecessary()
+        {
+            if (!should_reload)
+                return;
+
+            controller->RemoveAllFonts();
+            load_fonts_func(*controller, font_size, freetype_flags);
+            controller->ReloadGraphics();
+
+            should_reload = false;
         }
     };
 }
