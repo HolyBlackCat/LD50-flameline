@@ -525,14 +525,14 @@ clean: __no_mode_needed
 # Public: erase files for the current build mode, including precompiled headers but not including the executable.
 .PHONY: clean_mode
 clean_mode: __check_mode
-	@$(call echo,[Cleaning] Mode '$(mode)')
+	@$(call echo,[Cleaning] Mode '$(current_mode)')
 	@$(call rmdir,$(OBJECT_DIR))
 	@$(call echo,[Done])
 
 # Public: clean precompiled headers for the current build mode.
 .PHONY: clean_pch
 clean_pch: __check_mode
-	@$(call echo,[Cleaning] PCH for mode '$(mode)') $(foreach x,$(compiled_headers),&& $(call rmfile,$x))
+	@$(call echo,[Cleaning] PCH for mode '$(current_mode)') $(foreach x,$(compiled_headers),&& $(call rmfile,$x))
 	@$(call echo,[Done])
 
 # Public: clean absolutely everything.
