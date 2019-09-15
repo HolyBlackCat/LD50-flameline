@@ -16,6 +16,7 @@
 #include "program/exit.h"
 #include "reflection/complete.h"
 #include "utils/adjust.h"
+#include "utils/check.h"
 #include "utils/clock.h"
 #include "utils/format.h"
 #include "utils/meta.h"
