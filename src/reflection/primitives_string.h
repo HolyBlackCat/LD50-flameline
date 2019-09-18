@@ -69,7 +69,7 @@ namespace Refl::Custom
                     ret += '\\';
                     ret += esc;
                 }
-                else if (ch < ' ' || ch >= 0x7f)
+                else if ((unsigned char)ch < ' ' || ch == 0x7f)
                 {
                     ret += "\\x";
                     ret += _to_hex_digit((unsigned char)ch >> 4);
