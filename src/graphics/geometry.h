@@ -254,7 +254,13 @@ namespace Graphics::Geom
         std::vector<vertex_t> vertices;
 
         DataIndexless() {}
+
         DataIndexless(std::vector<vertex_t> vertices) : vertices(std::move(vertices)) {}
+
+        DataIndexless(const ProviderIndexless<V> &provider)
+        {
+            Insert(provider);
+        }
 
         void Insert(const ProviderIndexless<V> &provider)
         {
@@ -289,6 +295,11 @@ namespace Graphics::Geom
         Data(std::vector<vertex_t> vertices, std::vector<index_t> indices) : vertices(std::move(vertices)), indices(std::move(indices))
         {
             DebugAssert("Some indices provided for a geometry are out of range.", std::all_of(indices.begin(), indices.end(), [&](index_t index){return index < vertices.size();}));
+        }
+
+        Data(const Provider<V, I> &provider)
+        {
+            Insert(provider);
         }
 
         void Insert(const Provider<V, I> &provider)

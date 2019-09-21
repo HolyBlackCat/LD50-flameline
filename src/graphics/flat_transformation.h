@@ -122,9 +122,6 @@ namespace Graphics
 
         struct Funcs
         {
-            Funcs() = delete;
-            ~Funcs() = delete;
-
             [[nodiscard]] static constexpr auto identity()
             {
                 return Expr(IdentityMatrix{}, ZeroOffset{});
@@ -152,6 +149,10 @@ namespace Graphics
             [[nodiscard]] static constexpr auto flip_y(bool flip = true)
             {
                 return scale(vector_t(1, flip ? -1 : 1));
+            }
+            [[nodiscard]] static constexpr auto matrix(matrix_t m)
+            {
+                return Expr(Matrix(m), ZeroOffset{});
             }
         };
     };

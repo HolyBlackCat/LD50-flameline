@@ -1,6 +1,7 @@
 #pragma once
 
 #include "graphics/blending.h"
+#include "graphics/flat_transformation.h"
 #include "graphics/geometry.h"
 #include "graphics/shader.h"
 #include "program/errors.h"
@@ -9,9 +10,7 @@
 
 namespace Graphics::Renderers
 {
-
-
-    class Flat
+    class Flat : public TransformFlat<float>::Funcs
     {
       public:
         struct Vertex
