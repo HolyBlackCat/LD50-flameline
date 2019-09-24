@@ -24,6 +24,7 @@ CXXFLAGS := -Wall -Wextra -pedantic-errors -std=c++2a
 LDFLAGS :=
 # Important flags
 override CXXFLAGS += -include src/utils/common.h -include src/program/parachute.h -Isrc -Ilib/include $(subst -Dmain,-DENTRY_POINT,$(sort $(deps_compiler_flags)))
+override CXXFLAGS += -Ilib/include/cglfl_gl3.2_core # OpenGL version
 override LDFLAGS += $(filter-out -mwindows,$(deps_linker_flags))
 
 # Build modes
@@ -41,7 +42,7 @@ $(mode_flags) LDFLAGS += -mwindows
 endif
 
 # File-specific flags
-FILE_SPECIFIC_FLAGS := lib/implementation.cpp lib/glfl.cpp > -g0 -O3
+FILE_SPECIFIC_FLAGS := lib/implementation.cpp lib/cglfl.cpp > -g0 -O3
 
 # Precompiled headers
 PRECOMPILED_HEADERS := src/game/*.cpp > src/game/master.hpp

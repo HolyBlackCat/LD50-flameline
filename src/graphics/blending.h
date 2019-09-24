@@ -1,6 +1,6 @@
 #pragma once
 
-#include <GLFL/glfl.h>
+#include <cglfl/cglfl.hpp>
 
 namespace Graphics::Blending
 {
@@ -21,24 +21,22 @@ namespace Graphics::Blending
         constant_a           = GL_CONSTANT_ALPHA,
         one_minus_constant_a = GL_ONE_MINUS_CONSTANT_ALPHA,
         src_a_saturate       = GL_SRC_ALPHA_SATURATE,
-        OnPlatform(PC)
-        (
-            src1             = GL_SRC1_COLOR,
-            one_minus_src1   = GL_ONE_MINUS_SRC1_COLOR,
-            src1_a           = GL_SRC1_ALPHA,
-            one_minus_src1_a = GL_ONE_MINUS_SRC1_ALPHA,
-        )
+        #ifdef GL_SRC1_COLOR
+        src1                 = GL_SRC1_COLOR,
+        one_minus_src1       = GL_ONE_MINUS_SRC1_COLOR,
+        src1_a               = GL_SRC1_ALPHA,
+        one_minus_src1_a     = GL_ONE_MINUS_SRC1_ALPHA,
+        #endif
     };
     enum Equations
     {
         eq_add              = GL_FUNC_ADD,
         eq_subtract         = GL_FUNC_SUBTRACT,
         eq_reverse_subtract = GL_FUNC_REVERSE_SUBTRACT,
-        OnPlatform(PC)
-        (
-            eq_min          = GL_MIN,
-            eq_max          = GL_MAX,
-        )
+        #ifdef GL_MIN
+        eq_min          = GL_MIN,
+        eq_max          = GL_MAX,
+        #endif
     };
 
     // Func(a,b) and Equation(a) set same parameters for both color and alpha.

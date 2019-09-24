@@ -3,7 +3,7 @@
 #include <type_traits>
 #include <utility>
 
-#include <GLFL/glfl.h>
+#include <cglfl/cglfl.hpp>
 
 #include "program/errors.h"
 #include "reflection/complete.h"

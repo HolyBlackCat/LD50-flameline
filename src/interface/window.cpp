@@ -1,6 +1,6 @@
 #include "window.h"
 
-#include <GLFL/glfl.h>
+#include <cglfl/cglfl.hpp>
 
 #include "program/errors.h"
 #include "utils/finally.h"
@@ -272,11 +272,7 @@ namespace Interface
         SDL_GetWindowSize(data.handle, &data.size.x, &data.size.y);
 
         // Load OpenGL functions
-        glfl::set_function_loader(SDL_GL_GetProcAddress);
-        if (settings.gl_profile != Profile::es)
-            glfl::load_gl(settings.gl_major, settings.gl_minor);
-        else
-            glfl::load_gles(settings.gl_major, settings.gl_minor);
+        cglfl::load(SDL_GL_GetProcAddress);
 
         // Allocate input times array
         data.input_times = std::vector<InputTimes>(Input::IndexCount);

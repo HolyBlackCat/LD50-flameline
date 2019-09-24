@@ -1,3 +1,6 @@
+#include <cglfl/cglfl.hpp>
+#if CGLFL_GL_MAJOR > 2 || defined(CGLFL_GL_API_gles)
+
 // dear imgui: Renderer for modern OpenGL with shaders / programmatic pipeline
 // - Desktop GL: 3.x 4.x
 // - Embedded GL: ES 2.0 (WebGL 1.0), ES 3.0 (WebGL 2.0)
@@ -196,7 +199,7 @@ static void ImGui_ImplOpenGL3_SetupRenderState(ImDrawData* draw_data, int fb_wid
 #endif
 
     (void)vertex_array_object;
-#ifndef GL_VERTEX_ARRAY_BINDING
+#ifdef GL_VERTEX_ARRAY_BINDING
     if (glBindVertexArray)
         glBindVertexArray(vertex_array_object);
 #endif
@@ -234,7 +237,7 @@ void    ImGui_ImplOpenGL3_RenderDrawData(ImDrawData* draw_data)
         glGetIntegerv(GL_SAMPLER_BINDING, &last_sampler);
 #endif
     GLint last_array_buffer; glGetIntegerv(GL_ARRAY_BUFFER_BINDING, &last_array_buffer);
-#ifndef GL_VERTEX_ARRAY_BINDING
+#ifdef GL_VERTEX_ARRAY_BINDING
     GLint last_vertex_array_object;
     if (glBindVertexArray)
         glGetIntegerv(GL_VERTEX_ARRAY_BINDING, &last_vertex_array_object);
@@ -271,7 +274,7 @@ void    ImGui_ImplOpenGL3_RenderDrawData(ImDrawData* draw_data)
     // Recreate the VAO every time (this is to easily allow multiple GL contexts to be rendered to. VAO are not shared among GL contexts)
     // The renderer would actually work without any VAO bound, but then our VertexAttrib calls would overwrite the default one currently bound.
     GLuint vertex_array_object = 0;
-#ifndef GL_VERTEX_ARRAY_BINDING
+#ifdef GL_VERTEX_ARRAY_BINDING
     if (glBindVertexArray)
         glGenVertexArrays(1, &vertex_array_object);
 #endif
@@ -321,7 +324,7 @@ void    ImGui_ImplOpenGL3_RenderDrawData(ImDrawData* draw_data)
 
                     // Bind texture, Draw
                     glBindTexture(GL_TEXTURE_2D, (GLuint)(intptr_t)pcmd->TextureId);
-#if IMGUI_IMPL_OPENGL_HAS_DRAW_WITH_BASE_VERTEX
+#ifdef glDrawElementsBaseVertex
                     glDrawElementsBaseVertex(GL_TRIANGLES, (GLsizei)pcmd->ElemCount, sizeof(ImDrawIdx) == 2 ? GL_UNSIGNED_SHORT : GL_UNSIGNED_INT, (void*)(intptr_t)(pcmd->IdxOffset * sizeof(ImDrawIdx)), (GLint)pcmd->VtxOffset);
 #else
                     glDrawElements(GL_TRIANGLES, (GLsizei)pcmd->ElemCount, sizeof(ImDrawIdx) == 2 ? GL_UNSIGNED_SHORT : GL_UNSIGNED_INT, (void*)(intptr_t)(pcmd->IdxOffset * sizeof(ImDrawIdx)));
@@ -332,7 +335,7 @@ void    ImGui_ImplOpenGL3_RenderDrawData(ImDrawData* draw_data)
     }
 
     // Destroy the temporary VAO
-#ifndef GL_VERTEX_ARRAY_BINDING
+#ifdef GL_VERTEX_ARRAY_BINDING
     if (glBindVertexArray)
         glDeleteVertexArrays(1, &vertex_array_object);
 #endif
@@ -345,7 +348,7 @@ void    ImGui_ImplOpenGL3_RenderDrawData(ImDrawData* draw_data)
         glBindSampler(0, last_sampler);
 #endif
     glActiveTexture(last_active_texture);
-#ifndef GL_VERTEX_ARRAY_BINDING
+#ifdef GL_VERTEX_ARRAY_BINDING
     if (glBindVertexArray)
         glBindVertexArray(last_vertex_array_object);
 #endif
@@ -459,7 +462,7 @@ bool    ImGui_ImplOpenGL3_CreateDeviceObjects()
     GLint last_texture, last_array_buffer;
     glGetIntegerv(GL_TEXTURE_BINDING_2D, &last_texture);
     glGetIntegerv(GL_ARRAY_BUFFER_BINDING, &last_array_buffer);
-#ifndef GL_VERTEX_ARRAY_BINDING
+#ifdef GL_VERTEX_ARRAY_BINDING
     GLint last_vertex_array;
     if (glBindVertexArray)
         glGetIntegerv(GL_VERTEX_ARRAY_BINDING, &last_vertex_array);
@@ -627,7 +630,7 @@ bool    ImGui_ImplOpenGL3_CreateDeviceObjects()
     // Restore modified GL state
     glBindTexture(GL_TEXTURE_2D, last_texture);
     glBindBuffer(GL_ARRAY_BUFFER, last_array_buffer);
-#ifndef GL_VERTEX_ARRAY_BINDING
+#ifdef GL_VERTEX_ARRAY_BINDING
     if (glBindVertexArray)
         glBindVertexArray(last_vertex_array);
 #endif
@@ -654,3 +657,4 @@ void    ImGui_ImplOpenGL3_DestroyDeviceObjects()
 
     ImGui_ImplOpenGL3_DestroyFontsTexture();
 }
+#endif

@@ -4,7 +4,7 @@
 #include <utility>
 #include <vector>
 
-#include <GLFL/glfl.h>
+#include <cglfl/cglfl.hpp>
 
 #include "graphics/texture.h"
 #include "program/errors.h"
@@ -13,6 +13,11 @@
 
 namespace Graphics
 {
+    #if defined(GL_FRAMEBUFFER_BINDING) || defined(GL_DRAW_FRAMEBUFFER_BINDING)
+    #  define IMP_RE_HAVE_FRAMEBUFFERS
+    #endif
+
+    #ifdef IMP_RE_HAVE_FRAMEBUFFERS
     class FrameBuffer
     {
         struct Data
@@ -23,6 +28,13 @@ namespace Graphics
         Data data;
 
         inline static GLuint binding = 0;
+
+        static constexpr GLenum binding_point =
+        #ifdef GL_DRAW_FRAMEBUFFER
+            GL_DRAW_FRAMEBUFFER;
+        #else
+            GL_FRAMEBUFFER;
+        #endif
 
         struct Attachment
         {
@@ -63,10 +75,12 @@ namespace Graphics
         {
             Attach(att);
         }
+        #ifdef glDrawBuffers
         FrameBuffer(const std::vector<Attachment> &att) : FrameBuffer(nullptr)
         {
             Attach(att);
         }
+        #endif
 
         FrameBuffer(FrameBuffer &&other) noexcept : data(std::exchange(other.data, {})) {}
         FrameBuffer &operator=(FrameBuffer other) noexcept
@@ -97,7 +111,7 @@ namespace Graphics
         {
             if (binding == handle)
                 return;
-            glBindFramebuffer(GL_DRAW_FRAMEBUFFER, handle);
+            glBindFramebuffer(binding_point, handle);
             binding = handle;
         }
 
@@ -127,13 +141,15 @@ namespace Graphics
             Bind();
             FINALLY( BindHandle(old_binding); )
 
-            glFramebufferTexture2D(GL_DRAW_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, att.type, att.handle, 0);
-            OnPlatform(PC)( glDrawBuffer(GL_COLOR_ATTACHMENT0); )
+            glFramebufferTexture2D(binding_point, GL_COLOR_ATTACHMENT0, att.type, att.handle, 0);
+            #ifdef glDrawBuffer
+            glDrawBuffer(GL_COLOR_ATTACHMENT0);
+            #endif
 
             return std::move(*this);
         }
 
-        OnPlatform(PC)(
+        #ifdef glDrawBuffers
         FrameBuffer &&Attach(const std::vector<Attachment> &att) // Old non-depth attachments are discarded.
         {
             DebugAssert("Attempt to use a null framebuffer.", *this);
@@ -144,17 +160,16 @@ namespace Graphics
             Bind();
             FINALLY( BindHandle(old_binding); )
 
+            for (size_t i = 0; i < att.size(); i++)
+                glFramebufferTexture2D(binding_point, GL_COLOR_ATTACHMENT0 + i, att[i].type, att[i].handle, 0);
+
             std::vector<GLenum> draw_buffers(att.size());
             std::iota(draw_buffers.begin(), draw_buffers.end(), GL_COLOR_ATTACHMENT0);
-
-            for (size_t i = 0; i < att.size(); i++)
-                glFramebufferTexture2D(GL_DRAW_FRAMEBUFFER, GL_COLOR_ATTACHMENT0 + i, att[i].type, att[i].handle, 0);
-
             glDrawBuffers(draw_buffers.size(), draw_buffers.data());
 
             return std::move(*this);
         }
-        )
+        #endif
 
         FrameBuffer &&AttachDepth(Attachment att)
         {
@@ -166,7 +181,7 @@ namespace Graphics
             Bind();
             FINALLY( BindHandle(old_binding); )
 
-            glFramebufferTexture2D(GL_DRAW_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, att.type, att.handle, 0);
+            glFramebufferTexture2D(binding_point, GL_DEPTH_ATTACHMENT, att.type, att.handle, 0);
 
             return std::move(*this);
         }
@@ -181,29 +196,40 @@ namespace Graphics
             Bind();
             FINALLY( BindHandle(old_binding); )
 
-            switch (glCheckFramebufferStatus(GL_DRAW_FRAMEBUFFER))
+            switch (glCheckFramebufferStatus(binding_point))
             {
               case GL_FRAMEBUFFER_COMPLETE:
                 return std::move(*this);
-              case GL_FRAMEBUFFER_UNDEFINED:
-                Program::Error("Bad framebuffer status: Undefined.");
               case GL_FRAMEBUFFER_INCOMPLETE_ATTACHMENT:
                 Program::Error("Bad framebuffer status: Incomplete (attachment).");
               case GL_FRAMEBUFFER_INCOMPLETE_MISSING_ATTACHMENT:
                 Program::Error("Bad framebuffer status: Incomplete (missing attachment).");
-              case GL_FRAMEBUFFER_INCOMPLETE_DRAW_BUFFER:
-                Program::Error("Bad framebuffer status: Incomplete (draw buffer).");
-              case GL_FRAMEBUFFER_INCOMPLETE_READ_BUFFER:
-                Program::Error("Bad framebuffer status: Incomplete (read buffer).");
               case GL_FRAMEBUFFER_UNSUPPORTED:
                 Program::Error("Bad framebuffer status: Incomplete (unsupported).");
+                #ifdef GL_FRAMEBUFFER_UNDEFINED
+              case GL_FRAMEBUFFER_UNDEFINED:
+                Program::Error("Bad framebuffer status: Undefined.");
+                #endif
+                #ifdef GL_FRAMEBUFFER_INCOMPLETE_DRAW_BUFFER
+              case GL_FRAMEBUFFER_INCOMPLETE_DRAW_BUFFER:
+                Program::Error("Bad framebuffer status: Incomplete (draw buffer).");
+                #endif
+                #ifdef GL_FRAMEBUFFER_INCOMPLETE_READ_BUFFER
+              case GL_FRAMEBUFFER_INCOMPLETE_READ_BUFFER:
+                Program::Error("Bad framebuffer status: Incomplete (read buffer).");
+                #endif
+                #ifdef GL_FRAMEBUFFER_INCOMPLETE_MULTISAMPLE
               case GL_FRAMEBUFFER_INCOMPLETE_MULTISAMPLE:
                 Program::Error("Bad framebuffer status: Incomplete (multisample).");
+                #endif
+                #ifdef GL_FRAMEBUFFER_INCOMPLETE_LAYER_TARGETS
               case GL_FRAMEBUFFER_INCOMPLETE_LAYER_TARGETS:
                 Program::Error("Bad framebuffer status: Incomplete (layer targets).");
+                #endif
               default:
                 Program::Error("Bad framebuffer status: Unknown.");
             }
         }
     };
+    #endif
 }

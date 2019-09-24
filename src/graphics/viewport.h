@@ -1,6 +1,6 @@
 #pragma once
 
-#include <GLFL/glfl.h>
+#include <cglfl/cglfl.hpp>
 
 #include "utils/mat.h"
 

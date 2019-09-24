@@ -4,7 +4,7 @@
 #include <type_traits>
 #include <utility>
 
-#include <GLFL/glfl.h>
+#include <cglfl/cglfl.hpp>
 
 #include "graphics/vertex_buffer.h"
 #include "program/errors.h"

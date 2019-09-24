@@ -95,4 +95,4 @@ namespace ImGui
 }
 */
 
-#define IMGUI_IMPL_OPENGL_LOADER_CUSTOM <GLFL/glfl.h>
+#define IMGUI_IMPL_OPENGL_LOADER_CUSTOM <cglfl/cglfl.hpp>

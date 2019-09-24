@@ -9,6 +9,8 @@
 #include "interface/window.h"
 #include "reflection/complete.h"
 
+#ifdef IMP_RE_HAVE_FRAMEBUFFERS
+
 struct AdaptiveViewport::Data
 {
     ReflectStruct(ShaderAttribs,(
@@ -120,3 +122,4 @@ const AdaptiveViewport::Details &AdaptiveViewport::GetDetails() const
 {
     return data->details;
 }
+#endif

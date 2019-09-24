@@ -6,6 +6,7 @@
 #include <utility>
 #include <vector>
 
+#include <cglfl/cglfl.hpp>
 #include <SDL.h>
 
 #include "input/enum.h"
@@ -35,8 +36,19 @@ namespace Interface
         bool fixed_size = 0;
         int display = 0;
 
-        int gl_major = 3, gl_minor = 2; // 0,0 = don't care.
-        Profile gl_profile = Profile::core;
+        int gl_major = CGLFL_GL_MAJOR, gl_minor = CGLFL_GL_MINOR; // 0,0 = don't care.
+
+        Profile gl_profile =
+        #if defined(CGLFL_GL_API_gles)
+            Profile::es;
+        #elif defined(CGLFL_GL_PROFILE_core)
+            Profile::core;
+        #elif defined(CGLFL_GL_PROFILE_compat)
+            Profile::compat;
+        #else
+            Profile::any;
+        #endif
+
         bool gl_debug = 0;
         VSync vsync = VSync::adaptive;
         YesOrNo hw_accelerated = dont_care;
