@@ -106,7 +106,7 @@ namespace Poly
 
     template <typename T, typename UserData = DefaultData<T>>
     class Storage
-        : Meta::copyable_if<std::is_copy_constructible_v<T> || Meta::is_detected<DetectDataFlag_fake_copying, UserData>>
+        : Meta::copyable_if<Storage<T, UserData>, std::is_copy_constructible_v<T> || Meta::is_detected<DetectDataFlag_fake_copying, UserData>>
     {
         static_assert(!std::is_const_v<T> && !std::is_volatile_v<T>, "The template parameter has to have no cv-qualifiers.");
         static_assert(std::is_class_v<T>, "The template parameter has to be a structure or a class.");

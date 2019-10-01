@@ -4,12 +4,18 @@
 #include <type_traits>
 #include <utility>
 
+#include "check.h"
+
 namespace Meta
 {
+    // Tag dispatch helpers.
+
     template <typename T> struct tag {using type = T;};
     template <typename...> struct type_list {};
     template <auto...> struct value_list {};
 
+
+    // Dependent values and types, good for `static_asserts` and SFINAE.
 
     namespace impl
     {
@@ -25,9 +31,13 @@ namespace Meta
     template <typename A, typename ...B> using void_type = type<void, A, B...>;
 
 
+    // Lambda overloader.
+
     template <typename ...P> struct overload : P... { using P::operator()...; };
     template <typename ...P> overload(P...) -> overload<P...>;
 
+
+    // Copy cv-qualifiers from one type to another.
 
     namespace impl
     {
@@ -40,6 +50,8 @@ namespace Meta
     template <typename A, typename B> using copy_qualifiers = typename impl::copy_qualifiers<A, B>::type;
 
 
+    // Pre-C++20 replacement for `std::is_detected_v`.
+
     namespace impl
     {
         template <typename DummyVoid, template <typename...> typename A, typename ...B> struct is_detected : std::false_type {};
@@ -48,6 +60,8 @@ namespace Meta
 
     template <template <typename...> typename A, typename ...B> inline constexpr bool is_detected = impl::is_detected<void, A, B...>::value;
 
+
+    // Constexpr replacement for the for loop.
 
     template <typename Integer, Integer ...I, typename F> constexpr void cexpr_for_each(std::integer_sequence<Integer, I...>, F &&func)
     {
@@ -62,6 +76,8 @@ namespace Meta
         }
     }
 
+
+    // Helper functions to generate sequences of values by invoking lambdas with constexpr indices as parameters.
 
     template <typename T, typename Integer, Integer ...I, typename F> constexpr auto cexpr_generate_from_seq(std::integer_sequence<Integer, I...>, F &&func)
     {
@@ -90,19 +106,76 @@ namespace Meta
     }
 
 
-    template <bool C> struct copyable_if {};
+    // Invoke a funciton with a set of constexpr-ized boolean flags.
+    // (Beware that 2^n instantinations of the function will be generated.)
+    // Example usage:
+    //     T result = Meta::cexpr_flags(0,1,1) >> [](auto a, auto b, auto c) {return a.value + b.value + c.value};
 
-    template <> struct copyable_if<0>
+    namespace impl
     {
-        copyable_if() noexcept = default;
+        template <typename F, unsigned int ...I>
+        constexpr decltype(auto) cexpr_flags(unsigned int flags, F &&func, std::integer_sequence<unsigned int, I...>)
+        {
+            static_assert(sizeof...(I) <= sizeof(unsigned int) * 8);
+            constexpr unsigned int func_count = (unsigned int)1 << (unsigned int)(sizeof...(I));
+            return cexpr_generate_array<func_count>([](auto index) -> decltype(auto)
+            {
+                constexpr auto i = index.value;
+                return +[](F &&func) -> decltype(auto)
+                {
+                    return std::forward<F>(func)(std::bool_constant<bool(i & (1 << I))>{}...);
+                };
+            })[flags](std::forward<F>(func));
+        }
+
+        template <typename L>
+        class cexpr_flags_expr
+        {
+            L lambda;
+          public:
+            constexpr cexpr_flags_expr(L lambda) : lambda(lambda) {}
+
+            template <typename F>
+            constexpr decltype(auto) operator>>(F &&func) const
+            {
+                return lambda(std::forward<F>(func));
+            }
+        };
+    }
+
+    template <typename ...P, CHECK(std::is_convertible_v<const P &, bool> && ...)>
+    [[nodiscard]] constexpr auto cexpr_flags(const P &... params)
+    {
+        unsigned int flags = 0, mask = 1;
+        ((flags |= mask * bool(params), mask <<= 1) , ...);
+
+        auto lambda = [flags](auto &&func) -> decltype(auto)
+        {
+            return impl::cexpr_flags(flags, decltype(func)(func), std::make_integer_sequence<unsigned int, sizeof...(P)>{});
+        };
+
+        return impl::cexpr_flags_expr{lambda};
+    }
+
+
+    // Conditionally copyable/movable base class.
+
+    template <typename T, bool C> struct copyable_if {};
+
+    template <typename T> struct copyable_if<T, 0>
+    {
+        // Here we use CRTP to make sure the empty base class optimization is never defeated.
+        constexpr copyable_if() noexcept = default;
         ~copyable_if() noexcept = default;
-        copyable_if(copyable_if &&) noexcept = default;
-        copyable_if &operator=(copyable_if &&) noexcept = default;
+        constexpr copyable_if(copyable_if &&) noexcept = default;
+        constexpr copyable_if &operator=(copyable_if &&) noexcept = default;
 
         copyable_if(const copyable_if &) noexcept = delete;
         copyable_if &operator=(const copyable_if &) noexcept = delete;
     };
 
+
+    // Non-copyable and non-movable base class.
 
     template <typename Base> struct stationary // Use this as a CRTP base.
     {
@@ -115,6 +188,8 @@ namespace Meta
         ~stationary() = default;
     };
 
+
+    // Polymorphic base class.
 
     template <typename Base> struct with_virtual_destructor // Use this as a CRTP base.
     {
