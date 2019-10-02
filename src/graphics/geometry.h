@@ -18,70 +18,312 @@
 
 namespace Graphics::Geom
 {
-    // Generic interface for vertex containers
+    // Generic interfaces for vertex containers.
+
+    struct GenericProviderIndexless : Meta::with_virtual_destructor<GenericProviderIndexless> {};
 
     template <typename V>
-    class ProviderIndexless : Meta::with_virtual_destructor<ProviderIndexless<V>>
+    class ProviderIndexless : public GenericProviderIndexless
     {
       public:
         using vertex_t = V;
 
       protected:
-        virtual void GetVerticesFlatLow(std::size_t begin, std::size_t end, vertex_t *dest) const = 0;
+        virtual void GetVerticesFlatLow(std::size_t begin, std::size_t end, vertex_t *dest) const
+        {
+            const vertex_t *vertex_ptr = VertexPointerFlatIfAvailable();
+            std::copy(vertex_ptr + begin, vertex_ptr + end, dest);
+        }
 
       public:
         virtual std::size_t VertexCountFlat() const = 0;
+
+        // If no contiguous storage is available, this should return null.
+        // You should override either this function, or `GetVerticesFlatLow`.
+        virtual const vertex_t *VertexPointerFlatIfAvailable() const {return 0;}
 
         void GetVerticesFlat(std::size_t begin, std::size_t end, vertex_t *dest) const
         {
             DebugAssert("Invalid vertex range.", begin <= end && end <= VertexCountFlat());
             GetVerticesFlatLow(begin, end, dest);
         }
+
+        void CopyToVector(std::vector<vertex_t> &vertices) const
+        {
+            if (std::size_t added_vertex_count = VertexCountFlat())
+            {
+                std::size_t old_vertex_count = vertices.size();
+                vertices.resize(vertices.size() + added_vertex_count);
+                GetVerticesFlat(0, added_vertex_count, &vertices[old_vertex_count]);
+            }
+        }
     };
 
+    struct GenericProvider : Meta::with_virtual_destructor<GenericProvider> {};
+
     template <typename V, typename I>
-    class Provider : public ProviderIndexless<V>
+    class Provider : public GenericProvider
     {
         static_assert(is_valid_index_type_v<I>, "Invalid index type.");
 
       public:
-        using typename ProviderIndexless<V>::vertex_t;
+        using vertex_t = V;
         using index_t = I;
 
       protected:
-        virtual void GetVerticesLow(std::size_t begin, std::size_t end, vertex_t *dest) const = 0;
-        virtual void GetIndicesLow(std::size_t begin, std::size_t end, index_t *dest, index_t base_index) const = 0;
+        virtual void GetVerticesLow(std::size_t begin, std::size_t end, vertex_t *dest) const
+        {
+            const vertex_t *vertex_ptr = VertexPointerIfAvailable();
+            std::copy(vertex_ptr + begin, vertex_ptr + end, dest);
+        }
+
+        virtual void GetIndicesLow(std::size_t begin, std::size_t end, index_t *dest) const
+        {
+            const index_t *index_ptr = IndexPointerIfAvailable();
+            std::copy(index_ptr + begin, index_ptr + end, dest);
+        }
 
       public:
         virtual std::size_t VertexCount() const = 0;
         virtual std::size_t IndexCount() const = 0;
+
+        // If no contiguous storage is available, these should return null.
+        // You should override either these function, or `Get*Low` (separately for vertices and indices).
+        virtual const vertex_t *VertexPointerIfAvailable() const {return 0;}
+        virtual const index_t *IndexPointerIfAvailable() const {return 0;}
 
         void GetVertices(std::size_t begin, std::size_t end, vertex_t *dest) const
         {
             DebugAssert("Invalid vertex range.", begin <= end && end <= VertexCount());
             GetVerticesLow(begin, end, dest);
         }
-        void GetIndices(std::size_t begin, std::size_t end, index_t *dest, index_t base_index) const
+        void GetIndices(std::size_t begin, std::size_t end, index_t *dest) const
         {
             DebugAssert("Invalid index range.", begin <= end && end <= IndexCount());
-            GetIndicesLow(begin, end, dest, base_index);
+            GetIndicesLow(begin, end, dest);
+        }
+
+        void CopyToVectors(std::vector<vertex_t> &vertices, std::vector<index_t> &indices)
+        {
+            std::size_t old_vertex_count = vertices.size();
+
+            if (std::size_t added_vertex_count = VertexCount())
+            {
+                vertices.resize(vertices.size() + added_vertex_count);
+                GetVertices(0, added_vertex_count, &vertices[old_vertex_count]);
+            }
+
+            if (std::size_t added_index_count = IndexCount())
+            {
+                std::size_t old_index_count = indices.size();
+                indices.resize(indices.size() + added_index_count);
+                GetIndices(0, added_index_count, &indices[old_index_count]);
+
+                for (std::size_t i = 0; i < added_index_count; i++)
+                {
+                    index_t &this_index = indices[i + old_index_count];
+                    DebugAssert("Vertex index overflow.", index_t(this_index + old_vertex_count) >= this_index);
+                    this_index += old_vertex_count;
+                }
+            }
         }
     };
 
 
-    // Generic interface for vertex containers with contiguous storage
+    // References to geometry providers, intended to serve as function providers.
+    // Both indexless and indexed views can refer to indexless and indexed providers, even if index types are different.
+
+    template <typename T>
+    class DataView
+    {
+        // Internal. `View[Indexless]` use this call to refer to vertex and index arrays.
+      public:
+        using type = T;
+
+        using get_elements_func_t = void(const void *target, std::size_t begin, std::size_t end, T *dest);
+
+      private:
+        // The class can be in three different states:
+        // * A null state.
+        // * Pointing to a contiguous storage (size is set, target is null, pointer is non-null, storage may or may not be null).
+        // * Pointing to arbitrary object (size is set, target is set, pointer is null, storage is null, get_elements is non-null).
+
+        std::size_t size = 0; // The amount of elements.
+        const void *target = 0; // Pointer to an arbitrary user object, passed to `get_elements`.
+        const type *pointer = 0; // Pointer to contiguous storage (possibly `storage`), or null.
+        std::unique_ptr<type[]> storage; // Internal storage, may or may not be used.
+        get_elements_func_t *get_elements = 0; // A callback to get elements from `target`.
+
+      public:
+        DataView() {}
+
+        [[nodiscard]] static DataView ToContiguousStorage(std::size_t size, const type *pointer)
+        {
+            DataView ret;
+            ret.size = size;
+            ret.pointer = pointer;
+            return ret;
+        }
+
+        [[nodiscard]] static DataView ToArbitraryObject(std::size_t size, const void *target, get_elements_func_t *get_elements)
+        {
+            DataView ret;
+            ret.size = size;
+            ret.target = target;
+            ret.get_elements = get_elements;
+            return ret;
+        }
+
+        explicit operator bool() const
+        {
+            return bool(pointer) || bool(get_elements);
+        }
+
+        bool IsContiguous() const
+        {
+            DebugAssert("Attempt to use a null `DataView` instance.", *this);
+            return bool(pointer);
+        }
+
+        void MakeContiguousIfNeeded()
+        {
+            DebugAssert("Attempt to use a null `DataView` instance.", *this);
+
+            if (IsContiguous())
+                return;
+
+            storage = std::make_unique<type[]>(size);
+            pointer = storage.get();
+
+            get_elements(target, 0, size, storage.get());
+            get_elements = 0;
+            target = 0;
+        }
+
+        std::size_t Size() const
+        {
+            DebugAssert("Attempt to use a null `DataView` instance.", *this);
+            return size;
+        }
+
+        // Can return null if no contiguous storage is available.
+        const type *PointerIfAvailable() const
+        {
+            DebugAssert("Attempt to use a null `DataView` instance.", *this);
+            return pointer;
+        }
+
+        // Always returns a non-null pointer.
+        // If necessary, copies data to an internal storage first.
+        const type *Pointer() const
+        {
+            DebugAssert("Attempt to use a null `DataView` instance.", *this);
+            MakeContiguousIfNeeded();
+            return pointer;
+        }
+
+        void GetElements(std::size_t begin, std::size_t end, type *dest) const
+        {
+            DebugAssert("Attempt to use a null `DataView` instance.", *this);
+
+            if (pointer)
+                std::copy(pointer + begin, pointer + end, dest);
+            else
+                get_elements(target, begin, end, dest);
+        }
+    };
 
     template <typename V>
-    class ArrayProviderIndexless : public ProviderIndexless<V>
+    class ViewIndexless : public ProviderIndexless<V>
     {
       public:
         using typename ProviderIndexless<V>::vertex_t;
 
-        virtual const vertex_t *VertexPointerFlat() const = 0;
+      private:
+        DataView<vertex_t> vertex_view;
+
+      public:
+        ViewIndexless(const ProviderIndexless<vertex_t> &provider)
+        {
+            if (provider.VertexPointerFlatIfAvailable())
+            {
+                vertex_view = DataView<vertex_t>::ToContiguousStorage(provider.VertexCountFlat(), provider.VertexPointerFlatIfAvailable());
+            }
+            else
+            {
+                vertex_view = DataView<vertex_t>::ToArbitraryObject(provider.VertexCountFlat(), &provider,
+                    [](const void *provider_ptr, std::size_t begin, std::size_t end, vertex_t *dest)
+                    {
+                        const auto &provider = *static_cast<const ProviderIndexless<vertex_t> *>(provider_ptr);
+                        provider.GetVerticesFlat(begin, end, dest);
+                    });
+            }
+        }
+
+        template <typename T, CHECK(std::is_base_of_v<GenericProvider, T> && std::is_same_v<typename T::vertex_t, vertex_t>)>
+        ViewIndexless(const T &provider_obj)
+        {
+            const Provider<typename T::vertex_t, typename T::index_t> &provider = provider_obj;
+            using index_t = typename T::index_t;
+
+            vertex_view = DataView<vertex_t>::ToArbitraryObject(provider.IndexCount(), &provider,
+                Meta::cexpr_flags(provider.VertexPointerIfAvailable(), provider.IndexPointerIfAvailable())
+                >> [](auto contiguous_vertices, auto contiguous_indices)
+                {
+                    constexpr bool have_vertex_ptr = contiguous_vertices;
+                    constexpr bool have_index_ptr = contiguous_indices;
+
+                    return +[](const void *provider_ptr, std::size_t begin, std::size_t end, vertex_t *dest)
+                    {
+                        const auto &provider = *static_cast<const T *>(provider_ptr);
+
+                        const vertex_t *vertex_ptr = provider.VertexPointerIfAvailable();
+                        const index_t *index_ptr = provider.IndexPointerIfAvailable();
+
+                        for (std::size_t i = begin; i < end; i++)
+                        {
+                            index_t index;
+                            if constexpr (have_index_ptr)
+                                index = index_ptr[i];
+                            else
+                                provider.GetIndices(i, i+1, &index);
+
+                            DebugAssert("Invalid vertex index.", index < provider.VertexCount());
+
+                            if constexpr (have_vertex_ptr)
+                                *dest = vertex_ptr[index];
+                            else
+                                provider.GetVertices(index, index+1, dest);
+
+                            dest++;
+                        }
+                    };
+                });
+        }
+
+              DataView<vertex_t> &Vertices()       {return vertex_view;}
+        const DataView<vertex_t> &Vertices() const {return vertex_view;}
+
+        std::size_t VertexCountFlat() const override
+        {
+            return vertex_view.Size();
+        }
+
+        // Call `Vertices().MakeContiguousIfNeeded()` to force this to return a non-null pointer.
+        const vertex_t *VertexPointerFlatIfAvailable() const override
+        {
+            return vertex_view.PointerIfAvailable();
+        }
+
+      protected:
+        void GetVerticesFlatLow(std::size_t begin, std::size_t end, vertex_t *dest) const override
+        {
+            vertex_view.GetElements(begin, end, dest);
+        }
     };
 
     template <typename V, typename I>
-    class ArrayProvider : public Provider<V, I>
+    class View : public Provider<V, I>
     {
         static_assert(is_valid_index_type_v<I>, "Invalid index type.");
 
@@ -89,15 +331,145 @@ namespace Graphics::Geom
         using typename Provider<V, I>::vertex_t;
         using typename Provider<V, I>::index_t;
 
-        virtual const vertex_t *VertexPointer() const = 0;
-        virtual const index_t *IndexPointer() const = 0;
+      private:
+        DataView<vertex_t> vertex_view;
+        DataView<index_t> index_view;
+
+      public:
+        View(const ProviderIndexless<vertex_t> &provider)
+        {
+            if (provider.VertexPointerFlatIfAvailable())
+            {
+                vertex_view = DataView<vertex_t>::ToContiguousStorage(provider.VertexCountFlat(), provider.VertexPointerFlatIfAvailable());
+            }
+            else
+            {
+                vertex_view = DataView<vertex_t>::ToArbitraryObject(provider.VertexCountFlat(), &provider,
+                    [](const void *provider_ptr, std::size_t begin, std::size_t end, vertex_t *dest)
+                    {
+                        const auto &provider = *static_cast<const ProviderIndexless<vertex_t> *>(provider_ptr);
+                        provider.GetVerticesFlat(begin, end, dest);
+                    });
+            }
+
+            index_view = DataView<index_t>::ToArbitraryObject(provider.VertexCountFlat(), nullptr,
+                [](const void *, std::size_t begin, std::size_t end, index_t *dest)
+                {
+                    DebugAssert("Vertex index is too large for this type.", end == 0 || end - 1 <= std::numeric_limits<index_t>::max());
+                    std::iota(dest, dest + end - begin, index_t(begin));
+                });
+        }
+
+        View(const Provider<vertex_t, index_t> &provider)
+        {
+            if (provider.VertexPointerIfAvailable())
+            {
+                vertex_view = DataView<vertex_t>::ToContiguousStorage(provider.VertexCount(), provider.VertexPointerIfAvailable());
+            }
+            else
+            {
+                vertex_view = DataView<vertex_t>::ToArbitraryObject(provider.VertexCount(), &provider,
+                    [](const void *provider_ptr, std::size_t begin, std::size_t end, vertex_t *dest)
+                    {
+                        const auto &provider = *static_cast<const Provider<vertex_t, index_t> *>(provider_ptr);
+                        provider.GetVertices(begin, end, dest);
+                    });
+            }
+
+            if (provider.IndexPointerIfAvailable())
+            {
+                index_view = DataView<index_t>::ToContiguousStorage(provider.IndexCount(), provider.IndexPointerIfAvailable());
+            }
+            else
+            {
+                index_view = DataView<index_t>::ToArbitraryObject(provider.IndexCount(), &provider,
+                    [](const void *provider_ptr, std::size_t begin, std::size_t end, index_t *dest)
+                    {
+                        const auto &provider = *static_cast<const Provider<vertex_t, index_t> *>(provider_ptr);
+                        provider.GetIndices(begin, end, dest);
+                    });
+            }
+        }
+
+        template <typename T, CHECK(std::is_base_of_v<GenericProvider, T> &&
+                                    std::is_same_v<typename T::vertex_t, vertex_t> &&
+                                    /*sic*/!std::is_same_v<typename T::index_t, index_t>)>
+        View(const T &provider_obj)
+        {
+            const Provider<typename T::vertex_t, typename T::index_t> &provider = provider_obj;
+
+            if (provider.VertexPointerIfAvailable())
+            {
+                vertex_view = DataView<vertex_t>::ToContiguousStorage(provider.VertexCount(), provider.VertexPointerIfAvailable());
+            }
+            else
+            {
+                vertex_view = DataView<vertex_t>::ToArbitraryObject(provider.VertexCount(), &provider,
+                    [](const void *provider_ptr, std::size_t begin, std::size_t end, vertex_t *dest)
+                    {
+                        const auto &provider = *static_cast<const T *>(provider_ptr);
+                        provider.GetVertices(begin, end, dest);
+                    });
+            }
+
+            index_view = DataView<index_t>::ToArbitraryObject(provider.IndexCount(), &provider,
+                [](const void *provider_ptr, std::size_t begin, std::size_t end, index_t *dest)
+                {
+                    const auto &provider = *static_cast<const T *>(provider_ptr);
+
+                    for (std::size_t i = begin; i < end; i++)
+                    {
+                        typename T::index_t index;
+                        provider.GetIndices(i, i+1, &index);
+
+                        if constexpr (sizeof index > sizeof(index_t))
+                            DebugAssert("Vertex index is too large for this type.", index <= std::numeric_limits<index_t>::max());
+
+                        *dest++ = index;
+                    }
+                });
+        }
+
+              DataView<vertex_t> &Vertices()       {return vertex_view;}
+        const DataView<vertex_t> &Vertices() const {return vertex_view;}
+              DataView<index_t> &Indices()       {return index_view;}
+        const DataView<index_t> &Indices() const {return index_view;}
+
+        std::size_t VertexCount() const override
+        {
+            return vertex_view.Size();
+        }
+        std::size_t IndexCount() const override
+        {
+            return index_view.Size();
+        }
+
+        // Call `.MakeContiguousIfNeeded()` on `Vertices()` or `Indices()` to force these to return non-null pointers.
+        const vertex_t *VertexPointerIfAvailable() const override
+        {
+            return vertex_view.PointerIfAvailable();
+        }
+        const index_t *IndexPointerIfAvailable() const override
+        {
+            return index_view.PointerIfAvailable();
+        }
+
+      protected:
+        void GetVerticesLow(std::size_t begin, std::size_t end, vertex_t *dest) const override
+        {
+            vertex_view.GetElements(begin, end, dest);
+        }
+        void GetIndicesLow(std::size_t begin, std::size_t end, index_t *dest) const override
+        {
+            index_view.GetElements(begin, end, dest);
+        }
     };
 
 
-    // Implementations of `ArrayProvider[Indexless]` pointing to existing storage
+    // Wrappers around pointers to existing contiguous storage, implementing `Provider[Indexless]`.
 
     template <typename V>
-    class ViewIndexless : public ArrayProviderIndexless<V>
+    class ReferenceIndexless : public ProviderIndexless<V>
     {
         using Base = ProviderIndexless<V>;
 
@@ -108,15 +480,9 @@ namespace Graphics::Geom
         const vertex_t *vertex_ptr = nullptr;
         std::size_t vertex_count = 0;
 
-      protected:
-        void GetVerticesFlatLow(std::size_t begin, std::size_t end, vertex_t *dest) const override
-        {
-            std::copy(vertex_ptr + begin, vertex_ptr + end, dest);
-        }
-
       public:
-        ViewIndexless() {}
-        ViewIndexless(const vertex_t *vertex_ptr, std::size_t vertex_count)
+        ReferenceIndexless() {}
+        ReferenceIndexless(const vertex_t *vertex_ptr, std::size_t vertex_count)
             : vertex_ptr(vertex_ptr), vertex_count(vertex_count)
         {}
 
@@ -125,61 +491,14 @@ namespace Graphics::Geom
             return vertex_count;
         }
 
-        const vertex_t *VertexPointerFlat() const override
+        const vertex_t *VertexPointerFlatIfAvailable() const override
         {
             return vertex_ptr;
         }
     };
 
     template <typename V, typename I>
-    class ViewNonIndexBased : public Provider<V, I>
-    {
-        static_assert(is_valid_index_type_v<I>, "Invalid index type.");
-        using Base = Provider<V, I>;
-
-      public:
-        using typename Base::vertex_t;
-        using typename Base::index_t;
-
-      private:
-        ViewIndexless<V> source;
-
-      protected:
-        void GetVerticesFlatLow(std::size_t begin, std::size_t end, vertex_t *dest) const override
-        {
-            source.GetVerticesFlat(begin, end, dest);
-        }
-        void GetVerticesLow(std::size_t begin, std::size_t end, vertex_t *dest) const override
-        {
-            source.GetVerticesFlat(begin, end, dest);
-        }
-        void GetIndicesLow(std::size_t begin, std::size_t end, index_t *dest, index_t base_index) const override
-        {
-            DebugAssert("Vertex index is too large for this type.", (end - begin - 1) + base_index <= std::numeric_limits<index_t>::max());
-            std::iota(dest, dest + (end - begin), index_t(begin + base_index));
-        }
-
-      public:
-        ViewNonIndexBased() {}
-        ViewNonIndexBased(const vertex_t *vertex_ptr, std::size_t vertex_count) : source(vertex_ptr, vertex_count) {}
-        ViewNonIndexBased(const ViewIndexless<V> &source) : source(source) {}
-
-        std::size_t VertexCountFlat() const override
-        {
-            return source.VertexCountFlat();
-        }
-        std::size_t VertexCount() const override
-        {
-            return source.VertexCountFlat();
-        }
-        std::size_t IndexCount() const override
-        {
-            return source.VertexCountFlat();
-        }
-    };
-
-    template <typename V, typename I>
-    class View : public ArrayProvider<V, I>
+    class Reference : public Provider<V, I>
     {
         static_assert(is_valid_index_type_v<I>, "Invalid index type.");
         using Base = Provider<V, I>;
@@ -194,35 +513,12 @@ namespace Graphics::Geom
         const index_t *index_ptr = nullptr;
         std::size_t index_count = 0;
 
-      protected:
-        void GetVerticesFlatLow(std::size_t begin, std::size_t end, vertex_t *dest) const override
-        {
-            for (std::size_t i = begin; i < end; i++)
-            {
-                std::size_t index = index_ptr[i];
-                DebugAssert("Invalid vertex index.", index < vertex_count);
-                *dest++ = vertex_ptr[index];
-            }
-        }
-        void GetVerticesLow(std::size_t begin, std::size_t end, vertex_t *dest) const override
-        {
-            std::copy(vertex_ptr + begin, vertex_ptr + end, dest);
-        }
-        void GetIndicesLow(std::size_t begin, std::size_t end, index_t *dest, index_t base_index) const override
-        {
-            std::transform(index_ptr + begin, index_ptr + end, dest, [=](index_t index){return index + base_index;});
-        }
-
       public:
-        View() {}
-        View(const vertex_t *vertex_ptr, std::size_t vertex_count, const index_t *index_ptr, std::size_t index_count)
+        Reference() {}
+        Reference(const vertex_t *vertex_ptr, std::size_t vertex_count, const index_t *index_ptr, std::size_t index_count)
             : vertex_ptr(vertex_ptr), vertex_count(vertex_count), index_ptr(index_ptr), index_count(index_count)
         {}
 
-        std::size_t VertexCountFlat() const override
-        {
-            return index_count;
-        }
         std::size_t VertexCount() const override
         {
             return vertex_count;
@@ -232,149 +528,105 @@ namespace Graphics::Geom
             return index_count;
         }
 
-        const vertex_t *VertexPointer() const override
+        const vertex_t *VertexPointerIfAvailable() const override
         {
             return vertex_ptr;
         }
-        const index_t *IndexPointer() const override
+        const index_t *IndexPointerIfAvailable() const override
         {
             return index_ptr;
         }
     };
 
 
-    // Vectors of vertices convertible to `ArrayProvider[Indexless]`
+    // Wrappers for vectors or arrays, implementing `Provider[Indexless]`.
 
-    template <typename V>
-    class DataIndexless
+    template <typename T>
+    using contiguous_container_elem_t = std::remove_pointer_t<decltype(std::declval<T &>().data())>;
+
+    template <typename VC>
+    class DataIndexless : public ProviderIndexless<contiguous_container_elem_t<VC>>
     {
-      public:
-        using vertex_t = V;
+        using Base = ProviderIndexless<contiguous_container_elem_t<VC>>;
 
-        std::vector<vertex_t> vertices;
+      public:
+        using typename Base::vertex_t;
+
+        using vertex_container_t = VC;
+        vertex_container_t vertices;
 
         DataIndexless() {}
+        DataIndexless(vertex_container_t vertices) : vertices(std::move(vertices)) {}
 
-        DataIndexless(std::vector<vertex_t> vertices) : vertices(std::move(vertices)) {}
-
-        DataIndexless(const ProviderIndexless<V> &provider)
+        DataIndexless(ViewIndexless<vertex_t> view)
         {
-            Insert(provider);
+            Insert(view);
         }
 
-        void Insert(const ProviderIndexless<V> &provider)
+        void Insert(ViewIndexless<vertex_t> view)
         {
-            if (std::size_t added_vertex_count = provider.VertexCountFlat())
-            {
-                std::size_t old_vertex_count = vertices.size();
-                vertices.resize(vertices.size() + added_vertex_count);
-                provider.GetVerticesFlat(0, added_vertex_count, &vertices[old_vertex_count]);
-            }
+            view.CopyToVector(vertices);
         }
 
-        operator ViewIndexless<V>() const
+        std::size_t VertexCountFlat() const override
         {
-            return ViewIndexless<V>(vertices.data(), vertices.size());
+            return vertices.size();
+        }
+
+        const vertex_t *VertexPointerFlatIfAvailable() const override
+        {
+            return vertices.data();
         }
     };
 
-    template <typename V, typename I>
-    class Data
+    template <typename VC, typename IC>
+    class Data : public Provider<contiguous_container_elem_t<VC>, contiguous_container_elem_t<IC>>
     {
-        static_assert(is_valid_index_type_v<I>, "Invalid index type.");
+        using Base = Provider<contiguous_container_elem_t<VC>, contiguous_container_elem_t<IC>>;
 
       public:
-        using vertex_t = V;
-        using index_t = I;
+        using typename Base::vertex_t;
+        using typename Base::index_t;
 
-        std::vector<vertex_t> vertices;
-        std::vector<index_t> indices;
+        using vertex_container_t = VC;
+        using index_container_t = IC;
+        vertex_container_t vertices;
+        index_container_t indices;
 
         Data() {}
+        Data(vertex_container_t vertices, index_container_t indices) : vertices(std::move(vertices)), indices(std::move(indices)) {}
 
-        Data(std::vector<vertex_t> vertices, std::vector<index_t> indices) : vertices(std::move(vertices)), indices(std::move(indices))
+        Data(View<vertex_t, index_t> view)
         {
-            DebugAssert("Some indices provided for a geometry are out of range.", std::all_of(indices.begin(), indices.end(), [&](index_t index){return index < vertices.size();}));
+            Insert(view);
         }
 
-        Data(const Provider<V, I> &provider)
+        void Insert(View<vertex_t, index_t> view)
         {
-            Insert(provider);
+            view.CopyToVectors(vertices, indices);
         }
 
-        void Insert(const Provider<V, I> &provider)
+        std::size_t VertexCount() const override
         {
-            std::size_t old_vertex_count = vertices.size();
-
-            if (std::size_t added_vertex_count = provider.VertexCount())
-            {
-                vertices.resize(vertices.size() + added_vertex_count);
-                provider.GetVertices(0, added_vertex_count, &vertices[old_vertex_count]);
-            }
-
-            if (std::size_t added_index_count = provider.IndexCount())
-            {
-                std::size_t old_index_count = indices.size();
-                indices.resize(indices.size() + added_index_count);
-                provider.GetIndices(0, added_index_count, &indices[old_index_count], old_vertex_count);
-            }
+            return vertices.size();
+        }
+        std::size_t IndexCount() const override
+        {
+            return indices.size();
         }
 
-        void Insert(const ProviderIndexless<V> &provider)
+        const vertex_t *VertexPointerIfAvailable() const override
         {
-            Insert(ViewNonIndexBased<V, I>(provider));
+            return vertices.data();
         }
-
-        operator View<V, I>() const
+        const index_t *IndexPointerIfAvailable() const override
         {
-            return View<V, I>(vertices.data(), vertices.size(), indices.data(), indices.size());
+            return indices.data();
         }
     };
 
 
-    // Fixed-size arrays of vertices convertible to `ArrayProvider[Indexless]`
-
-    template <typename V, std::size_t VN>
-    class DataFixedSizeIndexless
-    {
-      public:
-        using vertex_t = V;
-
-        std::array<vertex_t, VN> vertices;
-
-        DataFixedSizeIndexless() {}
-        DataFixedSizeIndexless(std::array<vertex_t, VN> vertices) : vertices(std::move(vertices)) {}
-
-        operator ViewIndexless<V>() const
-        {
-            return ViewIndexless<V>(vertices.data(), vertices.size());
-        }
-    };
-
-    template <typename V, std::size_t VN, typename I, std::size_t IN>
-    class DataFixedSize
-    {
-        static_assert(is_valid_index_type_v<I>, "Invalid index type.");
-
-      public:
-        using vertex_t = V;
-        using index_t = I;
-
-        std::array<vertex_t, VN> vertices;
-        std::array<index_t, IN> indices;
-
-        DataFixedSize() {}
-        DataFixedSize(std::array<vertex_t, VN> vertices, std::array<index_t, IN> indices)
-            : vertices(std::move(vertices)), indices(std::move(indices)) {}
-
-        operator View<V, I>() const
-        {
-            return View<V, I>(vertices.data(), vertices.size(), indices.data(), indices.size());
-        }
-    };
-
-
-    // Drawable buffers that can be constructed from `ArrayProvider[Indexless]`
+    // Drawable buffers that can be constructed from `ArrayProvider[Indexless]`.
 
     template <typename V>
     class BufferIndexless
@@ -386,14 +638,23 @@ namespace Graphics::Geom
         using vertex_t = V;
 
         BufferIndexless() {}
-        BufferIndexless(const ArrayProviderIndexless<V> &data, DrawMode mode, Usage usage = static_draw)
-            : mode(mode), vertex_buffer(data.VertexCountFlat(), data.VertexPointerFlat(), usage)
-        {}
+        BufferIndexless(DrawMode mode, ViewIndexless<V> view, Usage usage = static_draw)
+            : mode(mode)
+        {
+            view.Vertices().MakeContiguousIfNeeded();
+            vertex_buffer = VertexBuffer<V>(view.VertexCountFlat(), view.VertexPointerFlatIfAvailable(), usage);
+        }
 
         explicit operator bool() const
         {
             return bool(vertex_buffer);
         }
+
+        DrawMode GetDrawMode() const {return mode;}
+        void SetDrawMode(DrawMode new_mode) {mode = new_mode;}
+
+              VertexBuffer<V> &Vertices()       {return vertex_buffer;}
+        const VertexBuffer<V> &Vertices() const {return vertex_buffer;}
 
         void Draw() const
         {
@@ -415,14 +676,29 @@ namespace Graphics::Geom
         using index_t = I;
 
         Buffer() {}
-        Buffer(const ArrayProvider<V, I> &data, DrawMode mode, Usage usage = static_draw)
-            : mode(mode), vertex_buffer(data.VertexCount(), data.VertexPointer(), usage), index_buffer(data.IndexCount(), data.IndexPointer(), usage)
-        {}
+        Buffer(DrawMode mode, View<V, I> view, Usage usage = static_draw)
+            : mode(mode)
+        {
+            view.Vertices().MakeContiguousIfNeeded();
+            view.Indices().MakeContiguousIfNeeded();
+
+            vertex_buffer = VertexBuffer<V>(view.VertexCount(), view.VertexPointerIfAvailable(), usage);
+            index_buffer = IndexBuffer<I>(view.IndexCount(), view.IndexPointerIfAvailable(), usage);
+        }
 
         explicit operator bool() const
         {
             return bool(vertex_buffer);
         }
+
+        DrawMode GetDrawMode() const {return mode;}
+        void SetDrawMode(DrawMode new_mode) {mode = new_mode;}
+
+              VertexBuffer<V> &Vertices()       {return vertex_buffer;}
+        const VertexBuffer<V> &Vertices() const {return vertex_buffer;}
+
+              IndexBuffer<V> &Indices()       {return index_buffer;}
+        const IndexBuffer<V> &Indices() const {return index_buffer;}
 
         void Draw() const
         {
@@ -440,6 +716,18 @@ namespace Graphics::Geom
         triangles = 3,
     };
 
+    inline constexpr DrawMode PrimitiveToDrawMode(Primitive primitive)
+    {
+        switch (primitive)
+        {
+            case points:    return DrawMode::points;
+            case lines:     return DrawMode::lines;
+            case triangles: return DrawMode::triangles;
+        }
+
+        return DrawMode::points;
+    }
+
     template <typename V, Primitive P>
     class QueueIndexless
     {
@@ -451,16 +739,6 @@ namespace Graphics::Geom
         using vertex_t = V;
 
         static constexpr Primitive primitive = P;
-
-        static constexpr DrawMode draw_mode = []
-        {
-            switch (primitive)
-            {
-                case points:    return DrawMode::points;
-                case lines:     return DrawMode::lines;
-                case triangles: return DrawMode::triangles;
-            }
-        }();
 
         QueueIndexless() {}
 
@@ -488,9 +766,9 @@ namespace Graphics::Geom
             return VertexCapacity() - UsedVertexCapacity();
         }
 
-        void Insert(const ProviderIndexless<V> &provider)
+        void Insert(ViewIndexless<V> view)
         {
-            std::size_t vertices_provided = provider.VertexCountFlat();
+            std::size_t vertices_provided = view.VertexCountFlat();
             if (vertices_provided == 0)
                 return;
             DebugAssert("Inserted vertex count is not a multiple of the primitive size.", vertices_provided % int(P) == 0);
@@ -502,7 +780,7 @@ namespace Graphics::Geom
             while (1)
             {
                 std::size_t segment_size = std::min(vertices_provided - vertices_inserted, RemainingVertexCapacity());
-                provider.GetVerticesFlat(vertices_inserted, vertices_inserted + segment_size, vertices.data() + vertex_pos);
+                view.GetVerticesFlat(vertices_inserted, vertices_inserted + segment_size, vertices.data() + vertex_pos);
 
                 vertices_inserted += segment_size;
                 vertex_pos += segment_size;
@@ -524,7 +802,7 @@ namespace Graphics::Geom
             if (vertex_pos == 0)
                 return;
             vertex_buffer.SetDataPart(0, vertex_pos, vertices.data());
-            vertex_buffer.Draw(draw_mode, vertex_pos);
+            vertex_buffer.Draw(PrimitiveToDrawMode(primitive), vertex_pos);
             vertex_pos = 0;
         }
     };
@@ -553,7 +831,7 @@ namespace Graphics::Geom
             }
 
             index_buffer.SetDataPart(0, index_pos, indices.data());
-            index_buffer.Draw(vertex_buffer, draw_mode, index_pos);
+            index_buffer.Draw(vertex_buffer, PrimitiveToDrawMode(primitive), index_pos);
             index_pos = 0;
         }
 
@@ -562,16 +840,6 @@ namespace Graphics::Geom
         using index_t = I;
 
         static constexpr Primitive primitive = P;
-
-        static constexpr DrawMode draw_mode = []
-        {
-            switch (primitive)
-            {
-                case points:    return DrawMode::points;
-                case lines:     return DrawMode::lines;
-                case triangles: return DrawMode::triangles;
-            }
-        }();
 
         Queue() {}
 
@@ -614,14 +882,14 @@ namespace Graphics::Geom
             return IndexCapacity() - UsedIndexCapacity();
         }
 
-        void Insert(const Provider<V, I> &provider)
+        void Insert(View<V, I> view)
         {
-            std::size_t indices_provided = provider.IndexCount();
+            std::size_t indices_provided = view.IndexCount();
             if (indices_provided == 0)
                 return;
             DebugAssert("Inserted index count is not a multiple of the primitive size.", indices_provided % int(P) == 0);
 
-            std::size_t vertices_provided = provider.VertexCount();
+            std::size_t vertices_provided = view.VertexCount();
             if (vertices_provided > VertexCapacity())
                 Program::Error("Unable to insert geometry into a render queue: too many vertices.");
 
@@ -630,14 +898,16 @@ namespace Graphics::Geom
 
             index_t base_index = vertex_pos;
 
-            provider.GetVertices(0, vertices_provided, vertices.data() + vertex_pos);
+            view.GetVertices(0, vertices_provided, vertices.data() + vertex_pos);
             vertex_pos += vertices_provided;
 
             std::size_t indices_inserted = 0;
             while (1)
             {
                 std::size_t segment_size = std::min(indices_provided - indices_inserted, RemainingIndexCapacity());
-                provider.GetIndices(indices_inserted, indices_inserted + segment_size, indices.data() + index_pos, base_index);
+                view.GetIndices(indices_inserted, indices_inserted + segment_size, indices.data() + index_pos);
+                for (std::size_t i = 0; i < segment_size; i++)
+                    indices[index_pos + i] += base_index;
 
                 indices_inserted += segment_size;
                 index_pos += segment_size;
@@ -647,11 +917,6 @@ namespace Graphics::Geom
                 else
                     FlushIndices();
             }
-        }
-
-        void Insert(const ProviderIndexless<V> &provider)
-        {
-            Insert(ViewNonIndexBased<V, I>(provider));
         }
 
         void Abort()
