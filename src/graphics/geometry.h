@@ -4,6 +4,7 @@
 #include <array>
 #include <cstddef>
 #include <cstdint>
+#include <initializer_list>
 #include <memory>
 #include <numeric>
 #include <type_traits>
@@ -468,8 +469,53 @@ namespace Graphics::Geom
 
     // Wrappers around pointers to existing contiguous storage, implementing `Provider[Indexless]`.
 
+    template <typename T>
+    using contiguous_container_elem_t = std::remove_pointer_t<decltype(std::declval<T &>().data())>;
+
+    template <typename T>
+    class DataRef
+    {
+        // Internal. A simple span-like class.
+      public:
+        using type = T;
+
+      private:
+        const type *pointer = 0;
+        std::size_t size = 0;
+
+      public:
+        constexpr DataRef() {}
+
+        constexpr DataRef(const type *pointer, std::size_t size)
+            : pointer(pointer), size(size)
+        {}
+
+        constexpr DataRef(std::initializer_list<type> init_list)
+            : pointer(&*init_list.begin()), size(init_list.size())
+        {}
+
+        template <typename C, CHECK_TYPE(contiguous_container_elem_t<C>)>
+        constexpr DataRef(const C &container)
+            : pointer(container.data()), size(container.size())
+        {}
+
+        explicit operator bool() const
+        {
+            return bool(pointer);
+        }
+
+        const type *Pointer() const
+        {
+            return pointer;
+        }
+        std::size_t Size() const
+        {
+            return size;
+        }
+    };
+
     template <typename V>
-    class ReferenceIndexless : public ProviderIndexless<V>
+    class RefIndexless : public ProviderIndexless<V>
     {
         using Base = ProviderIndexless<V>;
 
@@ -477,28 +523,25 @@ namespace Graphics::Geom
         using typename Base::vertex_t;
 
       private:
-        const vertex_t *vertex_ptr = nullptr;
-        std::size_t vertex_count = 0;
+        DataRef<vertex_t> vertex_ref;
 
       public:
-        ReferenceIndexless() {}
-        ReferenceIndexless(const vertex_t *vertex_ptr, std::size_t vertex_count)
-            : vertex_ptr(vertex_ptr), vertex_count(vertex_count)
-        {}
+        RefIndexless() {}
+        RefIndexless(DataRef<vertex_t> vertex_ref) : vertex_ref(vertex_ref) {}
 
         std::size_t VertexCountFlat() const override
         {
-            return vertex_count;
+            return vertex_ref.Size();
         }
 
         const vertex_t *VertexPointerFlatIfAvailable() const override
         {
-            return vertex_ptr;
+            return vertex_ref.Pointer();
         }
     };
 
     template <typename V, typename I>
-    class Reference : public Provider<V, I>
+    class Ref : public Provider<V, I>
     {
         static_assert(is_valid_index_type_v<I>, "Invalid index type.");
         using Base = Provider<V, I>;
@@ -508,41 +551,34 @@ namespace Graphics::Geom
         using typename Base::index_t;
 
       private:
-        const vertex_t *vertex_ptr = nullptr;
-        std::size_t vertex_count = 0;
-        const index_t *index_ptr = nullptr;
-        std::size_t index_count = 0;
+        DataRef<vertex_t> vertex_ref;
+        DataRef<index_t> index_ref;
 
       public:
-        Reference() {}
-        Reference(const vertex_t *vertex_ptr, std::size_t vertex_count, const index_t *index_ptr, std::size_t index_count)
-            : vertex_ptr(vertex_ptr), vertex_count(vertex_count), index_ptr(index_ptr), index_count(index_count)
-        {}
+        Ref() {}
+        Ref(DataRef<vertex_t> vertex_ref, DataRef<index_t> index_ref) : vertex_ref(vertex_ref), index_ref(index_ref) {}
 
         std::size_t VertexCount() const override
         {
-            return vertex_count;
+            return vertex_ref.Size();
         }
         std::size_t IndexCount() const override
         {
-            return index_count;
+            return index_ref.Size();
         }
 
         const vertex_t *VertexPointerIfAvailable() const override
         {
-            return vertex_ptr;
+            return vertex_ref.Pointer();
         }
         const index_t *IndexPointerIfAvailable() const override
         {
-            return index_ptr;
+            return index_ref.Pointer();
         }
     };
 
 
     // Wrappers for vectors or arrays, implementing `Provider[Indexless]`.
-
-    template <typename T>
-    using contiguous_container_elem_t = std::remove_pointer_t<decltype(std::declval<T &>().data())>;
 
     template <typename VC>
     class DataIndexless : public ProviderIndexless<contiguous_container_elem_t<VC>>
