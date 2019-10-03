@@ -319,7 +319,7 @@ namespace Math
             [[nodiscard]] constexpr auto len() const {return std::sqrt(len_sqr());}
             [[nodiscard]] constexpr auto norm() const -> vec2<decltype(type{}/len())> {if (auto l = len()) return *this / l; else return vec(0);}
             [[nodiscard]] static constexpr vec dir(type angle, type len = 1) {return vec(std::cos(angle) * len, std::sin(angle) * len); static_assert(is_floating_point, "The vector must be floating-point.");}
-            template <typename TT = double> [[nodiscard]] constexpr T angle() const {return std::atan2(TT(y), TT(x));}
+            template <typename TT = double> [[nodiscard]] constexpr TT angle() const {return std::atan2(TT(y), TT(x));}
             [[nodiscard]] constexpr vec rot90(int steps = 1) const {switch (steps & 3) {default: return *this; case 1: return {-y,x}; case 2: return -*this; case 3: return {y,-x};}}
             template <typename TT> [[nodiscard]] constexpr auto dot(const vec2<TT> &o) const {return x * o.x + y * o.y;}
             template <typename TT> [[nodiscard]] constexpr auto cross(const vec2<TT> &o) const {return x * o.y - y * o.x;}
