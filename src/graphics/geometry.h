@@ -12,6 +12,7 @@
 #include <vector>
 
 #include "graphics/index_buffer.h"
+#include "graphics/transformations.h"
 #include "graphics/vertex_buffer.h"
 #include "program/errors.h"
 #include "utils/check.h"
@@ -21,10 +22,10 @@ namespace Graphics::Geom
 {
     // Generic interfaces for vertex containers.
 
-    struct GenericProviderIndexless : Meta::with_virtual_destructor<GenericProviderIndexless> {};
+    struct GenericProviderFlat : Meta::with_virtual_destructor<GenericProviderFlat> {};
 
     template <typename V>
-    class ProviderIndexless : public GenericProviderIndexless
+    class ProviderFlat : public GenericProviderFlat
     {
       public:
         using vertex_t = V;
@@ -131,13 +132,103 @@ namespace Graphics::Geom
     };
 
 
+    // Vertex container transformations.
+    // Note that the result of `transformation * container` maintains a reference to `container`.
+    // Beware of dangling references!
+
+    template <typename P, typename T, CHECK(std::is_base_of_v<GenericProviderFlat, P>),
+        CHECK_EXPR(std::declval<const T &>() * std::declval<const typename P::vertex_t &>())>
+    class TransformedProviderFlat : public ProviderFlat<typename P::vertex_t>
+    {
+        using Base = ProviderFlat<typename P::vertex_t>;
+
+        const P &src_provider;
+        T transformation;
+
+      public:
+        using typename Base::vertex_t;
+
+        TransformedProviderFlat(const P &provider, const T &transformation)
+            : src_provider(provider), transformation(transformation) {}
+
+        std::size_t VertexCountFlat() const override
+        {
+            return src_provider.VertexCountFlat();
+        }
+
+      protected:
+        void GetVerticesFlatLow(std::size_t begin, std::size_t end, vertex_t *dest) const override
+        {
+            src_provider.GetVerticesFlat(begin, end, dest);
+            for (std::size_t i = 0; i < end - begin; i++)
+                dest[i] = transformation * dest[i];
+        }
+    };
+
+    template <typename P, typename T, CHECK(std::is_base_of_v<GenericProvider, P>),
+        CHECK_EXPR(std::declval<const T &>() * std::declval<const typename P::vertex_t &>())>
+    class TransformedProvider : public Provider<typename P::vertex_t, typename P::index_t>
+    {
+        using Base = Provider<typename P::vertex_t, typename P::index_t>;
+
+        const P &src_provider;
+        T transformation;
+
+      public:
+        using typename Base::vertex_t;
+        using typename Base::index_t;
+
+        TransformedProvider(const P &provider, const T &transformation)
+            : src_provider(provider), transformation(transformation) {}
+
+        std::size_t VertexCount() const override
+        {
+            return src_provider.VertexCount();
+        }
+        std::size_t IndexCount() const override
+        {
+            return src_provider.IndexCount();
+        }
+
+        const index_t *IndexPointerIfAvailable() const override
+        {
+            // Note that we don't expose `VertexPointerIfAvailable()` in the same way, since we modify the vertices.
+            return src_provider.IndexPointerIfAvailable();
+        }
+
+      protected:
+        void GetVerticesLow(std::size_t begin, std::size_t end, vertex_t *dest) const override
+        {
+            src_provider.GetVertices(begin, end, dest);
+            for (std::size_t i = 0; i < end - begin; i++)
+                dest[i] = transformation * dest[i];
+        }
+        void GetIndicesLow(std::size_t begin, std::size_t end, index_t *dest) const override
+        {
+            src_provider.GetIndices(begin, end, dest);
+        }
+    };
+
+    template <typename T, typename P>
+    TransformedProviderFlat<P, T> operator*(const T &transformation, const P &provider)
+    {
+        return {provider, transformation};
+    }
+
+    template <typename T, typename P>
+    TransformedProvider<P, T> operator*(const T &transformation, const P &provider)
+    {
+        return {provider, transformation};
+    }
+
+
     // References to geometry providers, intended to serve as function providers.
     // Both indexless and indexed views can refer to indexless and indexed providers, even if index types are different.
 
     template <typename T>
     class DataView
     {
-        // Internal. `View[Indexless]` use this call to refer to vertex and index arrays.
+        // Internal. `View[Flat]` use this call to refer to vertex and index arrays.
       public:
         using type = T;
 
@@ -235,16 +326,16 @@ namespace Graphics::Geom
     };
 
     template <typename V>
-    class ViewIndexless : public ProviderIndexless<V>
+    class ViewFlat : public ProviderFlat<V>
     {
       public:
-        using typename ProviderIndexless<V>::vertex_t;
+        using typename ProviderFlat<V>::vertex_t;
 
       private:
         DataView<vertex_t> vertex_view;
 
       public:
-        ViewIndexless(const ProviderIndexless<vertex_t> &provider)
+        ViewFlat(const ProviderFlat<vertex_t> &provider)
         {
             if (provider.VertexPointerFlatIfAvailable())
             {
@@ -255,14 +346,14 @@ namespace Graphics::Geom
                 vertex_view = DataView<vertex_t>::ToArbitraryObject(provider.VertexCountFlat(), &provider,
                     [](const void *provider_ptr, std::size_t begin, std::size_t end, vertex_t *dest)
                     {
-                        const auto &provider = *static_cast<const ProviderIndexless<vertex_t> *>(provider_ptr);
+                        const auto &provider = *static_cast<const ProviderFlat<vertex_t> *>(provider_ptr);
                         provider.GetVerticesFlat(begin, end, dest);
                     });
             }
         }
 
         template <typename T, CHECK(std::is_base_of_v<GenericProvider, T> && std::is_same_v<typename T::vertex_t, vertex_t>)>
-        ViewIndexless(const T &provider_obj)
+        ViewFlat(const T &provider_obj)
         {
             const Provider<typename T::vertex_t, typename T::index_t> &provider = provider_obj;
             using index_t = typename T::index_t;
@@ -337,7 +428,7 @@ namespace Graphics::Geom
         DataView<index_t> index_view;
 
       public:
-        View(const ProviderIndexless<vertex_t> &provider)
+        View(const ProviderFlat<vertex_t> &provider)
         {
             if (provider.VertexPointerFlatIfAvailable())
             {
@@ -348,7 +439,7 @@ namespace Graphics::Geom
                 vertex_view = DataView<vertex_t>::ToArbitraryObject(provider.VertexCountFlat(), &provider,
                     [](const void *provider_ptr, std::size_t begin, std::size_t end, vertex_t *dest)
                     {
-                        const auto &provider = *static_cast<const ProviderIndexless<vertex_t> *>(provider_ptr);
+                        const auto &provider = *static_cast<const ProviderFlat<vertex_t> *>(provider_ptr);
                         provider.GetVerticesFlat(begin, end, dest);
                     });
             }
@@ -467,7 +558,7 @@ namespace Graphics::Geom
     };
 
 
-    // Wrappers around pointers to existing contiguous storage, implementing `Provider[Indexless]`.
+    // Wrappers around pointers to existing contiguous storage, implementing `Provider[Flat]`.
 
     template <typename T>
     using contiguous_container_elem_t = std::remove_pointer_t<decltype(std::declval<T &>().data())>;
@@ -515,9 +606,9 @@ namespace Graphics::Geom
     };
 
     template <typename V>
-    class RefIndexless : public ProviderIndexless<V>
+    class RefFlat : public ProviderFlat<V>
     {
-        using Base = ProviderIndexless<V>;
+        using Base = ProviderFlat<V>;
 
       public:
         using typename Base::vertex_t;
@@ -526,8 +617,8 @@ namespace Graphics::Geom
         DataRef<vertex_t> vertex_ref;
 
       public:
-        RefIndexless() {}
-        RefIndexless(DataRef<vertex_t> vertex_ref) : vertex_ref(vertex_ref) {}
+        RefFlat() {}
+        RefFlat(DataRef<vertex_t> vertex_ref) : vertex_ref(vertex_ref) {}
 
         std::size_t VertexCountFlat() const override
         {
@@ -578,12 +669,12 @@ namespace Graphics::Geom
     };
 
 
-    // Wrappers for vectors or arrays, implementing `Provider[Indexless]`.
+    // Wrappers for vectors or arrays, implementing `Provider[Flat]`.
 
     template <typename VC>
-    class DataIndexless : public ProviderIndexless<contiguous_container_elem_t<VC>>
+    class DataFlat : public ProviderFlat<contiguous_container_elem_t<VC>>
     {
-        using Base = ProviderIndexless<contiguous_container_elem_t<VC>>;
+        using Base = ProviderFlat<contiguous_container_elem_t<VC>>;
 
       public:
         using typename Base::vertex_t;
@@ -591,17 +682,23 @@ namespace Graphics::Geom
         using vertex_container_t = VC;
         vertex_container_t vertices;
 
-        DataIndexless() {}
-        DataIndexless(vertex_container_t vertices) : vertices(std::move(vertices)) {}
+        DataFlat() {}
+        DataFlat(vertex_container_t vertices) : vertices(std::move(vertices)) {}
 
-        DataIndexless(ViewIndexless<vertex_t> view)
+        DataFlat(ViewFlat<vertex_t> view)
         {
-            Insert(view);
+            Insert(std::move(view));
         }
 
-        void Insert(ViewIndexless<vertex_t> view)
+        // Only work if the underlying container is a vector.
+        void Insert(ViewFlat<vertex_t> view)
         {
             view.CopyToVector(vertices);
+        }
+        DataFlat &operator<<(ViewFlat<vertex_t> view)
+        {
+            Insert(std::move(view));
+            return *this;
         }
 
         std::size_t VertexCountFlat() const override
@@ -634,12 +731,18 @@ namespace Graphics::Geom
 
         Data(View<vertex_t, index_t> view)
         {
-            Insert(view);
+            Insert(std::move(view));
         }
 
+        // Only work if the underlying containers are vectors.
         void Insert(View<vertex_t, index_t> view)
         {
             view.CopyToVectors(vertices, indices);
+        }
+        Data &operator<<(View<vertex_t, index_t> view)
+        {
+            Insert(std::move(view));
+            return *this;
         }
 
         std::size_t VertexCount() const override
@@ -662,10 +765,10 @@ namespace Graphics::Geom
     };
 
 
-    // Drawable buffers that can be constructed from `ArrayProvider[Indexless]`.
+    // Drawable buffers that can be constructed from `ArrayProvider[Flat]`.
 
     template <typename V>
-    class BufferIndexless
+    class BufferFlat
     {
         DrawMode mode = triangles;
         VertexBuffer<V> vertex_buffer;
@@ -673,8 +776,8 @@ namespace Graphics::Geom
       public:
         using vertex_t = V;
 
-        BufferIndexless() {}
-        BufferIndexless(DrawMode mode, ViewIndexless<V> view, Usage usage = static_draw)
+        BufferFlat() {}
+        BufferFlat(DrawMode mode, ViewFlat<V> view, Usage usage = static_draw)
             : mode(mode)
         {
             view.Vertices().MakeContiguousIfNeeded();
@@ -743,7 +846,7 @@ namespace Graphics::Geom
     };
 
 
-    // Rendering queues, accepting geometry from `Provider[Indexless]`
+    // Rendering queues, accepting geometry from `Provider[Flat]`
 
     enum Primitive
     {
@@ -765,7 +868,7 @@ namespace Graphics::Geom
     }
 
     template <typename V, Primitive P>
-    class QueueIndexless
+    class QueueFlat
     {
         std::vector<V> vertices;
         VertexBuffer<V> vertex_buffer;
@@ -776,9 +879,9 @@ namespace Graphics::Geom
 
         static constexpr Primitive primitive = P;
 
-        QueueIndexless() {}
+        QueueFlat() {}
 
-        QueueIndexless(std::size_t primitive_capacity)
+        QueueFlat(std::size_t primitive_capacity)
             : vertices(primitive_capacity * int(P)), vertex_buffer(primitive_capacity * int(P), nullptr, dynamic_draw)
         {
             DebugAssert("Invalid render queue capacity.", primitive_capacity > 0);
@@ -802,7 +905,7 @@ namespace Graphics::Geom
             return VertexCapacity() - UsedVertexCapacity();
         }
 
-        void Insert(ViewIndexless<V> view)
+        void Insert(ViewFlat<V> view)
         {
             std::size_t vertices_provided = view.VertexCountFlat();
             if (vertices_provided == 0)
@@ -826,6 +929,11 @@ namespace Graphics::Geom
                 else
                     Flush();
             }
+        }
+        QueueFlat &operator<<(ViewFlat<vertex_t> view)
+        {
+            Insert(std::move(view));
+            return *this;
         }
 
         void Abort()
@@ -953,6 +1061,11 @@ namespace Graphics::Geom
                 else
                     FlushIndices();
             }
+        }
+        Queue &operator<<(View<vertex_t, index_t> view)
+        {
+            Insert(std::move(view));
+            return *this;
         }
 
         void Abort()

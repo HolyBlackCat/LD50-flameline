@@ -1,7 +1,7 @@
 #pragma once
 
 #include "graphics/blending.h"
-#include "graphics/flat_transformation.h"
+#include "graphics/transformations.h"
 #include "graphics/geometry.h"
 #include "graphics/shader.h"
 #include "program/errors.h"
@@ -53,11 +53,16 @@ namespace Graphics::Renderers
             }
         };
 
-        using vertex_t = Vertex;
-        using index_t = uint16_t;
+        using Index = uint16_t;
+
+        template <typename VC> using DataFlat = Geom::DataFlat<VC>;
+        template <typename VC, typename IC> using Data = Geom::Data<VC, IC>;
+
+        using RefFlat = Geom::RefFlat<Vertex>;
+        using Ref = Geom::Ref<Vertex, Index>;
 
       private:
-        Geom::Queue<vertex_t, index_t, Geom::triangles> queue;
+        Geom::Queue<Vertex, Index, Geom::triangles> queue;
         Shader shader;
 
       public:
@@ -72,22 +77,22 @@ namespace Graphics::Renderers
             return bool(queue);
         }
 
-
         static void SetBlendingMode()
         {
             Graphics::Blending::FuncNormalPre();
         }
 
-
-        Flat &operator<<(const Geom::Provider<Vertex, index_t> &provider)
+        Flat &operator<<(Geom::View<Vertex, Index> view)
         {
-            DebugAssert("Attempt to use a null audio buffer.", *this);
+            DebugAssert("Attempt to use a null renderer.", *this);
             if (!*this)
                 return *this;
 
             shader.Bind();
-            queue.Insert(provider);
+            queue.Insert(std::move(view));
             return *this;
         }
+
+        static
     };
 }

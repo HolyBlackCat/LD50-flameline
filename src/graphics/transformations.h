@@ -1,6 +1,7 @@
 #pragma once
 
 #include <type_traits>
+#include <utility>
 
 #include "utils/check.h"
 #include "utils/mat.h"
@@ -8,6 +9,36 @@
 
 namespace Graphics
 {
+    template <typename T, CHECK_EXPR(T::transformable_position_mem_ptr)>
+    constexpr auto TransformablePositionMemPtr(Meta::tag<T>)
+    {
+        return T::transformable_position_mem_ptr;
+    }
+
+    template <typename T> using transformable_position_t = std::remove_cv_t<std::remove_reference_t<decltype(std::declval<T &>().*TransformablePositionMemPtr(Meta::tag<T>{}))>>;
+
+    template <typename V> struct Transformation : Meta::with_virtual_destructor<Transformation<V>>
+    {
+        using vector_t = V;
+        using disable_vec_mat_operators = void; // Prevent vec/mat `operator*` from messing things up.
+
+        vector_t operator*(vector_t vec) const
+        {
+            return ApplyLow(vec);
+        }
+
+        template <typename T, CHECK(std::is_same_v<vector_t, transformable_position_t<T>>)>
+        T operator*(T vertex) const
+        {
+            vector_t &pos = vertex.*TransformablePositionMemPtr(Meta::tag<T>{});
+            pos = ApplyLow(pos);
+            return vertex;
+        }
+
+      protected:
+        virtual vector_t ApplyLow(vector_t vec) const = 0;
+    };
+
     template <typename T> struct TransformFlat
     {
         static_assert(!std::is_const_v<T> && !std::is_volatile_v<T>, "The base type can't have CV-qualifiers.");
@@ -21,17 +52,7 @@ namespace Graphics
         using matrix_t = mat2<T>;
 
       public:
-        struct GenericExpr : Meta::with_virtual_destructor<GenericExpr>
-        {
-            using disable_vec_mat_operators = void; // Prevent vec/math `operator*` from messing things up.
-
-            virtual vector_t Apply(vector_t v) const = 0;
-
-            vector_t operator*(vector_t v) const
-            {
-                return Apply(v);
-            }
-        };
+        struct GenericExpr : Transformation<vector_t> {};
 
       private:
         struct GenericMatrix {};
@@ -98,14 +119,15 @@ namespace Graphics
             constexpr Expr() {}
             constexpr Expr(M matrix, O offset) : matrix(matrix), offset(offset) {}
 
-            constexpr vector_t ApplyLow(vector_t v) const
+            constexpr vector_t Apply(vector_t v) const
             {
                 return offset.Apply(matrix.Apply(v));
             }
 
-            vector_t Apply(vector_t v) const override
+          protected:
+            vector_t ApplyLow(vector_t v) const override
             {
-                return ApplyLow(v);
+                return Apply(v);
             }
         };
 
