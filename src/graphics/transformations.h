@@ -9,28 +9,28 @@
 
 namespace Graphics
 {
-    template <typename T, CHECK_EXPR(T::transformable_position_mem_ptr)>
-    constexpr auto TransformablePositionMemPtr(Meta::tag<T>)
+    template <typename T, CHECK_EXPR(std::declval<T &>().GetTransformableVertexPosition())>
+    constexpr auto &GetTransformableVertexPosition(T &vertex)
     {
-        return T::transformable_position_mem_ptr;
+        return vertex.GetTransformableVertexPosition();
     }
 
-    template <typename T> using transformable_position_t = std::remove_cv_t<std::remove_reference_t<decltype(std::declval<T &>().*TransformablePositionMemPtr(Meta::tag<T>{}))>>;
+    template <typename T> using transformable_position_t = std::remove_cv_t<std::remove_reference_t<decltype(GetTransformableVertexPosition(std::declval<T &>()))>>;
 
     template <typename V> struct Transformation : Meta::with_virtual_destructor<Transformation<V>>
     {
         using vector_t = V;
         using disable_vec_mat_operators = void; // Prevent vec/mat `operator*` from messing things up.
 
-        vector_t operator*(vector_t vec) const
+        [[nodiscard]] vector_t operator*(vector_t vec) const
         {
             return ApplyLow(vec);
         }
 
         template <typename T, CHECK(std::is_same_v<vector_t, transformable_position_t<T>>)>
-        T operator*(T vertex) const
+        [[nodiscard]] T operator*(T vertex) const
         {
-            vector_t &pos = vertex.*TransformablePositionMemPtr(Meta::tag<T>{});
+            vector_t &pos = GetTransformableVertexPosition(vertex);
             pos = ApplyLow(pos);
             return vertex;
         }
@@ -39,13 +39,16 @@ namespace Graphics
         virtual vector_t ApplyLow(vector_t vec) const = 0;
     };
 
-    template <typename T> struct TransformFlat
+    template <typename V> struct TransformImpl {};
+    template <typename V> using TransformFuncs = typename TransformImpl<V>::Funcs;
+
+    template <typename T> struct TransformImpl<vec2<T>>
     {
         static_assert(!std::is_const_v<T> && !std::is_volatile_v<T>, "The base type can't have CV-qualifiers.");
         static_assert(!std::is_reference_v<T>, "The base type can't be a reference.");
 
-        TransformFlat() = delete;
-        ~TransformFlat() = delete;
+        TransformImpl() = delete;
+        ~TransformImpl() = delete;
 
         using scalar_t = T;
         using vector_t = vec2<T>;
@@ -135,7 +138,7 @@ namespace Graphics
 
       public:
         template <typename M1, typename O1, typename M2, typename O2>
-        friend auto operator*(Expr<M1, O1> a, Expr<M2, O2> b)
+        [[nodiscard]] friend auto operator*(Expr<M1, O1> a, Expr<M2, O2> b)
         {
             auto matrix = Combine(a.matrix, b.matrix);
             auto offset = Combine(a.offset, Combine(a.matrix, b.offset));

@@ -142,7 +142,7 @@ namespace Graphics::Geom
     {
         using Base = ProviderFlat<typename P::vertex_t>;
 
-        const P &src_provider;
+        const Base &src_provider;
         T transformation;
 
       public:
@@ -171,7 +171,7 @@ namespace Graphics::Geom
     {
         using Base = Provider<typename P::vertex_t, typename P::index_t>;
 
-        const P &src_provider;
+        const Base &src_provider;
         T transformation;
 
       public:
@@ -583,6 +583,11 @@ namespace Graphics::Geom
 
         constexpr DataRef(std::initializer_list<type> init_list)
             : pointer(&*init_list.begin()), size(init_list.size())
+        {}
+
+        template <std::size_t N>
+        constexpr DataRef(const type (&array)[N])
+            : pointer(array), size(N)
         {}
 
         template <typename C, CHECK_TYPE(contiguous_container_elem_t<C>)>

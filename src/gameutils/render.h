@@ -3,8 +3,8 @@
 #include <memory>
 #include <utility>
 
-#include "gameutils/texture_atlas.h"
 #include "graphics/text.h"
+#include "graphics/texture_atlas.h"
 #include "program/errors.h"
 #include "utils/mat.h"
 
@@ -551,13 +551,13 @@ class Render
         return Quad_t(GetRenderQueuePtr(), pos, size);
     }
 
-    Quad_t fquad(fvec2 pos, const TextureAtlas::Image &image)
+    Quad_t fquad(fvec2 pos, const Graphics::TextureAtlas::Region &image)
     {
         return fquad(pos, image.size).tex(image.pos);
     }
 
-    Quad_t iquad(fvec2 pos, const TextureAtlas::Image &image) = delete;
-    Quad_t iquad(ivec2 pos, const TextureAtlas::Image &image)
+    Quad_t iquad(fvec2 pos, const Graphics::TextureAtlas::Region &image) = delete;
+    Quad_t iquad(ivec2 pos, const Graphics::TextureAtlas::Region &image)
     {
         return fquad(pos, image);
     }
