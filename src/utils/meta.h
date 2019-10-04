@@ -177,7 +177,7 @@ namespace Meta
 
     // Non-copyable and non-movable base class.
 
-    template <typename Base> struct stationary // Use this as a CRTP base.
+    template <typename T> struct stationary // Use this as a CRTP base.
     {
         // Here we use CRTP to make sure the empty base class optimization is never defeated.
         constexpr stationary() noexcept = default;
@@ -191,7 +191,7 @@ namespace Meta
 
     // Polymorphic base class.
 
-    template <typename Base> struct with_virtual_destructor // Use this as a CRTP base.
+    template <typename T> struct with_virtual_destructor // Use this as a CRTP base.
     {
         // The idea behind using CRTP is avoid connecting unrelated classes via a common base. I think we need to avoid that.
         constexpr with_virtual_destructor() noexcept = default;
