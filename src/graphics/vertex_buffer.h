@@ -5,6 +5,7 @@
 
 #include <cglfl/cglfl.hpp>
 
+#include "graphics/types.h"
 #include "program/errors.h"
 #include "reflection/complete.h"
 #include "utils/finally.h"
@@ -100,7 +101,8 @@ namespace Graphics
                 refl_t::for_each_field([&](auto index)
                 {
                     constexpr int i = index.value;
-                    using field_type = typename refl_t::template field_type<i>;
+                    using field_type_raw = typename refl_t::template field_type<i>;
+                    using field_type = attribute_type_t<field_type_raw>; // Strip wrappers like `NormalizedAttribute<T>`.
                     using base_type = Math::vec_base_t<field_type>;
 
                     GLint type_enum;
@@ -127,7 +129,7 @@ namespace Graphics
                         static_assert(Meta::value<false, T, decltype(index)>, "Attributes of this type are not supported.");
 
                     uintptr_t offset = reinterpret_cast<const char *>(&refl.template field_value<i>()) - reinterpret_cast<const char *>(&attributes);
-                    glVertexAttribPointer(attrib_index++, Math::vec_size_v<field_type>, type_enum, 0, sizeof(T), (void *)offset);
+                    glVertexAttribPointer(attrib_index++, Math::vec_size_v<field_type>, type_enum, attribute_is_normalized_v<field_type_raw>, sizeof(T), (void *)offset);
                 });
             }
 
