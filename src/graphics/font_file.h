@@ -212,8 +212,22 @@ namespace Graphics
             {
                 if (!HasGlyph(ch))
                     Program::Error("No such glyph.");
+
                 if (FT_Load_Char(data.ft_font, ch, FT_LOAD_RENDER | mode))
-                    Program::Error("Unknown error.");
+                {
+                    if (ch != Unicode::default_char)
+                        Program::Error("Unknown error.");
+
+                    // We can't render the default character (aka [?]), try the plain question mark instead.
+                    if (HasGlyph('?'))
+                        return GetGlyph('?', mode);
+
+                    // Return an empty glyph.
+                    GlyphData ret;
+                    ret.offset = ivec2(0);
+                    ret.advance = 0;
+                    return ret;
+                }
 
                 auto glyph = data.ft_font->glyph;
                 auto bitmap = glyph->bitmap;
