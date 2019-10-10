@@ -5,12 +5,13 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Debug (win)",
+            "name": "Debug",
             "type": "gdb",
             "request": "launch",
-            "target": "./imp-re.exe",
+            "windows": {"target": "./imp-re.exe"},
+            "linux": {"target": "./imp-re"},
             "cwd": "${workspaceRoot}/bin",
-            "valuesFormatting": "parseText",
+            "valuesFormatting": "prettyPrinters",
             "terminal": "",
         },
     ]

@@ -39,6 +39,12 @@
             "presentation": {"echo": true, "reveal": "always", "focus": false, "panel": "shared", "showReuseMessage": false, "clear": true},
         },
         {
+            "label": "↪ Profile (optimized)",
+            "type": "shell",
+            "command": "make use mode=release_profiled",
+            "presentation": {"echo": true, "reveal": "always", "focus": false, "panel": "shared", "showReuseMessage": false, "clear": true},
+        },
+        {
             "label": "↪ Release",
             "type": "shell",
             "command": "make use mode=release",
@@ -75,19 +81,19 @@
             "presentation": {"echo": true, "reveal": "always", "focus": false, "panel": "shared", "showReuseMessage": false, "clear": true},
         },
         {
-            "label": "⧮ Clean",
+            "label": "⧮ Clean (this mode)",
             "type": "shell",
             "command": "make clean_mode",
             "presentation": {"echo": true, "reveal": "always", "focus": false, "panel": "shared", "showReuseMessage": false, "clear": true},
         },
         {
-            "label": "⧯ Clean All",
+            "label": "⧯ Clean (all build artifacts)",
             "type": "shell",
             "command": "make clean",
             "presentation": {"echo": true, "reveal": "always", "focus": false, "panel": "shared", "showReuseMessage": false, "clear": true},
         },
         {
-            "label": "⧉ Clean Everything",
+            "label": "⧉ Clean (everything)",
             "type": "shell",
             "command": "make clean_everything",
             "presentation": {"echo": true, "reveal": "always", "focus": false, "panel": "shared", "showReuseMessage": false, "clear": true},

@@ -4,6 +4,8 @@ bin/*
 bin/*.exe
 bin/imgui.ini
 bin/*.dll
-bin/*.so*
+bin/*.so
+bin/*.so.*
 obj/**
 compile_commands.json
+gmon.out

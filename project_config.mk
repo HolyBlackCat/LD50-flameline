@@ -41,6 +41,13 @@ ifeq ($(TARGET_OS),windows)
 $(mode_flags) LDFLAGS += -mwindows
 endif
 
+$(call new_mode,release_profiled)
+$(mode_flags) CXXFLAGS += -DNDEBUG -O3 -pg
+$(mode_flags) LDFLAGS += -O3 -pg
+ifeq ($(TARGET_OS),windows)
+$(mode_flags) LDFLAGS += -mwindows
+endif
+
 # File-specific flags
 FILE_SPECIFIC_FLAGS := lib/implementation.cpp lib/cglfl.cpp > -g0 -O3
 
