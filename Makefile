@@ -116,8 +116,8 @@ __force_this_target:
 # Recursively searches a directory for all files matching a pattern.
 # The first parameter is a directory, the second is a pattern.
 # Example usage: SOURCES = $(call rwildcard, src, *.c *.cpp)
-# This implementation differs from the original. It was changed to correctly handle directory names without trailing `/`.
-override rwildcard = $(foreach d,$(wildcard $1/*),$(call rwildcard,$d,$2) $(filter $(subst *,%,$2),$d))
+# This implementation differs from the original. It was changed to correctly handle directory names without trailing `/`, and several directories at once.
+override rwildcard = $(foreach d,$(wildcard $(1:=/*)),$(call rwildcard,$d,$2) $(filter $(subst *,%,$2),$d))
 
 # Same as `$(shell ...)`, but triggers a error on failure.
 ifeq ($(filter --trace,$(MAKEFLAGS)),)
@@ -467,7 +467,7 @@ ifeq ($(TARGET_OS),windows)
 override source_file_extensions += *.rc
 endif
 
-override SOURCES += $(strip $(foreach dir,$(SOURCE_DIRS),$(call rwildcard,$(dir),$(source_file_extensions))))# Note the `+=`.
+override SOURCES += $(call rwildcard,$(SOURCE_DIRS),$(source_file_extensions))# Note the `+=`.
 
 # Object files.
 override objects := $(SOURCES:%=$(OBJECT_DIR)/%.o)
