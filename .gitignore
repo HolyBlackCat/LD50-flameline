@@ -9,3 +9,4 @@ bin/*.so.*
 obj/**
 compile_commands.json
 gmon.out
+.clangd/**
