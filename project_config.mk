@@ -9,7 +9,7 @@ OUTPUT_FILE := bin/imp-re
 LINKER_MODE := CXX
 
 # Dependency set name
-LIBRARY_PACK_NAME := imp-re_deps_v1.0
+LIBRARY_PACK_NAME := imp-re_deps_2019-10-14
 USED_PACKAGES := openal freetype2 ogg vorbis vorbisenc vorbisfile zlib fmt
 USED_EXTERNAL_PACKAGES :=
 ifeq ($(TARGET_OS),windows)

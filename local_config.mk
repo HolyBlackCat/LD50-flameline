@@ -4,10 +4,10 @@ CXX_COMPILER = clang++
 C_LINKER     = clang -fuse-ld=lld
 CXX_LINKER   = clang++ -fuse-ld=lld
 else
-C_COMPILER   = clang-8
-CXX_COMPILER = clang++-8
-C_LINKER     = clang-8 -fuse-ld=lld
-CXX_LINKER   = clang++-8 -fuse-ld=lld
+C_COMPILER   = clang-9
+CXX_COMPILER = clang++-9
+C_LINKER     = clang-9 -fuse-ld=lld
+CXX_LINKER   = clang++-9 -fuse-ld=lld
 endif
 
 ifeq ($(TARGET_OS),windows)
