@@ -11,12 +11,18 @@
 #pragma GCC diagnostic ignored "-Wpragmas" // Silence GCC warning about the next line disabling a warning that GCC doesn't have.
 #pragma GCC diagnostic ignored "-Wstring-plus-int" // Silence clang warning about `1+R"()"` pattern.
 
-#define VERSION "1.0.2"
+#define VERSION "1.1.0"
 
 namespace data
 {
-    constexpr int n = 64;
-    const std::vector<std::string> suffixes = {"", "_A"};
+    // Max number MA_VA_SIZE (and similar functions) can return.
+    constexpr int size_max = 16;
+
+    // Max length loops can handle.
+    constexpr int loop_max = 64;
+
+    // Max loop nesting level.
+    constexpr int loop_nesting_max = 6;
 }
 
 namespace impl
@@ -144,48 +150,87 @@ int main(int argc, char **argv)
 
     { // Macros
         { // To string
-            output("#define MA_STR(...) MA_STR_impl(__VA_ARGS__)\n");
-            output("#define MA_STR_impl(...) #__VA_ARGS__\n");
+            output(1+R"(
+                // Stringifies `...`, while expanding any macros in it.
+                #define MA_STR(...) MA_STR_impl(__VA_ARGS__)
+                #define MA_STR_impl(...) #__VA_ARGS__
+            )");
         }
 
         next_line();
 
         { // Concatenation
-            output("#define MA_CAT(x,y) MA_CAT_impl(x,y)\n");
-            output("#define MA_CAT_impl(x,y) x##y\n");
+            output(1+R"(
+                // Concatenates `x` and `y`, while expanding any macros in them. The expansions can't contain commas.
+                #define MA_CAT(x,y) MA_CAT_impl(x,y)
+                #define MA_CAT_impl(x,y) x##y
+
+                // Concatenates `...` and `x`. Note that the parameters are in a different order.
+                #define MA_APPEND_TO_VA_END(x,...) MA_APPEND_TO_VA_END_impl(x,__VA_ARGS__)
+                #define MA_APPEND_TO_VA_END_impl(x,...) __VA_ARGS__##x
+            )");
         }
 
         next_line();
 
         { // Misc
             output(1+R"(
+                // Expands to nothing.
                 #define MA_NULL(...)
+
+                // Expands to `...`.
                 #define MA_IDENTITY(...) __VA_ARGS__
 
+                // Expand to some basic symbols.
                 #define MA_COMMA() ,
                 #define MA_SEMICOLON() ;
                 #define MA_PLUS() +
 
-                #define MA_OVERLOAD(name, ...) MA_CAT(name, MA_VA_SIZE(__VA_ARGS__))(__VA_ARGS__)
+                // If `...` is not empty, adds a trailing comma to it.
+                #define MA_TR_C(...) __VA_OPT__(__VA_ARGS__,)
+
+                // Calls `m<i>(...)`, where `<i>` is the amount of comma-separated elements in `...`.
+                #define MA_OVERLOAD(m,...) MA_CAT(m, MA_VA_SIZE(__VA_ARGS__))(__VA_ARGS__)
+
+                // Expands to `a`, if `...` is not empty.
+                #define MA_IF_NOT_EMPTY(a,...) __VA_OPT__(a)
+
+                // Expands to `a`, if `...` is not empty. Otherwise expands to `b`.
+                #define MA_IF_NOT_EMPTY_ELSE(a,b,...) MA_IF_NOT_EMPTY_ELSE_impl##__VA_OPT__(_a)(a,b)
+                #define MA_IF_NOT_EMPTY_ELSE_impl(a,b) b
+                #define MA_IF_NOT_EMPTY_ELSE_impl_a(a,b) a
+
+                // Expands to `a`, if `...` has at least one comma in it after expansion.
+                #define MA_IF_COMMA(a,...) MA_IF_COMMA_impl(a,__VA_ARGS__,)
+                #define MA_IF_COMMA_impl(a,unused,...) __VA_OPT__(a)
+
+                // Expands to `a`, if `...` has at least one comma in it after expansion. Otherwise expands to `b`.
+                #define MA_IF_COMMA_ELSE(a,b,...) MA_IF_COMMA_ELSE_impl(a,b,__VA_ARGS__,)
+                #define MA_IF_COMMA_ELSE_impl(a,b,unused,...) MA_IF_COMMA_ELSE_impl_low##__VA_OPT__(_a)(a,b)
+                #define MA_IF_COMMA_ELSE_impl_low(a,b) b
+                #define MA_IF_COMMA_ELSE_impl_low_a(a,b) a
             )");
+            // `OVERLOAD` shouldn't be used in this header internally, especially in loop implementations. (Since it can't be used recursively, and user might use it in their macros.)
         }
 
         next_line();
 
-        { // Call a macro (this is intended for use outside of this header only, since it can't be used recursively and we want to be extra safe)
-            for (const auto &suffix : data::suffixes)
-                output("#define MA_CALL", suffix, "(macro, ...) macro(__VA_ARGS__)\n");
-            for (const auto &suffix : data::suffixes)
-                output("#define MA_IMPL_CALL", suffix, "(macro, ...) macro(__VA_ARGS__) // For implementation use\n");
+        { // Call a macro
+            // This shouldn't be used in this header internally, especially in loop implementations. (Since it can't be used recursively, and user might use it in their macros.)
+            output("// Same as `m(...)`, except `...` is expanded early, so any commas in it act as argument separators.\n");
+            output("#define MA_CALL(m, ...) m(__VA_ARGS__)\n");
+            // output("#define MA_IMPL_CALL(macro, ...) macro(__VA_ARGS__) // For implementation use\n");
         }
 
         next_line();
 
         { // Variadic access
             output(1+R"(
+                // Expands to the first comma-separated element of `...`.
                 #define MA_VA_FIRST(...) MA_VA_FIRST_impl(__VA_ARGS__,)
                 #define MA_VA_FIRST_impl(x, ...) x
 
+                // Expands to `...` with the first comma-separated element removed.
                 #define MA_VA_NO_FIRST(x, ...) __VA_ARGS__
             )");
         }
@@ -194,23 +239,50 @@ int main(int argc, char **argv)
 
         { // Sequence access
             output(1+R"(
-                #define MA_SEQ_FIRST(seq) MA_SEQ_FIRST_impl seq )
+                // `...` has to start with `(..)`. Expands to whatever is between the parens.
+                #define MA_SEQ_FIRST(...) MA_SEQ_FIRST_impl __VA_ARGS__ )
                 #define MA_SEQ_FIRST_impl(...) __VA_ARGS__ MA_NULL(
 
+                // `...` has to start with `(..)`. Removes this pair of parens, and inserts a comma after them.
+                #define MA_SEQ_SEP_FIRST(...) __VA_ARGS__,
+
+                // `...` has to start with `(..)`. Inserts a comma after that `(..)`.
+                #define MA_SEQ_SEP_FIRST_P(...) (__VA_ARGS__),
+
+                // `...` has to start with `(..)`. Expands to `...` with this part removed.
                 #define MA_SEQ_NO_FIRST(seq) MA_NULL seq
+
+                // `seq` has to be a sequence, like `(a)(b)(c)`. Converts it to a variadic list, like `a,b,c`.
+                #define MA_SEQ_TO_VA(seq) MA_APPEND_TO_VA_END(_end, MA_SEQ_TO_VA_impl_0 seq)
+                #define MA_SEQ_TO_VA_impl_0(...)  __VA_ARGS__ MA_SEQ_TO_VA_impl_a
+                #define MA_SEQ_TO_VA_impl_a(...) ,__VA_ARGS__ MA_SEQ_TO_VA_impl_b
+                #define MA_SEQ_TO_VA_impl_b(...) ,__VA_ARGS__ MA_SEQ_TO_VA_impl_a
+                #define MA_SEQ_TO_VA_impl_0_end
+                #define MA_SEQ_TO_VA_impl_a_end
+                #define MA_SEQ_TO_VA_impl_b_end
+
+                // `seq` has to be a sequence, like `(a)(b)(c)`. Converts it to a variadic list without removing parens, like `(a),(b),(c)`.
+                #define MA_SEQ_TO_VA_P(seq) MA_APPEND_TO_VA_END(_end, MA_SEQ_TO_VA_P_impl_0 seq)
+                #define MA_SEQ_TO_VA_P_impl_0(...)  (__VA_ARGS__) MA_SEQ_TO_VA_P_impl_a
+                #define MA_SEQ_TO_VA_P_impl_a(...) ,(__VA_ARGS__) MA_SEQ_TO_VA_P_impl_b
+                #define MA_SEQ_TO_VA_P_impl_b(...) ,(__VA_ARGS__) MA_SEQ_TO_VA_P_impl_a
+                #define MA_SEQ_TO_VA_P_impl_0_end
+                #define MA_SEQ_TO_VA_P_impl_a_end
+                #define MA_SEQ_TO_VA_P_impl_b_end
             )");
         }
 
         next_line();
 
         { // Variadic size
+            output("// `...` has to be a comma-separated list. Expands the size of the list. (If the list is empty, expands to 1.)\n");
             output("#define MA_VA_SIZE(...) MA_VA_SIZE_impl(__VA_ARGS__");
-            for (int i = data::n+1; i >= 0; i--) // Note that the loop goes up to n+1. This is to simplify support for the trailing comma for MA_VA_TO_SEQ.
+            for (int i = data::size_max; i >= 0; i--)
                 output(",", i);
             output(")\n");
 
             output("#define MA_VA_SIZE_impl(");
-            for (int i = 1; i <= data::n+1; i++)
+            for (int i = 1; i <= data::size_max; i++)
                 output("p", i, ",");
             output("size,...) size\n");
         }
@@ -218,16 +290,60 @@ int main(int argc, char **argv)
         next_line();
 
         { // Sequence size
+            output("// `seq` has to be a sequence, like `(a)(b)(c)`. Returns the number of elements in it, which can be 0.\n");
             output("#define MA_SEQ_SIZE(seq) MA_CAT(MA_SEQ_SIZE_impl_0 seq, _val)\n");
-            for (int i = 0; i <= data::n; i++)
+            for (int i = 0; i <= data::size_max; i++)
                 output("#define MA_SEQ_SIZE_impl_", i, "(...) MA_SEQ_SIZE_impl_", i+1, "\n");
-            for (int i = 0; i <= data::n; i++)
+            for (int i = 0; i <= data::size_max; i++)
                 output("#define MA_SEQ_SIZE_impl_", i, "_val ", i, "\n");
         }
 
         next_line();
 
-        { // Variadic to sequence
+        { // For each variadic element
+            output(1+R"(
+                // Applies macro `m` to each comma-separated element in `...`.
+                // A trailing comma in `...` is mandatory, not adding it causes an immediate error.
+                // If your list doesn't have a trailing comma, wrap it in `MA_TR_C(...)`.
+                // (Alternatively, you can add the comma manually. But in thsi case, if the list is empty, you'll get one unwanted iteration.)
+                // `m` will be called as `m(d,i,x)`, where `d` is arbitrary user data, `i` is 0-based index, `x` is current element.
+                // Is not reentrant (i.e. can't be nested in itself).
+                #define MA_VA_FOR_EACH(d,m,...) __VA_OPT__(MA_VA_FOR_EACH_impl_minus1(d,m,__VA_ARGS__))
+                // Nested loops. Similar to the regular version, but the indices start from `i+1` rather than `0`. (To start from `0`, pass `minus1`.)
+                // `i` should be passed from the enclosing loop.
+            )");
+
+            for (int i = 1; i <= data::loop_nesting_max; i++)
+                output("#define MA_VA_FOR_EACH_",i,"(i,d,m,...) __VA_OPT__(MA_CAT(MA_VA_FOR_EACH_impl_,i)(d,m,__VA_ARGS__))\n");
+            next_line();
+
+            output("#define MA_VA_FOR_EACH_impl_minus1(d,m,x,...) m(d,0,x) __VA_OPT__(MA_VA_FOR_EACH_impl_0(d,m,__VA_ARGS__))\n");
+
+            for (int i = 1; i < data::loop_max; i++)
+                output("#define MA_VA_FOR_EACH_impl_",i-1,"(d,m,x,...) m(d,",i,",x) __VA_OPT__(MA_VA_FOR_EACH_impl_",i,"(d,m,__VA_ARGS__))\n");
+        }
+
+        next_line();
+
+        { // For each sequence element
+            output(1+R"(
+                // Similar to `MA_VA_FOR_EACH`, but operates on sequences like `(a)(b)(c)`.
+                #define MA_SEQ_FOR_EACH(d,m,...) __VA_OPT__(MA_SEQ_FOR_EACH_impl_minus1(d,m,MA_SEQ_FIRST(__VA_ARGS__),MA_SEQ_NO_FIRST(__VA_ARGS__)))
+            )");
+
+            for (int i = 1; i <= data::loop_nesting_max; i++)
+                output("#define MA_SEQ_FOR_EACH_",i,"(i,d,m,...) __VA_OPT__(MA_CAT(MA_SEQ_FOR_EACH_impl_,i)(d,m,__VA_ARGS__))\n");
+            next_line();
+
+            output("#define MA_SEQ_FOR_EACH_impl_minus1(d,m,x,...) m(d,0,x) __VA_OPT__(MA_SEQ_FOR_EACH_impl_0(d,m,MA_SEQ_FIRST(__VA_ARGS__),MA_SEQ_NO_FIRST(__VA_ARGS__)))\n");
+
+            for (int i = 1; i < data::loop_max; i++)
+                output("#define MA_SEQ_FOR_EACH_impl_",i-1,"(d,m,x,...) m(d,",i,",x) __VA_OPT__(MA_SEQ_FOR_EACH_impl_",i,"(d,m,MA_SEQ_FIRST(__VA_ARGS__),MA_SEQ_NO_FIRST(__VA_ARGS__)))\n");
+        }
+
+        /*
+
+        { // Variadic to sequence (unnecessary)
             output("#define MA_VA_TO_SEQ(...) MA_CAT(MA_VA_TO_SEQ_impl_, MA_VA_SIZE(__VA_ARGS__,))(__VA_ARGS__,)\n");
             output("#define MA_VA_TO_SEQ_TRAILING_COMMA(...) MA_CAT(MA_VA_TO_SEQ_impl_, MA_VA_SIZE(__VA_ARGS__))(__VA_ARGS__)\n");
             output("#define MA_VA_TO_SEQ_impl_null\n");
@@ -246,7 +362,7 @@ int main(int argc, char **argv)
 
         next_line();
 
-        { // Sequence to variadic
+        { // Sequence to variadic (unnecessary)
             output("#define MA_SEQ_TO_VA(seq) MA_CAT(MA_SEQ_TO_VA_impl_, MA_SEQ_SIZE(seq)) seq\n");
             output("#define MA_SEQ_TO_VA_impl_0\n");
             output("#define MA_SEQ_TO_VA_impl_1(...) __VA_ARGS__\n");
@@ -256,7 +372,7 @@ int main(int argc, char **argv)
 
         next_line();
 
-        { // Sequence to variadic (preserve parens)
+        { // Sequence to variadic, preserve parens (replaced with a new implementation)
             output("#define MA_SEQ_TO_VA_PARENS(seq) MA_CAT(MA_SEQ_TO_VA_PARENS_impl_, MA_SEQ_SIZE(seq)) seq\n");
             output("#define MA_SEQ_TO_VA_PARENS_impl_0\n");
             output("#define MA_SEQ_TO_VA_PARENS_impl_1(...) (__VA_ARGS__)\n");
@@ -296,7 +412,7 @@ int main(int argc, char **argv)
                     output("#define MA_SEQ_FOR_EACH", suffix, "_impl_", i, "(macro, sep, data, seq) "
                            "MA_IMPL_CALL", suffix, "(macro, ", i-1, ", data, MA_SEQ_FIRST(seq)) sep() MA_SEQ_FOR_EACH", suffix, "_impl_", i-1, "(macro, sep, data, MA_SEQ_NO_FIRST(seq))\n");
             }
-        }
+        }*/
     }
 
     if (!impl::output_file)
