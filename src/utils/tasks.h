@@ -4,17 +4,18 @@
 
 #include "macro.h"
 
-/* `class Task` is basically a poor man's coroutine.
+/* `class CoTask` is basically a poor man's coroutine.
  *
  * Example usage:
  *
- *     Task t = TASK((),{
+ *     CoTask t = CO_TASK(,{
  *         std::cout << "1\n";
- *         YIELD
+ *         CO_YIELD
  *         std::cout << "2\n";
- *         YIELD
+ *         CO_YIELD
  *         std::cout << "3\n";
  *     });
+ *     // {} around the task body are optional.
  *
  *     while (!t.finished())
  *     {
@@ -34,24 +35,24 @@
  *     3
  *     Finished!
  *
- * In short, the thing works by constructing a lambda and replacing `YIELD` with `{ return x; goto_label_y: ; }`.
+ * In short, the thing works by constructing a lambda with a large switch inside, and placing CO_YIELD-separated pieces of code under separate `case`s.
  *
- * Since we use `goto`, you can't YIELD from a nested function or a nested lambda.
+ * Since we use switch/case, you can't CO_YIELD from a nested function or a nested lambda.
  *
- * Also goto can't jump across initializations, and because of that, USAGE OF LOCAL VARIABLES IS VERY LIMITED.
+ * Also switch/case can't jump across initializations, and because of that, USAGE OF LOCAL VARIABLES IS VERY LIMITED.
  *
- * The rule is: you can't have YIELD in the same scope (or nested in such scope) as a local variable below said variable.
+ * The rule is: you can't have CO_YIELD in the same scope (or nested in such scope) as a local variable below said variable.
  * The compiler won't enforce the rule for variables with trivial default constructors without initializers,
  * but keep in mind that such variables won't retain their values after resuming the task, so they shouldn't be used.
  *
  * If you want to store the state, you have to declare all the state variables at the beginning of the function, like so:
  *
- *     Task t = TASK((i = 0,), // <- All variables are declared here. Don't forget the trailing comma.
+ *     CoTask t = CO_TASK((i = 0,), // <- All variables are declared here. Don't forget the trailing comma.
  *     {
  *         std::cout << ++i << "\n";
- *         YIELD
+ *         CO_YIELD
  *         std::cout << ++i << "\n";
- *         YIELD
+ *         CO_YIELD
  *         std::cout << ++i << "\n";
  *     });
  *
@@ -60,14 +61,14 @@
  */
 
 
-class Task
+class CoTask
 {
     std::function<bool()> func;
     bool done = 0;
 
   public:
-    Task() {}
-    Task(std::function<bool()> func) : func(std::move(func)) {}
+    CoTask() {}
+    CoTask(std::function<bool()> func) : func(std::move(func)), done(0) {}
 
     explicit operator bool() const
     {
@@ -78,7 +79,7 @@ class Task
     {
         if (!func)
             return 1;
-        done = func() == 0;
+        done = func();
         return done;
     }
 
@@ -91,19 +92,17 @@ class Task
 };
 
 
-#define TASK(vars, ...) MA_CALL(IMPL_TASK, vars, (__VA_ARGS__))
-#define YIELD )(
+#define CO_TASK(vars, ...) MA_CALL(IMPL_CO_TASK, vars, (;__VA_ARGS__))
+#define CO_YIELD )(
 
-#define IMPL_TASK(vars, body_seq) \
-    ::Task([MA_IDENTITY vars _label_index = -1]() mutable -> bool \
+#define IMPL_CO_TASK(vars, body_seq) \
+    ::CoTask([ MA_IF_NOT_EMPTY(MA_IDENTITY vars, vars) _co_task_state = 0]() mutable -> bool \
     { \
-        switch (_label_index) \
+        switch (_co_task_state) \
         { \
-            MA_SEQ_FOR_EACH(IMPL_TASK_CASE, MA_NULL, , body_seq) \
+            MA_SEQ_FOR_EACH(,IMPL_CO_TASK_CASE,body_seq) \
         } \
-        MA_SEQ_FOR_EACH(IMPL_TASK_CODE, MA_NULL, , body_seq) \
-        return 0; \
+        return 1; \
     })
 
-#define IMPL_TASK_CASE(i, data, ...) case i: goto _task_point_##i;
-#define IMPL_TASK_CODE(i, data, ...) __VA_ARGS__ {_label_index = i; return i; _task_point_##i: ;}
+#define IMPL_CO_TASK_CASE(data, i, ...) do {_co_task_state = i; return 0; case i: ; } while (0) __VA_ARGS__
