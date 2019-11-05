@@ -106,6 +106,25 @@ namespace Meta
     }
 
 
+    // Invoke a function with a constexpr-ized integer argument.
+    // `func` is called with an argument of type `std::integral_constant<decltype(N), i>`, and its return value is returned.
+    // `i` has to be in the range `0..N-1`, otherwise the behavior is undefined (likely a crash if the `std::array` bounds checking is disabled).
+
+    template <auto N, typename F>
+    [[nodiscard]] constexpr decltype(auto) with_cexpr_value(decltype(N) i, F &&func)
+    {
+        static_assert(N >= 1);
+
+        return cexpr_generate_array<N>([&](auto value)
+        {
+            return +[](F &&func) -> decltype(auto)
+            {
+                return std::forward<F>(func)(decltype(value){});
+            };
+        })[i](std::forward<F>(func));
+    }
+
+
     // Invoke a funciton with a set of constexpr-ized boolean flags.
     // (Beware that 2^n instantinations of the function will be generated.)
     // Example usage:
@@ -113,19 +132,18 @@ namespace Meta
 
     namespace impl
     {
-        template <typename F, unsigned int ...I>
-        constexpr decltype(auto) cexpr_flags(unsigned int flags, F &&func, std::integer_sequence<unsigned int, I...>)
+        using cexpr_flag_bits_t = unsigned int;
+
+        template <typename F, int ...I>
+        constexpr decltype(auto) with_cexpr_flags(cexpr_flag_bits_t flags, F &&func, std::integer_sequence<int, I...>)
         {
-            static_assert(sizeof...(I) <= sizeof(unsigned int) * 8);
-            constexpr unsigned int func_count = (unsigned int)1 << (unsigned int)(sizeof...(I));
-            return cexpr_generate_array<func_count>([](auto index) -> decltype(auto)
+            static_assert(sizeof...(I) <= sizeof(cexpr_flag_bits_t) * 8);
+            constexpr cexpr_flag_bits_t func_count = (cexpr_flag_bits_t)1 << (cexpr_flag_bits_t)(sizeof...(I));
+            return with_cexpr_value<func_count>(flags, [&](auto index) -> decltype(auto)
             {
-                constexpr auto i = index.value;
-                return +[](F &&func) -> decltype(auto)
-                {
-                    return std::forward<F>(func)(std::bool_constant<bool(i & (1 << I))>{}...);
-                };
-            })[flags](std::forward<F>(func));
+                constexpr cexpr_flag_bits_t i = index;
+                return std::forward<F>(func)(std::bool_constant<bool(i & cexpr_flag_bits_t(cexpr_flag_bits_t(1) << cexpr_flag_bits_t(I)))>{}...);
+            });
         }
 
         template <typename L>
@@ -144,17 +162,17 @@ namespace Meta
     }
 
     template <typename ...P, CHECK(std::is_convertible_v<const P &, bool> && ...)>
-    [[nodiscard]] constexpr auto cexpr_flags(const P &... params)
+    [[nodiscard]] constexpr auto with_cexpr_flags(const P &... params)
     {
-        unsigned int flags = 0, mask = 1;
+        impl::cexpr_flag_bits_t flags = 0, mask = 1;
         ((flags |= mask * bool(params), mask <<= 1) , ...);
 
         auto lambda = [flags](auto &&func) -> decltype(auto)
         {
-            return impl::cexpr_flags(flags, decltype(func)(func), std::make_integer_sequence<unsigned int, sizeof...(P)>{});
+            return impl::with_cexpr_flags(flags, decltype(func)(func), std::make_integer_sequence<int, sizeof...(P)>{});
         };
 
-        return impl::cexpr_flags_expr{lambda};
+        return impl::cexpr_flags_expr(lambda);
     }
 
 
