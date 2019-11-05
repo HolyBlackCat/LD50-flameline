@@ -61,6 +61,32 @@ namespace Meta
     template <template <typename...> typename A, typename ...B> inline constexpr bool is_detected = impl::is_detected<void, A, B...>::value;
 
 
+    // An object wrapper that moves the underlying object even when copied.
+    // Also has a function-call operator that forwards the call to the underlying objects,
+    // which makes it good for putting non-copyable lambdas into `std::function`s.
+
+    template <typename T> struct fake_copyable
+    {
+        mutable T value;
+
+        constexpr fake_copyable(T &&value = {}) : value(std::move(value)) {}
+
+        constexpr fake_copyable(const fake_copyable &other) : value(std::move(other.value)) {}
+        constexpr fake_copyable(fake_copyable &&other) : value(std::move(other.value)) {}
+
+        constexpr fake_copyable &operator=(const fake_copyable &other) {value = std::move(other.value); return *this;}
+        constexpr fake_copyable &operator=(fake_copyable &&other) {value = std::move(other.value); return *this;}
+
+        template <typename ...P>
+        decltype(auto) operator()(P &&... params)
+        {
+            return value(std::forward<P>(params)...);
+        }
+    };
+
+    template <typename T> fake_copyable(T) -> fake_copyable<T>;
+
+
     // Constexpr replacement for the for loop.
 
     template <typename Integer, Integer ...I, typename F> constexpr void cexpr_for_each(std::integer_sequence<Integer, I...>, F &&func)
