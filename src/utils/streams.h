@@ -16,14 +16,23 @@
 #include "utils/memory_access.h"
 #include "utils/meta.h"
 
+/* Simple IO streams, which can be bound to files, memory or some other storagee.
+ *
+ * The input stream, when tested on a bunch of one-byte reads, appears to be faster
+ *   than a plain `FILE *` in release mode (more than 50% faster), but slower in debug mode (almost 50% slower).
+ *   As read size increases, the speed difference decreases. On four-byte reads, streams
+ *   are 25% faster in release mode, and almost 33% slower in debug mode.
+ */
+
 namespace Stream
 {
     class Input : Meta::with_virtual_destructor<Input>
     {
       public:
         using func_t = std::function<std::size_t(std::uint8_t *, std::size_t)>;
+        enum class buffer_capacity_t : std::size_t {};
 
-        static constexpr std::size_t default_buffer_capacity = 512; // The same buffer capacity appears to be used by `<cstdio>` by default.
+        static constexpr buffer_capacity_t default_buffer_capacity = buffer_capacity_t(512); // The same buffer capacity appears to be used by `<cstdio>` by default.
 
       private:
         struct Data
@@ -86,17 +95,17 @@ namespace Stream
         }
 
         // Constructs a stream referring to an arbitrary data source.
-        Input(func_t obtain_bytes, std::size_t buffer_capacity = default_buffer_capacity)
+        Input(func_t obtain_bytes, buffer_capacity_t buffer_capacity = default_buffer_capacity)
         {
-            data.buffer_storage = std::make_unique<std::uint8_t[]>(buffer_capacity);
+            data.buffer_storage = std::make_unique<std::uint8_t[]>(std::size_t(buffer_capacity));
             data.buffer = data.buffer_storage.get();
-            data.buffer_capacity = buffer_capacity;
+            data.buffer_capacity = std::size_t(buffer_capacity);
             data.buffer_pos = 1; // Sic.
             data.obtain_bytes = std::move(obtain_bytes);
         }
 
         // Constructs a stream referring to memory.
-        Input(const std::uint8_t *ptr, std::size_t size)
+        Input(std::size_t size, const std::uint8_t *ptr)
         {
             data.buffer = const_cast<std::uint8_t *>(ptr); // Since we use a no-op `obtain_bytes`, nothing should ever write to this buffer.
             data.buffer_capacity = size;
@@ -106,19 +115,23 @@ namespace Stream
 
         // Constructs a stream referring to memory.
         // An alternative overload, with `char *` instead of `uint8_t *`.
-        Input(const char *ptr, std::size_t size)
-            : Input(reinterpret_cast<const std::uint8_t *>(ptr), size)
+        Input(std::size_t size, const char *ptr)
+            : Input(size, reinterpret_cast<const std::uint8_t *>(ptr))
         {}
 
         // Constructs a stream referring to a file.
-        [[nodiscard]] static Input File(std::string file_name, std::size_t buffer_capacity = default_buffer_capacity)
+        Input(std::string file_name, buffer_capacity_t buffer_capacity = default_buffer_capacity)
         {
-            auto deleter = [](FILE *file){std::fclose(file);};
+            auto deleter = [](FILE *file){std::fclose(file);}; // `fclose` can fail, but it destroys `FILE *` even in that case, so we don't check the return value.
             std::unique_ptr<FILE, decltype(deleter)> handle(std::fopen(file_name.c_str(), "rb"));
             if (!handle)
                 throw std::runtime_error("Unable to open `" + file_name + "` for reading.");
 
-            return Input(Meta::fake_copyable([handle = std::move(handle), file_name = std::move(file_name)](std::uint8_t *dest, std::size_t size) -> std::size_t
+            // Disable file buffering, since we use a custom buffer.
+            // This doesn't indicate a error in any way, but if it did, we would ignore it.
+            setbuf(handle.get(), nullptr);
+
+            *this = Input(Meta::fake_copyable([handle = std::move(handle), file_name = std::move(file_name)](std::uint8_t *dest, std::size_t size) -> std::size_t
             {
                 std::size_t result = std::fread(dest, 1, size, handle.get());
                 if (result < size)
@@ -130,6 +143,12 @@ namespace Stream
                 return result;
             }), buffer_capacity);
         }
+
+        // Constructs a stream referring to a file.
+        // An alternative overload, using a C-string.
+        Input(const char *file_name, buffer_capacity_t buffer_capacity = default_buffer_capacity)
+            : Input(std::string(file_name), buffer_capacity)
+        {}
 
 
         // Checks if the stream is null.
@@ -199,14 +218,21 @@ namespace Stream
             return ret;
         }
 
-        // Reads an arithmetic type with a little-endian byte order.
+        // Reads an arithmetic type with the native byte order.
+        template <typename T>
+        [[nodiscard]] T ReadNative()
+        {
+            return ReadWithOrder<T>(ByteOrder::native);
+        }
+
+        // Reads an arithmetic type with the little-endian byte order.
         template <typename T>
         [[nodiscard]] T ReadLittle()
         {
             return ReadWithOrder<T>(ByteOrder::little);
         }
 
-        // Reads an arithmetic type with a big-endian byte order.
+        // Reads an arithmetic type with the big-endian byte order.
         template <typename T>
         [[nodiscard]] T ReadBig()
         {
