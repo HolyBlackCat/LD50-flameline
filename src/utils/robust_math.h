@@ -44,23 +44,6 @@ namespace Robust
 
     namespace impl
     {
-        // If a magnitude (aka absolute value) of a floating-point number is less than this value, the number can be fractional.
-        template <typename F> inline constexpr F float_frac_threshold = []{
-            // Computes `2^(std::numeric_limits<float>::digits-1)` at compile-time.
-            static_assert(std::is_floating_point_v<F>);
-            F ret = 1;
-            F factor = 2;
-            unsigned int power = std::numeric_limits<float>::digits-1;
-            while (power > 0)
-            {
-                if (power & 1)
-                    ret *= factor;
-                factor *= factor;
-                power >>= 1;
-            }
-            return ret;
-        }();
-
         // Compares an integral and a floating-point value.
         // Despite the parameter names, it doesn't matter which one is which.
         // Follows a so-called 'partial ordering': for some pairs of values you get a special 'undefined' result (i.e. for NaNs compared with any number).
@@ -109,28 +92,14 @@ namespace Robust
                         return f > 0 ? Ordering::less : Ordering::greater;
                 }
 
-                // ** Truncate `f` if it's not an integer.
-                Ordering result_if_eq = Ordering::equal;
-                if (f < float_frac_threshold<F> && f > -float_frac_threshold<F>)
-                {
-                    F trunc_f = std::trunc(f);
-                    if (f != trunc_f)
-                    {
-                        result_if_eq = f > 0 ? Ordering::less : Ordering::greater;
-                        f = trunc_f;
-                    }
-                }
-
                 // ** Perform integral comparsion.
-
                 I f_as_int = f;
-
                 if (i > f_as_int)
                     return Ordering::greater;
                 else if (i < f_as_int)
                     return Ordering::less;
                 else
-                    return result_if_eq;
+                    return Ordering::equal;
             }
         }
     }
