@@ -66,20 +66,20 @@ namespace Robust
                 if (i_as_float > f)
                     return Ordering::greater;
 
+                // I_magnitude_bits == sizeof(I) * CHAR_BIT - std::is_signed_v<I>
+                constexpr int I_magnitude_bits = std::numeric_limits<I>::digits;
+                constexpr int F_max_exp = std::numeric_limits<F>::max_exponent;
+
                 // ** Handle special floating-point values.
                 if (std::isnan(f))
                     return Ordering::unordered;
-                if (std::isinf(f))
+                if (I_magnitude_bits >= F_max_exp && std::isinf(f)) // `isinf(f)` check is only necessary if `F(i)` can result in infinity.
                     return f > 0 ? Ordering::less : Ordering::greater;
 
                 /* Unnecessary because covered by the floating-point comparsion.
                 if (std::is_unsigned_v<I> && f < 0)
-                    return Ordering::greater;
+                    return greater;
                 */
-
-                // I_magnitude_bits == sizeof(I) * CHAR_BIT - std::is_signed_v<I>
-                constexpr int I_magnitude_bits = std::numeric_limits<I>::digits;
-                constexpr int F_max_exp = std::numeric_limits<F>::max_exponent;
 
                 // ** Check if `f` is outside of the range `I` can represent.
                 if constexpr (F_max_exp > I_magnitude_bits)
