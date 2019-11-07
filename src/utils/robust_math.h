@@ -76,15 +76,23 @@ namespace Robust
                 static_assert(std::is_integral_v<I> && std::is_floating_point_v<F>);
                 static_assert(std::numeric_limits<F>::radix == 2);
 
-                // ** Handle special cases.
+                // ** Attempt a floating-point comparsion.
+                F i_as_float = i;
+                if (i_as_float < f)
+                    return Ordering::less;
+                if (i_as_float > f)
+                    return Ordering::greater;
 
+                // ** Handle special floating-point values.
                 if (std::isnan(f))
                     return Ordering::unordered;
-                else if (std::isinf(f))
+                if (std::isinf(f))
                     return f > 0 ? Ordering::less : Ordering::greater;
 
+                /* Unnecessary because covered by the floating-point comparsion.
                 if (std::is_unsigned_v<I> && f < 0)
                     return Ordering::greater;
+                */
 
                 // I_magnitude_bits == sizeof(I) * CHAR_BIT - std::is_signed_v<I>
                 constexpr int I_magnitude_bits = std::numeric_limits<I>::digits;
@@ -102,7 +110,6 @@ namespace Robust
                 }
 
                 // ** Truncate `f` if it's not an integer.
-
                 Ordering result_if_eq = Ordering::equal;
                 if (f < float_frac_threshold<F> && f > -float_frac_threshold<F>)
                 {
@@ -114,7 +121,7 @@ namespace Robust
                     }
                 }
 
-                // ** Actually compare the numbers.
+                // ** Perform integral comparsion.
 
                 I f_as_int = f;
 
