@@ -31,6 +31,22 @@ namespace Meta
     template <typename A, typename ...B> using void_type = type<void, A, B...>;
 
 
+    // Forces some of the function template parameters to be deduced.
+    // Usage:` template <typename A, Meta::deduct..., typename B>` ...
+    // All template parameters placed after `Meta::deduct...` can't be specified manually and would have to be deduced.
+
+    namespace impl
+    {
+        class deduct_helper
+        {
+          protected:
+            constexpr deduct_helper() {}
+        };
+    }
+
+    using deduct = impl::deduct_helper &;
+
+
     // Lambda overloader.
 
     template <typename ...P> struct overload : P... { using P::operator()...; };

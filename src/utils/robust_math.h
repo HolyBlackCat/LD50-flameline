@@ -2,7 +2,10 @@
 
 #include <cmath>
 #include <limits>
+#include <stdexcept>
 #include <type_traits>
+
+#include "utils/meta.h"
 
 /* The functions in this file can be used for ROBUST comparsions between integral and/or floating-point types.
  *
@@ -59,47 +62,50 @@ namespace Robust
                 static_assert(std::is_integral_v<I> && std::is_floating_point_v<F>);
                 static_assert(std::numeric_limits<F>::radix == 2);
 
-                // ** Attempt a floating-point comparsion.
-                F i_as_float = i;
-                if (i_as_float < f)
-                    return Ordering::less;
-                if (i_as_float > f)
-                    return Ordering::greater;
+                // This should be exactly representable as F due to being a power of two.
+                constexpr F I_min_as_F = std::numeric_limits<I>::min();
 
-                // I_magnitude_bits == sizeof(I) * CHAR_BIT - std::is_signed_v<I>
-                constexpr int I_magnitude_bits = std::numeric_limits<I>::digits;
-                constexpr int F_max_exp = std::numeric_limits<F>::max_exponent;
+                // The `numeric_limits<I>::max()` itself might not be representable as F, so we use this instead.
+                constexpr F I_max_as_F_plus_1 = F(std::numeric_limits<I>::max()/2+1) * 2;
 
-                // ** Handle special floating-point values.
-                if (std::isnan(f))
-                    return Ordering::unordered;
-                if (I_magnitude_bits >= F_max_exp && std::isinf(f)) // `isinf(f)` check is only necessary if `F(i)` can result in infinity.
-                    return f > 0 ? Ordering::less : Ordering::greater;
-
-                /* Unnecessary because covered by the floating-point comparsion.
-                if (std::is_unsigned_v<I> && f < 0)
-                    return greater;
-                */
-
-                // ** Check if `f` is outside of the range `I` can represent.
-                if constexpr (F_max_exp > I_magnitude_bits)
+                // Check if the constants above overflowed to infinity. Normally this shouldn't happen.
+                constexpr bool limits_overflow = I_min_as_F * 2 == I_min_as_F || I_max_as_F_plus_1 * 2 == I_max_as_F_plus_1;
+                if constexpr (limits_overflow)
                 {
-                    int exp = 0;
-                    F frac = std::frexp(f, &exp);
-
-                    bool float_too_large = exp > I_magnitude_bits + (std::is_signed_v<I> && frac == F(-0.5));
-                    if (float_too_large)
+                    // Manually check for special floating-point values.
+                    if (std::isinf(f))
                         return f > 0 ? Ordering::less : Ordering::greater;
+                    if (std::isnan(f))
+                        return Ordering::unordered;
                 }
 
-                // ** Perform integral comparsion.
-                I f_as_int = f;
-                if (i > f_as_int)
-                    return Ordering::greater;
-                else if (i < f_as_int)
+                if (limits_overflow || f >= I_min_as_F)
+                {
+                    // `f <= I_max_as_F_plus_1 - 1` would be problematic due to rounding, so we use this instead.
+                    if (limits_overflow || f - I_max_as_F_plus_1 <= -1)
+                    {
+                        I f_trunc = f;
+                        if (f_trunc < i)
+                            return Ordering::greater;
+                        if (f_trunc > i)
+                            return Ordering::less;
+
+                        F f_frac = f - f_trunc;
+                        if (f_frac < 0)
+                            return Ordering::greater;
+                        if (f_frac > 0)
+                            return Ordering::less;
+
+                        return Ordering::equal;
+                    }
+
                     return Ordering::less;
-                else
-                    return Ordering::equal;
+                }
+
+                if (f < 0)
+                    return Ordering::greater;
+
+                return Ordering::unordered;
             }
         }
     }
@@ -108,7 +114,7 @@ namespace Robust
     template <typename A, typename B>
     [[nodiscard]] constexpr bool equal(A a, B b)
     {
-        static_assert(std::is_arithmetic_v<A> && std::is_arithmetic_v<B>, "Parameters must be integral or floating-point.");
+        static_assert(std::is_arithmetic_v<A> && std::is_arithmetic_v<B>, "Parameters must be arithmetic.");
 
         constexpr bool a_is_int = std::is_integral_v<A>;
         constexpr bool b_is_int = std::is_integral_v<B>;
@@ -138,6 +144,9 @@ namespace Robust
     template <typename A, typename B>
     [[nodiscard]] constexpr bool not_equal(A a, B b)
     {
+        // We could remove the `static_assert`, but then the error messages would get longer.
+        // Also, in theory, ADL could kick in if a class is passed.
+        static_assert(std::is_arithmetic_v<A> && std::is_arithmetic_v<B>, "Parameters must be arithmetic.");
         return !equal(a, b);
     }
 
@@ -145,7 +154,7 @@ namespace Robust
     template <typename A, typename B>
     [[nodiscard]] constexpr bool less(A a, B b)
     {
-        static_assert(std::is_arithmetic_v<A> && std::is_arithmetic_v<B>, "Parameters must be integral or floating-point.");
+        static_assert(std::is_arithmetic_v<A> && std::is_arithmetic_v<B>, "Parameters must be arithmetic.");
 
         constexpr bool a_is_int = std::is_integral_v<A>;
         constexpr bool b_is_int = std::is_integral_v<B>;
@@ -175,18 +184,21 @@ namespace Robust
     template <typename A, typename B>
     [[nodiscard]] constexpr bool greater(A a, B b)
     {
+        static_assert(std::is_arithmetic_v<A> && std::is_arithmetic_v<B>, "Parameters must be arithmetic.");
         return less(b, a);
     }
 
     template <typename A, typename B>
     [[nodiscard]] constexpr bool less_eq(A a, B b)
     {
+        static_assert(std::is_arithmetic_v<A> && std::is_arithmetic_v<B>, "Parameters must be arithmetic.");
         return !less(b, a);
     }
 
     template <typename A, typename B>
     [[nodiscard]] constexpr bool greater_eq(A a, B b)
     {
+        static_assert(std::is_arithmetic_v<A> && std::is_arithmetic_v<B>, "Parameters must be arithmetic.");
         return !less(a, b);
     }
 
@@ -194,7 +206,7 @@ namespace Robust
     template <typename A, typename B>
     [[nodiscard]] constexpr Ordering compare_three_way(A a, B b)
     {
-        static_assert(std::is_arithmetic_v<A> && std::is_arithmetic_v<B>, "Parameters must be integral or floating-point.");
+        static_assert(std::is_arithmetic_v<A> && std::is_arithmetic_v<B>, "Parameters must be arithmetic.");
 
         constexpr bool a_is_int = std::is_integral_v<A>;
         constexpr bool b_is_int = std::is_integral_v<B>;
@@ -222,6 +234,20 @@ namespace Robust
     template <typename A, typename B>
     [[nodiscard]] constexpr bool representable_as(B value)
     {
+        static_assert(std::is_arithmetic_v<A> && std::is_arithmetic_v<B>, "Parameters must be arithmetic.");
         return equal(value, A(value));
+    }
+
+
+    // Attempts to convert `value` to type `A`. Throws if it's not represesntable as `A`.
+    // Usage `Robust::safe_cast<A>(value)`.
+    template <typename A, Meta::deduct..., typename B>
+    [[nodiscard]] constexpr A safe_cast(B value)
+    {
+        static_assert(std::is_arithmetic_v<A> && std::is_arithmetic_v<B>, "Parameters must be arithmetic.");
+        A result = value;
+        if (not_equal(result, value))
+            throw std::runtime_error("The value can't be represented by the specified type.");
+        return result;
     }
 }
