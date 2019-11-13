@@ -37,7 +37,7 @@ namespace Graphics
         {
             data = std::vector<u8vec4>(size.prod(), color);
         }
-        Image(MemoryFile file, FlipMode flip_mode = no_flip) // Throws on failure.
+        Image(Stream::MemoryFile file, FlipMode flip_mode = no_flip) // Throws on failure.
         {
             stbi_set_flip_vertically_on_load(flip_mode == flip_y);
             ivec2 img_size;

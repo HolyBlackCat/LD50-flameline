@@ -5,6 +5,7 @@
 #include <zlib.h>
 
 #include "program/errors.h"
+#include "utils/robust_math.h"
 
 namespace Archive
 {
@@ -67,11 +68,14 @@ namespace Archive
     [[nodiscard]] std::size_t UncompressedSize(const uint8_t *src_begin, const uint8_t *src_end)
     {
         if (src_end - src_begin < std::ptrdiff_t(sizeof(size_type)))
-            Program::Error("Decompression failure.");
+            Program::Error("Uncompression failure.");
 
-        std::size_t size = 0;
+        size_type size = 0;
         for (std::size_t i = 0; i < sizeof(size_type); i++)
             size |= (size_type(src_begin[i]) << (i * 8));
+
+        if (!Robust::representable_as<std::size_t>(size))
+            Program::Error("Unable to uncompress: The object is too large.");
 
         return size;
     }

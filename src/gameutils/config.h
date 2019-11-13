@@ -107,12 +107,12 @@ template <typename T> class Config
 
     Config(const std::string &file_name) : file_name(file_name)
     {
-        MemoryFile file;
+        Stream::MemoryFile file;
 
         // Try loading the file;
         try
         {
-            file = MemoryFile(file_name);
+            file = Stream::MemoryFile(file_name);
         }
         catch (...) {}
 
@@ -159,7 +159,7 @@ template <typename T> class Config
         std::string obj_string = refl.to_string(4);
         try
         {
-            MemoryFile::Save(file_name, (std::uint8_t *)obj_string.data(), (std::uint8_t *)obj_string.data() + obj_string.size());
+            Stream::MemoryFile::SaveFile(file_name, (std::uint8_t *)obj_string.data(), (std::uint8_t *)obj_string.data() + obj_string.size());
         }
         catch (...) {}
     }
@@ -184,7 +184,7 @@ template <typename T> class Config
         std::string obj_string = refl.to_string(4);
         try
         {
-            MemoryFile::Save(file_name, (std::uint8_t *)obj_string.data(), (std::uint8_t *)obj_string.data() + obj_string.size());
+            Stream::MemoryFile::SaveFile(file_name, (std::uint8_t *)obj_string.data(), (std::uint8_t *)obj_string.data() + obj_string.size());
         }
         catch (...) {}
     }

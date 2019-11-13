@@ -33,7 +33,7 @@ namespace Graphics
         struct Data
         {
             FT_Face ft_font = 0;
-            MemoryFile file;
+            Stream::MemoryFile file;
         };
 
         Data data;
@@ -45,9 +45,9 @@ namespace Graphics
         // `size` is measured in pixels. Normally you only provide height, but you can also provide width. In this case, `[x,0]` and `[0,x]` are equivalent to `[x,x]` due to how FreeType operates.
         // Some font files contain several fonts; `index` determines which one of them is loaded. Upper 16 bits of `index` contain so-called "variation" (sub-font?) index, which starts from 1. Use 0 to load the default one.
 
-        FontFile(MemoryFile file, int size, int index = 0) : FontFile(file, ivec2(0, size), index) {}
+        FontFile(Stream::MemoryFile file, int size, int index = 0) : FontFile(file, ivec2(0, size), index) {}
 
-        FontFile(MemoryFile file, ivec2 size, int index = 0)
+        FontFile(Stream::MemoryFile file, ivec2 size, int index = 0)
         {
             if (!ft_initialized)
             {

@@ -107,7 +107,7 @@ namespace Interface
             // We need `unique_ptr` because ImGui stores the file name in the context as `const char *`, so the string has to remain valid even if the controller is moved.
             std::unique_ptr<std::string> state_file_name;
 
-            std::vector<MemoryFile> font_storage;
+            std::vector<Stream::MemoryFile> font_storage;
         };
         Data data;
 
@@ -293,7 +293,7 @@ namespace Interface
         }
 
         // Load a font.
-        ImFont *LoadFont(MemoryFile file, float size, ImFontConfig config = {}, const ImWchar *glyph_ranges = 0)
+        ImFont *LoadFont(Stream::MemoryFile file, float size, ImFontConfig config = {}, const ImWchar *glyph_ranges = 0)
         {
             ImGuiContext *old_context = ImGui::GetCurrentContext();
             FINALLY( ImGui::SetCurrentContext(old_context); )
