@@ -73,9 +73,9 @@ namespace Graphics
         }
 
         IndexBuffer(IndexBuffer &&other) noexcept : data(std::exchange(other.data, {})) {}
-        IndexBuffer &operator=(IndexBuffer &&other) noexcept
+        IndexBuffer &operator=(IndexBuffer other) noexcept
         {
-            data = std::exchange(other.data, {});
+            std::swap(data, other.data);
             return *this;
         }
 

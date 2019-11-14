@@ -29,9 +29,9 @@ namespace Graphics
         }
 
         DummyVertexArray(DummyVertexArray &&other) noexcept : handle(std::exchange(other.handle, {})) {}
-        DummyVertexArray &operator=(DummyVertexArray &&other) noexcept
+        DummyVertexArray &operator=(DummyVertexArray other) noexcept
         {
-            handle = std::exchange(other.handle, {});
+            std::swap(handle, other.handle);
             return *this;
         }
 
