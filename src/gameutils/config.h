@@ -9,7 +9,7 @@
 #include "program/errors.h"
 #include "reflection/complete.h"
 #include "utils/mat.h"
-#include "utils/memory_file.h"
+#include "utils/file_contents.h"
 
 template <typename T> class Config
 {
@@ -107,12 +107,12 @@ template <typename T> class Config
 
     Config(const std::string &file_name) : file_name(file_name)
     {
-        Stream::MemoryFile file;
+        Stream::FileContents file;
 
         // Try loading the file;
         try
         {
-            file = Stream::MemoryFile(file_name);
+            file = Stream::FileContents(file_name);
         }
         catch (...) {}
 
@@ -159,7 +159,7 @@ template <typename T> class Config
         std::string obj_string = refl.to_string(4);
         try
         {
-            Stream::MemoryFile::SaveFile(file_name, (std::uint8_t *)obj_string.data(), (std::uint8_t *)obj_string.data() + obj_string.size());
+            Stream::SaveFile(file_name, obj_string);
         }
         catch (...) {}
     }
@@ -184,7 +184,7 @@ template <typename T> class Config
         std::string obj_string = refl.to_string(4);
         try
         {
-            Stream::MemoryFile::SaveFile(file_name, (std::uint8_t *)obj_string.data(), (std::uint8_t *)obj_string.data() + obj_string.size());
+            Stream::SaveFile(file_name, obj_string);
         }
         catch (...) {}
     }

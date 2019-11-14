@@ -5,15 +5,17 @@
 #include <cstdio>
 #include <memory>
 #include <string>
+#include <type_traits>
 
 #include "program/errors.h"
 #include "utils/archive.h"
+#include "utils/check.h"
 #include "utils/finally.h"
 #include "utils/strings.h"
 
 namespace Stream
 {
-    class MemoryFile
+    class FileContents
     {
         // A copy-on-write
 
@@ -30,29 +32,29 @@ namespace Stream
         std::shared_ptr<Data> ref;
 
       public:
-        MemoryFile() {}
+        FileContents() {}
 
-        MemoryFile(std::string file_name)
+        FileContents(std::string file_name)
         {
             *this = file(file_name);
         }
-        MemoryFile(const char *file_name) // This allows implicit conversions from string literals.
+        FileContents(const char *file_name) // This allows implicit conversions from string literals.
         {
             *this = file(file_name);
         }
-        MemoryFile(const std::uint8_t *begin, const std::uint8_t *end) // Doesn't copy the data (calls `mem_reference()`) under the hood.
+        FileContents(const std::uint8_t *begin, const std::uint8_t *end) // Doesn't copy the data (calls `mem_reference()`) under the hood.
         {
             *this = mem_reference(begin, end);
         }
-        MemoryFile(const char *begin, const char *end) // Doesn't copy the data (calls `mem_reference()`) under the hood.
+        FileContents(const char *begin, const char *end) // Doesn't copy the data (calls `mem_reference()`) under the hood.
         {
             *this = mem_reference(begin, end);
         }
 
         // Stores a reference to an existing memory block.
-        [[nodiscard]] static MemoryFile mem_reference(const std::uint8_t *begin, const std::uint8_t *end)
+        [[nodiscard]] static FileContents mem_reference(const std::uint8_t *begin, const std::uint8_t *end)
         {
-            MemoryFile ret;
+            FileContents ret;
             ret.ref = std::make_shared<Data>();
 
             ret.ref->begin = begin;
@@ -64,17 +66,17 @@ namespace Stream
         }
 
         // Stores a reference to an existing memory block.
-        [[nodiscard]] static MemoryFile mem_reference(const char *begin, const char *end)
+        [[nodiscard]] static FileContents mem_reference(const char *begin, const char *end)
         {
             return mem_reference(reinterpret_cast<const std::uint8_t *>(begin), reinterpret_cast<const std::uint8_t *>(end));
         }
 
         // Copies an existing memory block, adds a null-terminator.
-        [[nodiscard]] static MemoryFile mem_copy(const std::uint8_t *begin, const std::uint8_t *end)
+        [[nodiscard]] static FileContents mem_copy(const std::uint8_t *begin, const std::uint8_t *end)
         {
             auto size = end - begin;
 
-            MemoryFile ret;
+            FileContents ret;
             ret.ref = std::make_shared<Data>();
 
             ret.ref->storage = std::make_unique<std::uint8_t[]>(size+1); // 1 extra byte for the null-terminator.
@@ -91,21 +93,23 @@ namespace Stream
         }
 
         // Copies an existing memory block, adds a null-terminator.
-        [[nodiscard]] static MemoryFile mem_copy(const char *begin, const char *end)
+        [[nodiscard]] static FileContents mem_copy(const char *begin, const char *end)
         {
             return mem_copy(reinterpret_cast<const std::uint8_t *>(begin), reinterpret_cast<const std::uint8_t *>(end));
         }
 
         // Loads an entire file to memory, adds a null-terminator.
-        [[nodiscard]] static MemoryFile file(std::string file_name)
+        [[nodiscard]] static FileContents file(std::string file_name)
         {
-            MemoryFile ret;
+            FileContents ret;
             ret.ref = std::make_shared<Data>();
 
             FILE *file = std::fopen(file_name.c_str(), "rb");
             if (!file)
                 Program::Error("Unable to open file `", file_name, "`.");
             FINALLY( std::fclose(file); )
+
+            std::setbuf(file, 0); // This can fail, but we don't care about it.
 
             std::fseek(file, 0, SEEK_END);
             auto size = std::ftell(file);
@@ -188,12 +192,12 @@ namespace Stream
 
         // Returns an uncompressed copy of the file.
         // The data is assumed to be size-prefixed, see `archive.h` for the details.
-        [[nodiscard]] MemoryFile uncompress() const
+        [[nodiscard]] FileContents uncompress() const
         {
             if (!ref)
                 return {};
 
-            MemoryFile ret;
+            FileContents ret;
 
             try
             {
@@ -235,7 +239,7 @@ namespace Stream
             return false;
         }
         // If the null-terminator is missing, copies the data and adds it to the copy.
-        [[nodiscard]] MemoryFile null_terminate() const
+        [[nodiscard]] FileContents null_terminate() const
         {
             if (!ref)
                 return {};
@@ -243,7 +247,7 @@ namespace Stream
             if (is_null_terminated())
                 return *this;
 
-            MemoryFile ret;
+            FileContents ret;
             ret.ref = std::make_shared<Data>();
 
             ret.ref->storage = std::make_unique<std::uint8_t[]>(size()+1);
@@ -272,11 +276,29 @@ namespace Stream
         }
     };
 
-    // Saves a block of memory to a file.
-    // Throws on failure.
-    inline void SaveFile(std::string file_name, const std::uint8_t *begin, const std::uint8_t *end)
+
+    enum SaveMode
     {
-        FILE *file = std::fopen(file_name.c_str(), "wb");
+        overwrite,
+        append,
+    };
+
+    [[nodiscard]] inline const char *SaveModeStringRepresentation(SaveMode mode)
+    {
+        switch (mode)
+        {
+            case overwrite: return "wb";
+            case append:    return "ab";
+        }
+
+        return "wb";
+    }
+
+
+    // Saves a block of memory to a file. Throws on failure.
+    inline void SaveFile(std::string file_name, const std::uint8_t *begin, const std::uint8_t *end, SaveMode mode = overwrite)
+    {
+        FILE *file = std::fopen(file_name.c_str(), SaveModeStringRepresentation(mode));
         if (!file)
             Program::Error("Unable to open file `", file_name, "` for writing.");
         FINALLY( std::fclose(file); )
@@ -284,17 +306,23 @@ namespace Stream
             Program::Error("Unable to write to file `", file_name, "`.");
     }
 
-    // Saves a block of memory to a file.
-    // Throws on failure.
-    inline void SaveFile(std::string file_name, const std::string &string) // Throws on failure.
+    // Saves a block of memory to a file. Throws on failure.
+    inline void SaveFile(std::string file_name, const char *begin, const char *end, SaveMode mode = overwrite)
     {
-        auto ptr = reinterpret_cast<const std::uint8_t *>(string.c_str());
-        SaveFile(file_name, ptr, ptr + string.size());
+        SaveFile(std::move(file_name), reinterpret_cast<const std::uint8_t *>(begin), reinterpret_cast<const std::uint8_t *>(end), mode);
     }
 
-    // Saves a block of memory to a file, in a compressed form (see `archive.h` for details).
-    // Throws on failure.
-    inline void SaveFileCompressed(std::string file_name, const std::uint8_t *begin, const std::uint8_t *end) // Throws on failure.
+    // Saves a container to a file. Throws on failure.
+    template <typename T, CHECK_EXPR(std::declval<T&>().data(), std::declval<T&>().size(), std::enable_if_t<std::is_arithmetic_v<T> && sizeof(T) == 1>{})>
+    void SaveFile(std::string file_name, const T &container, SaveMode mode = overwrite)
+    {
+        const std::uint8_t *ptr = reinterpret_cast<const std::uint8_t *>(container.data());
+        SaveFile(std::move(file_name), ptr, ptr + container.size(), mode);
+    }
+
+
+    // Saves a block of memory to a file, in a compressed form (see `archive.h` for details). Throws on failure.
+    inline void SaveFileCompressed(std::string file_name, const std::uint8_t *begin, const std::uint8_t *end)
     {
         auto buffer_size = Archive::MaxCompressedSize(begin, end);
         auto buffer = std::make_unique<std::uint8_t[]>(buffer_size);
@@ -302,11 +330,17 @@ namespace Stream
         SaveFile(file_name, buffer.get(), compressed_end);
     }
 
-    // Saves a block of memory to a file, in a compressed form (see `archive.h` for details).
-    // Throws on failure.
-    inline void SaveFileCompressed(std::string file_name, const std::string &string) // Throws on failure.
+    // Saves a block of memory to a file, in a compressed form (see `archive.h` for details). Throws on failure.
+    inline void SaveFileCompressed(std::string file_name, const char *begin, const char *end)
     {
-        auto ptr = reinterpret_cast<const std::uint8_t *>(string.c_str());
-        SaveFileCompressed(file_name, ptr, ptr + string.size());
+        SaveFileCompressed(std::move(file_name), reinterpret_cast<const std::uint8_t *>(begin), reinterpret_cast<const std::uint8_t *>(end));
+    }
+
+    // Saves a container to a file, in a compressed form (see `archive.h` for details). Throws on failure.
+    template <typename T, CHECK_EXPR(std::declval<T&>().data(), std::declval<T&>().size(), std::enable_if_t<std::is_arithmetic_v<T> && sizeof(T) == 1>{})>
+    void SaveFile(std::string file_name, const T &container)
+    {
+        const std::uint8_t *ptr = reinterpret_cast<const std::uint8_t *>(container.data());
+        SaveFileCompressed(std::move(file_name), ptr, ptr + container.size());
     }
 }

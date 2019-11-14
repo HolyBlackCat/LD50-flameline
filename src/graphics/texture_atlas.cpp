@@ -67,7 +67,7 @@ namespace Graphics
                 image = Image(out_image_file);
 
                 // Load description.
-                std::string desc_string = Stream::MemoryFile(out_desc_file).string();
+                std::string desc_string = Stream::FileContents(out_desc_file).string();
 
                 // Parse description.
                 Desc new_desc; // We use a temporary instead of `description` because if conversion fails, we might need `description` to be empty to regenerate the atlas into it.
@@ -152,7 +152,7 @@ namespace Graphics
         try
         {
             std::string desc_string = Refl::Interface(desc).to_string(4);
-            Stream::MemoryFile::SaveFile(out_desc_file, (uint8_t *)desc_string.data(), (uint8_t *)desc_string.data() + desc_string.size());
+            Stream::SaveFile(out_desc_file, desc_string);
         }
         catch (...) {}
     }

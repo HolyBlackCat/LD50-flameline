@@ -11,7 +11,6 @@
 #include "reflection/complete.h"
 #include "utils/filesystem.h"
 #include "utils/mat.h"
-#include "utils/memory_file.h"
 #include "utils/strings.h"
 
 namespace Graphics

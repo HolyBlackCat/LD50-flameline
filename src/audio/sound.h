@@ -8,7 +8,7 @@
 #include "utils/byte_order.h"
 #include "utils/finally.h"
 #include "utils/memory_access.h"
-#include "utils/memory_file.h"
+#include "utils/file_contents.h"
 
 namespace Audio
 {
@@ -37,10 +37,10 @@ namespace Audio
                 data = std::vector<uint8_t>(byte_count);
         }
 
-        Sound(Format format, Stream::MemoryFile file, Bits preferred_bits_per_sample = bits_16); // `preferred_bits_per_sample` is ignored for WAV files.
+        Sound(Format format, Stream::FileContents file, Bits preferred_bits_per_sample = bits_16); // `preferred_bits_per_sample` is ignored for WAV files.
 
         // Throws if the file doesn't contain `desired_channel_count` channels.
-        Sound(Format format, Channels desired_channel_count, Stream::MemoryFile file, Bits preferred_bits_per_sample = bits_16)
+        Sound(Format format, Channels desired_channel_count, Stream::FileContents file, Bits preferred_bits_per_sample = bits_16)
             : Sound(format, file, preferred_bits_per_sample)
         {
             if (channel_count != desired_channel_count)

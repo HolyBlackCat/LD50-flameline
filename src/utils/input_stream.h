@@ -10,7 +10,7 @@
 #include "program/errors.h"
 #include "utils/byte_order.h"
 #include "utils/memory_access.h"
-#include "utils/memory_file.h"
+#include "utils/file_contents.h"
 #include "utils/strings.h"
 
 namespace Stream
@@ -34,7 +34,7 @@ namespace Stream
     {
         struct Data
         {
-            MemoryFile file;
+            FileContents file;
             std::size_t position = 0;
             LocationStyle location_style = none;
         };
@@ -47,19 +47,26 @@ namespace Stream
         }
 
       public:
+        // Constructs an empty stream.
         Input() {}
 
-        Input(MemoryFile file, LocationStyle location_style = none)
+        // Attaches a stream to a memory file.
+        Input(FileContents file, LocationStyle location_style = none)
         {
             data.file = std::move(file);
             data.location_style = location_style;
         }
 
         Input(Input &&other) noexcept : data(std::exchange(other.data, {})) {}
-        Input &operator=(Input &&other) noexcept
+        Input &operator=(Input other) noexcept
         {
             std::swap(data, other.data);
             return *this;
+        }
+
+        [[nodiscard]] explicit operator bool() const
+        {
+            return bool(data.file);
         }
 
         // Returns a name of the data source the stream is bound to.
@@ -99,6 +106,8 @@ namespace Stream
             return ret;
         }
 
+        // Moves the cursor.
+        // Throws if it ends up out of bounds.
         void Seek(std::ptrdiff_t offset, PositionCategory category = relative)
         {
             std::size_t base_pos =
@@ -116,34 +125,40 @@ namespace Stream
             data.position = new_pos;
         }
 
+        // Returns the current byte offset of the cursor.
         [[nodiscard]] std::size_t Position() const
         {
             return data.position;
         }
 
+        // Checks if the stream has more data available at the current cursor position.
         [[nodiscard]] bool MoreData() const
         {
             return data.position < data.file.size();
         }
 
+        // Throws if there is more data available at the current cursor position.
         void ExpectEnd() const
         {
             if (MoreData())
                 Program::Error(GetExceptionPrefix() + "Expected end of data.");
         }
 
+        // Returns the next byte, without advancing the cursor.
         [[nodiscard]] std::uint8_t PeekByte() const
         {
             ThrowIfNoData(1);
             return data.file.data()[data.position];
         }
 
+        // Reads a single byte.
         [[nodiscard]] std::uint8_t ReadByte()
         {
             ThrowIfNoData(1);
             return data.file.data()[data.position++];
         }
 
+        // Reads a sequence of bytes.
         void ReadBytes(std::uint8_t *buffer, std::size_t size)
         {
             ThrowIfNoData(size);
@@ -155,6 +170,7 @@ namespace Stream
             ReadBytes(reinterpret_cast<std::uint8_t *>(buffer), size);
         }
 
+        // Skips several bytes or objects.
         void SkipByte()
         {
             Seek(1);
@@ -170,6 +186,7 @@ namespace Stream
             SkipBytes(count * sizeof(T));
         }
 
+        // Reads a single arithmetic value with a specified byte order.
         template <typename T>
         [[nodiscard]] T ReadWithByteOrder(ByteOrder::Order order)
         {
@@ -194,6 +211,7 @@ namespace Stream
             return ReadWithByteOrder<T>(ByteOrder::native);
         }
 
+        // Reads a sequence of arithmetic values with a specified byte order.
         template <typename T>
         void ReadWithByteOrder(ByteOrder::Order order, T *buffer, std::size_t count)
         {
