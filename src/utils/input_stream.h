@@ -1,0 +1,220 @@
+#pragma once
+
+#include <algorithm>
+#include <cstddef>
+#include <cstdint>
+#include <memory>
+#include <string>
+#include <utility>
+
+#include "program/errors.h"
+#include "utils/byte_order.h"
+#include "utils/memory_access.h"
+#include "utils/memory_file.h"
+#include "utils/strings.h"
+
+namespace Stream
+{
+    enum PositionCategory
+    {
+        absolute,
+        relative,
+        end,
+    };
+
+    enum LocationStyle
+    {
+        none,
+        byte_offset,
+        text_position,
+        text_byte_position,
+    };
+
+    class Input
+    {
+        struct Data
+        {
+            MemoryFile file;
+            std::size_t position = 0;
+            LocationStyle location_style = none;
+        };
+        Data data;
+
+        void ThrowIfNoData(std::size_t bytes) const
+        {
+            if (data.position + bytes > data.file.size())
+                Program::Error(GetExceptionPrefix() + "Unexpected end of data.");
+        }
+
+      public:
+        Input() {}
+
+        Input(MemoryFile file, LocationStyle location_style = none)
+        {
+            data.file = std::move(file);
+            data.location_style = location_style;
+        }
+
+        Input(Input &&other) noexcept : data(std::exchange(other.data, {})) {}
+        Input &operator=(Input &&other) noexcept
+        {
+            std::swap(data, other.data);
+            return *this;
+        }
+
+        // Returns a name of the data source the stream is bound to.
+        [[nodiscard]] std::string GetTarget() const
+        {
+            return data.file.name();
+        }
+
+        // Returns a string describing current location in the stream.
+        // This function can be costly for some location flavors.
+        [[nodiscard]] std::string GetLocation() const
+        {
+            switch (data.location_style)
+            {
+              case none:
+              default:
+                return "";
+              case byte_offset:
+                return Str("offset 0x", std::hex, std::uppercase, data.position);
+              case text_position:
+              case text_byte_position:
+                return Strings::GetSymbolPosition(data.file.data_char(), data.file.data_char() + data.position).ToString();
+            }
+        }
+
+        // Uses `GetLocationString` to construct a prefix for exception messages.
+        [[nodiscard]] std::string GetExceptionPrefix() const
+        {
+            std::string ret = "In an input stream bound to `" + GetTarget() + "`";
+
+            if (std::string loc = GetLocation(); loc.size() > 0)
+            {
+                ret += ", at " + loc;
+            }
+
+            ret += ": ";
+            return ret;
+        }
+
+        void Seek(std::ptrdiff_t offset, PositionCategory category = relative)
+        {
+            std::size_t base_pos =
+                category == relative ? data.position    :
+                category == end      ? data.file.size() : 0;
+
+            std::size_t new_pos = base_pos + offset;
+
+            // Note the `>` rather than `<=`. Pointing to a single byte past the end of the file is allowed.
+            // Note that we don't check for an overflow here. It shouldn't be necessary,
+            // as `file.size()` will be representable as `ptrdiff_t`, because the file resides in memory.
+            if (new_pos > data.file.size())
+                Program::Error(GetExceptionPrefix() + "Cursor position is out of bounds.");
+
+            data.position = new_pos;
+        }
+
+        [[nodiscard]] std::size_t Position() const
+        {
+            return data.position;
+        }
+
+        [[nodiscard]] bool MoreData() const
+        {
+            return data.position < data.file.size();
+        }
+
+        void ExpectEnd() const
+        {
+            if (MoreData())
+                Program::Error(GetExceptionPrefix() + "Expected end of data.");
+        }
+
+        [[nodiscard]] std::uint8_t PeekByte() const
+        {
+            ThrowIfNoData(1);
+            return data.file.data()[data.position];
+        }
+
+        [[nodiscard]] std::uint8_t ReadByte()
+        {
+            ThrowIfNoData(1);
+            return data.file.data()[data.position++];
+        }
+
+        void ReadBytes(std::uint8_t *buffer, std::size_t size)
+        {
+            ThrowIfNoData(size);
+            std::copy_n(data.file.data() + data.position, size, buffer);
+            data.position += size;
+        }
+        void ReadBytes(char *buffer, std::size_t size)
+        {
+            ReadBytes(reinterpret_cast<std::uint8_t *>(buffer), size);
+        }
+
+        void SkipByte()
+        {
+            Seek(1);
+        }
+        void SkipBytes(std::size_t count)
+        {
+            Seek(count);
+        }
+        template <typename T>
+        void Skip(std::size_t count)
+        {
+            static_assert(std::is_arithmetic_v<T>, "The template parameter must be arithmetic.");
+            SkipBytes(count * sizeof(T));
+        }
+
+        template <typename T>
+        [[nodiscard]] T ReadWithByteOrder(ByteOrder::Order order)
+        {
+            T ret;
+            ReadBytes(reinterpret_cast<std::uint8_t *>(&ret), sizeof ret);
+            ByteOrder::Convert(ret, order);
+            return ret;
+        }
+        template <typename T>
+        [[nodiscard]] T ReadLittle()
+        {
+            return ReadWithByteOrder<T>(ByteOrder::little);
+        }
+        template <typename T>
+        [[nodiscard]] T ReadBig()
+        {
+            return ReadWithByteOrder<T>(ByteOrder::big);
+        }
+        template <typename T>
+        [[nodiscard]] T ReadNative()
+        {
+            return ReadWithByteOrder<T>(ByteOrder::native);
+        }
+
+        template <typename T>
+        void ReadWithByteOrder(ByteOrder::Order order, T *buffer, std::size_t count)
+        {
+            ReadBytes(reinterpret_cast<std::uint8_t *>(buffer), count * sizeof *buffer);
+            for (std::size_t i = 0; i < count; i++)
+                ByteOrder::Convert(buffer[i], order);
+        }
+        template <typename T>
+        void ReadLittle(T *buffer, std::size_t count)
+        {
+            ReadWithByteOrder(ByteOrder::little, buffer, count);
+        }
+        template <typename T>
+        void ReadBig(T *buffer, std::size_t count)
+        {
+            ReadWithByteOrder(ByteOrder::big, buffer, count);
+        }
+        template <typename T>
+        void ReadNative(T *buffer, std::size_t count)
+        {
+            ReadWithByteOrder(ByteOrder::native, buffer, count);
+        }
+    };
+}
