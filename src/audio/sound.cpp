@@ -7,7 +7,7 @@
 
 namespace Audio
 {
-    Sound::Sound(Format format, Stream::FileContents file, Bits preferred_bits_per_sample)
+    Sound::Sound(Format format, Stream::ReadOnlyData file, Bits preferred_bits_per_sample)
     {
         try
         {

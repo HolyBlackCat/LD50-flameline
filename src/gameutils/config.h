@@ -9,7 +9,7 @@
 #include "program/errors.h"
 #include "reflection/complete.h"
 #include "utils/mat.h"
-#include "utils/file_contents.h"
+#include "utils/readonly_data.h"
 
 template <typename T> class Config
 {
@@ -107,12 +107,12 @@ template <typename T> class Config
 
     Config(const std::string &file_name) : file_name(file_name)
     {
-        Stream::FileContents file;
+        Stream::ReadOnlyData file;
 
         // Try loading the file;
         try
         {
-            file = Stream::FileContents(file_name);
+            file = Stream::ReadOnlyData(file_name);
         }
         catch (...) {}
 

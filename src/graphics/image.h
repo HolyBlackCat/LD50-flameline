@@ -7,7 +7,7 @@
 #include "program/errors.h"
 #include "utils/finally.h"
 #include "utils/mat.h"
-#include "utils/file_contents.h"
+#include "utils/readonly_data.h"
 
 #include <stb_image.h>
 #include <stb_image_write.h>
@@ -37,7 +37,7 @@ namespace Graphics
         {
             data = std::vector<u8vec4>(size.prod(), color);
         }
-        Image(Stream::FileContents file, FlipMode flip_mode = no_flip) // Throws on failure.
+        Image(Stream::ReadOnlyData file, FlipMode flip_mode = no_flip) // Throws on failure.
         {
             stbi_set_flip_vertically_on_load(flip_mode == flip_y);
             ivec2 img_size;

@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cstddef>
 #include <cstdint>
+#include <cstdio>
 #include <cstring>
 #include <functional>
 #include <memory>
@@ -13,9 +14,10 @@
 #include "program/errors.h"
 #include "utils/byte_order.h"
 #include "utils/check.h"
-#include "utils/file_contents.h"
 #include "utils/finally.h"
 #include "utils/meta.h"
+#include "utils/readonly_data.h"
+#include "utils/unicode.h"
 
 namespace Stream
 {
@@ -100,6 +102,19 @@ namespace Stream
                 capacity);
         }
 
+        // Constructs a stream bound to a C file handle.
+        // The stream doesn't own the handle.
+        Output(FILE *handle, capacity_t capacity = default_capacity)
+        {
+            *this = Output(Str("File handle 0x", std::hex, std::uintptr_t(handle)),
+                [handle](const Output &object, const std::uint8_t *data, std::size_t size)
+                {
+                    if (!std::fwrite(data, 1, size, handle))
+                        Program::Error(object.GetExceptionPrefix() + "Unable to write to file.");
+                },
+                capacity);
+        }
+
         // Constructs a stream bound to a sequential container.
         // It should work at least with strings and vectors of `char` and `std::uint8_t`.
         template <
@@ -148,14 +163,25 @@ namespace Stream
         }
 
         // Writes a single byte.
-        void WriteByte(std::uint8_t byte)
+        Output &WriteByte(std::uint8_t byte)
         {
             NeedBufferSpace();
             data.buffer[data.buffer_pos++] = byte;
+            return *this;
+        }
+
+        // Writes a single UTF8 character.
+        Output &WriteUnicodeChar(Unicode::Char ch)
+        {
+            char buf[Unicode::max_char_len];
+            int len = Unicode::Encode(ch, buf);
+            for (int i = 0; i < len; i++)
+                WriteByte(buf[i]);
+            return *this;
         }
 
         // Writes several bytes.
-        void WriteBytes(const std::uint8_t *ptr, std::size_t size)
+        Output &WriteBytes(const std::uint8_t *ptr, std::size_t size)
         {
             // If there is a free space in the buffer, fill it.
             std::size_t segment_size = std::min(data.buffer_capacity - data.buffer_pos, size);
@@ -170,67 +196,70 @@ namespace Stream
                 Flush();
                 data.flush(*this, ptr, size);
             }
+
+            return *this;
         }
-        void WriteBytes(const char *ptr, std::size_t size)
+        Output &WriteBytes(const char *ptr, std::size_t size)
         {
-            WriteBytes(reinterpret_cast<const std::uint8_t *>(ptr), size);
+            return WriteBytes(reinterpret_cast<const std::uint8_t *>(ptr), size);
         }
 
         // Writes a string.
         // The null-terminator is not written.
-        void WriteString(const char *string)
+        Output &WriteString(const char *string)
         {
-            WriteBytes(string, std::strlen(string));
+            return WriteBytes(string, std::strlen(string));
         }
-        void WriteString(const std::string &string)
+        Output &WriteString(const std::string &string)
         {
-            WriteBytes(string.data(), string.size());
+            return WriteBytes(string.data(), string.size());
         }
 
         // Writes an arithmetic value with a specified byte order.
         template <typename T>
-        void WriteWithByteOrder(ByteOrder::Order order, std::type_identity_t<T> value)
+        Output &WriteWithByteOrder(ByteOrder::Order order, std::type_identity_t<T> value)
         {
             ByteOrder::Convert(value, order);
-            WriteBytes(reinterpret_cast<const std::uint8_t *>(&value), sizeof value);
+            return WriteBytes(reinterpret_cast<const std::uint8_t *>(&value), sizeof value);
         }
         template <typename T>
-        void WriteLittle(std::type_identity_t<T> value)
+        Output &WriteLittle(std::type_identity_t<T> value)
         {
-            WriteWithByteOrder(ByteOrder::little, value);
+            return WriteWithByteOrder(ByteOrder::little, value);
         }
         template <typename T>
-        void WriteBig(std::type_identity_t<T> value)
+        Output &WriteBig(std::type_identity_t<T> value)
         {
-            WriteWithByteOrder(ByteOrder::big, value);
+            return WriteWithByteOrder(ByteOrder::big, value);
         }
         template <typename T>
-        void WriteNative(std::type_identity_t<T> value)
+        Output &WriteNative(std::type_identity_t<T> value)
         {
-            WriteWithByteOrder(ByteOrder::native, value);
+            return WriteWithByteOrder(ByteOrder::native, value);
         }
 
         // Writes a sequence of arithmetic values with a specified byte order.
         template <typename T>
-        void WriteWithByteOrder(ByteOrder::Order order, const std::type_identity_t<T> *ptr, std::size_t count)
+        Output &WriteWithByteOrder(ByteOrder::Order order, const std::type_identity_t<T> *ptr, std::size_t count)
         {
             for (std::size_t i = 0; i < count; i++)
                 WriteWithByteOrder(order, ptr[i]);
+            return *this;
         }
         template <typename T>
-        void WriteLittle(const std::type_identity_t<T> *ptr, std::size_t count)
+        Output &WriteLittle(const std::type_identity_t<T> *ptr, std::size_t count)
         {
-            WriteWithByteOrder(ByteOrder::little, ptr, count);
+            return WriteWithByteOrder(ByteOrder::little, ptr, count);
         }
         template <typename T>
-        void WriteBig(const std::type_identity_t<T> *ptr, std::size_t count)
+        Output &WriteBig(const std::type_identity_t<T> *ptr, std::size_t count)
         {
-            WriteWithByteOrder(ByteOrder::big, ptr, count);
+            return WriteWithByteOrder(ByteOrder::big, ptr, count);
         }
         template <typename T>
-        void WriteNative(const std::type_identity_t<T> *ptr, std::size_t count)
+        Output &WriteNative(const std::type_identity_t<T> *ptr, std::size_t count)
         {
-            WriteWithByteOrder(ByteOrder::native, ptr, count);
+            return WriteWithByteOrder(ByteOrder::native, ptr, count);
         }
     };
 }

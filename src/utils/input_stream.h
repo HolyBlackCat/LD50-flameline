@@ -10,8 +10,9 @@
 #include "program/errors.h"
 #include "utils/byte_order.h"
 #include "utils/memory_access.h"
-#include "utils/file_contents.h"
+#include "utils/readonly_data.h"
 #include "utils/strings.h"
+#include "utils/unicode.h"
 
 namespace Stream
 {
@@ -34,7 +35,7 @@ namespace Stream
     {
         struct Data
         {
-            FileContents file;
+            ReadOnlyData file;
             std::size_t position = 0;
             LocationStyle location_style = none;
         };
@@ -51,7 +52,7 @@ namespace Stream
         Input() {}
 
         // Attaches a stream to a memory file.
-        Input(FileContents file, LocationStyle location_style = none)
+        Input(ReadOnlyData file, LocationStyle location_style = none)
         {
             data.file = std::move(file);
             data.location_style = location_style;
@@ -156,6 +157,50 @@ namespace Stream
         {
             ThrowIfNoData(1);
             return data.file.data()[data.position++];
+        }
+
+        // Reads a single UTF8 character.
+        // Shouldn't throw if the encoding is incorrect, instead `Unicode::default_char` will be returned.
+        [[nodiscard]] Unicode::Char ReadUnicodeChar()
+        {
+            std::uint8_t first = ReadByte();
+            int len = Unicode::FirstByteToCharacterLength(first);
+
+            // Check if the first byte is valid.
+            if (len == 0)
+            {
+                while (MoreData() && !Unicode::IsFirstByte(PeekByte()))
+                    SkipByte();
+                return Unicode::default_char;
+            }
+
+            // Check if the character occupies a single-byte.
+            if (len == 1)
+                return first;
+
+            // Extract bits from the first byte.
+            Unicode::Char ret = first & (0x7f >> len); // `0xff` would also work.
+
+            // Read remaining bytes.
+            for (int i = 1; i < len; i++)
+            {
+                if (!MoreData())
+                    return Unicode::default_char;
+
+                std::uint8_t byte = PeekByte();
+
+                // Make sure it's not a first byte of some character.
+                if (Unicode::IsFirstByte(byte))
+                    return Unicode::default_char;
+
+                // Now we can safely move the cursor.
+                SkipByte();
+
+                // Extract bits from the byte and append them to the result.
+                ret = (ret << 6) | (byte & 0b00111111);
+            }
+
+            return ret;
         }
 
         // Reads a sequence of bytes.

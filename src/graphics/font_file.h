@@ -13,7 +13,7 @@
 #include "program/errors.h"
 #include "utils/finally.h"
 #include "utils/mat.h"
-#include "utils/file_contents.h"
+#include "utils/readonly_data.h"
 #include "utils/packing.h"
 #include "utils/strings.h"
 #include "utils/unicode.h"
@@ -33,7 +33,7 @@ namespace Graphics
         struct Data
         {
             FT_Face ft_font = 0;
-            Stream::FileContents file;
+            Stream::ReadOnlyData file;
         };
 
         Data data;
@@ -45,9 +45,9 @@ namespace Graphics
         // `size` is measured in pixels. Normally you only provide height, but you can also provide width. In this case, `[x,0]` and `[0,x]` are equivalent to `[x,x]` due to how FreeType operates.
         // Some font files contain several fonts; `index` determines which one of them is loaded. Upper 16 bits of `index` contain so-called "variation" (sub-font?) index, which starts from 1. Use 0 to load the default one.
 
-        FontFile(Stream::FileContents file, int size, int index = 0) : FontFile(file, ivec2(0, size), index) {}
+        FontFile(Stream::ReadOnlyData file, int size, int index = 0) : FontFile(file, ivec2(0, size), index) {}
 
-        FontFile(Stream::FileContents file, ivec2 size, int index = 0)
+        FontFile(Stream::ReadOnlyData file, ivec2 size, int index = 0)
         {
             if (!ft_initialized)
             {

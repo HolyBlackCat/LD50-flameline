@@ -3,6 +3,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstdio>
+#include <iterator>
 #include <memory>
 #include <string>
 #include <type_traits>
@@ -11,13 +12,27 @@
 #include "utils/archive.h"
 #include "utils/check.h"
 #include "utils/finally.h"
+#include "utils/meta.h"
 #include "utils/strings.h"
 
 namespace Stream
 {
-    class FileContents
+    namespace impl
     {
-        // A copy-on-write
+        // Checks if `T` is a container consisting of single-byte arithmetic objects.
+        template <typename T> using detect_flat_byte_container = decltype(
+            std::data(std::declval<const T&>()),
+            std::size(std::declval<const T&>()),
+            std::enable_if_t<
+                std::is_arithmetic_v<std::remove_reference_t<decltype(*std::data(std::declval<const T&>()))>> &&
+                sizeof(*std::data(std::declval<const T&>())) == 1
+            >{}
+        );
+    }
+
+    class ReadOnlyData
+    {
+        // A copy-on-write immutable data storage. It may or may not own the data.
 
         struct Data
         {
@@ -32,29 +47,29 @@ namespace Stream
         std::shared_ptr<Data> ref;
 
       public:
-        FileContents() {}
+        ReadOnlyData() {}
 
-        FileContents(std::string file_name)
+        ReadOnlyData(std::string file_name)
         {
             *this = file(file_name);
         }
-        FileContents(const char *file_name) // This allows implicit conversions from string literals.
+        ReadOnlyData(const char *file_name) // This allows implicit conversions from string literals.
         {
             *this = file(file_name);
         }
-        FileContents(const std::uint8_t *begin, const std::uint8_t *end) // Doesn't copy the data (calls `mem_reference()`) under the hood.
+        ReadOnlyData(const std::uint8_t *begin, const std::uint8_t *end) // Doesn't copy the data (calls `mem_reference()`) under the hood.
         {
             *this = mem_reference(begin, end);
         }
-        FileContents(const char *begin, const char *end) // Doesn't copy the data (calls `mem_reference()`) under the hood.
+        ReadOnlyData(const char *begin, const char *end) // Doesn't copy the data (calls `mem_reference()`) under the hood.
         {
             *this = mem_reference(begin, end);
         }
 
         // Stores a reference to an existing memory block.
-        [[nodiscard]] static FileContents mem_reference(const std::uint8_t *begin, const std::uint8_t *end)
+        [[nodiscard]] static ReadOnlyData mem_reference(const std::uint8_t *begin, const std::uint8_t *end)
         {
-            FileContents ret;
+            ReadOnlyData ret;
             ret.ref = std::make_shared<Data>();
 
             ret.ref->begin = begin;
@@ -64,19 +79,25 @@ namespace Stream
 
             return ret;
         }
-
         // Stores a reference to an existing memory block.
-        [[nodiscard]] static FileContents mem_reference(const char *begin, const char *end)
+        [[nodiscard]] static ReadOnlyData mem_reference(const char *begin, const char *end)
         {
             return mem_reference(reinterpret_cast<const std::uint8_t *>(begin), reinterpret_cast<const std::uint8_t *>(end));
         }
+        // Stores a reference to an existing contaner.
+        template <typename T, CHECK_TYPE(impl::detect_flat_byte_container<T>)>
+        [[nodiscard]] static ReadOnlyData mem_reference(const T &container)
+        {
+            auto pointer = reinterpret_cast<const std::uint8_t *>(std::data(container));
+            return mem_reference(pointer, pointer + std::size(container));
+        }
 
         // Copies an existing memory block, adds a null-terminator.
-        [[nodiscard]] static FileContents mem_copy(const std::uint8_t *begin, const std::uint8_t *end)
+        [[nodiscard]] static ReadOnlyData mem_copy(const std::uint8_t *begin, const std::uint8_t *end)
         {
             auto size = end - begin;
 
-            FileContents ret;
+            ReadOnlyData ret;
             ret.ref = std::make_shared<Data>();
 
             ret.ref->storage = std::make_unique<std::uint8_t[]>(size+1); // 1 extra byte for the null-terminator.
@@ -91,17 +112,23 @@ namespace Stream
 
             return ret;
         }
-
         // Copies an existing memory block, adds a null-terminator.
-        [[nodiscard]] static FileContents mem_copy(const char *begin, const char *end)
+        [[nodiscard]] static ReadOnlyData mem_copy(const char *begin, const char *end)
         {
             return mem_copy(reinterpret_cast<const std::uint8_t *>(begin), reinterpret_cast<const std::uint8_t *>(end));
         }
+        // Copies an existing container, adds a null-terminator.
+        template <typename T, CHECK_TYPE(impl::detect_flat_byte_container<T>)>
+        [[nodiscard]] static ReadOnlyData mem_copy(const T &container)
+        {
+            auto pointer = reinterpret_cast<const std::uint8_t *>(std::data(container));
+            return mem_copy(pointer, pointer + std::size(container));
+        }
 
         // Loads an entire file to memory, adds a null-terminator.
-        [[nodiscard]] static FileContents file(std::string file_name)
+        [[nodiscard]] static ReadOnlyData file(std::string file_name)
         {
-            FileContents ret;
+            ReadOnlyData ret;
             ret.ref = std::make_shared<Data>();
 
             FILE *file = std::fopen(file_name.c_str(), "rb");
@@ -157,7 +184,6 @@ namespace Stream
         // Returns the data size, excluding the extra null-terminator if it's present.
         [[nodiscard]] std::size_t size() const
         {
-
             return end() - begin();
         }
 
@@ -192,12 +218,12 @@ namespace Stream
 
         // Returns an uncompressed copy of the file.
         // The data is assumed to be size-prefixed, see `archive.h` for the details.
-        [[nodiscard]] FileContents uncompress() const
+        [[nodiscard]] ReadOnlyData uncompress() const
         {
             if (!ref)
                 return {};
 
-            FileContents ret;
+            ReadOnlyData ret;
 
             try
             {
@@ -239,7 +265,7 @@ namespace Stream
             return false;
         }
         // If the null-terminator is missing, copies the data and adds it to the copy.
-        [[nodiscard]] FileContents null_terminate() const
+        [[nodiscard]] ReadOnlyData null_terminate() const
         {
             if (!ref)
                 return {};
@@ -247,7 +273,7 @@ namespace Stream
             if (is_null_terminated())
                 return *this;
 
-            FileContents ret;
+            ReadOnlyData ret;
             ret.ref = std::make_shared<Data>();
 
             ret.ref->storage = std::make_unique<std::uint8_t[]>(size()+1);
@@ -313,11 +339,11 @@ namespace Stream
     }
 
     // Saves a container to a file. Throws on failure.
-    template <typename T, CHECK_EXPR(std::declval<T&>().data(), std::declval<T&>().size(), std::enable_if_t<std::is_arithmetic_v<T> && sizeof(T) == 1>{})>
+    template <typename T, CHECK_TYPE(impl::detect_flat_byte_container<T>)>
     void SaveFile(std::string file_name, const T &container, SaveMode mode = overwrite)
     {
-        const std::uint8_t *ptr = reinterpret_cast<const std::uint8_t *>(container.data());
-        SaveFile(std::move(file_name), ptr, ptr + container.size(), mode);
+        const std::uint8_t *ptr = reinterpret_cast<const std::uint8_t *>(std::data(container));
+        SaveFile(std::move(file_name), ptr, ptr + std::size(container), mode);
     }
 
 
@@ -337,10 +363,10 @@ namespace Stream
     }
 
     // Saves a container to a file, in a compressed form (see `archive.h` for details). Throws on failure.
-    template <typename T, CHECK_EXPR(std::declval<T&>().data(), std::declval<T&>().size(), std::enable_if_t<std::is_arithmetic_v<T> && sizeof(T) == 1>{})>
-    void SaveFile(std::string file_name, const T &container)
+    template <typename T, CHECK_TYPE(impl::detect_flat_byte_container<T>)>
+    void SaveFileCompressed(std::string file_name, const T &container)
     {
-        const std::uint8_t *ptr = reinterpret_cast<const std::uint8_t *>(container.data());
-        SaveFileCompressed(std::move(file_name), ptr, ptr + container.size());
+        const std::uint8_t *ptr = reinterpret_cast<const std::uint8_t *>(std::data(container));
+        SaveFileCompressed(std::move(file_name), ptr, ptr + std::size(container));
     }
 }
