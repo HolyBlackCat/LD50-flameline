@@ -39,7 +39,7 @@ namespace Program
             }
             catch (std::exception &e)
             {
-                HardError("Exception: ", e.what());
+                HardError("Exception:\n", e.what());
             }
             catch (...)
             {

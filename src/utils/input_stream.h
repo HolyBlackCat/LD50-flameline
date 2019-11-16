@@ -103,7 +103,7 @@ namespace Stream
                 ret += ", at " + loc;
             }
 
-            ret += ": ";
+            ret += ":\n";
             return ret;
         }
 
