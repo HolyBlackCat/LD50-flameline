@@ -1,14 +1,11 @@
 #pragma once
 
-#include <cctype>
 #include <iomanip>
-#include <sstream>
-#include <string_view>
 #include <string>
-#include <type_traits>
+#include <string_view>
+#include <sstream>
 #include <utility>
 
-#include "utils/check.h"
 #include "utils/unicode.h"
 
 namespace Strings
@@ -35,11 +32,11 @@ namespace Strings
         return str.compare(0, prefix.size(), prefix) == 0;
     }
 
-    [[nodiscard]] inline bool EndsWith(std::string_view str, std::string_view suffix)
+    [[nodiscard]] inline bool EndsWith(std::string_view str, std::string_view prefix)
     {
-        if (str.size() < suffix.size()) // We don't want `str.size() - suffix.size()` to overflow.
+        if (str.size() < prefix.size()) // We don't want `str.size() - prefix.size()` to overflow.
             return 0;
-        return str.compare(str.size() - suffix.size(), suffix.size(), suffix) == 0;
+        return str.compare(str.size() - prefix.size(), prefix.size(), prefix) == 0;
     }
 
     enum class UseUnicode : bool {};
@@ -102,91 +99,6 @@ namespace Strings
 
         return ret;
     }
-
-
-    // A character category.
-    struct CharCategory
-    {
-        [[nodiscard]] virtual bool operator()(char ch) const = 0;
-        [[nodiscard]] virtual const char *name() const = 0;
-    };
-
-    // A generic character category.
-    // Usage: `Is("fancy character", [](char ch){return condition;})`
-    template <typename F, CHECK(std::is_convertible_v<decltype(std::declval<F>()(char())), bool>)>
-    class Is final : public CharCategory
-    {
-        F &&func;
-        const char *name_str;
-
-      public:
-        Is(const char *name, F &&func) : func(std::move(func)), name_str(name) {}
-
-        bool operator()(char ch) const override
-        {
-            return func(ch);
-        }
-        const char *name() const override
-        {
-            return name_str;
-        }
-    };
-
-
-    // Character categories corresponding to the functions from `<cctype>`:
-
-    #define CHAR_CATEGORY(class_name_, func_, string_) \
-        struct class_name_ final : CharCategory \
-        { \
-            [[nodiscard]] bool operator()(char ch) const override {return std::func_((unsigned char)ch);} \
-            [[nodiscard]] virtual const char *name() const override {return string_;} \
-        };
-
-    // 0-31, 127
-    CHAR_CATEGORY( IsControl      , iscntrl  , "a control character"     )
-    // !IsControl
-    CHAR_CATEGORY( IsNotControl   , isprint  , "a non-control character" )
-    // space, \r, \n, \t, \v (vertical tab), \f (form feed)
-    CHAR_CATEGORY( IsWhitespace   , isspace  , "a whitespace"            )
-    // space, \t
-    CHAR_CATEGORY( IsSpaceOrTab   , isblank  , "a space or a tab"        )
-    // !IsControl and not a space
-    CHAR_CATEGORY( IsVisible      , isgraph  , "a visible character"     )
-    // a-z,A-Z
-    CHAR_CATEGORY( IsAlpha        , isalpha  , "a letter"                )
-    // 0-9
-    CHAR_CATEGORY( IsDigit        , isdigit  , "a digit"                 )
-    // 0-9,a-f,A-F
-    CHAR_CATEGORY( IsHexDigit     , isxdigit , "a hexadecimal digit"     )
-    // IsAlpha || IsDigit
-    CHAR_CATEGORY( IsAlphaOrDigit , isalnum  , "a letter or a digit"     )
-    // IsVisible && !IsAlphaOrDigit
-    CHAR_CATEGORY( IsPunctuation  , ispunct  , "a punctuation character" )
-    // A-Z
-    CHAR_CATEGORY( IsUppercase    , isupper  , "an uppercase letter"     )
-    // a-z
-    CHAR_CATEGORY( IsLowercase    , islower  , "a lowercase letter"      )
-
-    #undef CHAR_CATEGORY
-
-
-    // Fancy stateful character categories.
-
-    // Matches a c-style identifier.
-    class SeqIdentifier final : public CharCategory
-    {
-        mutable bool first_char = true;
-
-      public:
-        bool operator()(char ch) const override
-        {
-            bool ok = IsAlpha{}(ch) || ch == '_' || (!first_char && IsDigit{}(ch));
-            first_char = false;
-            return ok;
-        }
-
-        const char *name() const override {return "an identifier";}
-    };
 }
 
 using Strings::Str;
