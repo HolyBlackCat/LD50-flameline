@@ -3,19 +3,151 @@
 #include <algorithm>
 #include <cstddef>
 #include <cstdint>
+#include <initializer_list>
 #include <memory>
 #include <string>
+#include <type_traits>
 #include <utility>
 
 #include "program/errors.h"
 #include "utils/byte_order.h"
+#include "utils/check.h"
 #include "utils/memory_access.h"
+#include "utils/meta.h"
 #include "utils/readonly_data.h"
 #include "utils/strings.h"
 #include "utils/unicode.h"
 
 namespace Stream
 {
+    namespace Char
+    {
+        // A base class for character categories.
+        struct Category
+        {
+            [[nodiscard]] virtual bool operator()(char ch) const = 0;
+            [[nodiscard]] virtual std::string name() const = 0;
+        };
+
+        // A category matching a single character.
+        class EqualTo final : public Category
+        {
+            char saved_char = 0;
+
+          public:
+            EqualTo(char ch) : saved_char(ch) {}
+
+            [[nodiscard]] bool operator()(char ch) const override
+            {
+                return ch == saved_char;
+            }
+            [[nodiscard]] std::string name() const override
+            {
+                return "'" + Strings::Escape(saved_char) + "'";
+            }
+        };
+
+        // A generic character category.
+        // Usage: `Is("fancy character", [](char ch){return condition;})`
+        template <typename F, CHECK(std::is_convertible_v<decltype(std::declval<F>()(char())), bool>)>
+        class Is final : public Category
+        {
+            F &&func;
+            const char *name_str;
+
+          public:
+            Is(const char *name, F &&func) : func(std::move(func)), name_str(name) {}
+
+            [[nodiscard]] bool operator()(char ch) const override
+            {
+                return func(ch);
+            }
+            [[nodiscard]] std::string name() const override
+            {
+                return name_str;
+            }
+        };
+
+
+        // Some character categories.
+
+        #define CHAR_CATEGORY(class_name_, string_, expr_) \
+            struct class_name_ final : Category \
+            { \
+                [[nodiscard]] bool operator()(char ch) const override {return expr_;} \
+                [[nodiscard]] std::string name() const override {return string_;} \
+            };
+
+        // Character categories corresponding to the functions from `<cctype>`:
+
+        #define CHAR_CATEGORY_STD(class_name_, func_, string_) CHAR_CATEGORY(class_name_, string_, std::func_((unsigned char)ch))
+        // 0-31, 127
+        CHAR_CATEGORY_STD( IsControl      , iscntrl  , "a control character"     )
+        // !IsControl
+        CHAR_CATEGORY_STD( IsNotControl   , isprint  , "a non-control character" )
+        // space, \r, \n, \t, \v (vertical tab), \f (form feed)
+        CHAR_CATEGORY_STD( IsWhitespace   , isspace  , "a whitespace"            )
+        // space, \t
+        CHAR_CATEGORY_STD( IsSpaceOrTab   , isblank  , "a space or a tab"        )
+        // !IsControl and not a space
+        CHAR_CATEGORY_STD( IsVisible      , isgraph  , "a visible character"     )
+        // a-z,A-Z
+        CHAR_CATEGORY_STD( IsAlpha        , isalpha  , "a letter"                )
+        // 0-9
+        CHAR_CATEGORY_STD( IsDigit        , isdigit  , "a digit"                 )
+        // 0-9,a-f,A-F
+        CHAR_CATEGORY_STD( IsHexDigit     , isxdigit , "a hexadecimal digit"     )
+        // IsAlpha || IsDigit
+        CHAR_CATEGORY_STD( IsAlphaOrDigit , isalnum  , "a letter or a digit"     )
+        // IsVisible && !IsAlphaOrDigit
+        CHAR_CATEGORY_STD( IsPunctuation  , ispunct  , "a punctuation character" )
+        // A-Z
+        CHAR_CATEGORY_STD( IsUppercase    , isupper  , "an uppercase letter"     )
+        // a-z
+        CHAR_CATEGORY_STD( IsLowercase    , islower  , "a lowercase letter"      )
+        #undef CHAR_CATEGORY_STD
+
+        // Other categories.
+        CHAR_CATEGORY(IsPartOfInteger, "an integer", IsAlphaOrDigit{}(ch) || ch == '+' || ch == '-')
+        CHAR_CATEGORY(IsPartOfReal, "a real number", IsPartOfInteger{}(ch) || ch == '.')
+
+        #undef CHAR_CATEGORY
+
+
+        // Fancy stateful character categories.
+
+        // Matches a c-style identifier.
+        class SeqIdentifier final : public Category
+        {
+            mutable bool first_char = true;
+
+          public:
+            [[nodiscard]] bool operator()(char ch) const override
+            {
+                bool ok = IsAlpha{}(ch) || ch == '_' || (!first_char && IsDigit{}(ch));
+                first_char = false;
+                return ok;
+            }
+
+            [[nodiscard]] std::string name() const override {return "an identifier";}
+        };
+    }
+
+    namespace impl
+    {
+        template <typename T>
+        using detect_appendable_byte_seq = decltype(
+            std::declval<T&>().push_back(std::uint8_t{}),
+            void()
+        );
+
+        template <typename T>
+        inline constexpr bool is_appendable_byte_seq_v = Meta::is_detected<impl::detect_appendable_byte_seq, T>;
+
+        template <typename T>
+        inline constexpr bool is_appendable_byte_seq_ptr_or_null_v = std::is_null_pointer_v<T> || (std::is_pointer_v<T> && is_appendable_byte_seq_v<std::remove_pointer_t<T>>);
+    }
+
     enum PositionCategory
     {
         absolute,
@@ -29,6 +161,14 @@ namespace Stream
         byte_offset,
         text_position,
         text_byte_position,
+    };
+
+    enum ExtractMode
+    {
+        one, // Exactly one.
+        any, // Any amount.
+        if_present, // If present.
+        at_least_one, // At least one.
     };
 
     class Input
@@ -109,7 +249,7 @@ namespace Stream
 
         // Moves the cursor.
         // Throws if it ends up out of bounds.
-        void Seek(std::ptrdiff_t offset, PositionCategory category = relative)
+        void Seek(std::ptrdiff_t offset, PositionCategory category)
         {
             std::size_t base_pos =
                 category == relative ? data.position    :
@@ -151,12 +291,20 @@ namespace Stream
             ThrowIfNoData(1);
             return data.file.data()[data.position];
         }
+        [[nodiscard]] char PeekChar() const
+        {
+            return PeekByte();
+        }
 
         // Reads a single byte.
         [[nodiscard]] std::uint8_t ReadByte()
         {
             ThrowIfNoData(1);
             return data.file.data()[data.position++];
+        }
+        [[nodiscard]] char ReadChar()
+        {
+            return ReadByte();
         }
 
         // Reads a single UTF8 character.
@@ -170,7 +318,7 @@ namespace Stream
             if (len == 0)
             {
                 while (MoreData() && !Unicode::IsFirstByte(PeekByte()))
-                    SkipByte();
+                    SkipOne();
                 return Unicode::default_char;
             }
 
@@ -194,7 +342,7 @@ namespace Stream
                     return Unicode::default_char;
 
                 // Now we can safely move the cursor.
-                SkipByte();
+                SkipOne();
 
                 // Extract bits from the byte and append them to the result.
                 ret = (ret << 6) | (byte & 0b00111111);
@@ -204,31 +352,26 @@ namespace Stream
         }
 
         // Reads a sequence of bytes.
-        void ReadBytes(std::uint8_t *buffer, std::size_t size)
+        void Read(std::uint8_t *buffer, std::size_t size)
         {
             ThrowIfNoData(size);
             std::copy_n(data.file.data() + data.position, size, buffer);
             data.position += size;
         }
-        void ReadBytes(char *buffer, std::size_t size)
+        void Read(char *buffer, std::size_t size)
         {
-            ReadBytes(reinterpret_cast<std::uint8_t *>(buffer), size);
+            Read(reinterpret_cast<std::uint8_t *>(buffer), size);
         }
 
-        // Skips several bytes or objects.
-        void SkipByte()
+        // Skips one byte.
+        void SkipOne()
         {
-            Seek(1);
+            Seek(1, relative);
         }
-        void SkipBytes(std::size_t count)
+        // Skips several bytes.
+        void Skip(std::size_t count = 1)
         {
-            Seek(count);
-        }
-        template <typename T>
-        void Skip(std::size_t count)
-        {
-            static_assert(std::is_arithmetic_v<T>, "The template parameter must be arithmetic.");
-            SkipBytes(count * sizeof(T));
+            Seek(count, relative);
         }
 
         // Reads a single arithmetic value with a specified byte order.
@@ -236,7 +379,7 @@ namespace Stream
         [[nodiscard]] T ReadWithByteOrder(ByteOrder::Order order)
         {
             T ret;
-            ReadBytes(reinterpret_cast<std::uint8_t *>(&ret), sizeof ret);
+            Read(reinterpret_cast<std::uint8_t *>(&ret), sizeof ret);
             ByteOrder::Convert(ret, order);
             return ret;
         }
@@ -260,7 +403,7 @@ namespace Stream
         template <typename T>
         void ReadWithByteOrder(ByteOrder::Order order, T *buffer, std::size_t count)
         {
-            ReadBytes(reinterpret_cast<std::uint8_t *>(buffer), count * sizeof *buffer);
+            Read(reinterpret_cast<std::uint8_t *>(buffer), count * sizeof *buffer);
             for (std::size_t i = 0; i < count; i++)
                 ByteOrder::Convert(buffer[i], order);
         }
@@ -278,6 +421,111 @@ namespace Stream
         void ReadNative(T *buffer, std::size_t count)
         {
             ReadWithByteOrder(ByteOrder::native, buffer, count);
+        }
+
+        // Reads matching characters from the input.
+        // `mode` affects how many characters are read, and whether or not reading 0 characters causes an exception.
+        // If `append_to` is not `nullptr`, the matching characters are appended to it.
+        // Returns the amount of characters processed.
+        template <ExtractMode mode = at_least_one, typename T, CHECK(impl::is_appendable_byte_seq_ptr_or_null_v<T>)>
+        std::size_t Extract(const Char::Category &category, T append_to) // `append_to` can be null.
+        {
+            constexpr bool several = mode == at_least_one || mode == any;
+            constexpr bool throw_if_none = mode == at_least_one || mode == one;
+
+            std::size_t count = 0;
+
+            do
+            {
+                if (!MoreData())
+                    break;
+                std::uint8_t byte = PeekByte();
+                if (!category(byte))
+                    break;
+                SkipOne();
+                if constexpr (!std::is_null_pointer_v<T>)
+                    if (append_to)
+                        append_to->push_back(byte);
+                count++;
+            }
+            while (several);
+
+            if (throw_if_none && count == 0)
+                Program::Error(GetExceptionPrefix() + "Expected " + category.name() + ".");
+
+            return count;
+        }
+        template <ExtractMode mode = at_least_one, typename T, CHECK(impl::is_appendable_byte_seq_ptr_or_null_v<T>)>
+        std::size_t Extract(std::uint8_t byte, T append_to)
+        {
+            return Extract<mode>(Char::EqualTo(byte), append_to);
+        }
+
+        // Reads matching characters from the input.
+        // `mode` affects whether or not reading 0 characters causes an exception.
+        // Returns the matching characters in a container of type `C`.
+        template <ExtractMode mode = at_least_one, typename C = std::string, CHECK(impl::is_appendable_byte_seq_v<C>)>
+        [[nodiscard]] C Extract(const Char::Category &category)
+        {
+            static_assert(mode == at_least_one || mode == any, "Mode has to be `at_least_one` or `any`.");
+            C ret;
+            Extract<mode>(category, &ret);
+            return ret;
+        }
+        template <ExtractMode mode = at_least_one, typename C = std::string, CHECK(impl::is_appendable_byte_seq_v<C>)>
+        [[nodiscard]] C Extract(std::uint8_t byte)
+        {
+            return Extract<mode, C>(Char::EqualTo(byte));
+        }
+
+        // Discards matching characters from the input.
+        // `mode` affects how many characters are read, and whether or not reading 0 characters causes an exception.
+        // Returns the amount of characters processed.
+        template <ExtractMode mode = one>
+        std::size_t Discard(const Char::Category &category)
+        {
+            return Extract<mode>(category, nullptr);
+        }
+        template <ExtractMode mode = one>
+        std::size_t Discard(std::uint8_t byte)
+        {
+            return Extract<mode>(Char::EqualTo(byte), nullptr);
+        }
+
+        // Discards a sequence of bytes from the input.
+        // `mode` affects whether it returns `false` on failure or throws.
+        template <ExtractMode mode = one>
+        bool DiscardBytes(const std::uint8_t *bytes, std::size_t count)
+        {
+            static_assert(mode == one || mode == if_present, "Mode has to be `one` or `if_present`.");
+            auto pos = Position();
+            for (std::size_t i = 0; i < count; i++)
+            {
+                if (!MoreData() || PeekByte() != bytes[i])
+                {
+                    Seek(pos, absolute);
+                    if constexpr (mode == one)
+                        Program::Error(GetExceptionPrefix() + "Expected \"" + Strings::Escape(std::string_view(reinterpret_cast<const char *>(bytes), count)) + "\".");
+                    return false;
+                }
+                SkipOne();
+            }
+            return true;
+        }
+        template <ExtractMode mode = one>
+        bool DiscardChars(const char *chars, std::size_t count)
+        {
+            return DiscardBytes<mode>(reinterpret_cast<const std::uint8_t *>(chars), count);
+        }
+        template <ExtractMode mode = one>
+        bool DiscardBytes(std::initializer_list<std::uint8_t> list)
+        {
+            return DiscardBytes<mode>(&*list.begin(), list.size());
+        }
+        template <ExtractMode mode = one>
+        bool DiscardChars(std::string_view view)
+        {
+            return DiscardChars<mode>(&*view.begin(), view.size());
         }
     };
 }

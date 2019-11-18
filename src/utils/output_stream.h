@@ -104,9 +104,9 @@ namespace Stream
 
         // Constructs a stream bound to a C file handle.
         // The stream doesn't own the handle.
-        Output(FILE *handle, capacity_t capacity = default_capacity)
+        [[nodiscard]] static Output FileHandle(FILE *handle, capacity_t capacity = default_capacity)
         {
-            *this = Output(Str("File handle 0x", std::hex, std::uintptr_t(handle)),
+            return Output(Str("File handle 0x", std::hex, std::uintptr_t(handle)),
                 [handle](const Output &object, const std::uint8_t *data, std::size_t size)
                 {
                     if (!std::fwrite(data, 1, size, handle))
@@ -121,12 +121,9 @@ namespace Stream
             typename T,
             CHECK_EXPR(std::declval<T&>().insert(std::declval<T&>().end(), (const std::uint8_t *)0, (const std::uint8_t *)0))
         >
-        Output(T *container, capacity_t capacity = default_capacity)
+        [[nodiscard]] static Output Container(T &container, capacity_t capacity = default_capacity)
         {
-            // We pass `container` by pointer rather than by reference, to avoid
-            // a conflict with the file-opening constructor when passing a `std::string.
-
-            *this = Output(Str("Vector at 0x", std::hex, std::uintptr_t(container)),
+            return Output(Str("Vector at 0x", std::hex, std::uintptr_t(container)),
                 [container](const Output &, const std::uint8_t *data, std::size_t size)
                 {
                     container->insert(container->end(), data, data + size);

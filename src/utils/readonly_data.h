@@ -26,7 +26,7 @@ namespace Stream
             std::enable_if_t<
                 std::is_arithmetic_v<std::remove_reference_t<decltype(*std::data(std::declval<const T&>()))>> &&
                 sizeof(*std::data(std::declval<const T&>())) == 1
-            >{}
+            >()
         );
     }
 
