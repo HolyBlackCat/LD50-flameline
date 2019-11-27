@@ -241,7 +241,7 @@ namespace Robust
 
     // Attempts to convert `value` to type `A`. Throws if it's not represesntable as `A`.
     // Usage `Robust::safe_cast<A>(value)`.
-    template <typename A, Meta::deduct..., typename B>
+    template <typename A, Meta::deduce..., typename B>
     [[nodiscard]] constexpr A safe_cast(B value)
     {
         static_assert(std::is_arithmetic_v<A> && std::is_arithmetic_v<B>, "Parameters must be arithmetic.");

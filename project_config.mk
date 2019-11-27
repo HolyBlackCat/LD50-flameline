@@ -1,5 +1,6 @@
 # Sources
-SOURCE_DIRS := src lib
+SOURCE_DIRS := src/interface lib
+SOURCES := src/program/errors.cpp src/game/main.cpp
 
 # Object directory
 OBJECT_DIR := obj
@@ -9,8 +10,8 @@ OUTPUT_FILE := bin/imp-re
 LINKER_MODE := CXX
 
 # Dependency set name
-LIBRARY_PACK_NAME := imp-re_deps_2019-10-14
-USED_PACKAGES := openal freetype2 ogg vorbis vorbisenc vorbisfile zlib fmt
+LIBRARY_PACK_NAME := imp-re_deps_2019-11-27
+USED_PACKAGES := openal freetype2 ogg vorbis vorbisenc vorbisfile zlib fmt double-conversion
 USED_EXTERNAL_PACKAGES :=
 ifeq ($(TARGET_OS),windows)
 USED_PACKAGES += sdl2

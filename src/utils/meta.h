@@ -32,19 +32,19 @@ namespace Meta
 
 
     // Forces some of the function template parameters to be deduced.
-    // Usage:` template <typename A, Meta::deduct..., typename B>` ...
-    // All template parameters placed after `Meta::deduct...` can't be specified manually and would have to be deduced.
+    // Usage:` template <typename A, Meta::deduce..., typename B>` ...
+    // All template parameters placed after `Meta::deduce...` can't be specified manually and would have to be deduced.
 
     namespace impl
     {
-        class deduct_helper
+        class deduce_helper
         {
           protected:
-            constexpr deduct_helper() {}
+            constexpr deduce_helper() {}
         };
     }
 
-    using deduct = impl::deduct_helper &;
+    using deduce = impl::deduce_helper &;
 
 
     // Lambda overloader.
@@ -66,7 +66,7 @@ namespace Meta
     template <typename A, typename B> using copy_qualifiers = typename impl::copy_qualifiers<A, B>::type;
 
 
-    // Pre-C++20 replacement for `std::is_detected_v`.
+    // Pre-C++20 replacement for `std::is_detected`.
 
     namespace impl
     {
