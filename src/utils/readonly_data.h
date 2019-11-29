@@ -75,7 +75,7 @@ namespace Stream
             ret.ref->begin = begin;
             ret.ref->end = end;
 
-            ret.ref->name = Str("Reference to ", end - begin, " bytes at 0x", std::hex, begin);
+            ret.ref->name = Str("Reference to ", end - begin, " bytes at 0x", std::hex, std::uintptr_t(begin));
 
             return ret;
         }
@@ -108,7 +108,7 @@ namespace Stream
             ret.ref->end = ret.ref->begin + size;
             ret.ref->extra_null_terminator = true;
 
-            ret.ref->name = Str("Copy of ", size-1, " bytes from 0x", std::hex, begin);
+            ret.ref->name = Str("Copy of ", size-1, " bytes from 0x", std::hex, std::uintptr_t(begin));
 
             return ret;
         }

@@ -231,11 +231,18 @@ namespace Robust
 
 
     // Returns true if `value` can be represented as `A`.
-    template <typename A, typename B>
+    template <typename A, Meta::deduce..., typename B>
     [[nodiscard]] constexpr bool representable_as(B value)
     {
         static_assert(std::is_arithmetic_v<A> && std::is_arithmetic_v<B>, "Parameters must be arithmetic.");
         return equal(value, A(value));
+    }
+
+    // Returns true if `value` can not be represented as `A`.
+    template <typename A, Meta::deduce..., typename B>
+    [[nodiscard]] constexpr bool not_representable_as(B value)
+    {
+        return !representable_as<A>(value);
     }
 
 

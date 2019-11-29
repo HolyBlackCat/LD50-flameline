@@ -6,6 +6,7 @@
 #include <cstdio>
 #include <cstring>
 #include <functional>
+#include <iterator>
 #include <memory>
 #include <string>
 #include <type_traits>
@@ -123,10 +124,10 @@ namespace Stream
         >
         [[nodiscard]] static Output Container(T &container, capacity_t capacity = default_capacity)
         {
-            return Output(Str("Vector at 0x", std::hex, std::uintptr_t(container)),
-                [container](const Output &, const std::uint8_t *data, std::size_t size)
+            return Output(Str("Container at 0x", std::hex, std::uintptr_t(&container)),
+                [&container](const Output &, const std::uint8_t *data, std::size_t size)
                 {
-                    container->insert(container->end(), data, data + size);
+                    container.insert(container.end(), data, data + size);
                 },
                 capacity);
         }
@@ -222,17 +223,17 @@ namespace Stream
         template <typename T>
         Output &WriteLittle(std::type_identity_t<T> value)
         {
-            return WriteWithByteOrder(ByteOrder::little, value);
+            return WriteWithByteOrder<T>(ByteOrder::little, value);
         }
         template <typename T>
         Output &WriteBig(std::type_identity_t<T> value)
         {
-            return WriteWithByteOrder(ByteOrder::big, value);
+            return WriteWithByteOrder<T>(ByteOrder::big, value);
         }
         template <typename T>
         Output &WriteNative(std::type_identity_t<T> value)
         {
-            return WriteWithByteOrder(ByteOrder::native, value);
+            return WriteWithByteOrder<T>(ByteOrder::native, value);
         }
 
         // Writes a sequence of arithmetic values with a specified byte order.
@@ -240,23 +241,57 @@ namespace Stream
         Output &WriteWithByteOrder(ByteOrder::Order order, const std::type_identity_t<T> *ptr, std::size_t count)
         {
             for (std::size_t i = 0; i < count; i++)
-                WriteWithByteOrder(order, ptr[i]);
+                WriteWithByteOrder<T>(order, ptr[i]);
             return *this;
         }
         template <typename T>
         Output &WriteLittle(const std::type_identity_t<T> *ptr, std::size_t count)
         {
-            return WriteWithByteOrder(ByteOrder::little, ptr, count);
+            return WriteWithByteOrder<T>(ByteOrder::little, ptr, count);
         }
         template <typename T>
         Output &WriteBig(const std::type_identity_t<T> *ptr, std::size_t count)
         {
-            return WriteWithByteOrder(ByteOrder::big, ptr, count);
+            return WriteWithByteOrder<T>(ByteOrder::big, ptr, count);
         }
         template <typename T>
         Output &WriteNative(const std::type_identity_t<T> *ptr, std::size_t count)
         {
-            return WriteWithByteOrder(ByteOrder::native, ptr, count);
+            return WriteWithByteOrder<T>(ByteOrder::native, ptr, count);
+        }
+
+        // An output iterator for a stream.
+        class OutputIterator
+        {
+            Output *target = 0;
+
+          public:
+            OutputIterator() {}
+            OutputIterator(Output &target) : target(&target) {}
+
+            // `std::back_insert_iterator` uses the same aliases.
+            using iterator_category = std::output_iterator_tag;
+            using value_type        = void;
+            using difference_type   = void;
+            using pointer           = void;
+            using reference         = void;
+
+            // Those return the object itself.
+            // Kinda weird, but `std::back_insert_iterator` does the same thing.
+            [[nodiscard]] OutputIterator &operator*() {return *this;}
+            OutputIterator &operator++() {return *this;}
+            OutputIterator &operator++(int) {return *this;}
+
+            OutputIterator &operator=(char ch)
+            {
+                target->WriteByte(ch);
+                return *this;
+            }
+        };
+        // Returns an output iterator for the stream.
+        [[nodiscard]] OutputIterator GetOutputIterator()
+        {
+            return OutputIterator(*this);
         }
     };
 }

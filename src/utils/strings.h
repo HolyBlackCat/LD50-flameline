@@ -40,47 +40,6 @@ namespace Strings
         return str.compare(str.size() - prefix.size(), prefix.size(), prefix) == 0;
     }
 
-    // A simple escaping function. Intended to be used for user-facing messages, not data storage.
-    [[nodiscard]] inline std::string Escape(std::string_view str)
-    {
-        std::string ret;
-        for (unsigned char ch : str)
-        {
-            if (ch >= ' ' && ch != 0x7f)
-            {
-                ret += ch;
-                continue;
-            }
-
-            switch (ch)
-            {
-                case '\0': ret += R"(\0)"; break;
-                case '\'': ret += R"(\')"; break;
-                case '\"': ret += R"(\")"; break;
-                case '\\': ret += R"(\\)"; break;
-                case '\a': ret += R"(\a)"; break;
-                case '\b': ret += R"(\b)"; break;
-                case '\f': ret += R"(\f)"; break;
-                case '\n': ret += R"(\n)"; break;
-                case '\r': ret += R"(\r)"; break;
-                case '\t': ret += R"(\t)"; break;
-                case '\v': ret += R"(\v)"; break;
-
-              default:
-                {
-                    char buffer[5]; // 5 bytes for: \ x N N \0
-                    std::snprintf(buffer, sizeof buffer, "\\x%02X", ch);
-                    ret += buffer;
-                }
-                break;
-            }
-        }
-        return ret;
-    }
-    [[nodiscard]] inline std::string Escape(char ch)
-    {
-        return Escape({&ch, 1});
-    }
 
     enum class UseUnicode : bool {};
 

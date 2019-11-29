@@ -12,9 +12,9 @@
 
 #include "program/errors.h"
 #include "utils/check.h"
+#include "utils/escape.h"
 #include "utils/meta.h"
 #include "utils/robust_math.h"
-#include "utils/strings.h"
 
 namespace Strings
 {
@@ -114,6 +114,11 @@ namespace Strings
         // `+1` is for the null terminator.
         return (i > f ? i : f) + 1;
     }
+
+    // Returns `'`, the digit separator.
+    inline constexpr char CharDigitSeparator() {return impl::char_digit_sep;}
+    // Returns `@`, which separates parts of a long double.
+    inline constexpr char CharLongDoublePartsSeparator() {return impl::char_long_double_parts_sep;}
 
     // Converts a number to a string.
     // Returns `false` on failure, which shouldn't happen if the buffer is at least `ToStringMaxBufferLen()` large.
@@ -325,5 +330,4 @@ namespace Strings
     {
         return FromString<T>(string);
     }
-
 }

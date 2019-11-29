@@ -94,8 +94,7 @@ namespace Unicode
     {
         char buf[max_char_len];
         int len = Encode(ch, buf);
-        for (int i = 0; i < len; i++)
-            str += buf[i];
+        str.append(buf, len);
         return len;
     }
 

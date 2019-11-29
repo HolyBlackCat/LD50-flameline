@@ -12,6 +12,7 @@
 #include "program/errors.h"
 #include "utils/byte_order.h"
 #include "utils/check.h"
+#include "utils/escape.h"
 #include "utils/memory_access.h"
 #include "utils/meta.h"
 #include "utils/readonly_data.h"
@@ -43,7 +44,7 @@ namespace Stream
             }
             [[nodiscard]] std::string name() const override
             {
-                return "'" + Strings::Escape(saved_char) + "'";
+                return "`" + Strings::Escape(saved_char) + "`";
             }
         };
 
@@ -106,10 +107,6 @@ namespace Stream
         // a-z
         CHAR_CATEGORY_STD( IsLowercase    , islower  , "a lowercase letter"      )
         #undef CHAR_CATEGORY_STD
-
-        // Other categories.
-        CHAR_CATEGORY(IsPartOfInteger, "an integer", IsAlphaOrDigit{}(ch) || ch == '+' || ch == '-')
-        CHAR_CATEGORY(IsPartOfReal, "a real number", IsPartOfInteger{}(ch) || ch == '.')
 
         #undef CHAR_CATEGORY
 
@@ -184,7 +181,7 @@ namespace Stream
         void ThrowIfNoData(std::size_t bytes) const
         {
             if (data.position + bytes > data.file.size())
-                Program::Error(GetExceptionPrefix() + "Unexpected end of data.");
+                Program::Error(GetExceptionPrefix() + "Unexpected end of input.");
         }
 
       public:
@@ -282,7 +279,7 @@ namespace Stream
         void ExpectEnd() const
         {
             if (MoreData())
-                Program::Error(GetExceptionPrefix() + "Expected end of data.");
+                Program::Error(GetExceptionPrefix() + "Unexpected junk at the end of input.");
         }
 
         // Returns the next byte, without advancing the cursor.
