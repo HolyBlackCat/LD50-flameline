@@ -2,6 +2,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <exception>
 #include <string>
 #include <type_traits>
 
@@ -42,7 +43,14 @@ namespace Refl
                     temp_str += input.ReadChar();
             }
 
-            object = Strings::Unescape(temp_str);
+            try
+            {
+                object = Strings::Unescape(temp_str);
+            }
+            catch (std::exception &e)
+            {
+                Program::Error(input.GetExceptionPrefix() + e.what());
+            }
         }
 
         using binary_length_t = std::uint32_t;

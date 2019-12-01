@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cctype>
+#include <cerrno>
 #include <cmath>
 #include <cstddef>
 #include <cstdio>
@@ -82,12 +83,14 @@ namespace Strings
     // `base` only works for integral types, and can be between 2 and 36. If it's 0, the base is detected automatically.
     // Skips leading spaces. Ignores any symbols after the number.
     // Shouldn't throw.
+    // If `T` is unsigned, negative values appear to be allowed (if they are greater than -2^n). Otherwise out-of-range values are not allowed.
     template <typename T, CHECK(std::is_arithmetic_v<T>)>
     [[nodiscard]] T strto(const char *str, const char **str_end, int base = 0)
     {
         char *end = const_cast<char *>(str);
+        errno = 0; // `strto*` appears to indicate out-of-range errors only by setting `errno`.
         auto raw_result = impl::strto_low<T>(str, &end, base);
-        if (end == str)
+        if (end == str || errno != 0)
         {
             *str_end = str;
             return 0;

@@ -1,5 +1,6 @@
 #pragma once
 
+#include <exception>
 #include <type_traits>
 
 #include "reflection/interface_basic.h"
@@ -33,7 +34,14 @@ namespace Refl
             });
 
             std::string str = input.Extract(category);
-            object = Strings::FromString<T>(str);
+            try
+            {
+                object = Strings::FromString<T>(str);
+            }
+            catch (std::exception &e)
+            {
+                Program::Error(input.GetExceptionPrefix() + e.what());
+            }
         }
 
         void ToBinary(const T &object, Stream::Output &output) const override

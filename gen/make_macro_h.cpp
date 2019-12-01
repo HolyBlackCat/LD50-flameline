@@ -18,6 +18,9 @@ namespace data
     // Max number MA_VA_SIZE (and similar functions) can return.
     constexpr int size_max = 16;
 
+    // The max amount of parameters CATn(...) can handle.
+    constexpr int cat_max = 8;
+
     // Max length loops can handle.
     constexpr int loop_max = 64;
 
@@ -149,6 +152,20 @@ int main(int argc, char **argv)
     }
 
     { // Macros
+        { // Special
+            output(1+R"(
+                // Stops the compilation with a specific error message.
+                // `msg` should be a string literal.
+                // This implementation works on both GCC and Clang.
+                #define MA_ABORT(msg) MA_ABORT_(GCC error msg)
+                #define MA_ABORT_(msg) _Pragma(MA_STR(msg))
+                // Same as `MA_ABORT`, but calling it with no parameters does nothing.
+                #define MA_ABORT_IF_NOT_EMPTY(...) __VA_OPT__(MA_ABORT(__VA_ARGS__))
+            )");
+        }
+
+        next_line();
+
         { // To string
             output(1+R"(
                 // Stringifies `...`, while expanding any macros in it.
@@ -160,11 +177,50 @@ int main(int argc, char **argv)
         next_line();
 
         { // Concatenation
-            output(1+R"(
-                // Concatenates `x` and `y`, while expanding any macros in them. The expansions can't contain commas.
-                #define MA_CAT(x,y) MA_CAT_impl(x,y)
-                #define MA_CAT_impl(x,y) x##y
+            output("// Concatenates all parameters, expanding any macros in them. The expansions can't contain commas.\n");
+            for (int i = 2; i <= data::cat_max; i++)
+            {
+                std::string index_str;
+                if (i > 2) index_str = make_str(i);
 
+                output("#define MA_CAT", index_str, "(");
+                for (int j = 1; j <= i; j++)
+                {
+                    if (j != 1) output(",");
+                    output("p", j);
+                }
+                output(") MA_CAT", index_str, "_impl(");
+                for (int j = 1; j <= i; j++)
+                {
+                    if (j != 1) output(",");
+                    output("p", j);
+                }
+                output(")\n");
+            }
+
+            for (int i = 2; i <= data::cat_max; i++)
+            {
+                std::string index_str;
+                if (i > 2) index_str = make_str(i);
+
+                output("#define MA_CAT", index_str, "_impl(");
+                for (int j = 1; j <= i; j++)
+                {
+                    if (j != 1) output(",");
+                    output("p", j);
+                }
+                output(") ");
+                for (int j = 1; j <= i; j++)
+                {
+                    if (j != 1) output("##");
+                    output("p", j);
+                }
+                output("\n");
+            }
+
+            next_line();
+
+            output(1+R"(
                 // Concatenates `...` and `x`. Note that the parameters are in a different order.
                 #define MA_APPEND_TO_VA_END(x,...) MA_APPEND_TO_VA_END_impl(x,__VA_ARGS__)
                 #define MA_APPEND_TO_VA_END_impl(x,...) __VA_ARGS__##x

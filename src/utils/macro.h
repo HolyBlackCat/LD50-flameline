@@ -5,13 +5,33 @@
 
 #pragma once
 
+// Stops the compilation with a specific error message.
+// `msg` should be a string literal.
+// This implementation works on both GCC and Clang.
+#define MA_ABORT(msg) MA_ABORT_(GCC error msg)
+#define MA_ABORT_(msg) _Pragma(MA_STR(msg))
+// Same as `MA_ABORT`, but calling it with no parameters does nothing.
+#define MA_ABORT_IF_NOT_EMPTY(...) __VA_OPT__(MA_ABORT(__VA_ARGS__))
+
 // Stringifies `...`, while expanding any macros in it.
 #define MA_STR(...) MA_STR_impl(__VA_ARGS__)
 #define MA_STR_impl(...) #__VA_ARGS__
 
-// Concatenates `x` and `y`, while expanding any macros in them. The expansions can't contain commas.
-#define MA_CAT(x,y) MA_CAT_impl(x,y)
-#define MA_CAT_impl(x,y) x##y
+// Concatenates all parameters, expanding any macros in them. The expansions can't contain commas.
+#define MA_CAT(p1,p2) MA_CAT_impl(p1,p2)
+#define MA_CAT3(p1,p2,p3) MA_CAT3_impl(p1,p2,p3)
+#define MA_CAT4(p1,p2,p3,p4) MA_CAT4_impl(p1,p2,p3,p4)
+#define MA_CAT5(p1,p2,p3,p4,p5) MA_CAT5_impl(p1,p2,p3,p4,p5)
+#define MA_CAT6(p1,p2,p3,p4,p5,p6) MA_CAT6_impl(p1,p2,p3,p4,p5,p6)
+#define MA_CAT7(p1,p2,p3,p4,p5,p6,p7) MA_CAT7_impl(p1,p2,p3,p4,p5,p6,p7)
+#define MA_CAT8(p1,p2,p3,p4,p5,p6,p7,p8) MA_CAT8_impl(p1,p2,p3,p4,p5,p6,p7,p8)
+#define MA_CAT_impl(p1,p2) p1##p2
+#define MA_CAT3_impl(p1,p2,p3) p1##p2##p3
+#define MA_CAT4_impl(p1,p2,p3,p4) p1##p2##p3##p4
+#define MA_CAT5_impl(p1,p2,p3,p4,p5) p1##p2##p3##p4##p5
+#define MA_CAT6_impl(p1,p2,p3,p4,p5,p6) p1##p2##p3##p4##p5##p6
+#define MA_CAT7_impl(p1,p2,p3,p4,p5,p6,p7) p1##p2##p3##p4##p5##p6##p7
+#define MA_CAT8_impl(p1,p2,p3,p4,p5,p6,p7,p8) p1##p2##p3##p4##p5##p6##p7##p8
 
 // Concatenates `...` and `x`. Note that the parameters are in a different order.
 #define MA_APPEND_TO_VA_END(x,...) MA_APPEND_TO_VA_END_impl(x,__VA_ARGS__)
