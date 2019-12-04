@@ -2,7 +2,7 @@
 
 #include <string>
 
-#include "enum.h"
+#include "input/enum.h"
 #include "interface/window.h"
 
 namespace Input

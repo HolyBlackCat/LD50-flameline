@@ -8,7 +8,7 @@
 #include <type_traits>
 #include <utility>
 
-#include "robust_compare.h"
+#include "utils/robust_compare.h"
 
 template <typename DefaultInt = int, typename DefaultReal = float>
 class Random

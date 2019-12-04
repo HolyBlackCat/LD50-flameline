@@ -6,7 +6,7 @@
 #include <type_traits>
 #include <vector>
 
-#include "vertex_buffer.h"
+#include "graphics/vertex_buffer.h"
 
 namespace Graphics
 {

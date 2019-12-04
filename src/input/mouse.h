@@ -1,7 +1,7 @@
 #pragma once
 
-#include "button.h"
-#include "enum.h"
+#include "input/button.h"
+#include "input/enum.h"
 #include "interface/window.h"
 #include "utils/mat.h"
 

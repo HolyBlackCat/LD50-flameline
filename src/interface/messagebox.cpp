@@ -4,7 +4,7 @@
 
 #include <SDL.h>
 
-#include "window.h"
+#include "interface/window.h"
 
 namespace Interface
 {

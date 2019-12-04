@@ -6,8 +6,7 @@
 
 #include <cglfl/cglfl.hpp>
 
-#include "texture.h"
-
+#include "graphics/texture.h"
 #include "graphics/types.h"
 #include "program/errors.h"
 #include "reflection/complete.h"

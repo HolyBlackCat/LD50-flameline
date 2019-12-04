@@ -1,5 +1,5 @@
 #pragma once
 
-#include "button.h"
-#include "enum.h"
-#include "mouse.h"
+#include "input/button.h"
+#include "input/enum.h"
+#include "input/mouse.h"
