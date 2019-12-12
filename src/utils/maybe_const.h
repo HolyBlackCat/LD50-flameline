@@ -1,5 +1,11 @@
 #pragma once
 
+/* Example usage:
+ *   MAYBE_CONST( CV int &GetX() CV {...} )
+ * This macro has a major limitation: CV can't appear inside of ().
+ * It might be possible to fix this (for a limited level of nested parens) with some heavy macros.
+ */
+
 #define MAYBE_CONST(...) IMPL_MAYBE_CONST( ((__VA_ARGS__)) )
 #define CV ))((
 // Double parens are probably an overkill, but I want this to be extra robust.

@@ -257,4 +257,14 @@ namespace Robust
             throw std::runtime_error("The value can't be represented by the specified type.");
         return result;
     }
+
+    // Does `dst = src`.
+    // If the value of `src` couldn't be represented by `dst` exactly, returns `true`.
+    template <Meta::deduce..., typename A, typename B>
+    [[nodiscard]] constexpr bool conversion_fails(A src, B &dst)
+    {
+        static_assert(std::is_arithmetic_v<A> && std::is_arithmetic_v<B>, "Parameters must be arithmetic.");
+        dst = src;
+        return not_equal(src, dst);
+    }
 }

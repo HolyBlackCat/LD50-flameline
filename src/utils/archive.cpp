@@ -74,10 +74,11 @@ namespace Archive
         for (std::size_t i = 0; i < sizeof(size_type); i++)
             size |= (size_type(src_begin[i]) << (i * 8));
 
-        if (!Robust::representable_as<std::size_t>(size))
+        std::size_t ret;
+        if (Robust::conversion_fails(size, ret))
             Program::Error("Unable to uncompress: The object is too large.");
 
-        return size;
+        return ret;
     }
 
     void Uncompress(const uint8_t *src_begin, const uint8_t *src_end, uint8_t *dst_begin)

@@ -3,16 +3,22 @@
 #include <exception>
 #include <type_traits>
 
+#include "program/errors.h"
 #include "reflection/interface_basic.h"
 #include "utils/lexical_cast.h"
 
 namespace Refl
 {
+    namespace impl
+    {
+        inline constexpr auto scalar_byte_order = ByteOrder::little;
+    }
+
     template <typename T>
     class Interface_Scalar : public InterfaceBasic<T>
     {
       public:
-        void ToString(const T &object, Stream::Output &output, const ToStringOptions &options = {}) const override
+        void ToString(const T &object, Stream::Output &output, const ToStringOptions &options) const override
         {
             (void)options;
             char buf[Strings::ToStringMaxBufferLen()];
@@ -20,7 +26,7 @@ namespace Refl
             output.WriteString(buf);
         }
 
-        void FromString(T &object, Stream::Input &input, const FromStringOptions &options = {}) override
+        void FromString(T &object, Stream::Input &input, const FromStringOptions &options) const override
         {
             (void)options;
             constexpr bool is_fp = std::is_floating_point_v<T>;
@@ -46,12 +52,13 @@ namespace Refl
 
         void ToBinary(const T &object, Stream::Output &output) const override
         {
-            output.WriteLittle<T>(object);
+            output.WriteWithByteOrder<T>(impl::scalar_byte_order, object);
         }
 
-        void FromBinary(T &object, Stream::Input &input) override
+        void FromBinary(T &object, Stream::Input &input, const FromBinaryOptions &options) const override
         {
-            object = input.ReadLittle<T>();
+            (void)options;
+            object = input.ReadWithByteOrder<T>(impl::scalar_byte_order);
         }
     };
 

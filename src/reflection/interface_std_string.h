@@ -8,6 +8,7 @@
 
 #include "program/errors.h"
 #include "reflection/interface_basic.h"
+#include "reflection/interface_container.h"
 #include "utils/escape.h"
 #include "utils/robust_math.h"
 
@@ -16,7 +17,7 @@ namespace Refl
     class Interface_StdString : public InterfaceBasic<std::string>
     {
       public:
-        void ToString(const std::string &object, Stream::Output &output, const ToStringOptions &options = {}) const override
+        void ToString(const std::string &object, Stream::Output &output, const ToStringOptions &options) const override
         {
             Strings::EscapeFlags flags = Strings::EscapeFlags::escape_double_quotes;
             if (options.multiline)
@@ -27,10 +28,10 @@ namespace Refl
             output.WriteByte('"');
         }
 
-        void FromString(std::string &object, Stream::Input &input, const FromStringOptions &options = {}) override
+        void FromString(std::string &object, Stream::Input &input, const FromStringOptions &options) const override
         {
             (void)options;
-            input.Discard<Stream::one>('"');
+            input.Discard('"');
             std::string temp_str;
             while (true)
             {
@@ -53,28 +54,24 @@ namespace Refl
             }
         }
 
-        using binary_length_t = std::uint32_t;
-        static constexpr auto binary_length_byte_order = ByteOrder::little;
-
-        // If the binary data ends up malformed, the size we read can be larger than the actual amount of bytes input contains.
-        // This would cause us to allocate too much heap memory for no reason.
-        // Rather than checking the remaining data size to make sure the size is valid, we simply refuse to `.reserve()` more bytes than a specific amount.
-        static constexpr std::size_t max_reserved_size = 1024;
-
         void ToBinary(const std::string &object, Stream::Output &output) const override
         {
-            if (Robust::not_representable_as<binary_length_t>(object.size()))
-                Program::Error("The string is too long to be saved.");
+            impl::container_length_binary_t len;
+            if (Robust::conversion_fails(object.size(), len))
+                Program::Error(output.GetExceptionPrefix() + "The string is too long.");
 
-            output.WriteWithByteOrder<binary_length_t>(binary_length_byte_order, object.size());
+            output.WriteWithByteOrder<impl::container_length_binary_t>(impl::container_length_byte_order, len);
             output.WriteString(object);
         }
 
-        void FromBinary(std::string &object, Stream::Input &input) override
+        void FromBinary(std::string &object, Stream::Input &input, const FromBinaryOptions &options) const override
         {
-            binary_length_t len = input.ReadWithByteOrder<binary_length_t>(binary_length_byte_order);
+            std::size_t len;
+            if (Robust::conversion_fails(input.ReadWithByteOrder<impl::container_length_binary_t>(impl::container_length_byte_order), len))
+                Program::Error(input.GetExceptionPrefix() + "The string is too long.");
+
             object = {};
-            object.reserve(len < max_reserved_size ? len : max_reserved_size);
+            object.reserve(len < options.max_reserved_size ? len : options.max_reserved_size);
             while (len-- > 0)
                 object += input.ReadChar();
         }
@@ -85,4 +82,7 @@ namespace Refl
     {
         using type = Interface_StdString;
     };
+
+    template <>
+    struct impl::ForceNotContainer<std::string> : std::true_type {};
 }

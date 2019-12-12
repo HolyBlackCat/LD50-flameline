@@ -23,7 +23,16 @@ namespace Refl
 
     struct FromStringOptions
     {
-        bool ignore_missing_fields = false; // If parsing a struct, don't complain if any fields are missing.
+        // When parsing a struct, don't complain if any fields are missing.
+        bool ignore_missing_fields = false;
+    };
+
+    struct FromBinaryOptions
+    {
+        // `reserve()` calls will be capped at this amount of bytes.
+        // This prevents malformed serialized data from causing
+        // too much temporary memory to be allocated.
+        std::size_t max_reserved_size = 1024 * 1024;
     };
 
     template <typename T>
@@ -35,15 +44,15 @@ namespace Refl
       public:
         constexpr InterfaceBasic() {}
 
-        virtual void ToString(const T &object, Stream::Output &output, const ToStringOptions &options = {}) const = 0;
+        virtual void ToString(const T &object, Stream::Output &output, const ToStringOptions &options) const = 0;
 
         // This shouldn't skip any leading or trailing whitespace and comments, and shouldn't check for end of stream.
-        virtual void FromString(T &object, Stream::Input &input, const FromStringOptions &options = {}) = 0;
+        virtual void FromString(T &object, Stream::Input &input, const FromStringOptions &options) const = 0;
 
         virtual void ToBinary(const T &object, Stream::Output &output) const = 0;
 
         // This shouldn't check for end of stream.
-        virtual void FromBinary(T &object, Stream::Input &input) = 0;
+        virtual void FromBinary(T &object, Stream::Input &input, const FromBinaryOptions &options) const = 0;
     };
 
     namespace impl
@@ -130,17 +139,17 @@ namespace Refl
 
         // Expects `input_data` to have no junk at the end.
         template <typename T, CHECK_EXPR(Interface<T>())>
-        void FromBinary(T &object, ReadOnlyDataWrapper input_data)
+        void FromBinary(T &object, ReadOnlyDataWrapper input_data, const FromBinaryOptions &options = {})
         {
             Stream::Input input(std::move(input_data.value), Stream::byte_offset);
-            Interface(object).FromBinary(object, input);
+            Interface(object).FromBinary(object, input, options);
             input.ExpectEnd();
         }
         template <typename T, CHECK_EXPR(void(Interface<T>()), T{})>
-        [[nodiscard]] T FromBinary(ReadOnlyDataWrapper input_data)
+        [[nodiscard]] T FromBinary(ReadOnlyDataWrapper input_data, const FromBinaryOptions &options = {})
         {
             T ret{};
-            FromBinary(ret, std::move(input_data));
+            FromBinary(ret, std::move(input_data), options);
             return ret;
         }
     }

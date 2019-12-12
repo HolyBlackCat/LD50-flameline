@@ -167,6 +167,22 @@ namespace Stream
             data.buffer[data.buffer_pos++] = byte;
             return *this;
         }
+        Output &WriteChar(char ch)
+        {
+            return WriteByte(ch);
+        }
+
+        // Writes a single byte several times.
+        Output &WriteByte(std::uint8_t byte, std::size_t repeat)
+        {
+            while (repeat-- > 0)
+                WriteByte(byte);
+            return *this;
+        }
+        Output &WriteChar(char ch, std::size_t repeat)
+        {
+            return WriteByte(ch, repeat);
+        }
 
         // Writes a single UTF8 character.
         Output &WriteUnicodeChar(Unicode::Char ch)

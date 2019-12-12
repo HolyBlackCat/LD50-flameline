@@ -118,7 +118,7 @@ namespace Refl
         using underlying = std::underlying_type_t<T>;
 
       public:
-        void ToString(const T &object, Stream::Output &output, const ToStringOptions &options = {}) const override
+        void ToString(const T &object, Stream::Output &output, const ToStringOptions &options) const override
         {
             (void)options;
             const auto &helper = impl::Enum::GetHelper<T>();
@@ -127,14 +127,14 @@ namespace Refl
             if (!name)
             {
                 if (!helper.IsRelaxed())
-                    Program::Error("Unable to serialize enum: Invalid value: ", underlying(object), ".");
+                    Program::Error(output.GetExceptionPrefix(), "Unable to serialize enum: Invalid value: ", underlying(object), ".");
                 Interface<underlying>().ToString(underlying(object), output, options);
                 return;
             }
             output.WriteString(name);
         }
 
-        void FromString(T &object, Stream::Input &input, const FromStringOptions &options = {}) override
+        void FromString(T &object, Stream::Input &input, const FromStringOptions &options) const override
         {
             (void)options;
             const auto &helper = impl::Enum::GetHelper<T>();
@@ -155,7 +155,7 @@ namespace Refl
             bool name_ok = false;
             T result = helper.NameToValue(name.c_str(), &name_ok);
             if (!name_ok)
-                Program::Error(input.GetExceptionPrefix() + "Unknown enumerator: `", name, "`.");
+                Program::Error(input.GetExceptionPrefix(), "Unknown enumerator: `", name, "`.");
             object = result;
         }
 
@@ -163,20 +163,20 @@ namespace Refl
         {
             const auto &helper = impl::Enum::GetHelper<T>();
             if (!helper.IsRelaxed() && helper.ValueToName(object) == nullptr)
-                Program::Error("Unable to serialize enum: Invalid value: ", underlying(object), ".");
+                Program::Error(output.GetExceptionPrefix(), "Unable to serialize enum: Invalid value: ", underlying(object), ".");
 
             Interface<underlying>().ToBinary(underlying(object), output);
         }
 
-        void FromBinary(T &object, Stream::Input &input) override
+        void FromBinary(T &object, Stream::Input &input, const FromBinaryOptions &options) const override
         {
             const auto &helper = impl::Enum::GetHelper<T>();
 
             underlying result = 0;
-            Interface<underlying>().FromBinary(result, input);
+            Interface<underlying>().FromBinary(result, input, options);
 
             if (!helper.IsRelaxed() && helper.ValueToName(T(result)) == nullptr)
-                Program::Error(input.GetExceptionPrefix() + "Invalid enum value: ", result, ".");
+                Program::Error(input.GetExceptionPrefix(), "Invalid enum value: ", result, ".");
 
             object = T(result);
         }
