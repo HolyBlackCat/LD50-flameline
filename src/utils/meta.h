@@ -15,6 +15,11 @@ namespace Meta
     template <auto...> struct value_list {};
 
 
+    // Some helper aliases.
+
+    template <typename T> using identity_t = T;
+
+
     // Dependent values and types, good for `static_asserts` and SFINAE.
 
     namespace impl

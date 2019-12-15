@@ -15,6 +15,9 @@
 
 namespace data
 {
+    // The amount of overloads of `MA_IDENTITYi`.
+    constexpr int identity_overloads = 4;
+
     // Max number MA_VA_SIZE (and similar functions) can return.
     constexpr int size_max = 16;
 
@@ -235,7 +238,12 @@ int main(int argc, char **argv)
                 #define MA_NULL(...)
 
                 // Expands to `...`.
-                #define MA_IDENTITY(...) __VA_ARGS__
+            )");
+
+            for (int i = 1; i <= data::identity_overloads; i++)
+                output("#define MA_IDENTITY", i == 1 ? "" : make_str(i), "(...) __VA_ARGS__\n");
+
+            output(1+R"(
 
                 // Expand to some basic symbols.
                 #define MA_COMMA() ,
@@ -255,6 +263,9 @@ int main(int argc, char **argv)
                 #define MA_IF_NOT_EMPTY_ELSE(a,b,...) MA_IF_NOT_EMPTY_ELSE_impl##__VA_OPT__(_a)(a,b)
                 #define MA_IF_NOT_EMPTY_ELSE_impl(a,b) b
                 #define MA_IF_NOT_EMPTY_ELSE_impl_a(a,b) a
+
+                // If `a` is not empty, expands to `a`. Otherwise expands to `b`.
+                #define MA_REPLACE_IF_EMPTY(a, b) MA_IF_NOT_EMPTY_ELSE(a, b, a)
 
                 // Expands to `a`, if `...` has at least one comma in it after expansion.
                 #define MA_IF_COMMA(a,...) MA_IF_COMMA_impl(a,__VA_ARGS__,)

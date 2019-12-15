@@ -42,6 +42,9 @@
 
 // Expands to `...`.
 #define MA_IDENTITY(...) __VA_ARGS__
+#define MA_IDENTITY2(...) __VA_ARGS__
+#define MA_IDENTITY3(...) __VA_ARGS__
+#define MA_IDENTITY4(...) __VA_ARGS__
 
 // Expand to some basic symbols.
 #define MA_COMMA() ,
@@ -61,6 +64,9 @@
 #define MA_IF_NOT_EMPTY_ELSE(a,b,...) MA_IF_NOT_EMPTY_ELSE_impl##__VA_OPT__(_a)(a,b)
 #define MA_IF_NOT_EMPTY_ELSE_impl(a,b) b
 #define MA_IF_NOT_EMPTY_ELSE_impl_a(a,b) a
+
+// If `a` is not empty, expands to `a`. Otherwise expands to `b`.
+#define MA_REPLACE_IF_EMPTY(a, b) MA_IF_NOT_EMPTY_ELSE(a, b, a)
 
 // Expands to `a`, if `...` has at least one comma in it after expansion.
 #define MA_IF_COMMA(a,...) MA_IF_COMMA_impl(a,__VA_ARGS__,)

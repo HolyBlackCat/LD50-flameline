@@ -206,11 +206,15 @@ namespace Refl
 #define MA_PARAMS_category_ReflEnum_X_ReflUnderlyingType
 #define MA_PARAMS_equal_ReflUnderlyingType_X_ReflUnderlyingType
 
-#define BAR(data, value) data:value
-
-// #define FOO(list) MA_PARAMS_FIRST( ((list)) )
-#define FOO(list) MA_PARAMS_GET_ONE(d, ReflEnum, Alpha, ((list)), BAR)
-
+/* Declares a reflected enum.
+ * Usage:
+ *   REFL_ENUM( Name [REFL_ENUM_CLASS] [REFL_ENUM_RELAXED] [REFL_ENUM_TYPE Type] ,
+ *       ( Name1 [ , value1] )
+ *       ( Name2 [ , value2] )
+ *   )
+ * Optional parameters following the enum name can be reordered.
+ * Parameter meaning is described above.
+ */
 #define REFL_ENUM(name_params, seq) \
     REFL_ENUM_impl( \
         MA_PARAMS_FIRST(((name_params))), \
@@ -224,7 +228,6 @@ namespace Refl
         seq \
     )
 
-// If `is_class` is non-empty, it's considered to be true.
 #define REFL_ENUM_impl(name_, maybe_type_, is_class_if_not_empty_, seq_) \
     enum MA_IF_NOT_EMPTY(class, is_class_if_not_empty_) name_ maybe_type_ { REFL_ENUM_impl_elem_loop(seq_) };
 
@@ -238,11 +241,15 @@ namespace Refl
 #define REFL_ENUM_impl_elem(...) MA_CALL(REFL_ENUM_impl_elem0,__VA_ARGS__,)
 #define REFL_ENUM_impl_elem0(elem_, ...) elem_ MA_IF_NOT_EMPTY(= __VA_ARGS__, __VA_ARGS__),
 
+// Generates metadata for an existing enum.
+// Has to be in the same namespace/class as the enum.
+// `name_` is the enum type.
+// `is_relaxed_` is either `true` or `false`, see `REFL_ENUM_RELAXED` for an explanation.
+// `seq_` is a list of constants, see `REFL_ENUM` for explanation.
 #define REFL_ENUM_METADATA(name_, is_relaxed_, seq_) \
     struct MA_CAT(zrefl_EnumHelper_, name_) \
     { \
-        using type = name_; \
-        inline static auto helper = ::Refl::impl::Enum::Helper<type>({ REFL_ENUM_impl_pair_loop(seq_) }, is_relaxed_); \
+        inline static auto helper = ::Refl::impl::Enum::Helper<name_>({ REFL_ENUM_impl_pair_loop(seq_) }, is_relaxed_); \
     }; \
     [[maybe_unused]] inline static MA_CAT(zrefl_EnumHelper_, name_) zrefl_EnumFunc(name_) {return {};}
 
