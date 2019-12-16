@@ -96,6 +96,11 @@
 // Expands to the parameter enclosed in `(...)`.
 #define MA_PARAMS_PARENS(data, ...) (__VA_ARGS__)
 
-// This can be passed as `macro` to `MA_PARAMS_GET[_ONE]` to designate that if the parameter exists, it should be empty.
+// This can be passed as `macro` to `MA_PARAMS_GET[_ONE]`.
 // Expands to a single comma.
+#define MA_PARAMS_DUMMY_COMMA(data, ...) ,
+
+// This can be passed as `macro` to `MA_PARAMS_GET[_ONE]`.
+// Expands to a single comma.
+// Emits an error if the parameter is not empty.
 #define MA_PARAMS_EMPTY_COMMA(data, ...) , __VA_OPT__(MA_ABORT("This named parameter has to be empty"))

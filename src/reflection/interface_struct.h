@@ -359,9 +359,14 @@ namespace Refl
         /* can't use `MA_IDENTITY` here, since it would conflict with the same macro in `REFL_STRUCT_impl_low_base` */\
         MA_IDENTITY2( MA_NULL MA_APPEND_TO_VA_END(_end, REFL_MEMBERS_impl_metadata_memptr_loop_a __VA_ARGS__) () ) \
     >; \
+    MA_IF_NOT_EMPTY_ELSE(REFL_MEMBERS_impl_metadata_generic_low_attribs, MA_NULL, \
+    MA_APPEND_TO_VA_END(_end, REFL_MEMBERS_impl_metadata_memattr_dry_loop_a __VA_ARGS__))(__VA_ARGS__)
+
+#define REFL_MEMBERS_impl_metadata_generic_low_attribs(...) \
     using member_attribs = ::Meta::type_list< \
         MA_APPEND_TO_VA_END(_end, REFL_MEMBERS_impl_metadata_memattr_loop_0 __VA_ARGS__) \
     >;
+
 
 // Internal. Generates member pointers (as a part of common metadata).
 #define REFL_MEMBERS_impl_metadata_memptr_loop_a(...) REFL_MEMBERS_impl_metadata_memptr_body(__VA_ARGS__) REFL_MEMBERS_impl_metadata_memptr_loop_b
@@ -375,6 +380,13 @@ namespace Refl
 #define REFL_MEMBERS_impl_metadata_memptr_body_low(params, ...) MA_VA_FOR_EACH(, REFL_MEMBERS_impl_metadata_memptr_pointer, MA_TR_C(__VA_ARGS__) )
 #define REFL_MEMBERS_impl_metadata_memptr_pointer(data, index, name) (,) &t::name MA_IDENTITY
 
+// Internal. Checks if there is at least attribute used in a struct. If there is, expands to one or more commas, otherwise expands to nothing.
+#define REFL_MEMBERS_impl_metadata_memattr_dry_loop_a(...) REFL_MEMBERS_impl_metadata_memattr_dry_body(__VA_ARGS__) REFL_MEMBERS_impl_metadata_memattr_dry_loop_b
+#define REFL_MEMBERS_impl_metadata_memattr_dry_loop_b(...) REFL_MEMBERS_impl_metadata_memattr_dry_body(__VA_ARGS__) REFL_MEMBERS_impl_metadata_memattr_dry_loop_a
+#define REFL_MEMBERS_impl_metadata_memattr_dry_loop_a_end
+#define REFL_MEMBERS_impl_metadata_memattr_dry_loop_b_end
+#define REFL_MEMBERS_impl_metadata_memattr_dry_body(params, ...) MA_PARAMS_GET_ONE(, ReflMemberDecl, ReflAttr, params, MA_PARAMS_DUMMY_COMMA)
+
 // Internal. Generates member attributes (as a part of common metadata).
 #define REFL_MEMBERS_impl_metadata_memattr_loop_0(...)   REFL_MEMBERS_impl_metadata_memattr_body(__VA_ARGS__) REFL_MEMBERS_impl_metadata_memattr_loop_a
 #define REFL_MEMBERS_impl_metadata_memattr_loop_a(...) , REFL_MEMBERS_impl_metadata_memattr_body(__VA_ARGS__) REFL_MEMBERS_impl_metadata_memattr_loop_b
@@ -384,9 +396,9 @@ namespace Refl
 #define REFL_MEMBERS_impl_metadata_memattr_loop_b_end
 
 #define REFL_MEMBERS_impl_metadata_memattr_body(params, ...) \
-    MA_IF_NOT_EMPTY_ELSE(REFL_MEMBERS_impl_metadata_memattr_body_low0, MA_NULL, params)(MA_PARAMS_GET_ONE(, ReflMemberDecl, ReflAttr, params, MA_PARAMS_PARENS), __VA_ARGS__)
+    MA_IF_NOT_EMPTY_ELSE(REFL_MEMBERS_impl_metadata_memattr_body_low, MA_NULL, params)(MA_PARAMS_GET_ONE(, ReflMemberDecl, ReflAttr, params, MA_PARAMS_PARENS), __VA_ARGS__)
 
-#define REFL_MEMBERS_impl_metadata_memattr_body_low0(maybe_attr, ...) \
+#define REFL_MEMBERS_impl_metadata_memattr_body_low(maybe_attr, ...) \
     ::Refl::impl::Struct::Attr< \
         MA_VA_FOR_EACH(, REFL_MEMBERS_impl_metadata_memattr_plus1, MA_TR_C(__VA_ARGS__)) \
         MA_IF_NOT_EMPTY(MA_COMMA() MA_IDENTITY maybe_attr, maybe_attr) \
@@ -437,7 +449,16 @@ REFL_STRUCT(A)
 {
     REFL_MEMBERS(
         REFL_DECL(int REFL_INIT =0) x, y, z
-        REFL_DECL(float REFL_ATTR int,float) w, ww
+        REFL_DECL(float) w, ww
+        REFL_DECL(float) h, hh
+    )
+};
+
+REFL_STRUCT(B)
+{
+    REFL_MEMBERS(
+        REFL_DECL(int REFL_INIT =0) x, y, z
+        REFL_DECL(float) w, ww
         REFL_DECL(float REFL_ATTR int) h, hh
     )
 };
