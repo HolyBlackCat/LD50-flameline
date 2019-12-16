@@ -384,12 +384,12 @@ namespace Refl
 #define REFL_MEMBERS_impl_metadata_memattr_loop_b_end
 
 #define REFL_MEMBERS_impl_metadata_memattr_body(params, ...) \
-    MA_IF_NOT_EMPTY_ELSE(REFL_MEMBERS_impl_metadata_memattr_body_low0, MA_NULL, params)(MA_PARAMS_GET_ONE(, ReflMemberDecl, ReflAttr, params, MA_PARAMS_IDENTITY), __VA_ARGS__)
+    MA_IF_NOT_EMPTY_ELSE(REFL_MEMBERS_impl_metadata_memattr_body_low0, MA_NULL, params)(MA_PARAMS_GET_ONE(, ReflMemberDecl, ReflAttr, params, MA_PARAMS_PARENS), __VA_ARGS__)
 
 #define REFL_MEMBERS_impl_metadata_memattr_body_low0(maybe_attr, ...) \
     ::Refl::impl::Struct::Attr< \
         MA_VA_FOR_EACH(, REFL_MEMBERS_impl_metadata_memattr_plus1, MA_TR_C(__VA_ARGS__)) \
-        MA_IF_NOT_EMPTY(MA_COMMA() maybe_attr, maybe_attr) \
+        MA_IF_NOT_EMPTY(MA_COMMA() MA_IDENTITY maybe_attr, maybe_attr) \
     >
 
 #define REFL_MEMBERS_impl_metadata_memattr_plus1(data, index, name) +1
@@ -437,7 +437,7 @@ REFL_STRUCT(A)
 {
     REFL_MEMBERS(
         REFL_DECL(int REFL_INIT =0) x, y, z
-        REFL_DECL(float REFL_ATTR int) w, ww
+        REFL_DECL(float REFL_ATTR int,float) w, ww
         REFL_DECL(float REFL_ATTR int) h, hh
     )
 };
