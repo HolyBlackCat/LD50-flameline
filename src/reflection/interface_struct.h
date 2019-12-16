@@ -154,10 +154,18 @@ namespace Refl
 
 // An optional parameter for `REFL_STRUCT`.
 // Specifies a list of untracked bases for the struct.
+// Can't be used more than once per struct declaration.
 // 'Untracked' means that those bases are ignored by the reflection
-#define REFL_VIRTUAL_BASE MA_PARAM(ReflVirtualBase)
-#define MA_PARAMS_category_ReflStruct_X_ReflVirtualBase
-#define MA_PARAMS_equal_ReflVirtualBase_X_ReflVirtualBase
+#define REFL_UNTRACKED_BASES MA_PARAM(ReflUntrackedBases)
+#define MA_PARAMS_category_ReflStruct_X_ReflUntrackedBases
+#define MA_PARAMS_equal_ReflUntrackedBases_X_ReflUntrackedBases
+
+// An optional parameter for `REFL_STRUCT`.
+// Specifies a single template parameter for the struct.
+// Must be followed by `Type , Name [, Init]`.
+#define REFL_PARAM MA_PARAM(ReflTemplateParam)
+#define MA_PARAMS_category_ReflStruct_X_ReflTemplateParam
+#define MA_PARAMS_equal_ReflTemplateParam_X_ReflTemplateParam
 
 // An optional parameter for `REFL_STRUCT`.
 // This struct is polymorphic.
@@ -180,33 +188,75 @@ namespace Refl
 #define REFL_STRUCT_impl(seq) \
     REFL_STRUCT_impl_low( \
         MA_PARAMS_FIRST(seq), \
+        MA_PARAMS_GET(, ReflStruct, ReflTemplateParam, seq, MA_PARAMS_PARENS), \
         MA_PARAMS_GET(, ReflStruct, ReflBase, seq, MA_PARAMS_PARENS), \
         MA_PARAMS_GET(, ReflStruct, ReflVirtualBase, seq, MA_PARAMS_PARENS), \
+        MA_PARAMS_GET_ONE(, ReflStruct, ReflUntrackedBases, seq, MA_PARAMS_PARENS), \
         MA_PARAMS_GET_ONE(, ReflStruct, ReflIsFinal, seq, MA_EMPTY_COMMA), \
         MA_PARAMS_GET_ONE(, ReflStruct, ReflIsPoly, seq, MA_EMPTY_COMMA) \
     )
 
 // Internal. Declares a reflected struct.
-#define REFL_STRUCT_impl_low(name_, base_seq_, virt_base_seq_, is_final_if_not_empty_, is_poly_if_not_empty_) \
+#define REFL_STRUCT_impl_low(name_, tparams_, base_seq_, virt_base_seq_, untracked_bases_, is_final_if_not_empty_, is_poly_if_not_empty_) \
+    MA_IF_NOT_EMPTY(template <REFL_STRUCT_impl_tparams_longdecl(tparams_)>, tparams_) \
     struct name_; \
     struct MA_CAT(zrefl_StructHelper_, name_) \
     { \
-        static constexpr const char *name = MA_STR(name_); \
         using bases = ::Meta::type_list<MA_SEQ_TO_VA(base_seq_)>; \
         using virt_bases = ::Meta::type_list<MA_SEQ_TO_VA(virt_base_seq_)>; \
     }; \
-    [[maybe_unused]] inline static MA_CAT(zrefl_StructHelper_, name_) zrefl_StructFunc(::Meta::tag<name_>) {return {};} \
+    MA_IF_NOT_EMPTY(template <REFL_STRUCT_impl_tparams_decl(tparams_)>, tparams_) \
+    [[maybe_unused]] inline static MA_CAT(zrefl_StructHelper_, name_) zrefl_StructFunc(::Meta::tag<name_ MA_IF_NOT_EMPTY(<REFL_STRUCT_impl_tparams(tparams_)>, tparams_)>) {return {};} \
+    MA_IF_NOT_EMPTY(template <REFL_STRUCT_impl_tparams_decl(tparams_)>, tparams_) \
     struct name_ \
     MA_IF_NOT_EMPTY(final, is_final_if_not_empty_) \
-    MA_IF_NOT_EMPTY_ELSE(REFL_STRUCT_impl_low_expand_bases, MA_NULL, base_seq_ virt_base_seq_) \
-        (name_, base_seq_, virt_base_seq_, is_poly_if_not_empty_)
+    MA_IF_NOT_EMPTY_ELSE(REFL_STRUCT_impl_low_expand_bases, MA_NULL, base_seq_ virt_base_seq_ untracked_bases_ is_poly_if_not_empty_) \
+    ( \
+        name_ MA_IF_NOT_EMPTY(<REFL_STRUCT_impl_tparams(tparams_)>, tparams_), \
+        base_seq_, virt_base_seq_, untracked_bases_, \
+        is_poly_if_not_empty_ \
+    )
+
+// Internal. Expands a sequence of template parameters `(type,name[,init])...` to a list of parameter declarations with default values: `type name = init, ...`.
+#define REFL_STRUCT_impl_tparams_longdecl(seq) MA_APPEND_TO_VA_END(_end, REFL_STRUCT_impl_tparams_longdecl_loop_0 seq)
+#define REFL_STRUCT_impl_tparams_longdecl_loop_0(...)   REFL_STRUCT_impl_tparams_longdecl_loop_body(__VA_ARGS__) REFL_STRUCT_impl_tparams_longdecl_loop_a
+#define REFL_STRUCT_impl_tparams_longdecl_loop_a(...) , REFL_STRUCT_impl_tparams_longdecl_loop_body(__VA_ARGS__) REFL_STRUCT_impl_tparams_longdecl_loop_b
+#define REFL_STRUCT_impl_tparams_longdecl_loop_b(...) , REFL_STRUCT_impl_tparams_longdecl_loop_body(__VA_ARGS__) REFL_STRUCT_impl_tparams_longdecl_loop_a
+#define REFL_STRUCT_impl_tparams_longdecl_loop_0_end
+#define REFL_STRUCT_impl_tparams_longdecl_loop_a_end
+#define REFL_STRUCT_impl_tparams_longdecl_loop_b_end
+#define REFL_STRUCT_impl_tparams_longdecl_loop_body(type, ...) MA_IF_COMMA_ELSE(REFL_STRUCT_impl_tparams_longdecl_loop_body3,REFL_STRUCT_impl_tparams_longdecl_loop_body2,__VA_ARGS__)(type, __VA_ARGS__)
+#define REFL_STRUCT_impl_tparams_longdecl_loop_body3(type, name, /*init*/...) type name = __VA_ARGS__
+#define REFL_STRUCT_impl_tparams_longdecl_loop_body2(type, name) type name
+
+// Internal. Expands a sequence of template parameters `(type,name[,init])...` to a list of parameter declarations: `type name, ...`.
+#define REFL_STRUCT_impl_tparams_decl(seq) MA_APPEND_TO_VA_END(_end, REFL_STRUCT_impl_tparams_decl_loop_0 seq)
+#define REFL_STRUCT_impl_tparams_decl_loop_0(...)   REFL_STRUCT_impl_tparams_decl_loop_body(__VA_ARGS__,) REFL_STRUCT_impl_tparams_decl_loop_a
+#define REFL_STRUCT_impl_tparams_decl_loop_a(...) , REFL_STRUCT_impl_tparams_decl_loop_body(__VA_ARGS__,) REFL_STRUCT_impl_tparams_decl_loop_b
+#define REFL_STRUCT_impl_tparams_decl_loop_b(...) , REFL_STRUCT_impl_tparams_decl_loop_body(__VA_ARGS__,) REFL_STRUCT_impl_tparams_decl_loop_a
+#define REFL_STRUCT_impl_tparams_decl_loop_0_end
+#define REFL_STRUCT_impl_tparams_decl_loop_a_end
+#define REFL_STRUCT_impl_tparams_decl_loop_b_end
+#define REFL_STRUCT_impl_tparams_decl_loop_body(type, name, ...) type name
+
+// Internal. Expands a sequence of template parameters `(type,name[,init])...` to a comma-separated list of parameter names.
+#define REFL_STRUCT_impl_tparams(seq) MA_APPEND_TO_VA_END(_end, REFL_STRUCT_impl_tparams_loop_0 seq)
+#define REFL_STRUCT_impl_tparams_loop_0(...)   REFL_STRUCT_impl_tparams_loop_body(__VA_ARGS__,) REFL_STRUCT_impl_tparams_loop_a
+#define REFL_STRUCT_impl_tparams_loop_a(...) , REFL_STRUCT_impl_tparams_loop_body(__VA_ARGS__,) REFL_STRUCT_impl_tparams_loop_b
+#define REFL_STRUCT_impl_tparams_loop_b(...) , REFL_STRUCT_impl_tparams_loop_body(__VA_ARGS__,) REFL_STRUCT_impl_tparams_loop_a
+#define REFL_STRUCT_impl_tparams_loop_0_end
+#define REFL_STRUCT_impl_tparams_loop_a_end
+#define REFL_STRUCT_impl_tparams_loop_b_end
+#define REFL_STRUCT_impl_tparams_loop_body(type, name, ...) name
+
 
 // Internal. Expands to a list of base classes of a struct.
-#define REFL_STRUCT_impl_low_expand_bases(name, base_seq, virt_base_seq, /*is_poly_if_not_empty*/...) \
+#define REFL_STRUCT_impl_low_expand_bases(name, base_seq, virt_base_seq, untracked_bases_, /*is_poly_if_not_empty*/...) \
     : MA_IDENTITY2( /* can't use `MA_IDENTITY` here, since it would conflict with the same macro in `REFL_STRUCT_impl_low_base` */\
         MA_NULL \
         MA_SEQ_FOR_EACH(, REFL_STRUCT_impl_low_base, __VA_OPT__((::Meta::with_virtual_destructor<name>)) base_seq) \
         MA_SEQ_FOR_EACH(virtual, REFL_STRUCT_impl_low_base, virt_base_seq) \
+        MA_IF_NOT_EMPTY(REFL_STRUCT_impl_low_base(,,MA_IDENTITY untracked_bases_), untracked_bases_) \
         () \
     )
 
@@ -310,8 +360,7 @@ namespace Refl
         MA_IDENTITY2( MA_NULL MA_APPEND_TO_VA_END(_end, REFL_MEMBERS_impl_metadata_memptr_loop_a __VA_ARGS__) () ) \
     >; \
     using member_attribs = ::Meta::type_list< \
-        /* can't use `MA_IDENTITY` here, since it would conflict with the same macro in `REFL_STRUCT_impl_low_base` */\
-        MA_IDENTITY2( MA_NULL MA_APPEND_TO_VA_END(_end, REFL_MEMBERS_impl_metadata_memattr_loop_a __VA_ARGS__) () ) \
+        MA_APPEND_TO_VA_END(_end, REFL_MEMBERS_impl_metadata_memattr_loop_0 __VA_ARGS__) \
     >;
 
 // Internal. Generates member pointers (as a part of common metadata).
@@ -320,21 +369,21 @@ namespace Refl
 #define REFL_MEMBERS_impl_metadata_memptr_loop_a_end
 #define REFL_MEMBERS_impl_metadata_memptr_loop_b_end
 
-#define REFL_MEMBERS_impl_metadata_memptr_body(...) REFL_MEMBERS_impl_metadata_memptr_body_low(__VA_ARGS__)
-#define REFL_MEMBERS_impl_metadata_memptr_body_low(params, ...) \
-    MA_IF_NOT_EMPTY_ELSE(REFL_MEMBERS_impl_metadata_memptr_body_low0, MA_NULL, params)(params, __VA_ARGS__)
+#define REFL_MEMBERS_impl_metadata_memptr_body(params, ...) \
+    MA_IF_NOT_EMPTY_ELSE(REFL_MEMBERS_impl_metadata_memptr_body_low, MA_NULL, params)(params, __VA_ARGS__)
 
-#define REFL_MEMBERS_impl_metadata_memptr_body_low0(params, ...) MA_VA_FOR_EACH(, REFL_MEMBERS_impl_metadata_memptr_pointer, MA_TR_C(__VA_ARGS__) )
+#define REFL_MEMBERS_impl_metadata_memptr_body_low(params, ...) MA_VA_FOR_EACH(, REFL_MEMBERS_impl_metadata_memptr_pointer, MA_TR_C(__VA_ARGS__) )
 #define REFL_MEMBERS_impl_metadata_memptr_pointer(data, index, name) (,) &t::name MA_IDENTITY
 
 // Internal. Generates member attributes (as a part of common metadata).
-#define REFL_MEMBERS_impl_metadata_memattr_loop_a(...) REFL_MEMBERS_impl_metadata_memattr_body(__VA_ARGS__) REFL_MEMBERS_impl_metadata_memattr_loop_b
-#define REFL_MEMBERS_impl_metadata_memattr_loop_b(...) REFL_MEMBERS_impl_metadata_memattr_body(__VA_ARGS__) REFL_MEMBERS_impl_metadata_memattr_loop_a
+#define REFL_MEMBERS_impl_metadata_memattr_loop_0(...)   REFL_MEMBERS_impl_metadata_memattr_body(__VA_ARGS__) REFL_MEMBERS_impl_metadata_memattr_loop_a
+#define REFL_MEMBERS_impl_metadata_memattr_loop_a(...) , REFL_MEMBERS_impl_metadata_memattr_body(__VA_ARGS__) REFL_MEMBERS_impl_metadata_memattr_loop_b
+#define REFL_MEMBERS_impl_metadata_memattr_loop_b(...) , REFL_MEMBERS_impl_metadata_memattr_body(__VA_ARGS__) REFL_MEMBERS_impl_metadata_memattr_loop_a
+#define REFL_MEMBERS_impl_metadata_memattr_loop_0_end
 #define REFL_MEMBERS_impl_metadata_memattr_loop_a_end
 #define REFL_MEMBERS_impl_metadata_memattr_loop_b_end
 
-#define REFL_MEMBERS_impl_metadata_memattr_body(...) (,) REFL_MEMBERS_impl_metadata_memattr_body_low(__VA_ARGS__) MA_IDENTITY
-#define REFL_MEMBERS_impl_metadata_memattr_body_low(params, ...) \
+#define REFL_MEMBERS_impl_metadata_memattr_body(params, ...) \
     MA_IF_NOT_EMPTY_ELSE(REFL_MEMBERS_impl_metadata_memattr_body_low0, MA_NULL, params)(MA_PARAMS_GET_ONE(, ReflMemberDecl, ReflAttr, params, MA_PARAMS_IDENTITY), __VA_ARGS__)
 
 #define REFL_MEMBERS_impl_metadata_memattr_body_low0(maybe_attr, ...) \
@@ -366,16 +415,20 @@ namespace Refl
 #define REFL_MEMBERS_impl_metadata_memname_loop_a_end
 #define REFL_MEMBERS_impl_metadata_memname_loop_b_end
 
-#define REFL_MEMBERS_impl_metadata_memname_body(...) REFL_MEMBERS_impl_metadata_memname_body_low(__VA_ARGS__)
-#define REFL_MEMBERS_impl_metadata_memname_body_low(params, ...) \
-    MA_IF_NOT_EMPTY_ELSE(REFL_MEMBERS_impl_metadata_memname_body_low0, MA_NULL, params)(params, __VA_ARGS__)
+#define REFL_MEMBERS_impl_metadata_memname_body(params, ...) \
+    MA_IF_NOT_EMPTY_ELSE(REFL_MEMBERS_impl_metadata_memname_body_low, MA_NULL, params)(params, __VA_ARGS__)
 
-#define REFL_MEMBERS_impl_metadata_memname_body_low0(params, ...) MA_VA_FOR_EACH(, REFL_MEMBERS_impl_metadata_memname_string, MA_TR_C(__VA_ARGS__) )
+#define REFL_MEMBERS_impl_metadata_memname_body_low(params, ...) MA_VA_FOR_EACH(, REFL_MEMBERS_impl_metadata_memname_string, MA_TR_C(__VA_ARGS__) )
 
 #define REFL_MEMBERS_impl_metadata_memname_string(data, index, name) #name,
 
 
-REFL_STRUCT(MyStruct REFL_BASE std::string REFL_BASE std::pair<int,int> REFL_VIRTUAL_BASE std::string_view)
+REFL_STRUCT(MyStruct REFL_UNTRACKED_BASES std::vector<int> REFL_BASE std::string REFL_BASE std::string_view REFL_VIRTUAL_BASE std::vector<float>)
+{
+
+};
+
+REFL_STRUCT(X REFL_PARAM auto,V REFL_PARAM typename,T,void REFL_POLYMORPHIC )
 {
 
 };
@@ -385,5 +438,6 @@ REFL_STRUCT(A)
     REFL_MEMBERS(
         REFL_DECL(int REFL_INIT =0) x, y, z
         REFL_DECL(float REFL_ATTR int) w, ww
+        REFL_DECL(float REFL_ATTR int) h, hh
     )
 };
