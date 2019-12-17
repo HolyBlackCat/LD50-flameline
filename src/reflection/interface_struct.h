@@ -179,13 +179,21 @@ namespace Refl
 #define MA_PARAMS_category_ReflStruct_X_ReflIsFinal
 #define MA_PARAMS_equal_ReflIsFinal_X_ReflIsFinal
 
+// An optional parameter for `REFL_STRUCT`.
+// If present, must be the last parameter.
+// If present, replaces a struct body that would normally follow a `REFL_STRUCT` invocation.
+// The parameters is interpreted as a struct body, as if it was passed to `REFL_MEMBERS`.
+// `REFL_BODY_NAMELESS` is similar to `REFL_BODY`, but uses `REFL_MEMBERS_NAMELESS`.
+#define REFL_BODY )),(,(
+#define REFL_BODY_NAMELESS )),(x,(
+
 // Declares a reflected struct, and some metadata for it.
 // Must be followed by the struct body.
 #define REFL_STRUCT(...) \
-    REFL_STRUCT_impl(((__VA_ARGS__)))
+    REFL_STRUCT_impl(((__VA_ARGS__)),)
 
 // Internal. Declares a reflected struct.
-#define REFL_STRUCT_impl(seq) \
+#define REFL_STRUCT_impl(seq, ...) \
     REFL_STRUCT_impl_low( \
         MA_PARAMS_FIRST(seq), \
         MA_PARAMS_GET(, ReflStruct, ReflTemplateParam, seq, MA_PARAMS_PARENS), \
@@ -194,7 +202,15 @@ namespace Refl
         MA_PARAMS_GET_ONE(, ReflStruct, ReflUntrackedBases, seq, MA_PARAMS_PARENS), \
         MA_PARAMS_GET_ONE(, ReflStruct, ReflIsFinal, seq, MA_EMPTY_COMMA), \
         MA_PARAMS_GET_ONE(, ReflStruct, ReflIsPoly, seq, MA_EMPTY_COMMA) \
-    )
+    ) \
+    __VA_OPT__(REFL_STRUCT_impl_body(__VA_ARGS__))
+
+#define REFL_STRUCT_impl_body(body, ...) \
+    __VA_OPT__(MA_ABORT("Invalid usage of REFL_STRUCT(...).")) \
+    { REFL_STRUCT_impl_body_low body };
+
+#define REFL_STRUCT_impl_body_low(no_names_if_not_empty, seq) \
+    MA_IF_NOT_EMPTY_ELSE(REFL_MEMBERS_NAMELESS_impl, REFL_MEMBERS_impl, no_names_if_not_empty)(seq)
 
 // Internal. Declares a reflected struct.
 #define REFL_STRUCT_impl_low(name_, tparams_, base_seq_, virt_base_seq_, untracked_bases_, is_final_if_not_empty_, is_poly_if_not_empty_) \
@@ -295,28 +311,30 @@ namespace Refl
 // Declares several member variables of a struct, as well as some metadata for them.
 // Must be used at class scope, at most once per class.
 // `...` is a sequence of `REFL_DECL` and `REFL_VERBATIM` entries.
-#define REFL_MEMBERS(...) \
-    REFL_MEMBERS_impl_decl((__VA_ARGS__)) \
+#define REFL_MEMBERS(...) REFL_MEMBERS_impl((__VA_ARGS__))
+#define REFL_MEMBERS_impl(...) \
+    REFL_MEMBERS_impl_decl(__VA_ARGS__) \
     auto zrefl_MembersHelper() const \
     { \
         using t [[maybe_unused]] = std::remove_cv_t<std::remove_pointer_t<decltype(this)>>; \
         struct Helper \
         { \
-            REFL_MEMBERS_impl_metadata_generic((__VA_ARGS__)) \
-            REFL_MEMBERS_impl_metadata_memname((__VA_ARGS__)) \
+            REFL_MEMBERS_impl_metadata_generic(__VA_ARGS__) \
+            REFL_MEMBERS_impl_metadata_memname(__VA_ARGS__) \
         }; \
         return Helper{}; \
     }
 
 // Same as `REFL_MEMBERS`, but doesn't save variable names.
-#define REFL_MEMBERS_NAMELESS(...) \
-    REFL_MEMBERS_impl_decl((__VA_ARGS__)) \
+#define REFL_MEMBERS_NAMELESS(...) REFL_MEMBERS_NAMELESS_impl((__VA_ARGS__))
+#define REFL_MEMBERS_NAMELESS_impl(...) \
+    REFL_MEMBERS_impl_decl(__VA_ARGS__) \
     auto zrefl_MembersHelper() const \
     { \
         using t = std::remove_cv_t<std::remove_pointer_t<decltype(this)>>; \
         struct Helper \
         { \
-            REFL_MEMBERS_impl_metadata_generic((__VA_ARGS__)) \
+            REFL_MEMBERS_impl_metadata_generic(__VA_ARGS__) \
         }; \
         return Helper{}; \
     }
@@ -354,6 +372,7 @@ namespace Refl
 #define REFL_MEMBERS_impl_metadata_generic(...) \
     MA_CALL(REFL_MEMBERS_impl_metadata_generic_low, REFL_MEMBERS_impl_skip_first __VA_ARGS__)
 
+// Internal. Generates common metadata for member variables.
 #define REFL_MEMBERS_impl_metadata_generic_low(...) \
     using member_ptrs = ::Meta::value_list< \
         /* can't use `MA_IDENTITY` here, since it would conflict with the same macro in `REFL_STRUCT_impl_low_base` */\
@@ -362,6 +381,7 @@ namespace Refl
     MA_IF_NOT_EMPTY_ELSE(REFL_MEMBERS_impl_metadata_generic_low_attribs, MA_NULL, \
     MA_APPEND_TO_VA_END(_end, REFL_MEMBERS_impl_metadata_memattr_dry_loop_a __VA_ARGS__))(__VA_ARGS__)
 
+// Internal. Generates attribute list as a part of the common metadata for member variables.
 #define REFL_MEMBERS_impl_metadata_generic_low_attribs(...) \
     using member_attribs = ::Meta::type_list< \
         MA_APPEND_TO_VA_END(_end, REFL_MEMBERS_impl_metadata_memattr_loop_0 __VA_ARGS__) \
@@ -462,3 +482,15 @@ REFL_STRUCT(B)
         REFL_DECL(float REFL_ATTR int) h, hh
     )
 };
+
+REFL_STRUCT( C
+    REFL_BODY
+    REFL_DECL(int) x,y
+    REFL_DECL(float) z
+)
+
+REFL_STRUCT( D
+    REFL_BODY_NAMELESS
+    REFL_DECL(int) x,y
+    REFL_DECL(float) z
+)
