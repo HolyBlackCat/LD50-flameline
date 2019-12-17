@@ -162,8 +162,8 @@ namespace Refl
 
 // An optional parameter for `REFL_STRUCT`.
 // Specifies a single template parameter for the struct.
-// Must be followed by `Type , Name [, Init]`.
-#define REFL_PARAM MA_PARAM(ReflTemplateParam)
+// Must be followed by `(Type) Name [, Init]`.
+#define REFL_PARAM(type) MA_PARAM(ReflTemplateParam) (type),
 #define MA_PARAMS_category_ReflStruct_X_ReflTemplateParam
 #define MA_PARAMS_equal_ReflTemplateParam_X_ReflTemplateParam
 
@@ -198,7 +198,7 @@ namespace Refl
 
 // Internal. Declares a reflected struct.
 #define REFL_STRUCT_impl_low(name_, tparams_, base_seq_, virt_base_seq_, untracked_bases_, is_final_if_not_empty_, is_poly_if_not_empty_) \
-    MA_IF_NOT_EMPTY(template <REFL_STRUCT_impl_tparams_longdecl(tparams_)>, tparams_) \
+    MA_IF_NOT_EMPTY(template <REFL_STRUCT_impl_tparams_firstdecl(tparams_)>, tparams_) \
     struct name_; \
     struct MA_CAT(zrefl_StructHelper_, name_) \
     { \
@@ -218,16 +218,16 @@ namespace Refl
     )
 
 // Internal. Expands a sequence of template parameters `(type,name[,init])...` to a list of parameter declarations with default values: `type name = init, ...`.
-#define REFL_STRUCT_impl_tparams_longdecl(seq) MA_APPEND_TO_VA_END(_end, REFL_STRUCT_impl_tparams_longdecl_loop_0 seq)
-#define REFL_STRUCT_impl_tparams_longdecl_loop_0(...)   REFL_STRUCT_impl_tparams_longdecl_loop_body(__VA_ARGS__) REFL_STRUCT_impl_tparams_longdecl_loop_a
-#define REFL_STRUCT_impl_tparams_longdecl_loop_a(...) , REFL_STRUCT_impl_tparams_longdecl_loop_body(__VA_ARGS__) REFL_STRUCT_impl_tparams_longdecl_loop_b
-#define REFL_STRUCT_impl_tparams_longdecl_loop_b(...) , REFL_STRUCT_impl_tparams_longdecl_loop_body(__VA_ARGS__) REFL_STRUCT_impl_tparams_longdecl_loop_a
-#define REFL_STRUCT_impl_tparams_longdecl_loop_0_end
-#define REFL_STRUCT_impl_tparams_longdecl_loop_a_end
-#define REFL_STRUCT_impl_tparams_longdecl_loop_b_end
-#define REFL_STRUCT_impl_tparams_longdecl_loop_body(type, ...) MA_IF_COMMA_ELSE(REFL_STRUCT_impl_tparams_longdecl_loop_body3,REFL_STRUCT_impl_tparams_longdecl_loop_body2,__VA_ARGS__)(type, __VA_ARGS__)
-#define REFL_STRUCT_impl_tparams_longdecl_loop_body3(type, name, /*init*/...) type name = __VA_ARGS__
-#define REFL_STRUCT_impl_tparams_longdecl_loop_body2(type, name) type name
+#define REFL_STRUCT_impl_tparams_firstdecl(seq) MA_APPEND_TO_VA_END(_end, REFL_STRUCT_impl_tparams_firstdecl_loop_0 seq)
+#define REFL_STRUCT_impl_tparams_firstdecl_loop_0(...)   REFL_STRUCT_impl_tparams_firstdecl_loop_body(__VA_ARGS__) REFL_STRUCT_impl_tparams_firstdecl_loop_a
+#define REFL_STRUCT_impl_tparams_firstdecl_loop_a(...) , REFL_STRUCT_impl_tparams_firstdecl_loop_body(__VA_ARGS__) REFL_STRUCT_impl_tparams_firstdecl_loop_b
+#define REFL_STRUCT_impl_tparams_firstdecl_loop_b(...) , REFL_STRUCT_impl_tparams_firstdecl_loop_body(__VA_ARGS__) REFL_STRUCT_impl_tparams_firstdecl_loop_a
+#define REFL_STRUCT_impl_tparams_firstdecl_loop_0_end
+#define REFL_STRUCT_impl_tparams_firstdecl_loop_a_end
+#define REFL_STRUCT_impl_tparams_firstdecl_loop_b_end
+#define REFL_STRUCT_impl_tparams_firstdecl_loop_body(type, ...) MA_IF_COMMA_ELSE(REFL_STRUCT_impl_tparams_firstdecl_loop_body3,REFL_STRUCT_impl_tparams_firstdecl_loop_body2,__VA_ARGS__)(type, __VA_ARGS__)
+#define REFL_STRUCT_impl_tparams_firstdecl_loop_body3(type, name, /*init*/...) MA_IDENTITY type name = __VA_ARGS__
+#define REFL_STRUCT_impl_tparams_firstdecl_loop_body2(type, name) MA_IDENTITY type name
 
 // Internal. Expands a sequence of template parameters `(type,name[,init])...` to a list of parameter declarations: `type name, ...`.
 #define REFL_STRUCT_impl_tparams_decl(seq) MA_APPEND_TO_VA_END(_end, REFL_STRUCT_impl_tparams_decl_loop_0 seq)
@@ -237,7 +237,7 @@ namespace Refl
 #define REFL_STRUCT_impl_tparams_decl_loop_0_end
 #define REFL_STRUCT_impl_tparams_decl_loop_a_end
 #define REFL_STRUCT_impl_tparams_decl_loop_b_end
-#define REFL_STRUCT_impl_tparams_decl_loop_body(type, name, ...) type name
+#define REFL_STRUCT_impl_tparams_decl_loop_body(type, name, ...) MA_IDENTITY type name
 
 // Internal. Expands a sequence of template parameters `(type,name[,init])...` to a comma-separated list of parameter names.
 #define REFL_STRUCT_impl_tparams(seq) MA_APPEND_TO_VA_END(_end, REFL_STRUCT_impl_tparams_loop_0 seq)
@@ -440,7 +440,7 @@ REFL_STRUCT(MyStruct REFL_UNTRACKED_BASES std::vector<int> REFL_BASE std::string
 
 };
 
-REFL_STRUCT(X REFL_PARAM auto,V REFL_PARAM typename,T,void REFL_POLYMORPHIC )
+REFL_STRUCT(X REFL_PARAM(typename) T REFL_PARAM(auto) V,0 REFL_POLYMORPHIC )
 {
 
 };
