@@ -267,6 +267,11 @@ int main(int argc, char **argv)
                 // If `a` is not empty, expands to `a`. Otherwise expands to `b`.
                 #define MA_REPLACE_IF_EMPTY(a, b) MA_IF_NOT_EMPTY_ELSE(a, b, a)
 
+                // If `...` is empty, expands to `x`, otherwise expands to nothing.
+                #define MA_INVERT_EMPTINESS(...) MA_INVERT_EMPTINESS_impl##__VA_OPT__(_a)
+                #define MA_INVERT_EMPTINESS_impl x
+                #define MA_INVERT_EMPTINESS_impl_a
+
                 // Expands to `a`, if `...` has at least one comma in it after expansion.
                 #define MA_IF_COMMA(a,...) MA_IF_COMMA_impl(a,__VA_ARGS__,)
                 #define MA_IF_COMMA_impl(a,unused,...) __VA_OPT__(a)

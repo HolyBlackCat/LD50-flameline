@@ -219,12 +219,12 @@ namespace Refl
     REFL_ENUM_impl( \
         MA_PARAMS_FIRST(((name_params))), \
         MA_PARAMS_GET_ONE(, ReflEnum, ReflUnderlyingType, ((name_params)), REFL_ENUM_impl_type), \
-        MA_PARAMS_GET_ONE(, ReflEnum, ReflIsClass, ((name_params)), MA_PARAMS_EMPTY_COMMA), \
+        MA_PARAMS_GET_ONE(, ReflEnum, ReflIsClass, ((name_params)), MA_PARAMS_DUMMY_EMPTY), \
         seq \
     ) \
     REFL_ENUM_METADATA( \
         MA_PARAMS_FIRST(((name_params))), \
-        MA_IF_NOT_EMPTY_ELSE(true, false, MA_PARAMS_GET_ONE(, ReflEnum, ReflIsRelaxed, ((name_params)), MA_PARAMS_EMPTY_COMMA)), \
+        MA_IF_NOT_EMPTY_ELSE(true, false, MA_PARAMS_GET_ONE(, ReflEnum, ReflIsRelaxed, ((name_params)), MA_PARAMS_DUMMY_EMPTY)), \
         seq \
     )
 
