@@ -11,6 +11,7 @@ namespace Meta
     // Tag dispatch helpers.
 
     template <typename T> struct tag {using type = T;};
+    template <auto V> struct value_tag {static constexpr auto value = V;};
     template <typename...> struct type_list {};
     template <auto...> struct value_list {};
 
@@ -34,6 +35,54 @@ namespace Meta
 
     template <typename T, typename A, typename ...B> using type = typename impl::dependent_type<T, A, B...>::type;
     template <typename A, typename ...B> using void_type = type<void, A, B...>;
+
+
+    // Utilities for `{meta|value}_list`.
+
+    namespace impl
+    {
+        template <typename T> struct list_size {};
+
+        template <typename ...P> struct list_size<type_list<P...>> : std::integral_constant<std::size_t, sizeof...(P)> {};
+        template <auto ...V> struct list_size<value_list<V...>> : std::integral_constant<std::size_t, sizeof...(V)> {};
+
+
+        template <typename T, std::size_t I> struct list_at {};
+
+        template <typename T, typename ...P, std::size_t I> struct list_at<type_list<T, P...>, I>
+        {
+            using type = typename list_at<type_list<P...>, I-1>::type;
+        };
+        template <typename T, typename ...P> struct list_at<type_list<T, P...>, 0>
+        {
+            using type = T;
+        };
+        template <std::size_t I> struct list_at<type_list<>, I>
+        {
+            static_assert(Meta::value<false, value_tag<I>>, "List index is out of range.");
+        };
+
+        template <auto V, auto ...P, std::size_t I> struct list_at<value_list<V, P...>, I>
+        {
+            static constexpr auto value = list_at<value_list<P...>, I-1>::value;
+        };
+        template <auto V, auto ...P> struct list_at<value_list<V, P...>, 0>
+        {
+            static constexpr auto value = V;
+        };
+        template <std::size_t I> struct list_at<value_list<>, I>
+        {
+            static_assert(Meta::value<false, value_tag<I>>, "List index is out of range.");
+        };
+    }
+
+    // Returns size of `type_list` or `value_list`.
+    template <typename T> inline constexpr std::size_t list_size = impl::list_size<T>::value;
+
+    // Returns ith element of a `type_list`.
+    template <typename T, std::size_t I> using list_at_t = typename impl::list_at<T, I>::type;
+    // Returns ith element of a `value_list`.
+    template <typename T, std::size_t I> inline constexpr auto list_at_v = impl::list_at<T, I>::value;
 
 
     // Forces some of the function template parameters to be deduced.
