@@ -94,7 +94,7 @@ namespace Refl
                 index++;
             });
 
-            if (options.multiline)
+            if (options.multiline && size > 0)
                 output.WriteChar('\n').WriteChar(' ', options.extra_indent);
 
             output.WriteChar(']');

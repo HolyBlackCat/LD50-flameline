@@ -3,6 +3,7 @@
 #include <cstddef>
 #include <cstdlib>
 #include <stdexcept>
+#include <typeinfo>
 #include <utility>
 
 #include <cxxabi.h>
@@ -63,4 +64,19 @@ namespace Abi
             #endif
         }
     };
+
+    // Returns the pretty name of a type.
+    // For each specific T, caches the name on the first call.
+    template <typename T>
+    [[nodiscard]] const char *TypeName()
+    {
+        static Demangle d;
+        static const char *ret = d(typeid(T).name());
+        return ret;
+    }
+    template <typename T>
+    [[nodiscard]] const char *TypeName(const T &)
+    {
+        return TypeName<T>();
+    }
 }

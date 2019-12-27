@@ -1,17 +1,23 @@
 #pragma once
 
+#include <cctype>
 #include <cstddef>
+#include <cstring>
 #include <exception>
 #include <functional>
 #include <tuple>
 #include <type_traits>
+#include <typeinfo>
 #include <utility>
 
 #include "program/errors.h"
 #include "reflection/interface_basic.h"
+#include "reflection/interface_std_string.h"
+#include "utils/abi.h"
 #include "utils/macro.h"
 #include "utils/meta.h"
 #include "utils/named_macro_parameters.h"
+#include "utils/strings.h"
 
 namespace Refl
 {
@@ -28,6 +34,28 @@ namespace Refl
             static_assert(((std::is_base_of_v<BasicAttribute, P> && !std::is_same_v<BasicAttribute, P>) && ...), "Attributes must inherit from Refl::BasicAttribute.");
             using type = Meta::type_list<P...>;
         };
+
+        // Obtains a pretty type name.
+        // Names of standard types might be not portable, so if the type name mentions `std::`, a debug assertion is triggered.
+        template <typename T> const std::string &TypeName()
+        {
+            static std::string ret = []{
+                std::string ret = Strings::Condense(Abi::Demangle{}(typeid(T).name()));
+                DebugAssert("Attempt to get the name of a standard type:\n" + ret, [&]{
+                    for (char &ch : ret)
+                    {
+                        if (!std::isalpha((unsigned char)ch))
+                        {
+                            if (std::strncmp(&ch+1, "std::", 5) == 0)
+                                return false;
+                        }
+                    }
+                    return true;
+                }());
+                return ret;
+            }();
+            return ret;
+        }
     }
 
     namespace Class
@@ -109,24 +137,22 @@ namespace Refl
             template <typename T, typename Void = void> struct bases
             {
                 static_assert(std::is_void_v<Void>);
-                static constexpr std::size_t count = 0;
+                using type = Meta::type_list<>;
             };
             template <typename T> struct bases<T, Meta::void_type<Macro::bases<T>>>
             {
-                static constexpr std::size_t count = Meta::list_size<Macro::bases<T>>;
-                template <std::size_t I> using at = Meta::list_at_t<Macro::bases<T>, I>;
+                using type = Macro::bases<T>;
             };
 
             // Provides information about virtual base classes.
             template <typename T, typename Void = void> struct virt_bases
             {
                 static_assert(std::is_void_v<Void>);
-                static constexpr std::size_t count = 0;
+                using type = Meta::type_list<>;
             };
             template <typename T> struct virt_bases<T, Meta::void_type<Macro::virt_bases<T>>>
             {
-                static constexpr std::size_t count = Meta::list_size<Macro::virt_bases<T>>;
-                template <std::size_t I> using at = Meta::list_at_t<Macro::virt_bases<T>, I>;
+                using type = Macro::virt_bases<T>;
             };
 
             // Provides information about members.
@@ -140,11 +166,11 @@ namespace Refl
                 static constexpr std::size_t count = Meta::list_size<Macro::member_ptrs<T>>;
                 template <std::size_t I> static auto &at(T &object)
                 {
-                    return object.*Meta::list_at_v<Macro::member_ptrs<T>, I>;
+                    return object.*Meta::list_value_at<Macro::member_ptrs<T>, I>;
                 }
                 template <std::size_t I> static const auto &at(const T &object)
                 {
-                    return object.*Meta::list_at_v<Macro::member_ptrs<T>, I>;
+                    return object.*Meta::list_value_at<Macro::member_ptrs<T>, I>;
                 }
             };
 
@@ -169,7 +195,7 @@ namespace Refl
             template <typename T> struct member_attribs<T, Meta::void_type<Macro::member_attribs<T>>>
             {
                 template <std::size_t I>
-                using at = typename Meta::list_at_t<Macro::member_attribs<T>, impl::MemberIndexToAttrPackIndex(Macro::member_attribs<T>{}, I)>::type;
+                using at = typename Meta::list_type_at<Macro::member_attribs<T>, impl::MemberIndexToAttrPackIndex(Macro::member_attribs<T>{}, I)>::type;
             };
 
             // Provides information about member names.
@@ -192,13 +218,9 @@ namespace Refl
         // This is the low-level interface.
         // Here, constness of T shouldn't matter.
 
-        // Direct non-virtual bases.
-        template <typename T> inline constexpr std::size_t base_count = Custom::bases<std::remove_const_t<T>>::count;
-        template <typename T, std::size_t I> using base = typename Custom::bases<std::remove_const_t<T>>::template at<I>;
-
-        // Direct virtual bases.
-        template <typename T> inline constexpr std::size_t virt_base_count = Custom::virt_bases<std::remove_const_t<T>>::count;
-        template <typename T, std::size_t I> using virt_base = typename Custom::virt_bases<std::remove_const_t<T>>::template at<I>;
+        // Direct non-virtual and virtual bases.
+        template <typename T> using bases = typename Custom::bases<std::remove_const_t<T>>::type;
+        template <typename T> using virtual_bases = typename Custom::virt_bases<std::remove_const_t<T>>::type;
 
         // Non-staic members.
         template <typename T> inline constexpr bool members_known = Custom::members<std::remove_const_t<T>>::count != std::size_t(-1);
@@ -220,6 +242,41 @@ namespace Refl
                 return "";
             return Custom::member_names<std::remove_const_t<T>>::at(i);
         }
+
+        // This is the higher-level interface.
+
+        // Returns the type of a member variable.
+        template <typename T, std::size_t I> using member_type = std::remove_reference_t<decltype(Class::Member<I>(std::declval<T &>()))>; // Using a qualified call to protect against accidental ADL.
+
+        namespace impl
+        {
+            template <typename Bases, typename Out> struct rec_virt_bases_norm {}; // Collect all recursive virtual bases of `Bases` to `Out`.
+            template <typename VirtBases, typename Out> struct rec_virt_bases_virt {}; // Collect `VirtBases` and all their recursive virtual bases to `Out`.
+
+            template <typename Out> struct rec_virt_bases_norm<Meta::type_list<>, Out> {using type = Out;};
+            template <typename FirstBase, typename ...Bases, typename Out> struct rec_virt_bases_norm<Meta::type_list<FirstBase, Bases...>, Out>
+            {
+                using type =
+                    typename rec_virt_bases_virt<virtual_bases<FirstBase>,  // ^ 3. Recursively process virtual bases of the first base.
+                    typename rec_virt_bases_norm<bases<FirstBase>,          // | 2. Recursively process bases of the first base.
+                    typename rec_virt_bases_norm<Meta::type_list<Bases...>, // | 1. Process the remaining bases.
+                Out>::type>::type>::type;
+            };
+
+            template <typename Out> struct rec_virt_bases_virt<Meta::type_list<>, Out> {using type = Out;};
+            template <typename FirstVirtBase, typename ...VirtBases, typename Out> struct rec_virt_bases_virt<Meta::type_list<FirstVirtBase, VirtBases...>, Out>
+            {
+                using type =
+                    typename rec_virt_bases_virt<virtual_bases<FirstVirtBase>,  // ^ 4. Recursively process virtual bases of the first base.
+                    typename rec_virt_bases_norm<bases<FirstVirtBase>,          // | 3. Recursively process bases of the first base.
+                    typename rec_virt_bases_virt<Meta::type_list<VirtBases...>, // | 2. Process the remaining virtual bases.
+                    Meta::list_copy_uniq<Meta::type_list<FirstVirtBase>,        // | 1. Add the first virtual base.
+                Out>>::type>::type>::type;
+            };
+        }
+
+        // Recursively get a list of all virtual bases of a class.
+        template <typename T> using recursive_virtual_bases = typename impl::rec_virt_bases_virt<virtual_bases<T>, typename impl::rec_virt_bases_norm<bases<T>, Meta::type_list<>>::type>::type;
     }
 
 
@@ -230,30 +287,87 @@ namespace Refl
       public:
         void ToString(const T &object, Stream::Output &output, const ToStringOptions &options) const override
         {
-            // output.WriteChar('[');
+            static_assert(Class::members_known<T>, "Can't convert T to string: its members are not reflected.");
 
-            // auto next_options = options;
-            // if (options.multiline)
-            //     next_options.extra_indent += options.indent;
+            if constexpr (Class::member_names_known<T>)
+            {
+                output.WriteChar('{');
 
-            // std::size_t index = 0, size = Size(object);
-            // ForEach(object, [&](const elem_t &elem)
-            // {
-            //     if (options.multiline)
-            //         output.WriteChar('\n').WriteChar(' ', next_options.extra_indent);
+                auto next_options = options;
+                if (options.multiline)
+                    next_options.extra_indent += options.indent;
 
-            //     Interface<elem_t>().ToString(elem, output, next_options);>
+                bool first = true;
 
-            //     if (index != size-1 || options.multiline)
-            //         output.WriteChar(',');
+                auto WriteSeparator = [&]
+                {
+                    if (first)
+                    {
+                        first = false;
+                        if (options.multiline)
+                            output.WriteChar('\n').WriteChar(' ', next_options.extra_indent);
+                    }
+                    else
+                    {
+                        output.WriteChar(',');
+                        if (options.multiline)
+                            output.WriteChar('\n').WriteChar(' ', next_options.extra_indent);
+                    }
+                };
 
-            //     index++;
-            // });
+                auto WriteBase = [&](auto tag)
+                {
+                    using type = const typename decltype(tag)::type;
+                    if (Class::member_count<type> == 0)
+                        return;
 
-            // if (options.multiline)
-            //     output.WriteChar('\n').WriteChar(' ', options.extra_indent);
+                    type &ref = *static_cast<type *>(&object); // Use a pointer cast rather than a reference cast to avoid any custom conversion operators.
+                    std::string name = Abi::TypeName<type>();
 
-            // output.WriteChar(']');
+                    WriteSeparator();
+
+                    Interface(name).ToString(name, output, {});
+                    if (options.multiline)
+                        output.WriteChar(' ');
+
+                    Interface(ref).ToString(ref, output, next_options);
+                };
+
+                using virt_bases = Class::recursive_virtual_bases<T>;
+                Meta::cexpr_for<Meta::list_size<virt_bases>>([&](auto index)
+                {
+                    constexpr auto i = index.value;
+                    WriteBase(Meta::tag<Meta::list_type_at<virt_bases, i>>{});
+                });
+
+                using bases = Class::bases<T>;
+                Meta::cexpr_for<Meta::list_size<bases>>([&](auto index)
+                {
+                    constexpr auto i = index.value;
+                    WriteBase(Meta::tag<Meta::list_type_at<bases, i>>{});
+                });
+
+                Meta::cexpr_for<Class::member_count<T>>([&](auto index)
+                {
+                    constexpr auto i = index.value;
+                    using type = const Class::member_type<T, i>;
+                    type &ref = Class::Member<i>(object);
+
+                    WriteSeparator();
+                    output.WriteString(Class::MemberName<T>(i));
+                    if (options.multiline)
+                        output.WriteString(" = ");
+                    else
+                        output.WriteChar('=');
+
+                    Interface(ref).ToString(ref, output, next_options);
+                });
+
+                if (!first && options.multiline)
+                    output.WriteString(",\n").WriteChar(' ', options.extra_indent);
+
+                output.WriteChar('}');
+            }
         }
 
         void FromString(T &object, Stream::Input &input, const FromStringOptions &options) const override
@@ -331,11 +445,11 @@ namespace Refl
         }
     };
 
-    // template <typename T>
-    // struct impl::SelectInterface<T, std::enable_if_t<Meta::is_detected<impl::StdContainer::has_sane_begin_end, T> && !impl::ForceNotContainer<T>::value>>
-    // {
-    //     using type = Interface_StdContainer<T>;
-    // };
+    template <typename T>
+    struct impl::SelectInterface<T, std::enable_if_t<Class::members_known<T>>>
+    {
+        using type = Interface_Struct<T>;
+    };
 }
 
 /* Macros for declaring reflected structures - the long guide.
@@ -448,7 +562,7 @@ Allowed parameters are:
   Prevents structure definition from being generated, but the metadata
   is still generated. See the next section.
 
-* `REFL_BODY <body>`
+* `REFL_TERSE <body>`
   Causes a terse structure definition syntax to be used.
   If it's used, `REFL_STRUCT` generates a simple structure
   body (with the trailing semicolon). If you use this parameter,
@@ -457,8 +571,8 @@ Allowed parameters are:
   It can be used at most once per `REFL_STRUCT`.
   This parameter is special. If present, it must be the last parameter.
 
-* `REFL_BODY_WITHOUT_NAMES`
-  Same as `REFL_BODY`, but doesn't generate metadata for the field names.
+* `REFL_TERSE_WITHOUT_NAMES`
+  Same as `REFL_TERSE`, but doesn't generate metadata for the field names.
 
 
 --- GENERATING METADATA ---
@@ -468,7 +582,7 @@ To do so, you need to generate a metadata for it.
 You can generate metadata by invoking `REFL_STRUCT` with
 the `REFL_METADATA_ONLY` parameter.
 
-Generating metadata is only possible using `REFL_BODY[_WITHOUT_NAMES]`
+Generating metadata is only possible using `REFL_TERSE[_WITHOUT_NAMES]`
 (aka the terse struct definition syntax).
 
 Note that some information is not used when generating reflection metadata.
@@ -488,7 +602,7 @@ Basic metadata, at the same scope as the class.
         // A list of virtual bases.
         using virt_bases = ::Meta::type_list<base3, base4, ...>;
 
-        // If both `REFL_METADATA_ONLY` and `REFL_BODY` are used,
+        // If both `REFL_METADATA_ONLY` and `REFL_TERSE` are used,
         // members metadata will also be here.
         // It's will look exactly like the contents of `struct Helper` described below.
     };
@@ -576,12 +690,12 @@ That's all.
 // If present, must be the last parameter.
 // If present, replaces a struct body that would normally follow a `REFL_STRUCT` invocation.
 // The parameters is interpreted as a struct body, as if it was passed to `REFL_MEMBERS`.
-// `REFL_BODY_WITHOUT_NAMES` is similar to `REFL_BODY`, but uses `REFL_UNNAMED_MEMBERS`.
-#define REFL_BODY )),(,(
-#define REFL_BODY_WITHOUT_NAMES )),(x,(
+// `REFL_TERSE_WITHOUT_NAMES` is similar to `REFL_TERSE`, but uses `REFL_UNNAMED_MEMBERS`.
+#define REFL_TERSE )),(,(
+#define REFL_TERSE_WITHOUT_NAMES )),(x,(
 
 // Declares a reflected struct, and some metadata for it.
-// Must be followed by a struct body (unless `REFL_BODY` parameter is present).
+// Must be followed by a struct body (unless `REFL_TERSE` parameter is present).
 #define REFL_STRUCT(...) \
     REFL_STRUCT_impl(((__VA_ARGS__)),)
 
@@ -605,7 +719,7 @@ That's all.
     __VA_OPT__(MA_ABORT("Invalid usage of REFL_STRUCT(...).")) body
 
 // Internal. Declares a reflected struct, and a metadata for it.
-// Also generates a struct body if `REFL_BODY` is present, but `REFL_METADATA_ONLY` is not.
+// Also generates a struct body if `REFL_TERSE` is present, but `REFL_METADATA_ONLY` is not.
 // `name_` is a class name. `tparams_seq_` is a sequence of template parameters: `(type,name[,init])...` or empty,
 // `[virt_]base_seq_` are sequences of base classes: `(name)...` or empty, `untracked_bases_` is `(base1,base2,...)` or empty,
 // `*_if_not_empty_` are equal to `x` or empty, `body_or_empty_` is `(unnamed_if_not_empty_,seq_)` or empty.
@@ -620,7 +734,7 @@ That's all.
         using bases = ::Meta::type_list<MA_SEQ_TO_VA(base_seq_)>; \
         /* A list of virtual bases. */\
         using virt_bases = ::Meta::type_list<MA_SEQ_TO_VA(virt_base_seq_)>; \
-        /* If both `REFL_METADATA_ONLY` and `REFL_BODY` are used, generate metadata */\
+        /* If both `REFL_METADATA_ONLY` and `REFL_TERSE` are used, generate metadata */\
         /* for member variables here instead of its normal location. */\
         MA_IF_NOT_EMPTY_ELSE(MA_NULL, REFL_STRUCT_impl_low_extra_metadata, MA_INVERT_EMPTINESS(body_or_empty_) MA_INVERT_EMPTINESS(metadata_only_if_not_empty_)) \
             (name_, MA_IDENTITY body_or_empty_) \
@@ -632,7 +746,7 @@ That's all.
     /* It includes the struct name and a list of bases. */\
     MA_IF_NOT_EMPTY_ELSE(MA_NULL, REFL_STRUCT_impl_low_header, metadata_only_if_not_empty_) \
         (name_, tparams_seq_, base_seq_, virt_base_seq_, untracked_bases_, is_final_if_not_empty_, is_poly_if_not_empty_) \
-    /* If `REFL_BODY` is used (and `REFL_METADATA_ONLY` is not), generate a simple body for the structure. */\
+    /* If `REFL_TERSE` is used (and `REFL_METADATA_ONLY` is not), generate a simple body for the structure. */\
     MA_IF_NOT_EMPTY_ELSE(MA_NULL, REFL_STRUCT_impl_low_body, MA_INVERT_EMPTINESS(body_or_empty_) metadata_only_if_not_empty_) \
         (MA_IDENTITY body_or_empty_)
 
@@ -652,12 +766,12 @@ That's all.
         is_poly_if_not_empty_ \
     )
 
-// Internal. Helper for `REFL_STRUCT_impl_low`. Generates a simple body for the structure (for `REFL_BODY`).
+// Internal. Helper for `REFL_STRUCT_impl_low`. Generates a simple body for the structure (for `REFL_TERSE`).
 #define REFL_STRUCT_impl_low_body(...) REFL_STRUCT_impl_low_body_low(__VA_ARGS__)
 #define REFL_STRUCT_impl_low_body_low(unnamed_if_not_empty, seq) \
     { MA_IF_NOT_EMPTY_ELSE(REFL_UNNAMED_MEMBERS_impl, REFL_MEMBERS_impl, unnamed_if_not_empty)(seq) };
 
-// Internal. Helper for `REFL_STRUCT_impl_low`. Used for generating field metadata if both `REFL_METADATA_ONLY` and `REFL_BODY` are used.
+// Internal. Helper for `REFL_STRUCT_impl_low`. Used for generating field metadata if both `REFL_METADATA_ONLY` and `REFL_TERSE` are used.
 #define REFL_STRUCT_impl_low_extra_metadata(...) REFL_STRUCT_impl_low_extra_metadata_low(__VA_ARGS__)
 #define REFL_STRUCT_impl_low_extra_metadata_low(name, unnamed_if_not_empty, seq) \
     using t = name; \
@@ -912,7 +1026,7 @@ That's all.
 #define REFL_MEMBERS_impl_metadata_memname_string(data, index, name) #name,
 
 
-#if 1 // Tests
+#if 0 // Tests
 
 REFL_STRUCT(MyStruct REFL_UNTRACKED_BASES std::vector<int> REFL_BASE std::string REFL_BASE std::string_view REFL_VIRTUAL_BASE std::vector<float>)
 {
@@ -945,13 +1059,13 @@ REFL_STRUCT(B)
 };
 
 REFL_STRUCT( C
-    REFL_BODY
+    REFL_TERSE
     REFL_DECL(int) x,y
     REFL_DECL(float) z
 )
 
 REFL_STRUCT( D
-    REFL_BODY_WITHOUT_NAMES
+    REFL_TERSE_WITHOUT_NAMES
     REFL_DECL(int) x,y
     REFL_DECL(float) z
 )
@@ -960,7 +1074,7 @@ struct E {int x, y; float z;};
 
 REFL_STRUCT( E
     REFL_METADATA_ONLY
-    REFL_BODY_WITHOUT_NAMES
+    REFL_TERSE_WITHOUT_NAMES
     REFL_DECL() x,y
     REFL_DECL() z
 )
