@@ -18,13 +18,211 @@ namespace Refl
     // A base class for field attributes.
     struct BasicAttribute {};
 
-    namespace impl::Struct
+    namespace impl::Class
     {
-        template <std::size_t N, typename ...P> struct Attr
+        // Stores the list of attributes for a single `REFL_DECL` declaration.
+        // `N` is the amount of variables, `T` is a `Meta::type_list` of attributes.
+        template <std::size_t N, typename T> struct Attr {};
+        template <std::size_t N, typename ...P> struct Attr<N, Meta::type_list<P...>>
         {
             static_assert(((std::is_base_of_v<BasicAttribute, P> && !std::is_same_v<BasicAttribute, P>) && ...), "Attributes must inherit from Refl::BasicAttribute.");
+            using type = Meta::type_list<P...>;
         };
     }
+
+    namespace Class
+    {
+        namespace Macro
+        {
+            // Those can be used to obtain macro-generated class metadata.
+            // Here, `T` is never const.
+
+            namespace impl
+            {
+                // Obtains the internal (member) metadata type for T, one of the two possible metadata types.
+                // Should be SFINAE-friendly.
+                template <typename T, typename = void> struct member_metadata {};
+                template <typename T> struct member_metadata<T, Meta::void_type<decltype(std::declval<const T &>().zrefl_MembersHelper())>>
+                {
+                    using type = decltype(std::declval<const T &>().zrefl_MembersHelper());
+                };
+                template <typename T> using member_metadata_t = typename member_metadata<T>::type;
+
+                void zrefl_StructFunc(); // Dummy ADL target.
+
+                // Obtains the external (non-member) metadata type for T, one of the two possible metadata types.
+                // Should be SFINAE-friendly.
+                template <typename T, typename = void> struct nonmember_metadata {};
+                template <typename T> struct nonmember_metadata<T, Meta::void_type<decltype(zrefl_StructFunc(Meta::tag<T>{}))>>
+                {
+                    using type = decltype(zrefl_StructFunc(Meta::tag<T>{}));
+                };
+                template <typename T> using nonmember_metadata_t = typename nonmember_metadata<T>::type;
+
+                // Applies `Alias` to the metadata of `T`.
+                // Both member and non-member metadata types are examined.
+                template <template <typename> typename Alias, typename T, typename = void>
+                struct metadata_type {};
+
+                template <template <typename> typename Alias, typename T>
+                struct metadata_type<Alias, T, Meta::void_type<Alias<member_metadata_t<T>>>>
+                {
+                    using type = Alias<member_metadata_t<T>>;
+                };
+
+                template <template <typename> typename Alias, typename T>
+                struct metadata_type<Alias, T, Meta::void_type<Alias<nonmember_metadata_t<T>>>>
+                {
+                    using type = Alias<nonmember_metadata_t<T>>;
+                };
+
+                template <template <typename> typename Alias, typename T>
+                using metadata_type_t = typename metadata_type<Alias, T>::type;
+
+                // Aliases for `metadata_type`.
+                template <typename T> using type_bases = typename T::bases;
+                template <typename T> using type_virt_bases = typename T::virt_bases;
+                template <typename T> using type_member_ptrs = typename T::member_ptrs;
+                template <typename T> using type_member_attribs = typename T::member_attribs;
+                template <typename T> using value_member_names_func = Meta::value_tag<T::member_name>;
+            }
+
+            // All of those should be SFINAE-friendly.
+            // Returns a `Meta::type_list` of bases if they are known.
+            template <typename T> using bases = impl::metadata_type_t<impl::type_bases, T>;
+            // Returns a `Meta::type_list` of virtual bases if they are known.
+            template <typename T> using virt_bases = impl::metadata_type_t<impl::type_virt_bases, T>;
+            // Returns a `Meta::value_list` of member pointers.
+            template <typename T> using member_ptrs = impl::metadata_type_t<impl::type_member_ptrs, T>;
+            // Returns a `Meta::type_list` of `Refl::impl::Class::Attr`, one per `REFL_DECL`.
+            template <typename T> using member_attribs = impl::metadata_type_t<impl::type_member_attribs, T>;
+            // `::value` is a function pointer `const char (*)(std::size_t index)`, which returns member names based on index.
+            template <typename T> using member_name = impl::metadata_type_t<impl::value_member_names_func, T>;
+        }
+
+        namespace Custom
+        {
+            // Those are customization points for class reflection.
+            // Here, `T` is never const.
+
+            // Provides information about base classes.
+            template <typename T, typename Void = void> struct bases
+            {
+                static_assert(std::is_void_v<Void>);
+                static constexpr std::size_t count = 0;
+            };
+            template <typename T> struct bases<T, Meta::void_type<Macro::bases<T>>>
+            {
+                static constexpr std::size_t count = Meta::list_size<Macro::bases<T>>;
+                template <std::size_t I> using at = Meta::list_at_t<Macro::bases<T>, I>;
+            };
+
+            // Provides information about virtual base classes.
+            template <typename T, typename Void = void> struct virt_bases
+            {
+                static_assert(std::is_void_v<Void>);
+                static constexpr std::size_t count = 0;
+            };
+            template <typename T> struct virt_bases<T, Meta::void_type<Macro::virt_bases<T>>>
+            {
+                static constexpr std::size_t count = Meta::list_size<Macro::virt_bases<T>>;
+                template <std::size_t I> using at = Meta::list_at_t<Macro::virt_bases<T>, I>;
+            };
+
+            // Provides information about members.
+            template <typename T, typename Void = void> struct members
+            {
+                static_assert(std::is_void_v<Void>);
+                static constexpr std::size_t count = -1;
+            };
+            template <typename T> struct members<T, Meta::void_type<Macro::member_ptrs<T>>>
+            {
+                static constexpr std::size_t count = Meta::list_size<Macro::member_ptrs<T>>;
+                template <std::size_t I> static auto &at(T &object)
+                {
+                    return object.*Meta::list_at_v<Macro::member_ptrs<T>, I>;
+                }
+                template <std::size_t I> static const auto &at(const T &object)
+                {
+                    return object.*Meta::list_at_v<Macro::member_ptrs<T>, I>;
+                }
+            };
+
+            namespace impl
+            {
+                // Converts a member index to the index of the corresponding `REFL_DECL`.
+                template <std::size_t ...I, typename ...T>
+                constexpr std::size_t MemberIndexToAttrPackIndex(Meta::type_list<Refl::impl::Class::Attr<I, T>...>, std::size_t index)
+                {
+                    std::size_t ret = 0;
+                    (void)((index < I ? false : (index -= I, ret++, true)) && ...);
+                    return ret;
+                }
+            }
+
+            // Provides information about member attributes.
+            template <typename T, typename Void = void> struct member_attribs
+            {
+                static_assert(std::is_void_v<Void>);
+                template <std::size_t I> using at = Meta::type_list<>;
+            };
+            template <typename T> struct member_attribs<T, Meta::void_type<Macro::member_attribs<T>>>
+            {
+                template <std::size_t I>
+                using at = typename Meta::list_at_t<Macro::member_attribs<T>, impl::MemberIndexToAttrPackIndex(Macro::member_attribs<T>{}, I)>::type;
+            };
+
+            // Provides information about member names.
+            template <typename T, typename Void = void> struct member_names
+            {
+                static_assert(std::is_void_v<Void>);
+                static constexpr bool known = false;
+            };
+            template <typename T> struct member_names<T, Meta::void_type<Macro::member_name<T>>>
+            {
+                static constexpr bool known = true;
+                static const char *at(std::size_t index)
+                {
+                    // `index` is guaranteed to be valid.
+                    return Macro::member_name<T>::value(index);
+                }
+            };
+        }
+
+        // This is the low-level interface.
+        // Here, constness of T shouldn't matter.
+
+        // Direct non-virtual bases.
+        template <typename T> inline constexpr std::size_t base_count = Custom::bases<std::remove_const_t<T>>::count;
+        template <typename T, std::size_t I> using base = typename Custom::bases<std::remove_const_t<T>>::template at<I>;
+
+        // Direct virtual bases.
+        template <typename T> inline constexpr std::size_t virt_base_count = Custom::virt_bases<std::remove_const_t<T>>::count;
+        template <typename T, std::size_t I> using virt_base = typename Custom::virt_bases<std::remove_const_t<T>>::template at<I>;
+
+        // Non-staic members.
+        template <typename T> inline constexpr bool members_known = Custom::members<std::remove_const_t<T>>::count != std::size_t(-1);
+        template <typename T> inline constexpr std::size_t member_count = members_known<T> ? Custom::members<std::remove_const_t<T>>::count : 0;
+        template <std::size_t I, Meta::deduce..., typename T> auto &Member(T &object)
+        {
+            return Custom::members<std::remove_const_t<T>>::template at<I>(object);
+        }
+
+        // Member attributes.
+        // Returns a `Meta::type_list`.
+        template <typename T, std::size_t I> using attrib_list = typename Custom::member_attribs<std::remove_const_t<T>>::template at<I>;
+
+        // Member names.
+        template <typename T> inline constexpr bool member_names_known = Custom::member_names<std::remove_const_t<T>>::known;
+        template <typename T> [[nodiscard]] const char *MemberName(std::size_t i)
+        {
+            if (i >= member_count<T>)
+                return "";
+            return Custom::member_names<std::remove_const_t<T>>::at(i);
+        }
+    }
+
+
 
     template <typename T>
     class Interface_Struct : public InterfaceBasic<T>
@@ -44,7 +242,7 @@ namespace Refl
             //     if (options.multiline)
             //         output.WriteChar('\n').WriteChar(' ', next_options.extra_indent);
 
-            //     Interface<elem_t>().ToString(elem, output, next_options);
+            //     Interface<elem_t>().ToString(elem, output, next_options);>
 
             //     if (index != size-1 || options.multiline)
             //         output.WriteChar(',');
@@ -308,10 +506,10 @@ Members metadata, inside of a class.
             // Member attributes.
             // Only present if there is at least one attribute used in the structure.
             // Here, `ATTRIBSi` is a set of attributes, and `COUNTi` is the amount of variables using those attributes.
-            // One `Refl::impl::Struct::Attr` corresponds to one `REFL_DECL`.
+            // One `Refl::impl::Class::Attr` corresponds to one `REFL_DECL`.
             using member_attribs = Meta::type_list<
-                Refl::impl::Struct::Attr<COUNT1, ATTRIBS1>,
-                Refl::impl::Struct::Attr<COUNT2, ATTRIBS2>
+                Refl::impl::Class::Attr<COUNT1, ATTRIBS1>,
+                Refl::impl::Class::Attr<COUNT2, ATTRIBS2>
             >;
 
             // Member names.
@@ -672,15 +870,15 @@ That's all.
 #define REFL_MEMBERS_impl_metadata_memattr_loop_b_end
 
 // Internal. Helper for `REFL_MEMBERS_impl_metadata_memattr_loop_*`. Called once for each `DECL_REFL` for structs that use attributes.
-// Expands to `::Refl::impl::Struct::Attr<count, attribs>`, where `count` is the amount of variables in this `DECL_REFL` (represented as repeated `+1`),
+// Expands to `::Refl::impl::Class::Attr<count, attribs>`, where `count` is the amount of variables in this `DECL_REFL` (represented as repeated `+1`),
 // and `attribs` is a list of attributes.
 #define REFL_MEMBERS_impl_metadata_memattr_body(params, ...) \
     MA_IF_NOT_EMPTY_ELSE(REFL_MEMBERS_impl_metadata_memattr_body_low, MA_NULL, params)(MA_PARAMS_GET_ONE(, ReflMemberDecl, ReflAttr, params, MA_PARAMS_PARENS), __VA_ARGS__)
 
 #define REFL_MEMBERS_impl_metadata_memattr_body_low(maybe_attr, ...) \
-    ::Refl::impl::Struct::Attr< \
-        MA_VA_FOR_EACH(, REFL_MEMBERS_impl_metadata_memattr_plus1, MA_TR_C(__VA_ARGS__)) \
-        MA_IF_NOT_EMPTY(MA_COMMA() MA_IDENTITY maybe_attr, maybe_attr) \
+    ::Refl::impl::Class::Attr< \
+        MA_VA_FOR_EACH(, REFL_MEMBERS_impl_metadata_memattr_plus1, MA_TR_C(__VA_ARGS__)), \
+        ::Meta::type_list<MA_IF_NOT_EMPTY(MA_IDENTITY maybe_attr, maybe_attr)> \
     >
 
 #define REFL_MEMBERS_impl_metadata_memattr_plus1(data, index, name) +1
@@ -735,12 +933,14 @@ REFL_STRUCT(A)
     )
 };
 
+struct MyAttr : Refl::BasicAttribute {};
+
 REFL_STRUCT(B)
 {
     REFL_MEMBERS(
         REFL_DECL(int REFL_INIT =0) x, y, z
         REFL_DECL(float) w, ww
-        REFL_DECL(float REFL_ATTR int) h, hh
+        REFL_DECL(float REFL_ATTR MyAttr) h, hh
     )
 };
 
