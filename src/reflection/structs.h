@@ -56,7 +56,7 @@ namespace Refl
             {
                 // Obtains the internal (member) metadata type for T, one of the two possible metadata types.
                 // Should be SFINAE-friendly.
-                template <typename T, typename = void> struct member_metadata {};
+                template <typename T, typename = void> struct member_metadata {}; // WARNING: If you rename this class, don't forget to rename the friend declaration in the macros.
                 template <typename T> struct member_metadata<T, Meta::void_type<decltype(std::declval<const T &>().zrefl_MembersHelper())>>
                 {
                     using type = decltype(std::declval<const T &>().zrefl_MembersHelper());
@@ -502,22 +502,24 @@ That's all.
 
 
 // An optional parameter for `REFL_STRUCT`.
-// Specifies a base class for the struct.
-#define REFL_BASE MA_PARAM(ReflBase)
-#define MA_PARAMS_category_ReflStruct_X_ReflBase
-#define MA_PARAMS_equal_ReflBase_X_ReflBase
-
-// An optional parameter for `REFL_STRUCT`.
-// Specifies a virtual base class for the struct.
-#define REFL_VIRTUAL_BASE MA_PARAM(ReflVirtualBase)
-#define MA_PARAMS_category_ReflStruct_X_ReflVirtualBase
-#define MA_PARAMS_equal_ReflVirtualBase_X_ReflVirtualBase
-
-// An optional parameter for `REFL_STRUCT`.
-// Specifies a list of untracked bases for the struct.
+// Specifies a list of base classes for the struct.
 // Can't be used more than once per struct declaration.
-// 'Untracked' means that those bases are ignored by the reflection
-#define REFL_UNTRACKED_BASES MA_PARAM(ReflUntrackedBases)
+#define REFL_EXTENDS MA_PARAM(ReflBases)
+#define MA_PARAMS_category_ReflStruct_X_ReflBases
+#define MA_PARAMS_equal_ReflBases_X_ReflBases
+
+// An optional parameter for `REFL_STRUCT`.
+// Specifies a list of virtual base classes for the struct.
+// Can't be used more than once per struct declaration.
+#define REFL_VIRTUALLY_EXTENDS MA_PARAM(ReflVirtualBases)
+#define MA_PARAMS_category_ReflStruct_X_ReflVirtualBases
+#define MA_PARAMS_equal_ReflVirtualBases_X_ReflVirtualBases
+
+// An optional parameter for `REFL_STRUCT`.
+// Specifies a list of untracked base classes for the struct.
+// 'Untracked' means that those bases are invisible for the reflection.
+// Can't be used more than once per struct declaration.
+#define REFL_SILENTLY_EXTENDS MA_PARAM(ReflUntrackedBases)
 #define MA_PARAMS_category_ReflStruct_X_ReflUntrackedBases
 #define MA_PARAMS_equal_ReflUntrackedBases_X_ReflUntrackedBases
 
@@ -570,8 +572,8 @@ That's all.
     REFL_STRUCT_impl_low( \
         MA_PARAMS_FIRST(seq), \
         MA_PARAMS_GET(, ReflStruct, ReflTemplateParam, seq, MA_PARAMS_PARENS), \
-        MA_PARAMS_GET(, ReflStruct, ReflBase, seq, MA_PARAMS_PARENS), \
-        MA_PARAMS_GET(, ReflStruct, ReflVirtualBase, seq, MA_PARAMS_PARENS), \
+        MA_PARAMS_GET_ONE(, ReflStruct, ReflBases, seq, MA_PARAMS_PARENS), \
+        MA_PARAMS_GET_ONE(, ReflStruct, ReflVirtualBases, seq, MA_PARAMS_PARENS), \
         MA_PARAMS_GET_ONE(, ReflStruct, ReflUntrackedBases, seq, MA_PARAMS_PARENS), \
         MA_PARAMS_GET_ONE(, ReflStruct, ReflIsPoly, seq, MA_PARAMS_DUMMY_EMPTY), \
         MA_PARAMS_GET_ONE(, ReflStruct, ReflIsFinal, seq, MA_PARAMS_DUMMY_EMPTY), \
@@ -588,9 +590,9 @@ That's all.
 // Internal. Declares a reflected struct, and a metadata for it.
 // Also generates a struct body if `REFL_TERSE` is present, but `REFL_METADATA_ONLY` is not.
 // `name_` is a class name. `tparams_seq_` is a sequence of template parameters: `(type,name[,init])...` or empty,
-// `[virt_]base_seq_` are sequences of base classes: `(name)...` or empty, `untracked_bases_` is `(base1,base2,...)` or empty,
-// `*_if_not_empty_` are equal to `x` or empty, `body_or_empty_` is `(unnamed_if_not_empty_,seq_)` or empty.
-#define REFL_STRUCT_impl_low(name_, tparams_seq_, base_seq_, virt_base_seq_, untracked_bases_, is_poly_if_not_empty_, is_final_if_not_empty_, attribs_, body_or_empty_, metadata_only_if_not_empty_) \
+// `*bases_` are lists of base classes: `(base1,base2,...)` or empty, `*_if_not_empty_` are equal to `x` or empty,
+// `body_or_empty_` is `(unnamed_if_not_empty_,seq_)` or empty.
+#define REFL_STRUCT_impl_low(name_, tparams_seq_, bases_, virt_bases_, untracked_bases_, is_poly_if_not_empty_, is_final_if_not_empty_, attribs_, body_or_empty_, metadata_only_if_not_empty_) \
     /* Unless we're generating metadata, declar the structure. */\
     MA_IF_NOT_EMPTY_ELSE(MA_NULL, REFL_STRUCT_impl_low_decl, metadata_only_if_not_empty_) \
         (name_, tparams_seq_) \
@@ -604,9 +606,9 @@ That's all.
         /* Attribute list. */\
         using attribs = ::Refl::impl::Class::ClassAttr<MA_IDENTITY attribs_>; \
         /* A list of bases. */\
-        using bases = ::Meta::type_list<MA_SEQ_TO_VA(base_seq_)>; \
+        using bases = ::Meta::type_list<MA_IF_NOT_EMPTY(MA_IDENTITY bases_, bases_)>; \
         /* A list of virtual bases. */\
-        using virt_bases = ::Meta::type_list<MA_SEQ_TO_VA(virt_base_seq_)>; \
+        using virt_bases = ::Meta::type_list<MA_IF_NOT_EMPTY(MA_IDENTITY virt_bases_, virt_bases_)>; \
         /* If both `REFL_METADATA_ONLY` and `REFL_TERSE` are used, generate metadata */\
         /* for member variables here instead of its normal location. */\
         MA_IF_NOT_EMPTY_ELSE(MA_NULL, REFL_STRUCT_impl_low_extra_metadata, MA_INVERT_EMPTINESS(body_or_empty_) MA_INVERT_EMPTINESS(metadata_only_if_not_empty_)) \
@@ -618,7 +620,7 @@ That's all.
     /* Generate the beginning of the definition of the structure. */\
     /* It includes the struct name and a list of bases. */\
     MA_IF_NOT_EMPTY_ELSE(MA_NULL, REFL_STRUCT_impl_low_header, metadata_only_if_not_empty_) \
-        (name_, tparams_seq_, base_seq_, virt_base_seq_, untracked_bases_, is_poly_if_not_empty_, is_final_if_not_empty_) \
+        (name_, tparams_seq_, bases_, virt_bases_, untracked_bases_, is_poly_if_not_empty_, is_final_if_not_empty_) \
     /* If `REFL_TERSE` is used (and `REFL_METADATA_ONLY` is not), generate a simple body for the structure. */\
     MA_IF_NOT_EMPTY_ELSE(MA_NULL, REFL_STRUCT_impl_low_body, MA_INVERT_EMPTINESS(body_or_empty_) metadata_only_if_not_empty_) \
         (MA_IDENTITY body_or_empty_)
@@ -629,13 +631,13 @@ That's all.
 
 // Internal. Helper for `REFL_STRUCT_impl_low`. Generates the beginning of the definition of a structure,
 // which includes its name and base classes.
-#define REFL_STRUCT_impl_low_header(name_, tparams_seq_, base_seq_, virt_base_seq_, untracked_bases_, is_poly_if_not_empty_, is_final_if_not_empty_) \
+#define REFL_STRUCT_impl_low_header(name_, tparams_seq_, bases_, virt_bases_, untracked_bases_, is_poly_if_not_empty_, is_final_if_not_empty_) \
     REFL_STRUCT_impl_tparams_decl(tparams_seq_) struct name_ \
     MA_IF_NOT_EMPTY(final, is_final_if_not_empty_) \
-    MA_IF_NOT_EMPTY_ELSE(REFL_STRUCT_impl_low_expand_bases, MA_NULL, base_seq_ virt_base_seq_ untracked_bases_ is_poly_if_not_empty_) \
+    MA_IF_NOT_EMPTY_ELSE(REFL_STRUCT_impl_low_expand_bases, MA_NULL, bases_ virt_bases_ untracked_bases_ is_poly_if_not_empty_) \
     ( \
         name_ REFL_STRUCT_impl_tparams(tparams_seq_), \
-        base_seq_, virt_base_seq_, untracked_bases_, \
+        bases_, virt_bases_, untracked_bases_, \
         is_poly_if_not_empty_ \
     )
 
@@ -692,18 +694,19 @@ That's all.
 
 // Internal. Helper for `REFL_STRUCT_impl_low`. Generates a list of base classes, starting with a colon.
 // `name` is the struct name, possibly followed by `<...>` template parameters.
-// `[virt_]base_seq` are sequences of base classes: `(class1)(class2)...` or empty,
-// `untracked_bases` is a list of base classes: `(class1,class2,...)` or empty.
+// `*bases` are lists of base classes: `(class1,class2,...)` or empty.
 // `...` is `x` if the class is polymorphic, empty otherwise.
-#define REFL_STRUCT_impl_low_expand_bases(name, base_seq, virt_base_seq, untracked_bases_, /*is_poly_if_not_empty*/...) \
+#define REFL_STRUCT_impl_low_expand_bases(name, bases, virt_bases, untracked_bases, /*is_poly_if_not_empty*/...) \
     : MA_IDENTITY2( /* can't use `MA_IDENTITY` here, since it would conflict with the same macro in `REFL_STRUCT_impl_low_base` */\
         MA_NULL \
-        /* Regular bases, including the special base that makes the struct polymorphic if needed. */\
-        MA_SEQ_FOR_EACH(, REFL_STRUCT_impl_low_base, __VA_OPT__((::Meta::with_virtual_destructor<name>)) base_seq) \
+        /* Regular bases. */\
+        MA_IF_NOT_EMPTY(REFL_STRUCT_impl_low_base(,,MA_IDENTITY bases), bases) \
         /* Virtual bases. */\
-        MA_SEQ_FOR_EACH(virtual, REFL_STRUCT_impl_low_base, virt_base_seq) \
+        MA_IF_NOT_EMPTY(MA_VA_FOR_EACH(virtual, REFL_STRUCT_impl_low_base, MA_TR_C(MA_IDENTITY virt_bases)), virt_bases) \
         /* Untracked bases. */\
-        MA_IF_NOT_EMPTY(REFL_STRUCT_impl_low_base(,,MA_IDENTITY untracked_bases_), untracked_bases_) \
+        MA_IF_NOT_EMPTY(REFL_STRUCT_impl_low_base(,,MA_IDENTITY untracked_bases), untracked_bases) \
+        /* The special base that makes the struct polymorphic if needed. */\
+        __VA_OPT__(REFL_STRUCT_impl_low_base(,,::Meta::with_virtual_destructor<name>)) \
         () \
     )
 
@@ -754,7 +757,8 @@ That's all.
             REFL_MEMBERS_impl_metadata_memname(__VA_ARGS__) \
         }; \
         return Helper{}; \
-    }
+    } \
+    template <typename, typename> friend struct ::Refl::Class::Macro::impl::member_metadata;
 
 // Same as `REFL_MEMBERS`, but doesn't save variable names.
 #define REFL_UNNAMED_MEMBERS(...) REFL_UNNAMED_MEMBERS_impl((__VA_ARGS__))
@@ -903,7 +907,7 @@ That's all.
 
 #if 0 // Tests
 
-REFL_STRUCT(MyStruct REFL_UNTRACKED_BASES std::vector<int> REFL_BASE std::string REFL_BASE std::string_view REFL_VIRTUAL_BASE std::vector<float>)
+REFL_STRUCT(MyStruct REFL_SILENTLY_EXTENDS std::vector<int> REFL_EXTENDS std::string, std::string_view REFL_VIRTUALLY_EXTENDS std::vector<float>)
 {
 
 };

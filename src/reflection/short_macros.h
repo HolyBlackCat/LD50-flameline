@@ -9,9 +9,9 @@
 
 // Structs
 #define STRUCT              REFL_STRUCT
-#define BASE                REFL_BASE
-#define VIRTUAL_BASE        REFL_VIRTUAL_BASE
-#define UNTRACKED_BASES     REFL_UNTRACKED_BASES
+#define EXTENDS             REFL_EXTENDS
+#define VIRTUALLY_EXTENDS   REFL_VIRTUALLY_EXTENDS
+#define SILENTLY_EXTENDS    REFL_SILENTLY_EXTENDS
 #define PARAM               REFL_PARAM
 #define POLYMORPHIC         REFL_POLYMORPHIC
 #define FINAL               REFL_FINAL
