@@ -67,4 +67,7 @@ namespace Refl
     {
         using type = Interface_Scalar<T>;
     };
+
+    template <typename T>
+    struct impl::HasShortStringRepresentation<T, std::enable_if_t<std::is_arithmetic_v<T>>> : std::true_type {};
 }

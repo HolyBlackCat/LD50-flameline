@@ -110,6 +110,8 @@ namespace Refl
         {
             return zrefl_EnumFunc(T{}).helper;
         }
+
+        template <typename T> using detect_enum = decltype(impl::Enum::GetHelper<T>());
     }
 
     template <typename T>
@@ -183,10 +185,13 @@ namespace Refl
     };
 
     template <typename T>
-    struct impl::SelectInterface<T, Meta::void_type<decltype(impl::Enum::GetHelper<T>())>>
+    struct impl::SelectInterface<T, Meta::void_type<impl::Enum::detect_enum<T>>>
     {
         using type = Interface_Enum<T>;
     };
+
+    template <typename T>
+    struct impl::HasShortStringRepresentation<T, Meta::void_type<impl::Enum::detect_enum<T>>> : std::true_type {};
 }
 
 

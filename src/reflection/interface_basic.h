@@ -16,7 +16,8 @@ namespace Refl
 {
     struct ToStringOptions
     {
-        bool multiline = false;
+        bool pretty = false; // Add extra spaces for readability. Make some containers and structs mulitiline (and add trailing commas to them).
+        bool multiline_strings = false; // If enabled, preserve line-feeds when printing `std::string`s. Otherwise they will be printed as `\n`.
         int indent = 4; // Indentation step.
         int extra_indent = 0; // Extra indentation at the beginning of each line, except the first one. Intended for the internal use.
     };
@@ -57,8 +58,15 @@ namespace Refl
 
     namespace impl
     {
+        // Specializations should contain `using type = <interface>;`.
         template <typename T, typename = void>
         struct SelectInterface {};
+
+        // Set this to `false` for scalars and similar types.
+        // Do not set this to true for objects that have nested objects (unless you can guarantee
+        // that all nested objects have this flag set too), otherwise conversion to string can yield weird results.
+        template <typename T, typename = void>
+        struct HasShortStringRepresentation : std::false_type {};
     }
 
 

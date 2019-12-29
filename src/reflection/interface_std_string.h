@@ -20,7 +20,7 @@ namespace Refl
         void ToString(const std::string &object, Stream::Output &output, const ToStringOptions &options) const override
         {
             Strings::EscapeFlags flags = Strings::EscapeFlags::escape_double_quotes;
-            if (options.multiline)
+            if (options.multiline_strings)
                 flags = flags | Strings::EscapeFlags::multiline;
 
             output.WriteByte('"');

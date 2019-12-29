@@ -74,27 +74,33 @@ namespace Refl
 
         void ToString(const T &object, Stream::Output &output, const ToStringOptions &options) const override
         {
+            constexpr bool force_single_line = impl::HasShortStringRepresentation<elem_t>::value;
+
             output.WriteChar('[');
 
             auto next_options = options;
-            if (options.multiline)
+            if (options.pretty)
                 next_options.extra_indent += options.indent;
 
             std::size_t index = 0, size = Size(object);
             ForEach(object, [&](const elem_t &elem)
             {
-                if (options.multiline)
+                if (options.pretty && !force_single_line)
                     output.WriteChar('\n').WriteChar(' ', next_options.extra_indent);
 
                 Interface<elem_t>().ToString(elem, output, next_options);
 
-                if (index != size-1 || options.multiline)
+                if (index != size-1 || (options.pretty && !force_single_line))
+                {
                     output.WriteChar(',');
+                    if (options.pretty && force_single_line)
+                        output.WriteChar(' ');
+                }
 
                 index++;
             });
 
-            if (options.multiline && size > 0)
+            if (options.pretty && !force_single_line && size > 0)
                 output.WriteChar('\n').WriteChar(' ', options.extra_indent);
 
             output.WriteChar(']');
@@ -197,6 +203,8 @@ namespace Refl
             // Make sure `*begin()` returns a reference.
             std::enable_if_t<std::is_reference_v<decltype(*std::declval<T &>().begin())>>()
         );
+
+        template <typename T> inline constexpr bool is_container = Meta::is_detected<has_sane_begin_end, T> && !ForceNotContainer<T>::value;
     }
 
     template <typename T>
@@ -253,13 +261,13 @@ namespace Refl
     };
 
     template <typename T>
-    struct impl::SelectInterface<T, std::enable_if_t<Meta::is_detected<impl::StdContainer::has_sane_begin_end, T> && !impl::ForceNotContainer<T>::value>>
+    struct impl::SelectInterface<T, std::enable_if_t<impl::StdContainer::is_container<T>>>
     {
         using type = Interface_StdContainer<T>;
     };
 
     template <typename T>
-    struct impl::ContainerElem<T, Meta::void_type<impl::StdContainer::has_sane_begin_end<T>>>
+    struct impl::ContainerElem<T, std::enable_if_t<impl::StdContainer::is_container<T>>>
     {
         using type = std::remove_reference_t<decltype(*std::declval<T &>().begin())>;
     };

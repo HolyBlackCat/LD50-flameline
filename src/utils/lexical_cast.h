@@ -1,11 +1,13 @@
 #pragma once
 
+#include <algorithm>
 #include <cctype>
 #include <cerrno>
 #include <cmath>
 #include <cstddef>
 #include <cstdio>
 #include <cstdlib>
+#include <cstring>
 #include <limits>
 #include <string>
 
@@ -16,6 +18,7 @@
 #include "utils/escape.h"
 #include "utils/meta.h"
 #include "utils/robust_math.h"
+#include "utils/type_names.h"
 
 namespace Strings
 {
@@ -55,9 +58,9 @@ namespace Strings
         }
 
         template <typename T>
-        void ConversionFailure(const char *str)
+        [[noreturn]] void ConversionFailure(std::string_view str, std::string_view message = "")
         {
-            Program::Error("Unable to convert `", str, "` to an ", std::is_integral_v<T> ? "integer" : "real number", ".");
+            Program::Error("Unable to convert `", Escape(str), "` to ", Meta::TypeName<T>(), message.empty() ? "." : std::string(": ").append(message).append("."));
         }
 
         inline constexpr const char *string_inf = "inf", *string_nan = "nan";
@@ -110,12 +113,14 @@ namespace Strings
     // Returns the max buffer size that `ToString()` needs to successfully do its job.
     inline constexpr std::size_t ToStringMaxBufferLen()
     {
+        // Length of the string "false".
+        constexpr std::size_t b = 5;
         // `digits10` is the amount of digits that can represented exactly, so we add one extra digit. We also might need space for a sign, so we add one more.
         constexpr std::size_t i = std::numeric_limits<unsigned long long>::digits10 + 2;
         // Since we represent long doubles as pairs of regular doubles, we multiply by 2. We also add 1 for a number separator.
         constexpr std::size_t f = double_conversion::DoubleToStringConverter::kBase10MaximalLength * 2 + 1;
         // `+1` is for the null terminator.
-        return (i > f ? i : f) + 1;
+        return std::max({b, i, f}) + 1;
     }
 
     // Returns `'`, the digit separator.
@@ -136,7 +141,13 @@ namespace Strings
     >
     bool ToString(char *buffer, std::size_t buffer_size, T number)
     {
-        if constexpr (std::is_integral_v<T> && std::is_signed_v<T>)
+        if constexpr (std::is_same_v<T, bool>)
+        {
+            if (buffer_size < (number ? 5/*true\0*/ : 6/*false\0*/))
+                return false;
+            std::strcpy(buffer, number ? "true" : "false");
+        }
+        else if constexpr (std::is_integral_v<T> && std::is_signed_v<T>)
         {
             if (std::snprintf(buffer, buffer_size, "%lld", (long long)number) <= 0)
                 return false;
@@ -243,8 +254,19 @@ namespace Strings
     >
     [[nodiscard]] T FromString(std::string_view str)
     {
+        static_assert(!std::is_const_v<T> && !std::is_volatile_v<T>);
+
         // Strip leading and trailing whitespace.
         str = Trim(str);
+
+        if constexpr (std::is_same_v<T, bool>)
+        {
+            if (str == "false")
+                return false;
+            if (str == "true")
+                return true;
+            // Otherwise fall back to integral conversion.
+        }
 
         if constexpr (std::is_integral_v<T>)
         {
@@ -257,14 +279,14 @@ namespace Strings
             for (char ch : str)
             {
                 if (buf_pos >= sizeof buf - 1) // `-1` because we need space for a null-terminator.
-                    Program::Error("Unable to convert `", Escape(str), "` to an integer: too long.");
+                    impl::ConversionFailure<T>(str, "too long");
 
                 bool is_digit = std::isdigit((unsigned char)ch);
                 bool is_separator = ch == impl::char_digit_sep;
 
                 // Make sure a separator is always preceeded by a digit.
                 if (is_separator && !prev_is_digit)
-                    Program::Error("Unable to convert `", Escape(str), "` to an integer: incorrect separator usage.");
+                    impl::ConversionFailure<T>(str, "incorrect separator usage");
 
                 if (!is_separator)
                     buf[buf_pos++] = ch;
@@ -275,14 +297,14 @@ namespace Strings
 
             // Stop if the number ends with a separator.
             if (prev_is_separator)
-                Program::Error("Unable to convert `", Escape(str), "` to an integer: incorrect separator usage.");
+                impl::ConversionFailure<T>(str, "incorrect separator usage");
 
             buf[buf_pos] = '\0';
 
             const char *end = buf;
             T result = strto<T>(buf, &end);
             if (end != buf + buf_pos)
-                Program::Error("Unable to convert `", Escape(str), "` to an integer.");
+                impl::ConversionFailure<T>(str);
 
             return result;
         }
@@ -290,7 +312,7 @@ namespace Strings
         {
             // We have to explicitly check for an empty string.
             if (str.size() == 0)
-                Program::Error("Unable to convert `", Escape(str), "` to a real number.");
+                impl::ConversionFailure<T>(str);
 
             int chars_consumed = 0;
             T result;
@@ -302,7 +324,7 @@ namespace Strings
             // We can safely use this to check if the conversion succeeded, because the converter is configured
             // to disallow any extra whitespace and junk at the edges of the string.
             if (std::size_t(chars_consumed) != str.size())
-                Program::Error("Unable to convert `", Escape(str), "` to a real number.");
+                impl::ConversionFailure<T>(str);
             return result;
         }
         else // sizeof(T) <= sizeof(long double)
@@ -315,7 +337,7 @@ namespace Strings
             bool bad_separator = separator_pos == 0 || separator_pos == str.size() - 1 ||
                 std::isspace((unsigned char)str[separator_pos-1]) || std::isspace((unsigned char)str[separator_pos+1]);
             if (bad_separator)
-                Program::Error("Unable to convert `", Escape(str), "` to a real number: incorrect usage of ", impl::char_long_double_parts_sep, ".");
+                impl::ConversionFailure<T>(str, Str("incorrect usage of ", impl::char_long_double_parts_sep));
 
             return (long double)FromString<double>(str.substr(0, separator_pos)) + FromString<double>(str.substr(separator_pos+1));
         }
