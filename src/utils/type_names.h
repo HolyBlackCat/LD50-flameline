@@ -3,10 +3,6 @@
 #include <array>
 #include <cstddef>
 
-#ifdef _MSC_VER
-#define __PRETTY_FUNCTION__ __FUNCSIG__
-#endif
-
 namespace Meta
 {
     namespace impl
@@ -14,7 +10,11 @@ namespace Meta
         template <typename T>
         constexpr const auto &RawTypeName()
         {
+            #ifdef _MSC_VER
+            return __FUNCSIG__;
+            #else
             return __PRETTY_FUNCTION__;
+            #endif
         }
 
         struct RawTypeNameFormat
@@ -51,8 +51,8 @@ namespace Meta
     }
 
     // Returns the type name in a `std::array<char, N>` (null-terminated).
-    // Don't use this unless you need the value to be constexpr,
-    // since if used in a non-constexpr context in debug build, it might add runtime overhead.
+    // Don't use this unless you need the value to be constexpr, since if used in
+    // a non-constexpr context in a non-optimized build, it might add runtime overhead.
     template <typename T>
     [[nodiscard]] constexpr auto CexprTypeName()
     {
