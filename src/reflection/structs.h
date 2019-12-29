@@ -386,17 +386,27 @@ Where:
 
 Allowed parameters are:
 
-* `REFL_BASE <base_class>`
-  Specifies a public base class for the structure.
-  Can be used more than once per `REFL_STRUCT`.
-
-* `REFL_VIRTUAL_BASE <base_class>`
-  Same, but the base class is virtual.
-
-* `REFL_UNTRACKED_BASES <base_classes>`
-  Specifies additional base classes that shouldn't be visible to reflection.
+* `REFL_EXTENDS <base_classes>`
+  Specifies public base classes for the structure.
   <base_classes> is a comma-separated list of one or more classes.
   Can be used at most once per `REFL_STRUCT`.
+
+* `REFL_VIRTUALLY_EXTENDS <base_classes>`
+  Same as `REFL_EXTENDS`, but the base classes are virtual.
+
+* `REFL_SILENTLY_EXTENDS <base_class_list>`
+  Specifies additional base classes that shouldn't be visible to reflection.
+  <base_class_list> is a comma-separated list of one or more classes that
+  can include access specifiers and `virtual`.
+  Can be used at most once per `REFL_STRUCT`.
+
+* `REFL_ASSUME_EXTENDS <base_classes>`
+  Same as `REFL_EXTENDS`, but the base classes are only added to the metadata.
+  They are not actually inherited from. This is good for when you inherit from
+  those classes indirectly, in a way that's otherwise not recorded in the metadata.
+
+* `REFL_ASSUME_VIRTUALLY_EXTENDS <base_classes>`
+  Same as `REFL_ASSUME_EXTENDS`, but the base classes are virtual.
 
 * `REFL_PARAM( <pseudo-type> ) <name> [, <init>]`
   Specifies a template parameter for the structure.
@@ -517,11 +527,29 @@ That's all.
 
 // An optional parameter for `REFL_STRUCT`.
 // Specifies a list of untracked base classes for the struct.
-// 'Untracked' means that those bases are invisible for the reflection.
+// Those bases will be invisible for the reflection (will not be added to metadata).
 // Can't be used more than once per struct declaration.
 #define REFL_SILENTLY_EXTENDS MA_PARAM(ReflUntrackedBases)
 #define MA_PARAMS_category_ReflStruct_X_ReflUntrackedBases
 #define MA_PARAMS_equal_ReflUntrackedBases_X_ReflUntrackedBases
+
+// An optional parameter for `REFL_STRUCT`.
+// Specifies a list of base classes for the struct that should be added
+// to the metadata, but not actually inherited from. Good for when you
+// indirectly inherit from those classes in a way that can't normally be detected.
+// Can't be used more than once per struct declaration.
+#define REFL_ASSUME_EXTENDS MA_PARAM(ReflFakeBases)
+#define MA_PARAMS_category_ReflStruct_X_ReflFakeBases
+#define MA_PARAMS_equal_ReflFakeBases_X_ReflFakeBases
+
+// An optional parameter for `REFL_STRUCT`.
+// Specifies a list of virtual base classes for the struct that should be added
+// to the metadata, but not actually inherited from. Good for when you
+// indirectly inherit from those classes in a way that can't normally be detected.
+// Can't be used more than once per struct declaration.
+#define REFL_ASSUME_VIRTUALLY_EXTENDS MA_PARAM(ReflFakeVirtualBases)
+#define MA_PARAMS_category_ReflStruct_X_ReflFakeVirtualBases
+#define MA_PARAMS_equal_ReflFakeVirtualBases_X_ReflFakeVirtualBases
 
 // An optional parameter for `REFL_STRUCT`.
 // Specifies a single template parameter for the struct.
@@ -574,6 +602,8 @@ That's all.
         MA_PARAMS_GET(, ReflStruct, ReflTemplateParam, seq, MA_PARAMS_PARENS), \
         MA_PARAMS_GET_ONE(, ReflStruct, ReflBases, seq, MA_PARAMS_PARENS), \
         MA_PARAMS_GET_ONE(, ReflStruct, ReflVirtualBases, seq, MA_PARAMS_PARENS), \
+        MA_PARAMS_GET_ONE(, ReflStruct, ReflFakeBases, seq, MA_PARAMS_PARENS), \
+        MA_PARAMS_GET_ONE(, ReflStruct, ReflFakeVirtualBases, seq, MA_PARAMS_PARENS), \
         MA_PARAMS_GET_ONE(, ReflStruct, ReflUntrackedBases, seq, MA_PARAMS_PARENS), \
         MA_PARAMS_GET_ONE(, ReflStruct, ReflIsPoly, seq, MA_PARAMS_DUMMY_EMPTY), \
         MA_PARAMS_GET_ONE(, ReflStruct, ReflIsFinal, seq, MA_PARAMS_DUMMY_EMPTY), \
@@ -592,7 +622,7 @@ That's all.
 // `name_` is a class name. `tparams_seq_` is a sequence of template parameters: `(type,name[,init])...` or empty,
 // `*bases_` are lists of base classes: `(base1,base2,...)` or empty, `*_if_not_empty_` are equal to `x` or empty,
 // `body_or_empty_` is `(unnamed_if_not_empty_,seq_)` or empty.
-#define REFL_STRUCT_impl_low(name_, tparams_seq_, bases_, virt_bases_, untracked_bases_, is_poly_if_not_empty_, is_final_if_not_empty_, attribs_, body_or_empty_, metadata_only_if_not_empty_) \
+#define REFL_STRUCT_impl_low(name_, tparams_seq_, bases_, virt_bases_, fake_bases_, fake_virt_bases_, untracked_bases_, is_poly_if_not_empty_, is_final_if_not_empty_, attribs_, body_or_empty_, metadata_only_if_not_empty_) \
     /* Unless we're generating metadata, declar the structure. */\
     MA_IF_NOT_EMPTY_ELSE(MA_NULL, REFL_STRUCT_impl_low_decl, metadata_only_if_not_empty_) \
         (name_, tparams_seq_) \
@@ -606,9 +636,9 @@ That's all.
         /* Attribute list. */\
         using attribs = ::Refl::impl::Class::ClassAttr<MA_IDENTITY attribs_>; \
         /* A list of bases. */\
-        using bases = ::Meta::type_list<MA_IF_NOT_EMPTY(MA_IDENTITY bases_, bases_)>; \
+        using bases = ::Meta::type_list<MA_IF_NOT_EMPTY(MA_IDENTITY bases_, bases_) MA_IF_NOT_EMPTY(MA_IF_NOT_EMPTY(MA_COMMA(), bases_) MA_IDENTITY fake_bases_, fake_bases_)>; \
         /* A list of virtual bases. */\
-        using virt_bases = ::Meta::type_list<MA_IF_NOT_EMPTY(MA_IDENTITY virt_bases_, virt_bases_)>; \
+        using virt_bases = ::Meta::type_list<MA_IF_NOT_EMPTY(MA_IDENTITY virt_bases_, virt_bases_) MA_IF_NOT_EMPTY(MA_IF_NOT_EMPTY(MA_COMMA(), virt_bases_) MA_IDENTITY fake_virt_bases_, fake_virt_bases_)>; \
         /* If both `REFL_METADATA_ONLY` and `REFL_TERSE` are used, generate metadata */\
         /* for member variables here instead of its normal location. */\
         MA_IF_NOT_EMPTY_ELSE(MA_NULL, REFL_STRUCT_impl_low_extra_metadata, MA_INVERT_EMPTINESS(body_or_empty_) MA_INVERT_EMPTINESS(metadata_only_if_not_empty_)) \
