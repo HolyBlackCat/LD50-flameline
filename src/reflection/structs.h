@@ -845,7 +845,9 @@ That's all.
 #define REFL_MEMBERS_impl_metadata_memattr_dry_loop_b(...) REFL_MEMBERS_impl_metadata_memattr_dry_body(__VA_ARGS__) REFL_MEMBERS_impl_metadata_memattr_dry_loop_a
 #define REFL_MEMBERS_impl_metadata_memattr_dry_loop_a_end
 #define REFL_MEMBERS_impl_metadata_memattr_dry_loop_b_end
-#define REFL_MEMBERS_impl_metadata_memattr_dry_body(params, ...) MA_PARAMS_GET_ONE(, ReflMemberDecl, ReflAttr, params, MA_PARAMS_DUMMY)
+
+#define REFL_MEMBERS_impl_metadata_memattr_dry_body(params, ...) MA_IF_NOT_EMPTY_ELSE(REFL_MEMBERS_impl_metadata_memattr_dry_body_low, MA_NULL, params)(params)
+#define REFL_MEMBERS_impl_metadata_memattr_dry_body_low(params) MA_PARAMS_GET_ONE(, ReflMemberDecl, ReflAttr, params, MA_PARAMS_DUMMY)
 
 // Internal. Helper for `REFL_MEMBERS_impl_metadata_generic_low`.
 // Generates attribute information for member variables.
