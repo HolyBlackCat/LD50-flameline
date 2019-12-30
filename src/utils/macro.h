@@ -53,6 +53,8 @@
 
 // If `...` is not empty, adds a trailing comma to it.
 #define MA_TR_C(...) __VA_OPT__(__VA_ARGS__,)
+// If `...` is not empty, adds a leading comma to it.
+#define MA_LE_C(...) __VA_OPT__(,__VA_ARGS__)
 
 // Calls `m<i>(...)`, where `<i>` is the amount of comma-separated elements in `...`.
 #define MA_OVERLOAD(m,...) MA_CAT(m, MA_VA_SIZE(__VA_ARGS__))(__VA_ARGS__)

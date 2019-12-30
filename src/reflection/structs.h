@@ -1,6 +1,10 @@
 #pragma once
 
+#include <algorithm>
+#include <array>
 #include <cstddef>
+#include <cstring>
+#include <string>
 #include <tuple>
 #include <type_traits>
 #include <utility>
@@ -222,7 +226,7 @@ namespace Refl
             template <typename T> struct member_names<T, Meta::void_type<Macro::member_name<T>>>
             {
                 static constexpr bool known = true;
-                static const char *at(std::size_t index)
+                static constexpr const char *at(std::size_t index)
                 {
                     // `index` is guaranteed to be valid.
                     return Macro::member_name<T>::value(index);
@@ -243,7 +247,7 @@ namespace Refl
 
         // Direct non-virtual and virtual bases.
         template <typename T> using bases = typename Custom::bases<std::remove_const_t<T>>::type;
-        template <typename T> using virtual_bases = typename Custom::virt_bases<std::remove_const_t<T>>::type;
+        template <typename T> using direct_virtual_bases = typename Custom::virt_bases<std::remove_const_t<T>>::type;
 
         // Non-staic members.
         template <typename T> inline constexpr bool members_known = Custom::members<std::remove_const_t<T>>::count != std::size_t(-1);
@@ -259,7 +263,7 @@ namespace Refl
 
         // Member names.
         template <typename T> inline constexpr bool member_names_known = Custom::member_names<std::remove_const_t<T>>::known;
-        template <typename T> [[nodiscard]] const char *MemberName(std::size_t i)
+        template <typename T> [[nodiscard]] constexpr const char *MemberName(std::size_t i)
         {
             if (i >= member_count<T>)
                 return "";
@@ -273,6 +277,7 @@ namespace Refl
 
         namespace impl
         {
+            // Helpers for recursively determining all virtual base classes.
             template <typename Bases, typename Out> struct rec_virt_bases_norm {}; // Collect all recursive virtual bases of `Bases` to `Out`.
             template <typename VirtBases, typename Out> struct rec_virt_bases_virt {}; // Collect `VirtBases` and all their recursive virtual bases to `Out`.
 
@@ -280,7 +285,7 @@ namespace Refl
             template <typename FirstBase, typename ...Bases, typename Out> struct rec_virt_bases_norm<Meta::type_list<FirstBase, Bases...>, Out>
             {
                 using type =
-                    typename rec_virt_bases_virt<virtual_bases<FirstBase>,  // ^ 3. Recursively process virtual bases of the first base.
+                    typename rec_virt_bases_virt<direct_virtual_bases<FirstBase>,  // ^ 3. Recursively process virtual bases of the first base.
                     typename rec_virt_bases_norm<bases<FirstBase>,          // | 2. Recursively process bases of the first base.
                     typename rec_virt_bases_norm<Meta::type_list<Bases...>, // | 1. Process the remaining bases.
                 Out>::type>::type>::type;
@@ -290,21 +295,106 @@ namespace Refl
             template <typename FirstVirtBase, typename ...VirtBases, typename Out> struct rec_virt_bases_virt<Meta::type_list<FirstVirtBase, VirtBases...>, Out>
             {
                 using type =
-                    typename rec_virt_bases_virt<virtual_bases<FirstVirtBase>,  // ^ 4. Recursively process virtual bases of the first base.
+                    typename rec_virt_bases_virt<direct_virtual_bases<FirstVirtBase>,  // ^ 4. Recursively process virtual bases of the first base.
                     typename rec_virt_bases_norm<bases<FirstVirtBase>,          // | 3. Recursively process bases of the first base.
-                    typename rec_virt_bases_virt<Meta::type_list<VirtBases...>, // | 2. Process the remaining virtual bases.
+                    typename rec_virt_bases_virt<Meta::type_list<VirtBases...>, // | 2. Process the remaining virtual bases. // Sic! Note `_virt` here. The `rec_virt_bases_norm` uses `_norm` here instead.
                     Meta::list_copy_uniq<Meta::type_list<FirstVirtBase>,        // | 1. Add the first virtual base.
                 Out>>::type>::type>::type;
             };
         }
 
         // Recursively get a list of all virtual bases of a class.
-        template <typename T> using recursive_virtual_bases = typename impl::rec_virt_bases_virt<virtual_bases<T>, typename impl::rec_virt_bases_norm<bases<T>, Meta::type_list<>>::type>::type;
+        template <typename T> using virtual_bases = typename impl::rec_virt_bases_virt<direct_virtual_bases<T>, typename impl::rec_virt_bases_norm<bases<T>, Meta::type_list<>>::type>::type;
 
         // Check if a class has a specific attribute.
         template <typename T, typename A> inline constexpr bool class_has_attrib = Meta::list_contains_type<class_attribs<T>, A>;
         // Check if a class member has a specific attribute.
         template <typename T, std::size_t I, typename A> inline constexpr bool member_has_attrib = Meta::list_contains_type<member_attribs<T, I>, A>;
+
+        namespace impl
+        {
+            // Checks if one string is less than the other at constexpr.
+            constexpr int cexpr_string_less(const char *a, const char *b)
+            {
+                while (*a == *b)
+                {
+                    if (*a == '\0')
+                        return false;
+                    a++;
+                    b++;
+                }
+                return (unsigned char)*a < (unsigned char)*b;
+            }
+
+            // An universal function to look up member and base indices by name.
+            // `N` is the amount of entries, `F` is a pointer to a constexpr function that returns
+            // an array of names: `std::array<const char *, N> (*)(auto index)`.
+            // `name` is a name that we're looking for. If it's not found, -1 is returned.
+            template <auto F> std::size_t EntryIndex(const char *name)
+            {
+                static const/*expr*/ auto array = []() /*constexpr*/ // We can make this constexpr as soon as we get a `constexpr` `std::sort` in C++20.
+                {
+                    auto array = F();
+                    std::sort(array.begin(), array.end(), cexpr_string_less);
+                    DebugAssert("Duplicate member or base name in a reflected class.", std::adjacent_find(array.begin(), array.end()) == array.end());
+                    return array;
+                }();
+                auto it = std::lower_bound(array.begin(), array.end(), name, [](const char *a, const char *b){return std::strcmp(a, b) < 0;});
+                if (it == array.end() || std::strcmp(*it, name) != 0)
+                    return -1;
+                return it - array.begin();
+            }
+
+            // Helper functions for `EntryIndex`.
+            // Note that even though those would be able to handle T being const, it would cause two identical
+            // instantiatons of `EntryIndex` being created (for const and non-const T), which is not good.
+            // Because of that we force T to not be cosnt.
+            template <typename T> constexpr auto EntryList_Members()
+            {
+                static_assert(!std::is_const_v<T>);
+                std::array<const char *, member_count<T>> ret{};
+                for (std::size_t i = 0; i < ret.size(); i++)
+                    ret[i] = Class::MemberName<T>(i); // Using a qualified call to protect against accidental ADL.
+                return ret;
+            };
+            template <typename L> constexpr auto EntryList_Bases() // `L` is a `Meta::type_list` of base classes.
+            {
+                return Meta::cexpr_generate_array<Meta::list_size<L>>([](auto index)
+                {
+                    using base_type = Meta::list_type_at<L, index.value>;
+                    static_assert(Class::name_known<base_type>, "Name of this base class is not known.");
+                    return name<base_type>;
+                });
+            };
+        }
+
+        // Those convert {member|base|virtual base} name to its index.
+        // If there is no such entry, -1 is returned.
+        // If a class has several entries with the same name, using corresponding function will cause an assertion at program startup.
+        // (When we get C++20 constexpr algorithms, we can move that assertion to compile-time).
+        template <typename T> [[nodiscard]] std::size_t MemberIndex(const char *name)
+        {
+            // Note that `remove_const_t` is necessary here, but not in the other three functions.
+            return impl::EntryIndex<impl::EntryList_Members<std::remove_const_t<T>>>(name);
+        }
+        template <typename T> [[nodiscard]] std::size_t BaseIndex(const char *name)
+        {
+            return impl::EntryIndex<impl::EntryList_Bases<bases<T>>>(name);
+        }
+        template <typename T> [[nodiscard]] std::size_t VirtualBaseIndex(const char *name)
+        {
+            return impl::EntryIndex<impl::EntryList_Bases<virtual_bases<T>>>(name);
+        }
+        template <typename T> [[nodiscard]] std::size_t CombinedBaseIndex(const char *name)
+        {
+            // Concatenates `bases<T>` and `virtual_bases<T>` and returns the index in the combined list.
+            return impl::EntryIndex<impl::EntryList_Bases<Meta::list_cat<bases<T>, virtual_bases<T>>>>(name);
+        }
+
+        template <typename T> [[nodiscard]] std::size_t MemberIndex      (const std::string &name) {return MemberIndex      <T>(name.c_str());}
+        template <typename T> [[nodiscard]] std::size_t BaseIndex        (const std::string &name) {return BaseIndex        <T>(name.c_str());}
+        template <typename T> [[nodiscard]] std::size_t VirtualBaseIndex (const std::string &name) {return VirtualBaseIndex <T>(name.c_str());}
+        template <typename T> [[nodiscard]] std::size_t CombinedBaseIndex(const std::string &name) {return CombinedBaseIndex<T>(name.c_str());}
     }
 }
 
@@ -389,10 +479,9 @@ Allowed parameters are:
 * `REFL_EXTENDS <base_classes>`
   Specifies public base classes for the structure.
   <base_classes> is a comma-separated list of one or more classes.
+  If you want to inherit from a class virtually, write it as `virtual( <name> )`.
+  Adding access specifiers is not allowed, so only public inheritance is supported.
   Can be used at most once per `REFL_STRUCT`.
-
-* `REFL_VIRTUALLY_EXTENDS <base_classes>`
-  Same as `REFL_EXTENDS`, but the base classes are virtual.
 
 * `REFL_SILENTLY_EXTENDS <base_class_list>`
   Specifies additional base classes that shouldn't be visible to reflection.
@@ -404,9 +493,6 @@ Allowed parameters are:
   Same as `REFL_EXTENDS`, but the base classes are only added to the metadata.
   They are not actually inherited from. This is good for when you inherit from
   those classes indirectly, in a way that's otherwise not recorded in the metadata.
-
-* `REFL_ASSUME_VIRTUALLY_EXTENDS <base_classes>`
-  Same as `REFL_ASSUME_EXTENDS`, but the base classes are virtual.
 
 * `REFL_PARAM( <pseudo-type> ) <name> [, <init>]`
   Specifies a template parameter for the structure.
@@ -513,21 +599,22 @@ That's all.
 
 // An optional parameter for `REFL_STRUCT`.
 // Specifies a list of base classes for the struct.
+// Adding access specifiers is not allowed, only public inheritance is supported.
+// To inherit from a class virtually, write it as `virtual(ClassName)`. Note that this
+// syntax was carefully chosen: while the list of regular bases can be copied verbatim
+// to the metadata, the list of virtual bases needs to be written without `virtual` in
+// the metadata, and with `virtual` in the struct definition. We can't simply have a
+// separate comma-separated list of virtual bases, since their names can contain commas
+// in template parameter lists.
 // Can't be used more than once per struct declaration.
 #define REFL_EXTENDS MA_PARAM(ReflBases)
 #define MA_PARAMS_category_ReflStruct_X_ReflBases
 #define MA_PARAMS_equal_ReflBases_X_ReflBases
 
 // An optional parameter for `REFL_STRUCT`.
-// Specifies a list of virtual base classes for the struct.
-// Can't be used more than once per struct declaration.
-#define REFL_VIRTUALLY_EXTENDS MA_PARAM(ReflVirtualBases)
-#define MA_PARAMS_category_ReflStruct_X_ReflVirtualBases
-#define MA_PARAMS_equal_ReflVirtualBases_X_ReflVirtualBases
-
-// An optional parameter for `REFL_STRUCT`.
 // Specifies a list of untracked base classes for the struct.
 // Those bases will be invisible for the reflection (will not be added to metadata).
+// You can freely put access specifiers and `virtual` on those.
 // Can't be used more than once per struct declaration.
 #define REFL_SILENTLY_EXTENDS MA_PARAM(ReflUntrackedBases)
 #define MA_PARAMS_category_ReflStruct_X_ReflUntrackedBases
@@ -537,19 +624,11 @@ That's all.
 // Specifies a list of base classes for the struct that should be added
 // to the metadata, but not actually inherited from. Good for when you
 // indirectly inherit from those classes in a way that can't normally be detected.
+// Uses the same syntax as `REFL_EXTENDS`.
 // Can't be used more than once per struct declaration.
 #define REFL_ASSUME_EXTENDS MA_PARAM(ReflFakeBases)
 #define MA_PARAMS_category_ReflStruct_X_ReflFakeBases
 #define MA_PARAMS_equal_ReflFakeBases_X_ReflFakeBases
-
-// An optional parameter for `REFL_STRUCT`.
-// Specifies a list of virtual base classes for the struct that should be added
-// to the metadata, but not actually inherited from. Good for when you
-// indirectly inherit from those classes in a way that can't normally be detected.
-// Can't be used more than once per struct declaration.
-#define REFL_ASSUME_VIRTUALLY_EXTENDS MA_PARAM(ReflFakeVirtualBases)
-#define MA_PARAMS_category_ReflStruct_X_ReflFakeVirtualBases
-#define MA_PARAMS_equal_ReflFakeVirtualBases_X_ReflFakeVirtualBases
 
 // An optional parameter for `REFL_STRUCT`.
 // Specifies a single template parameter for the struct.
@@ -600,11 +679,9 @@ That's all.
     REFL_STRUCT_impl_low( \
         MA_PARAMS_FIRST(seq), \
         MA_PARAMS_GET(, ReflStruct, ReflTemplateParam, seq, MA_PARAMS_PARENS), \
-        MA_PARAMS_GET_ONE(, ReflStruct, ReflBases, seq, MA_PARAMS_PARENS), \
-        MA_PARAMS_GET_ONE(, ReflStruct, ReflVirtualBases, seq, MA_PARAMS_PARENS), \
-        MA_PARAMS_GET_ONE(, ReflStruct, ReflFakeBases, seq, MA_PARAMS_PARENS), \
-        MA_PARAMS_GET_ONE(, ReflStruct, ReflFakeVirtualBases, seq, MA_PARAMS_PARENS), \
-        MA_PARAMS_GET_ONE(, ReflStruct, ReflUntrackedBases, seq, MA_PARAMS_PARENS), \
+        (MA_PARAMS_GET(, ReflStruct, ReflBases, seq, MA_PARAMS_IDENTITY)), \
+        (MA_PARAMS_GET(, ReflStruct, ReflFakeBases, seq, MA_PARAMS_IDENTITY)), \
+        (MA_PARAMS_GET_ONE(, ReflStruct, ReflUntrackedBases, seq, MA_PARAMS_IDENTITY)), \
         MA_PARAMS_GET_ONE(, ReflStruct, ReflIsPoly, seq, MA_PARAMS_DUMMY_EMPTY), \
         MA_PARAMS_GET_ONE(, ReflStruct, ReflIsFinal, seq, MA_PARAMS_DUMMY_EMPTY), \
         (MA_PARAMS_GET_ONE(, ReflStruct, ReflAttr, seq, MA_PARAMS_IDENTITY)), \
@@ -620,9 +697,9 @@ That's all.
 // Internal. Declares a reflected struct, and a metadata for it.
 // Also generates a struct body if `REFL_TERSE` is present, but `REFL_METADATA_ONLY` is not.
 // `name_` is a class name. `tparams_seq_` is a sequence of template parameters: `(type,name[,init])...` or empty,
-// `*bases_` are lists of base classes: `(base1,base2,...)` or empty, `*_if_not_empty_` are equal to `x` or empty,
+// `*bases_` are lists of base classes: `(base1,base2,...)` or `()` if empty, `*_if_not_empty_` are equal to `x` or empty,
 // `body_or_empty_` is `(unnamed_if_not_empty_,seq_)` or empty.
-#define REFL_STRUCT_impl_low(name_, tparams_seq_, bases_, virt_bases_, fake_bases_, fake_virt_bases_, untracked_bases_, is_poly_if_not_empty_, is_final_if_not_empty_, attribs_, body_or_empty_, metadata_only_if_not_empty_) \
+#define REFL_STRUCT_impl_low(name_, tparams_seq_, bases_, fake_bases_, untracked_bases_, is_poly_if_not_empty_, is_final_if_not_empty_, attribs_, body_or_empty_, metadata_only_if_not_empty_) \
     /* Unless we're generating metadata, declar the structure. */\
     MA_IF_NOT_EMPTY_ELSE(MA_NULL, REFL_STRUCT_impl_low_decl, metadata_only_if_not_empty_) \
         (name_, tparams_seq_) \
@@ -636,9 +713,9 @@ That's all.
         /* Attribute list. */\
         using attribs = ::Refl::impl::Class::ClassAttr<MA_IDENTITY attribs_>; \
         /* A list of bases. */\
-        using bases = ::Meta::type_list<MA_IF_NOT_EMPTY(MA_IDENTITY bases_, bases_) MA_IF_NOT_EMPTY(MA_IF_NOT_EMPTY(MA_COMMA(), bases_) MA_IDENTITY fake_bases_, fake_bases_)>; \
+        using bases = ::Meta::type_list<REFL_STRUCT_impl_strip_leading_comma(REFL_STRUCT_impl_nonvirt_bases(MA_TR_C(MA_IDENTITY bases_) MA_TR_C(MA_IDENTITY fake_bases_)))>; \
         /* A list of virtual bases. */\
-        using virt_bases = ::Meta::type_list<MA_IF_NOT_EMPTY(MA_IDENTITY virt_bases_, virt_bases_) MA_IF_NOT_EMPTY(MA_IF_NOT_EMPTY(MA_COMMA(), virt_bases_) MA_IDENTITY fake_virt_bases_, fake_virt_bases_)>; \
+        using virt_bases = ::Meta::type_list<REFL_STRUCT_impl_strip_leading_comma(REFL_STRUCT_impl_virt_bases_with_prefix(,MA_TR_C(MA_IDENTITY bases_) MA_TR_C(MA_IDENTITY fake_bases_)))>; \
         /* If both `REFL_METADATA_ONLY` and `REFL_TERSE` are used, generate metadata */\
         /* for member variables here instead of its normal location. */\
         MA_IF_NOT_EMPTY_ELSE(MA_NULL, REFL_STRUCT_impl_low_extra_metadata, MA_INVERT_EMPTINESS(body_or_empty_) MA_INVERT_EMPTINESS(metadata_only_if_not_empty_)) \
@@ -650,7 +727,7 @@ That's all.
     /* Generate the beginning of the definition of the structure. */\
     /* It includes the struct name and a list of bases. */\
     MA_IF_NOT_EMPTY_ELSE(MA_NULL, REFL_STRUCT_impl_low_header, metadata_only_if_not_empty_) \
-        (name_, tparams_seq_, bases_, virt_bases_, untracked_bases_, is_poly_if_not_empty_, is_final_if_not_empty_) \
+        (name_, tparams_seq_, bases_, untracked_bases_, is_poly_if_not_empty_, is_final_if_not_empty_) \
     /* If `REFL_TERSE` is used (and `REFL_METADATA_ONLY` is not), generate a simple body for the structure. */\
     MA_IF_NOT_EMPTY_ELSE(MA_NULL, REFL_STRUCT_impl_low_body, MA_INVERT_EMPTINESS(body_or_empty_) metadata_only_if_not_empty_) \
         (MA_IDENTITY body_or_empty_)
@@ -661,15 +738,34 @@ That's all.
 
 // Internal. Helper for `REFL_STRUCT_impl_low`. Generates the beginning of the definition of a structure,
 // which includes its name and base classes.
-#define REFL_STRUCT_impl_low_header(name_, tparams_seq_, bases_, virt_bases_, untracked_bases_, is_poly_if_not_empty_, is_final_if_not_empty_) \
+#define REFL_STRUCT_impl_low_header(name_, tparams_seq_, bases_, untracked_bases_, is_poly_if_not_empty_, is_final_if_not_empty_) \
     REFL_STRUCT_impl_tparams_decl(tparams_seq_) struct name_ \
     MA_IF_NOT_EMPTY(final, is_final_if_not_empty_) \
-    MA_IF_NOT_EMPTY_ELSE(REFL_STRUCT_impl_low_expand_bases, MA_NULL, bases_ virt_bases_ untracked_bases_ is_poly_if_not_empty_) \
+    MA_IF_NOT_EMPTY_ELSE(REFL_STRUCT_impl_low_expand_bases, MA_NULL, MA_IDENTITY bases_ MA_IDENTITY untracked_bases_ is_poly_if_not_empty_) \
     ( \
         name_ REFL_STRUCT_impl_tparams(tparams_seq_), \
-        bases_, virt_bases_, untracked_bases_, \
+        bases_, untracked_bases_, \
         is_poly_if_not_empty_ \
     )
+
+// Internal. Helper for `REFL_STRUCT_impl_low`. Generates a list of base classes, starting with a colon.
+// `name` is the struct name, possibly followed by `<...>` template parameters.
+// `*bases` are lists of base classes: `(class1,class2,...)` or `()` if empty.
+// `...` is `x` if the class is polymorphic, empty otherwise.
+#define REFL_STRUCT_impl_low_expand_bases(name, bases, untracked_bases, /*is_poly_if_not_empty*/...) \
+    : REFL_STRUCT_impl_strip_leading_comma( \
+        /* Regular bases. */\
+        REFL_STRUCT_impl_nonvirt_bases(MA_TR_C(MA_IDENTITY bases)) \
+        /* Virtual bases. */\
+        REFL_STRUCT_impl_virt_bases_with_prefix(virtual, MA_TR_C(MA_IDENTITY bases)) \
+        /* Untracked bases. */\
+        MA_LE_C(MA_IDENTITY untracked_bases) \
+        /* The special base that makes the struct polymorphic if needed. */\
+        __VA_OPT__(,::Meta::with_virtual_destructor<name>) \
+    )
+
+#define REFL_STRUCT_impl_strip_leading_comma(...) __VA_OPT__(REFL_STRUCT_impl_strip_leading_comma_low(__VA_ARGS__))
+#define REFL_STRUCT_impl_strip_leading_comma_low(x, ...) __VA_ARGS__
 
 // Internal. Helper for `REFL_STRUCT_impl_low`. Generates a simple body for the structure (for `REFL_TERSE`).
 #define REFL_STRUCT_impl_low_body(...) REFL_STRUCT_impl_low_body_low(__VA_ARGS__)
@@ -721,27 +817,26 @@ That's all.
 #define REFL_STRUCT_impl_tparams_loop_b_end
 #define REFL_STRUCT_impl_tparams_loop_body(type, name, ...) name
 
+// Internal. Helper for `REFL_STRUCT_impl_low`. Extracts non-virtual bases from a list of bases.
+// `...` is a comma-separated list of bases (with trailing comma), where virtual bases are written as `virtual(ClassName)`.
+// Returns a comma-separated list with a leading (sic) comma.
+#define REFL_STRUCT_impl_nonvirt_bases(...) \
+    MA_VA_FOR_EACH(, REFL_STRUCT_impl_nonvirt_bases_low, __VA_ARGS__)
+#define REFL_STRUCT_impl_nonvirt_bases_low(data, index, elem) \
+    MA_IF_NOT_EMPTY(MA_COMMA() elem, MA_CAT(REFL_STRUCT_impl_virtual_null_, elem))
 
-// Internal. Helper for `REFL_STRUCT_impl_low`. Generates a list of base classes, starting with a colon.
-// `name` is the struct name, possibly followed by `<...>` template parameters.
-// `*bases` are lists of base classes: `(class1,class2,...)` or empty.
-// `...` is `x` if the class is polymorphic, empty otherwise.
-#define REFL_STRUCT_impl_low_expand_bases(name, bases, virt_bases, untracked_bases, /*is_poly_if_not_empty*/...) \
-    : MA_IDENTITY2( /* can't use `MA_IDENTITY` here, since it would conflict with the same macro in `REFL_STRUCT_impl_low_base` */\
-        MA_NULL \
-        /* Regular bases. */\
-        MA_IF_NOT_EMPTY(REFL_STRUCT_impl_low_base(,,MA_IDENTITY bases), bases) \
-        /* Virtual bases. */\
-        MA_IF_NOT_EMPTY(MA_VA_FOR_EACH(virtual, REFL_STRUCT_impl_low_base, MA_TR_C(MA_IDENTITY virt_bases)), virt_bases) \
-        /* Untracked bases. */\
-        MA_IF_NOT_EMPTY(REFL_STRUCT_impl_low_base(,,MA_IDENTITY untracked_bases), untracked_bases) \
-        /* The special base that makes the struct polymorphic if needed. */\
-        __VA_OPT__(REFL_STRUCT_impl_low_base(,,::Meta::with_virtual_destructor<name>)) \
-        () \
-    )
+// Internal. Helper for `REFL_STRUCT_impl_low`. Extracts virtual bases from a list of bases, possibly adds a prefix to each.
+// `...` is a comma-separated list of bases (with trailing comma), where virtual bases are written as `virtual(ClassName)`.
+// Returns a comma-separated list with a leading (sic) comma.
+#define REFL_STRUCT_impl_virt_bases_with_prefix(maybe_virtual, ...) \
+    MA_VA_FOR_EACH(maybe_virtual, REFL_STRUCT_impl_virt_bases_with_prefix_low, __VA_ARGS__)
+#define REFL_STRUCT_impl_virt_bases_with_prefix_low(maybe_virtual, index, elem) \
+    MA_IF_NOT_EMPTY(MA_COMMA() maybe_virtual MA_CAT(REFL_STRUCT_impl_virtual_iden_, elem), MA_INVERT_EMPTINESS(MA_CAT(REFL_STRUCT_impl_virtual_null_, elem)))
 
-// Internal. Helper for `REFL_STRUCT_impl_low_expand_bases`. Expands to a single base class of a struct.
-#define REFL_STRUCT_impl_low_base(maybe_virtual, index, ...) (,) maybe_virtual __VA_ARGS__ MA_IDENTITY
+// Internal. Helpers for `REFL_STRUCT_impl_[non]virt_bases[_with_prefix]`.
+// The `virtual` part at the end is added with MA_CAT.
+#define REFL_STRUCT_impl_virtual_null_virtual(...)
+#define REFL_STRUCT_impl_virtual_iden_virtual(...) __VA_ARGS__
 
 
 // An optional parameter for `REFL_DECL`.
@@ -937,7 +1032,7 @@ That's all.
 
 #if 0 // Tests
 
-REFL_STRUCT(MyStruct REFL_SILENTLY_EXTENDS std::vector<int> REFL_EXTENDS std::string, std::string_view REFL_VIRTUALLY_EXTENDS std::vector<float>)
+REFL_STRUCT(MyStruct REFL_SILENTLY_EXTENDS std::vector<int> REFL_EXTENDS std::string, std::string_view, virtual(std::vector<float>))
 {
 
 };
