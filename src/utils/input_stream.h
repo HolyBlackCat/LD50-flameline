@@ -366,7 +366,7 @@ namespace Stream
             Seek(1, relative);
         }
         // Skips several bytes.
-        void Skip(std::size_t count = 1)
+        void Skip(std::size_t count)
         {
             Seek(count, relative);
         }

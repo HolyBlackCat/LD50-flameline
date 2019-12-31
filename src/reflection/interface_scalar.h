@@ -35,7 +35,7 @@ namespace Refl
             {
                 bool ok = Stream::Char::IsAlphaOrDigit{}(ch) || ch == '+' || ch == '-' || ch == Strings::CharDigitSeparator();
                 if constexpr (is_fp)
-                    ok = ok || ch == Strings::CharLongDoublePartsSeparator();
+                    ok = ok || ch == '.' || ch == Strings::CharLongDoublePartsSeparator();
                 return ok;
             });
 

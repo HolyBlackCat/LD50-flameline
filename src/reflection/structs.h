@@ -214,7 +214,7 @@ namespace Refl
             template <typename T> struct member_attribs<T, Meta::void_type<Macro::member_attribs<T>>>
             {
                 template <std::size_t I>
-                using at = typename Meta::list_type_at<typename Macro::member_attribs<T>::list, impl::MemberIndexToAttrPackIndex(Macro::member_attribs<T>{}, I)>::type;
+                using at = typename Meta::list_type_at<Macro::member_attribs<T>, impl::MemberIndexToAttrPackIndex(Macro::member_attribs<T>{}, I)>::list;
             };
 
             // Provides information about member names.
@@ -266,7 +266,7 @@ namespace Refl
         template <typename T> [[nodiscard]] constexpr const char *MemberName(std::size_t i)
         {
             if (i >= member_count<T>)
-                return "";
+                return nullptr;
             return Custom::member_names<std::remove_const_t<T>>::at(i);
         }
 
@@ -305,6 +305,9 @@ namespace Refl
 
         // Recursively get a list of all virtual bases of a class.
         template <typename T> using virtual_bases = typename impl::rec_virt_bases_virt<direct_virtual_bases<T>, typename impl::rec_virt_bases_norm<bases<T>, Meta::type_list<>>::type>::type;
+        // A list of all bases of a class: regular ones, then virtual ones.
+        // Duplicates are not removed from this list, so you should probably check for them separately. If you use `CombinedBaseIndex`, it takes care of that.
+        template <typename T> using combined_bases = Meta::list_cat<bases<T>, virtual_bases<T>>;
 
         // Check if a class has a specific attribute.
         template <typename T, typename A> inline constexpr bool class_has_attrib = Meta::list_contains_type<class_attribs<T>, A>;
@@ -359,12 +362,19 @@ namespace Refl
             };
             template <typename L> constexpr auto EntryList_Bases() // `L` is a `Meta::type_list` of base classes.
             {
-                return Meta::cexpr_generate_array<Meta::list_size<L>>([](auto index)
+                if constexpr (Meta::list_size<L> == 0)
                 {
-                    using base_type = Meta::list_type_at<L, index.value>;
-                    static_assert(Class::name_known<base_type>, "Name of this base class is not known.");
-                    return name<base_type>;
-                });
+                    return std::array<const char *, 0>{};
+                }
+                else
+                {
+                    return Meta::cexpr_generate_array<Meta::list_size<L>>([](auto index)
+                    {
+                        using base_type = Meta::list_type_at<L, index.value>;
+                        static_assert(Class::name_known<base_type>, "Name of this base class is not known.");
+                        return name<base_type>;
+                    });
+                }
             };
         }
 

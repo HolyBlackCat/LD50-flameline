@@ -1,8 +1,11 @@
 #pragma once
 
+#include <algorithm>
+#include <array>
 #include <cctype>
 #include <cstddef>
 #include <exception>
+#include <string_view>
 #include <type_traits>
 #include <utility>
 
@@ -32,6 +35,7 @@ namespace Refl
             if (options.pretty)
                 next_options.extra_indent += options.indent;
 
+            // Force a single-line representation if member names aren't known and the struct has no members with 'non-short' representation.
             constexpr bool force_single_line = !Class::member_names_known<T> && []{
                 bool ret = true;
                 Meta::cexpr_for<Class::member_count<T>>([&](auto index)
@@ -45,6 +49,8 @@ namespace Refl
 
             bool first = true;
 
+            // Call this before outputting a field or a base.
+            // Writes a comma, unless it's the first entry. Also adds some line-feeds and indents if necessary.
             auto WriteSeparator = [&]
             {
                 if (first)
@@ -66,6 +72,8 @@ namespace Refl
                 }
             };
 
+            // Writes a base class to the output.
+            // `tag` is `Meta::tag<BaseClass>`.
             auto WriteBase = [&](auto tag)
             {
                 using base_type = const typename decltype(tag)::type;
@@ -84,17 +92,20 @@ namespace Refl
                         output.WriteChar(' ');
                 }
 
-                base_type &base_ref = *static_cast<base_type *>(&object); // Use a pointer cast rather than a reference cast to avoid any custom conversion operators.
+                // We use a pointer cast instead of a reference one to catch cases where the derived class doesn't actually inherit from this base, but merely overloads the conversion operator.
+                base_type &base_ref = *static_cast<base_type *>(&object);
                 Interface(base_ref).ToString(base_ref, output, next_options);
             };
 
-            using virt_bases = Class::recursive_virtual_bases<T>;
+            // Output virtual bases.
+            using virt_bases = Class::virtual_bases<T>;
             Meta::cexpr_for<Meta::list_size<virt_bases>>([&](auto index)
             {
                 constexpr auto i = index.value;
                 WriteBase(Meta::tag<Meta::list_type_at<virt_bases, i>>{});
             });
 
+            // Output regular bases.
             using bases = Class::bases<T>;
             Meta::cexpr_for<Meta::list_size<bases>>([&](auto index)
             {
@@ -102,6 +113,7 @@ namespace Refl
                 WriteBase(Meta::tag<Meta::list_type_at<bases, i>>{});
             });
 
+            // Output members.
             Meta::cexpr_for<Class::member_count<T>>([&](auto index)
             {
                 constexpr auto i = index.value;
@@ -121,6 +133,7 @@ namespace Refl
                 Interface(ref).ToString(ref, output, next_options);
             });
 
+            // Output a trailing comma if we're using a multiline representation.
             if (!first && options.pretty && !force_single_line)
                 output.WriteString(",\n").WriteChar(' ', options.extra_indent);
 
@@ -129,40 +142,128 @@ namespace Refl
 
         void FromString(T &object, Stream::Input &input, const FromStringOptions &options) const override
         {
-            // Clear(object);
+            static_assert(Class::members_known<T>, "Can't convert string to T: its members are not reflected.");
 
-            // input.Discard('[');
+            constexpr bool named_members = Class::member_names_known<T>;
 
-            // while (true)
-            // {
-            //     Parsing::SkipWhitespaceAndComments(input);
-            //     if (input.Discard<Stream::if_present>(']'))
-            //         break;
+            if constexpr (named_members)
+            {
+                // A list of all base class. First regular ones, then virtual ones.
+                using combined_bases = Class::combined_bases<T>;
+                constexpr std::size_t combined_base_count = Meta::list_size<combined_bases>;
 
-            //     mutable_elem_t elem{};
-            //     Interface<mutable_elem_t>().FromString(elem, input, options);
+                // Those flags indicate if a member/base was already deserialized.
+                // Regular arrays can't be used here, since those arrays can be empty.
+                std::array<bool, Class::member_count<T>> obtained_members = {};
+                std::array<bool, combined_base_count> obtained_bases = {};
 
-            //     try
-            //     {
-            //         PushBack(object, std::move(elem));
-            //     }
-            //     catch (std::exception &e)
-            //     {
-            //         Program::Error(input.GetExceptionPrefix() + e.what());
-            //     }
+                input.Discard('{');
 
-            //     Parsing::SkipWhitespaceAndComments(input);
+                while (true)
+                {
+                    // Skip whitespace before the entry.
+                    Parsing::SkipWhitespaceAndComments(input);
 
-            //     if (!input.Discard<Stream::if_present>(','))
-            //     {
-            //         input.Discard(']');
-            //         break;
-            //     }
-            // }
+                    // Stop on a closing brace. If this triggers, we either had 0 entries, or had a trailing comma.
+                    if (input.Discard<Stream::if_present>('}'))
+                        break;
+
+                    // Get member or base name.
+                    std::string name = input.Extract(Stream::Char::SeqIdentifier{});
+                    Parsing::SkipWhitespaceAndComments(input);
+
+                    char first_char = input.PeekChar();
+
+                    // Check if this looks like a member or like a base class.
+                    if (first_char == '{' || first_char == '(')
+                    {
+                        std::size_t base_index = Class::CombinedBaseIndex<T>(name);
+                        if (base_index == std::size_t(-1))
+                            Program::Error(input.GetExceptionPrefix() + "Unknown base class: `" + name + "`.");
+
+                        Meta::with_cexpr_value<combined_base_count>(base_index, [&](auto index)
+                        {
+                            constexpr auto i = index.value;
+                            if (obtained_bases[i])
+                                Program::Error(input.GetExceptionPrefix() + "Base class mentioned more than once: `" + name + "`.");
+
+                            using this_base = Meta::list_type_at<combined_bases, i>;
+
+                            // We use a pointer cast instead of a reference one to catch cases where the derived class doesn't actually inherit from this base, but merely overloads the conversion operator.
+                            auto &base_ref = *static_cast<this_base *>(&object);
+                            Interface<this_base>().FromString(base_ref, input, options);
+
+                            obtained_bases[i] = true;
+                        });
+                    }
+                    else
+                    {
+                        // We got a member variable.
+                        input.Discard('=');
+                        Parsing::SkipWhitespaceAndComments(input);
+
+                        std::size_t member_index = Class::MemberIndex<T>(name);
+                        if (member_index == std::size_t(-1))
+                            Program::Error(input.GetExceptionPrefix() + "Unknown field: `" + name + "`.");
+
+                        Meta::with_cexpr_value<Class::member_count<T>>(member_index, [&](auto index)
+                        {
+                            constexpr auto i = index.value;
+                            if (obtained_members[i])
+                                Program::Error(input.GetExceptionPrefix() + "Field mentioned more than once: `" + name + "`.");
+
+                            auto &member_ref = Class::Member<i>(object);
+                            Interface(member_ref).FromString(member_ref, input, options);
+
+                            obtained_members[i] = true;
+                        });
+                    }
+
+                    // Skip whitespace after the entry.
+                    Parsing::SkipWhitespaceAndComments(input);
+
+                    // Skip comma after the entry.
+                    if (!input.Discard<Stream::if_present>(','))
+                    {
+                        // No comma found, expect a closing brace.
+                        input.Discard('}');
+                        break;
+                    }
+                }
+
+                // Make sure we got all required fields and bases.
+                if (!options.ignore_missing_fields)
+                {
+                    // Check fields.
+                    Meta::cexpr_for<Class::member_count<T>>([&](auto index)
+                    {
+                        constexpr auto i = index.value;
+                        if constexpr (!Class::member_has_attrib<T, i, Optional>)
+                        {
+                            if (!obtained_members[i])
+                                Program::Error(input.GetExceptionPrefix() + "Field `" + Class::MemberName<T>(i) + "` is missing.");
+                        }
+                    });
+
+                    // Check bases.
+                    Meta::cexpr_for<combined_base_count>([&](auto index)
+                    {
+                        constexpr auto i = index.value;
+                        using this_base = Meta::list_type_at<combined_bases, i>;
+                        if constexpr (!Class::class_has_attrib<this_base, Optional>)
+                        {
+                            if (!obtained_bases[i])
+                                Program::Error(input.GetExceptionPrefix() + "Base class `" + Class::name<this_base> + "` is missing.");
+                        }
+                    });
+                }
+            }
         }
 
         void ToBinary(const T &object, Stream::Output &output) const override
         {
+            (void)object;
+            (void)output;
             // impl::container_length_binary_t len;
             // if (Robust::conversion_fails(object.size(), len))
             //     Program::Error(output.GetExceptionPrefix() + "The container is too long.");
@@ -176,6 +277,9 @@ namespace Refl
 
         void FromBinary(T &object, Stream::Input &input, const FromBinaryOptions &options) const override
         {
+            (void)object;
+            (void)input;
+            (void)options;
             // std::size_t len;
             // if (Robust::conversion_fails(input.ReadWithByteOrder<impl::container_length_binary_t>(impl::container_length_byte_order), len))
             //     Program::Error(input.GetExceptionPrefix() + "The string is too long.");

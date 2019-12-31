@@ -264,15 +264,21 @@ namespace Meta
     template <auto N, typename F>
     [[nodiscard]] constexpr decltype(auto) with_cexpr_value(decltype(N) i, F &&func)
     {
-        static_assert(N >= 1);
-
-        return cexpr_generate_array<N>([&](auto value)
+        if constexpr (N <= 0)
         {
-            return +[](F &&func) -> decltype(auto)
+            (void)i;
+            (void)func;
+        }
+        else
+        {
+            return cexpr_generate_array<N>([&](auto value)
             {
-                return std::forward<F>(func)(decltype(value){});
-            };
-        })[i](std::forward<F>(func));
+                return +[](F &&func) -> decltype(auto)
+                {
+                    return std::forward<F>(func)(decltype(value){});
+                };
+            })[i](std::forward<F>(func));
+        }
     }
 
 
