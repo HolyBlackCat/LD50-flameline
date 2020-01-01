@@ -84,7 +84,7 @@ namespace Refl
             // `tag` is `Meta::tag<BaseClass>`.
             auto WriteBase = [&](auto tag)
             {
-                using base_type = const typename decltype(tag)::type;
+                using base_type = typename decltype(tag)::type;
 
                 if constexpr (!impl::Class::skip_base<base_type>)
                 {
@@ -99,7 +99,7 @@ namespace Refl
                     }
 
                     // We use a pointer cast instead of a reference one to catch cases where the derived class doesn't actually inherit from this base, but merely overloads the conversion operator.
-                    base_type &base_ref = *static_cast<base_type *>(&object);
+                    const base_type &base_ref = *static_cast<const base_type *>(&object);
                     Interface(base_ref).ToString(base_ref, output, next_options);
                 }
             };
@@ -336,7 +336,7 @@ namespace Refl
                 });
 
                 Parsing::SkipWhitespaceAndComments(input);
-                if (input.Discard<Stream::if_present>(','))
+                if (!first && input.Discard<Stream::if_present>(','))
                     Parsing::SkipWhitespaceAndComments(input);
                 input.Discard(')');
             }
@@ -344,47 +344,76 @@ namespace Refl
 
         void ToBinary(const T &object, Stream::Output &output) const override
         {
-            (void)object;
-            (void)output;
-            // impl::container_length_binary_t len;
-            // if (Robust::conversion_fails(object.size(), len))
-            //     Program::Error(output.GetExceptionPrefix() + "The container is too long.");
-            // output.WriteWithByteOrder<impl::container_length_binary_t>(impl::container_length_byte_order, len);
+            auto WriteEntry = [&](auto &ref)
+            {
+                Interface(ref).ToBinary(ref, output);
+            };
 
-            // ForEach(object, [&](const elem_t &elem)
-            // {
-            //     Interface<elem_t>().ToBinary(elem, output);
-            // });
+            // Write virtual bases.
+            using virt_bases = Class::virtual_bases<T>;
+            Meta::cexpr_for<Meta::list_size<virt_bases>>([&](auto index)
+            {
+                constexpr auto i = index.value;
+                using base_type = Meta::list_type_at<virt_bases, i>;
+                if constexpr (!impl::Class::skip_base<base_type>)
+                    WriteEntry(*static_cast<const base_type *>(&object));
+            });
+
+            // Write regular bases.
+            using bases = Class::bases<T>;
+            Meta::cexpr_for<Meta::list_size<bases>>([&](auto index)
+            {
+                constexpr auto i = index.value;
+                using base_type = Meta::list_type_at<bases, i>;
+                if constexpr (!impl::Class::skip_base<base_type>)
+                    WriteEntry(*static_cast<const base_type *>(&object));
+            });
+
+            // Write members.
+            Meta::cexpr_for<Class::member_count<T>>([&](auto index)
+            {
+                constexpr auto i = index.value;
+                using type = const Class::member_type<T, i>;
+                if constexpr (!impl::Class::skip_member<type>)
+                    WriteEntry(Class::Member<i>(object));
+            });
         }
 
         void FromBinary(T &object, Stream::Input &input, const FromBinaryOptions &options) const override
         {
-            (void)object;
-            (void)input;
-            (void)options;
-            // std::size_t len;
-            // if (Robust::conversion_fails(input.ReadWithByteOrder<impl::container_length_binary_t>(impl::container_length_byte_order), len))
-            //     Program::Error(input.GetExceptionPrefix() + "The string is too long.");
+            auto ReadEntry = [&](auto &ref)
+            {
+                Interface(ref).FromBinary(ref, input, options);
+            };
 
-            // std::size_t max_reserved_elems = options.max_reserved_size / sizeof(elem_t);
+            // Write virtual bases.
+            using virt_bases = Class::virtual_bases<T>;
+            Meta::cexpr_for<Meta::list_size<virt_bases>>([&](auto index)
+            {
+                constexpr auto i = index.value;
+                using base_type = Meta::list_type_at<virt_bases, i>;
+                if constexpr (!impl::Class::skip_base<base_type>)
+                    ReadEntry(*static_cast<base_type *>(&object));
+            });
 
-            // Clear(object);
-            // Reserve(object, len < max_reserved_elems ? len : max_reserved_elems);
+            // Write regular bases.
+            using bases = Class::bases<T>;
+            Meta::cexpr_for<Meta::list_size<bases>>([&](auto index)
+            {
+                constexpr auto i = index.value;
+                using base_type = Meta::list_type_at<bases, i>;
+                if constexpr (!impl::Class::skip_base<base_type>)
+                    ReadEntry(*static_cast<base_type *>(&object));
+            });
 
-            // while (len-- > 0)
-            // {
-            //     mutable_elem_t elem{};
-            //     Interface<mutable_elem_t>().FromBinary(elem, input, options);
-
-            //     try
-            //     {
-            //         PushBack(object, std::move(elem));
-            //     }
-            //     catch (std::exception &e)
-            //     {
-            //         Program::Error(input.GetExceptionPrefix() + e.what());
-            //     }
-            // }
+            // Write members.
+            Meta::cexpr_for<Class::member_count<T>>([&](auto index)
+            {
+                constexpr auto i = index.value;
+                using type = const Class::member_type<T, i>;
+                if constexpr (!impl::Class::skip_member<type>)
+                    ReadEntry(Class::Member<i>(object));
+            });
         }
     };
 
