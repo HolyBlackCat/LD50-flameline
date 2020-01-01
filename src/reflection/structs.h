@@ -2,7 +2,6 @@
 
 #include <algorithm>
 #include <array>
-#include <cstddef>
 #include <cstring>
 #include <string>
 #include <tuple>
@@ -317,17 +316,40 @@ namespace Refl
         namespace impl
         {
             // Checks if one string is less than the other at constexpr.
-            constexpr int cexpr_string_less(const char *a, const char *b)
+            constexpr int cexpr_strcmp(const char *a, const char *b)
             {
                 while (*a == *b)
                 {
                     if (*a == '\0')
-                        return false;
+                        return 0;
                     a++;
                     b++;
                 }
-                return (unsigned char)*a < (unsigned char)*b;
+                return (unsigned char)*a - (unsigned char)*b;
             }
+
+            struct NameIndexPair
+            {
+                const char *name = nullptr;
+                std::size_t index = 0;
+
+                constexpr NameIndexPair() {}
+                constexpr NameIndexPair(const char *name) : name(name) {}
+
+                constexpr bool operator==(const NameIndexPair &other) const // For `adjacent_find`.
+                {
+                    return cexpr_strcmp(name, other.name) == 0;
+                }
+                constexpr bool operator!=(const NameIndexPair &other) const
+                {
+                    return !(*this == other);
+                }
+
+                constexpr bool operator<(const NameIndexPair &other) const
+                {
+                    return cexpr_strcmp(name, other.name) < 0;
+                }
+            };
 
             // An universal function to look up member and base indices by name.
             // `N` is the amount of entries, `F` is a pointer to a constexpr function that returns
@@ -337,15 +359,22 @@ namespace Refl
             {
                 static const/*expr*/ auto array = []() /*constexpr*/ // We can make this constexpr as soon as we get a `constexpr` `std::sort` in C++20.
                 {
-                    auto array = F();
-                    std::sort(array.begin(), array.end(), cexpr_string_less);
+                    auto name_array = F();
+                    std::array<NameIndexPair, name_array.size()> array{};
+                    for (std::size_t i = 0; i < array.size(); i++)
+                    {
+                        array[i].name = name_array[i];
+                        array[i].index = i;
+                    }
+
+                    std::sort(array.begin(), array.end());
                     DebugAssert("Duplicate member or base name in a reflected class.", std::adjacent_find(array.begin(), array.end()) == array.end());
                     return array;
                 }();
-                auto it = std::lower_bound(array.begin(), array.end(), name, [](const char *a, const char *b){return std::strcmp(a, b) < 0;});
-                if (it == array.end() || std::strcmp(*it, name) != 0)
+                auto it = std::lower_bound(array.begin(), array.end(), name);
+                if (it == array.end() || *it != name)
                     return -1;
-                return it - array.begin();
+                return it->index;
             }
 
             // Helper functions for `EntryIndex`.
@@ -883,32 +912,33 @@ That's all.
 #define REFL_MEMBERS(...) REFL_MEMBERS_impl((__VA_ARGS__))
 #define REFL_MEMBERS_impl(...) \
     REFL_MEMBERS_impl_decl(__VA_ARGS__) \
-    auto zrefl_MembersHelper() const \
-    { \
-        using t [[maybe_unused]] = std::remove_cv_t<std::remove_pointer_t<decltype(this)>>; \
-        struct Helper \
-        { \
-            REFL_MEMBERS_impl_metadata_generic(__VA_ARGS__) \
-            REFL_MEMBERS_impl_metadata_memname(__VA_ARGS__) \
-        }; \
-        return Helper{}; \
-    } \
-    template <typename, typename> friend struct ::Refl::Class::Macro::impl::member_metadata;
+    REFL_MEMBERS_impl_meta_begin \
+    REFL_MEMBERS_impl_metadata_generic(__VA_ARGS__) \
+    REFL_MEMBERS_impl_metadata_memname(__VA_ARGS__) \
+    REFL_MEMBERS_impl_meta_end
 
 // Same as `REFL_MEMBERS`, but doesn't save variable names.
 #define REFL_UNNAMED_MEMBERS(...) REFL_UNNAMED_MEMBERS_impl((__VA_ARGS__))
 #define REFL_UNNAMED_MEMBERS_impl(...) \
     REFL_MEMBERS_impl_decl(__VA_ARGS__) \
+    REFL_MEMBERS_impl_meta_begin \
+    REFL_MEMBERS_impl_metadata_generic(__VA_ARGS__) \
+    REFL_MEMBERS_impl_meta_end
+
+// Internal. Helper for `REFL_MEMBERS`. Expands to the opening of the embedded metadata section.
+#define REFL_MEMBERS_impl_meta_begin \
     auto zrefl_MembersHelper() const \
     { \
-        using t = std::remove_cv_t<std::remove_pointer_t<decltype(this)>>; \
+        using t [[maybe_unused]] = std::remove_cv_t<std::remove_pointer_t<decltype(this)>>; \
         struct Helper \
-        { \
-            REFL_MEMBERS_impl_metadata_generic(__VA_ARGS__) \
+        {
+
+// Internal. Helper for `REFL_MEMBERS`. Expands to the ending of the embedded metadata section.
+#define REFL_MEMBERS_impl_meta_end \
         }; \
         return Helper{}; \
-    }
-
+    } \
+    template <typename, typename> friend struct ::Refl::Class::Macro::impl::member_metadata;
 
 // Internal. Helper for `REFL_MEMBERS`. Declares variables themselves, without metadata.
 #define REFL_MEMBERS_impl_decl(...) REFL_MEMBERS_impl_decl_low(REFL_MEMBERS_impl_skip_first __VA_ARGS__)

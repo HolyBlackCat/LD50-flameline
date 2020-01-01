@@ -19,6 +19,14 @@
 
 namespace Refl
 {
+    namespace impl::Class
+    {
+        // Indicates if a specific base class should be skipped when [de]serializing.
+        template <typename T> inline constexpr bool skip_base = Refl::Class::member_count<T> == 0; // No members or they aren't known.
+        // Indicates if a specific field type should be skipped when [de]serializing.
+        template <typename T> inline constexpr bool skip_member = Refl::Class::members_known<T> && Refl::Class::member_count<T> == 0; // No members.
+    }
+
     template <typename T>
     class Interface_Struct : public InterfaceBasic<T>
     {
@@ -78,23 +86,22 @@ namespace Refl
             {
                 using base_type = const typename decltype(tag)::type;
 
-                constexpr bool skip_this_base = Class::member_count<base_type> == 0 && Class::class_has_attrib<base_type, Refl::Optional>;
-                if (skip_this_base)
-                    return;
-
-                WriteSeparator();
-
-                if constexpr (named_members)
+                if constexpr (!impl::Class::skip_base<base_type>)
                 {
-                    static_assert(Class::name_known<base_type>, "Name of this base class is not known.");
-                    output.WriteString(Class::name<base_type>);
-                    if (options.pretty)
-                        output.WriteChar(' ');
-                }
+                    WriteSeparator();
 
-                // We use a pointer cast instead of a reference one to catch cases where the derived class doesn't actually inherit from this base, but merely overloads the conversion operator.
-                base_type &base_ref = *static_cast<base_type *>(&object);
-                Interface(base_ref).ToString(base_ref, output, next_options);
+                    if constexpr (named_members)
+                    {
+                        static_assert(Class::name_known<base_type>, "Name of this base class is not known.");
+                        output.WriteString(Class::name<base_type>);
+                        if (options.pretty)
+                            output.WriteChar(' ');
+                    }
+
+                    // We use a pointer cast instead of a reference one to catch cases where the derived class doesn't actually inherit from this base, but merely overloads the conversion operator.
+                    base_type &base_ref = *static_cast<base_type *>(&object);
+                    Interface(base_ref).ToString(base_ref, output, next_options);
+                }
             };
 
             // Output virtual bases.
@@ -118,19 +125,23 @@ namespace Refl
             {
                 constexpr auto i = index.value;
                 using type = const Class::member_type<T, i>;
-                type &ref = Class::Member<i>(object);
 
-                WriteSeparator();
-                if constexpr (named_members)
+                if constexpr (!impl::Class::skip_member<type>)
                 {
-                    output.WriteString(Class::MemberName<T>(i));
-                    if (options.pretty)
-                        output.WriteString(" = ");
-                    else
-                        output.WriteChar('=');
-                }
+                    type &ref = Class::Member<i>(object);
 
-                Interface(ref).ToString(ref, output, next_options);
+                    WriteSeparator();
+                    if constexpr (named_members)
+                    {
+                        output.WriteString(Class::MemberName<T>(i));
+                        if (options.pretty)
+                            output.WriteString(" = ");
+                        else
+                            output.WriteChar('=');
+                    }
+
+                    Interface(ref).ToString(ref, output, next_options);
+                }
             });
 
             // Output a trailing comma if we're using a multiline representation.
@@ -189,11 +200,18 @@ namespace Refl
 
                             using this_base = Meta::list_type_at<combined_bases, i>;
 
-                            // We use a pointer cast instead of a reference one to catch cases where the derived class doesn't actually inherit from this base, but merely overloads the conversion operator.
-                            auto &base_ref = *static_cast<this_base *>(&object);
-                            Interface<this_base>().FromString(base_ref, input, options);
+                            if constexpr (impl::Class::skip_base<this_base>)
+                            {
+                                Program::Error(input.GetExceptionPrefix() + "Empty base class is mentioned: `" + name + "`.");
+                            }
+                            else
+                            {
+                                // We use a pointer cast instead of a reference one to catch cases where the derived class doesn't actually inherit from this base, but merely overloads the conversion operator.
+                                auto &base_ref = *static_cast<this_base *>(&object);
+                                Interface<this_base>().FromString(base_ref, input, options);
 
-                            obtained_bases[i] = true;
+                                obtained_bases[i] = true;
+                            }
                         });
                     }
                     else
@@ -212,10 +230,17 @@ namespace Refl
                             if (obtained_members[i])
                                 Program::Error(input.GetExceptionPrefix() + "Field mentioned more than once: `" + name + "`.");
 
-                            auto &member_ref = Class::Member<i>(object);
-                            Interface(member_ref).FromString(member_ref, input, options);
+                            if constexpr (impl::Class::skip_member<Class::member_type<T, i>>)
+                            {
+                                Program::Error(input.GetExceptionPrefix() + "Empty field is mentioned: `" + name + "`.");
+                            }
+                            else
+                            {
+                                auto &member_ref = Class::Member<i>(object);
+                                Interface(member_ref).FromString(member_ref, input, options);
 
-                            obtained_members[i] = true;
+                                obtained_members[i] = true;
+                            }
                         });
                     }
 
@@ -238,7 +263,7 @@ namespace Refl
                     Meta::cexpr_for<Class::member_count<T>>([&](auto index)
                     {
                         constexpr auto i = index.value;
-                        if constexpr (!Class::member_has_attrib<T, i, Optional>)
+                        if constexpr (!Class::member_has_attrib<T, i, Optional> && !impl::Class::skip_member<Class::member_type<T, i>>)
                         {
                             if (!obtained_members[i])
                                 Program::Error(input.GetExceptionPrefix() + "Field `" + Class::MemberName<T>(i) + "` is missing.");
@@ -250,13 +275,70 @@ namespace Refl
                     {
                         constexpr auto i = index.value;
                         using this_base = Meta::list_type_at<combined_bases, i>;
-                        if constexpr (!Class::class_has_attrib<this_base, Optional>)
+                        if constexpr (!Class::class_has_attrib<this_base, Optional> && !impl::Class::skip_base<this_base>)
                         {
                             if (!obtained_bases[i])
                                 Program::Error(input.GetExceptionPrefix() + "Base class `" + Class::name<this_base> + "` is missing.");
                         }
                     });
                 }
+            }
+            else
+            {
+                input.Discard('(');
+
+                bool first = true;
+
+                auto ReadEntry = [&](auto &ref)
+                {
+                    if (first)
+                    {
+                        first = false;
+                        Parsing::SkipWhitespaceAndComments(input);
+                    }
+                    else
+                    {
+                        Parsing::SkipWhitespaceAndComments(input);
+                        input.Discard(',');
+                        Parsing::SkipWhitespaceAndComments(input);
+                    }
+
+                    Interface(ref).FromString(ref, input, options);
+                };
+
+                // Read virtual bases.
+                using virt_bases = Class::virtual_bases<T>;
+                Meta::cexpr_for<Meta::list_size<virt_bases>>([&](auto index)
+                {
+                    constexpr auto i = index.value;
+                    using base_type = Meta::list_type_at<virt_bases, i>;
+                    if constexpr (!impl::Class::skip_base<base_type>)
+                        ReadEntry(*static_cast<base_type *>(&object));
+                });
+
+                // Read regular bases.
+                using bases = Class::bases<T>;
+                Meta::cexpr_for<Meta::list_size<bases>>([&](auto index)
+                {
+                    constexpr auto i = index.value;
+                    using base_type = Meta::list_type_at<bases, i>;
+                    if constexpr (!impl::Class::skip_base<base_type>)
+                        ReadEntry(*static_cast<base_type *>(&object));
+                });
+
+                // Read members.
+                Meta::cexpr_for<Class::member_count<T>>([&](auto index)
+                {
+                    constexpr auto i = index.value;
+                    using type = const Class::member_type<T, i>;
+                    if constexpr (!impl::Class::skip_member<type>)
+                        ReadEntry(Class::Member<i>(object));
+                });
+
+                Parsing::SkipWhitespaceAndComments(input);
+                if (input.Discard<Stream::if_present>(','))
+                    Parsing::SkipWhitespaceAndComments(input);
+                input.Discard(')');
             }
         }
 

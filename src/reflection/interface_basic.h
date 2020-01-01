@@ -20,6 +20,14 @@ namespace Refl
         bool multiline_strings = false; // If enabled, preserve line-feeds when printing `std::string`s. Otherwise they will be printed as `\n`.
         int indent = 4; // Indentation step.
         int extra_indent = 0; // Extra indentation at the beginning of each line, except the first one. Intended for the internal use.
+
+        [[nodiscard]] static ToStringOptions Pretty(int indent = 4)
+        {
+            ToStringOptions ret;
+            ret.pretty = true;
+            ret.indent = indent;
+            return ret;
+        }
     };
 
     struct FromStringOptions
