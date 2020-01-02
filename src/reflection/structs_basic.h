@@ -344,73 +344,11 @@ namespace Refl
 
         namespace impl
         {
-            // Checks if one string is less than the other at constexpr.
-            constexpr int cexpr_strcmp(const char *a, const char *b)
-            {
-                while (*a == *b)
-                {
-                    if (*a == '\0')
-                        return 0;
-                    a++;
-                    b++;
-                }
-                return (unsigned char)*a - (unsigned char)*b;
-            }
-
-            struct NameIndexPair
-            {
-                const char *name = nullptr;
-                std::size_t index = 0;
-
-                constexpr NameIndexPair() {}
-                constexpr NameIndexPair(const char *name) : name(name) {}
-
-                constexpr bool operator==(const NameIndexPair &other) const // For `adjacent_find`.
-                {
-                    return cexpr_strcmp(name, other.name) == 0;
-                }
-                constexpr bool operator!=(const NameIndexPair &other) const
-                {
-                    return !(*this == other);
-                }
-
-                constexpr bool operator<(const NameIndexPair &other) const
-                {
-                    return cexpr_strcmp(name, other.name) < 0;
-                }
-            };
-
-            // An universal function to look up member and base indices by name.
-            // `N` is the amount of entries, `F` is a pointer to a constexpr function that returns
-            // an array of names: `std::array<const char *, N> (*)(auto index)`.
-            // `name` is a name that we're looking for. If it's not found, -1 is returned.
-            template <auto F> std::size_t EntryIndex(const char *name)
-            {
-                static const/*expr*/ auto array = []() /*constexpr*/ // We can make this constexpr as soon as we get a `constexpr` `std::sort` in C++20.
-                {
-                    auto name_array = F();
-                    std::array<NameIndexPair, name_array.size()> array{};
-                    for (std::size_t i = 0; i < array.size(); i++)
-                    {
-                        array[i].name = name_array[i];
-                        array[i].index = i;
-                    }
-
-                    std::sort(array.begin(), array.end());
-                    DebugAssert("Duplicate member or base name in a reflected class.", std::adjacent_find(array.begin(), array.end()) == array.end());
-                    return array;
-                }();
-                auto it = std::lower_bound(array.begin(), array.end(), name);
-                if (it == array.end() || *it != name)
-                    return -1;
-                return it->index;
-            }
-
-            // Helper functions for `EntryIndex`.
+            // Helper functions for `Utils::GetStringIndex`.
             // Note that even though those would be able to handle T being const, it would cause two identical
             // instantiatons of `EntryIndex` being created (for const and non-const T), which is not good.
             // Because of that we force T to not be cosnt.
-            template <typename T> constexpr auto EntryList_Members()
+            template <typename T> constexpr auto StringList_Members()
             {
                 static_assert(!std::is_const_v<T>);
                 std::array<const char *, member_count<T>> ret{};
@@ -418,7 +356,7 @@ namespace Refl
                     ret[i] = Class::MemberName<T>(i); // Using a qualified call to protect against accidental ADL.
                 return ret;
             };
-            template <typename L> constexpr auto EntryList_Bases() // `L` is a `Meta::type_list` of base classes.
+            template <typename L> constexpr auto StringList_Classes() // `L` is a `Meta::type_list` of classes.
             {
                 if constexpr (Meta::list_size<L> == 0)
                 {
@@ -428,9 +366,9 @@ namespace Refl
                 {
                     return Meta::cexpr_generate_array<Meta::list_size<L>>([](auto index)
                     {
-                        using base_type = Meta::list_type_at<L, index.value>;
-                        static_assert(Class::name_known<base_type>, "Name of this base class is not known.");
-                        return name<base_type>;
+                        using type = Meta::list_type_at<L, index.value>;
+                        static_assert(Class::name_known<type>, "Name of this class is not known.");
+                        return name<type>;
                     });
                 }
             };
@@ -443,20 +381,20 @@ namespace Refl
         template <typename T> [[nodiscard]] std::size_t MemberIndex(const char *name)
         {
             // Note that `remove_const_t` is necessary here, but not in the other three functions.
-            return impl::EntryIndex<impl::EntryList_Members<std::remove_const_t<T>>>(name);
+            return Utils::GetStringIndex<impl::StringList_Members<std::remove_const_t<T>>>(name);
         }
         template <typename T> [[nodiscard]] std::size_t BaseIndex(const char *name)
         {
-            return impl::EntryIndex<impl::EntryList_Bases<bases<T>>>(name);
+            return Utils::GetStringIndex<impl::StringList_Classes<bases<T>>>(name);
         }
         template <typename T> [[nodiscard]] std::size_t VirtualBaseIndex(const char *name)
         {
-            return impl::EntryIndex<impl::EntryList_Bases<virtual_bases<T>>>(name);
+            return Utils::GetStringIndex<impl::StringList_Classes<virtual_bases<T>>>(name);
         }
         template <typename T> [[nodiscard]] std::size_t CombinedBaseIndex(const char *name)
         {
             // Concatenates `bases<T>` and `virtual_bases<T>` and returns the index in the combined list.
-            return impl::EntryIndex<impl::EntryList_Bases<Meta::list_cat<bases<T>, virtual_bases<T>>>>(name);
+            return Utils::GetStringIndex<impl::StringList_Classes<Meta::list_cat<bases<T>, virtual_bases<T>>>>(name);
         }
 
         template <typename T> [[nodiscard]] std::size_t MemberIndex      (const std::string &name) {return MemberIndex      <T>(name.c_str());}

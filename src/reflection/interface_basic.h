@@ -6,7 +6,7 @@
 #include <string_view>
 #include <utility>
 
-#include "reflection/parsing.h"
+#include "reflection/utils.h"
 #include "utils/check.h"
 #include "utils/input_stream.h"
 #include "utils/meta.h"
@@ -122,9 +122,9 @@ namespace Refl
         void FromString(T &object, ReadOnlyDataWrapper input_data, const FromStringOptions &options = {})
         {
             Stream::Input input(std::move(input_data.value), Stream::text_position);
-            Parsing::SkipWhitespaceAndComments(input);
+            Utils::SkipWhitespaceAndComments(input);
             Interface(object).FromString(object, input, options);
-            Parsing::SkipWhitespaceAndComments(input);
+            Utils::SkipWhitespaceAndComments(input);
             input.ExpectEnd();
         }
         template <typename T, CHECK_EXPR(Interface<T>())>
@@ -151,6 +151,15 @@ namespace Refl
         void ToBinary(const T &object, Stream::Output &output)
         {
             Interface(object).ToBinary(object, output);
+        }
+        template <typename C, typename T, CHECK_EXPR(void(Interface<T>()), Stream::Output::Container(std::declval<C &>()))>
+        [[nodiscard]] C ToBinary(const T &object)
+        {
+            C ret;
+            auto output = Stream::Output::Container(ret);
+            ToBinary(object, output);
+            output.Flush();
+            return ret;
         }
 
         // Expects `input_data` to have no junk at the end.

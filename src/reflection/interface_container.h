@@ -114,7 +114,7 @@ namespace Refl
 
             while (true)
             {
-                Parsing::SkipWhitespaceAndComments(input);
+                Utils::SkipWhitespaceAndComments(input);
                 if (input.Discard<Stream::if_present>(']'))
                     break;
 
@@ -130,7 +130,7 @@ namespace Refl
                     Program::Error(input.GetExceptionPrefix() + e.what());
                 }
 
-                Parsing::SkipWhitespaceAndComments(input);
+                Utils::SkipWhitespaceAndComments(input);
 
                 if (!input.Discard<Stream::if_present>(','))
                 {

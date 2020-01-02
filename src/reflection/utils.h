@@ -1,11 +1,14 @@
 #pragma once
 
+#include <algorithm>
+#include <array>
 #include <cstddef>
 #include <string>
 
+#include "program/errors.h"
 #include "utils/input_stream.h"
 
-namespace Refl::Parsing
+namespace Refl::Utils
 {
     // Skips whitespace and c++-style comments (`//` and `/* */`).
     // Returns true if skipped at least one character.
@@ -84,5 +87,68 @@ namespace Refl::Parsing
         }
 
         return !first;
+    }
+
+
+    // Constexpr alternative to `std::strcmp`.
+    constexpr int cexpr_strcmp(const char *a, const char *b)
+    {
+        while (*a == *b)
+        {
+            if (*a == '\0')
+                return 0;
+            a++;
+            b++;
+        }
+        return (unsigned char)*a - (unsigned char)*b;
+    }
+
+    struct NameIndexPair
+    {
+        const char *name = nullptr;
+        std::size_t index = 0;
+
+        constexpr NameIndexPair() {}
+        constexpr NameIndexPair(const char *name) : name(name) {}
+
+        constexpr bool operator==(const NameIndexPair &other) const // For `adjacent_find`.
+        {
+            return cexpr_strcmp(name, other.name) == 0;
+        }
+        constexpr bool operator!=(const NameIndexPair &other) const
+        {
+            return !(*this == other);
+        }
+
+        constexpr bool operator<(const NameIndexPair &other) const
+        {
+            return cexpr_strcmp(name, other.name) < 0;
+        }
+    };
+
+    // An universal function to look up strings in immutable lists.
+    // `F` is a pointer to a constexpr function that returns an array of names: `std::array<const char *, N> (*)(auto index)`.
+    // `name` is a name that we're looking for. If it's not found, -1 is returned.
+    // Avoid using lambdas as `F`. If you do that in a header, you most likely get an ODR violation.
+    template <auto F> std::size_t GetStringIndex(const char *name)
+    {
+        static const/*expr*/ auto array = []() /*constexpr*/ // We can make this constexpr as soon as we get a `constexpr` `std::sort` in C++20.
+        {
+            auto name_array = F();
+            std::array<NameIndexPair, name_array.size()> array{};
+            for (std::size_t i = 0; i < array.size(); i++)
+            {
+                array[i].name = name_array[i];
+                array[i].index = i;
+            }
+
+            std::sort(array.begin(), array.end());
+            DebugAssert("Duplicate string in a static list.", std::adjacent_find(array.begin(), array.end()) == array.end());
+            return array;
+        }();
+        auto it = std::lower_bound(array.begin(), array.end(), name);
+        if (it == array.end() || *it != name)
+            return -1;
+        return it->index;
     }
 }

@@ -173,7 +173,7 @@ namespace Refl
                 while (true)
                 {
                     // Skip whitespace before the entry.
-                    Parsing::SkipWhitespaceAndComments(input);
+                    Utils::SkipWhitespaceAndComments(input);
 
                     // Stop on a closing brace. If this triggers, we either had 0 entries, or had a trailing comma.
                     if (input.Discard<Stream::if_present>('}'))
@@ -181,7 +181,7 @@ namespace Refl
 
                     // Get member or base name.
                     std::string name = input.Extract(Stream::Char::SeqIdentifier{});
-                    Parsing::SkipWhitespaceAndComments(input);
+                    Utils::SkipWhitespaceAndComments(input);
 
                     char first_char = input.PeekChar();
 
@@ -218,7 +218,7 @@ namespace Refl
                     {
                         // We got a member variable.
                         input.Discard('=');
-                        Parsing::SkipWhitespaceAndComments(input);
+                        Utils::SkipWhitespaceAndComments(input);
 
                         std::size_t member_index = Class::MemberIndex<T>(name);
                         if (member_index == std::size_t(-1))
@@ -245,7 +245,7 @@ namespace Refl
                     }
 
                     // Skip whitespace after the entry.
-                    Parsing::SkipWhitespaceAndComments(input);
+                    Utils::SkipWhitespaceAndComments(input);
 
                     // Skip comma after the entry.
                     if (!input.Discard<Stream::if_present>(','))
@@ -294,13 +294,13 @@ namespace Refl
                     if (first)
                     {
                         first = false;
-                        Parsing::SkipWhitespaceAndComments(input);
+                        Utils::SkipWhitespaceAndComments(input);
                     }
                     else
                     {
-                        Parsing::SkipWhitespaceAndComments(input);
+                        Utils::SkipWhitespaceAndComments(input);
                         input.Discard(',');
-                        Parsing::SkipWhitespaceAndComments(input);
+                        Utils::SkipWhitespaceAndComments(input);
                     }
 
                     Interface(ref).FromString(ref, input, options);
@@ -335,9 +335,9 @@ namespace Refl
                         ReadEntry(Class::Member<i>(object));
                 });
 
-                Parsing::SkipWhitespaceAndComments(input);
+                Utils::SkipWhitespaceAndComments(input);
                 if (!first && input.Discard<Stream::if_present>(','))
-                    Parsing::SkipWhitespaceAndComments(input);
+                    Utils::SkipWhitespaceAndComments(input);
                 input.Discard(')');
             }
         }

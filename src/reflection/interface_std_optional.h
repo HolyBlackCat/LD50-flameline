@@ -37,7 +37,7 @@ namespace Refl
             }
 
             input.Discard(':');
-            Parsing::SkipWhitespaceAndComments(input);
+            Utils::SkipWhitespaceAndComments(input);
 
             try
             {
@@ -82,12 +82,12 @@ namespace Refl
         }
     };
 
-    template <typename elem_t>
-    struct impl::SelectInterface<std::optional<elem_t>>
+    template <typename U>
+    struct impl::SelectInterface<std::optional<U>>
     {
-        using type = Interface_StdOptional<std::optional<elem_t>>;
+        using type = Interface_StdOptional<std::optional<U>>;
     };
 
-    template <typename elem_t>
-    struct impl::HasShortStringRepresentation<std::optional<elem_t>> : impl::HasShortStringRepresentation<elem_t> {};
+    template <typename U>
+    struct impl::HasShortStringRepresentation<std::optional<U>> : impl::HasShortStringRepresentation<U> {};
 }
