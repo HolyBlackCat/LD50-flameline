@@ -204,7 +204,10 @@ namespace Refl
             std::enable_if_t<std::is_reference_v<decltype(*std::declval<T &>().begin())>>()
         );
 
-        template <typename T> inline constexpr bool is_container = Meta::is_detected<has_sane_begin_end, T> && !ForceNotContainer<T>::value;
+        // Check if a type looks like a container.
+        // It has to have sane `begin()` and `end()`, and either `push_back` or single-arg `insert` (so only variable-length arrays are allowed).
+        template <typename T> inline constexpr bool is_container =
+            Meta::is_detected<has_sane_begin_end, T> && (Meta::is_detected<has_push_back, T> || Meta::is_detected<has_single_arg_insert, T>) && !ForceNotContainer<T>::value;
     }
 
     template <typename T>

@@ -139,6 +139,10 @@ namespace Refl
             {
                 static constexpr const char *value = Macro::name<T>::value;
             };
+            template <typename T> struct name<T, Meta::void_type<decltype(std::tuple_size<T>::value)>> // Tuple interface. Note that we don't use `tuple_size_v` here because it's not SFINAE-friendly.
+            {
+                static constexpr const char *value = "tuple";
+            };
 
             // Provides information about class attributes.
             template <typename T, typename Void = void> struct class_attribs
@@ -189,6 +193,30 @@ namespace Refl
                 template <std::size_t I> static const auto &at(const T &object)
                 {
                     return object.*Meta::list_value_at<Macro::member_ptrs<T>, I>;
+                }
+            };
+            template <typename T> struct members<T, Meta::void_type<decltype(std::tuple_size<T>::value)>> // Tuple interface. Note that we don't use `tuple_size_v` here because it's not SFINAE-friendly.
+            {
+                static constexpr std::size_t count = std::tuple_size_v<T>;
+                template <std::size_t I> static auto &at(T &object)
+                {
+                    return std::get<I>(object);
+                }
+                template <std::size_t I> static const auto &at(const T &object)
+                {
+                    return std::get<I>(object);
+                }
+            };
+            template <typename T> struct members<T, std::enable_if_t<std::is_bounded_array_v<T>>> // Array interface.
+            {
+                static constexpr std::size_t count = std::extent_v<T>;
+                template <std::size_t I> static auto &at(T &object)
+                {
+                    return object[I];
+                }
+                template <std::size_t I> static const auto &at(const T &object)
+                {
+                    return object[I];
                 }
             };
 
