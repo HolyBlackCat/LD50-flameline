@@ -186,11 +186,11 @@ namespace Refl
             template <typename T> struct members<T, Meta::void_type<Macro::member_ptrs<T>>>
             {
                 static constexpr std::size_t count = Meta::list_size<Macro::member_ptrs<T>>;
-                template <std::size_t I> static auto &at(T &object)
+                template <std::size_t I> static constexpr auto &at(T &object)
                 {
                     return object.*Meta::list_value_at<Macro::member_ptrs<T>, I>;
                 }
-                template <std::size_t I> static const auto &at(const T &object)
+                template <std::size_t I> static constexpr const auto &at(const T &object)
                 {
                     return object.*Meta::list_value_at<Macro::member_ptrs<T>, I>;
                 }
@@ -198,23 +198,24 @@ namespace Refl
             template <typename T> struct members<T, Meta::void_type<decltype(std::tuple_size<T>::value)>> // Tuple interface. Note that we don't use `tuple_size_v` here because it's not SFINAE-friendly.
             {
                 static constexpr std::size_t count = std::tuple_size_v<T>;
-                template <std::size_t I> static auto &at(T &object)
+                template <std::size_t I> static constexpr auto &at(T &object)
                 {
                     return std::get<I>(object);
                 }
-                template <std::size_t I> static const auto &at(const T &object)
+                template <std::size_t I> static constexpr const auto &at(const T &object)
                 {
                     return std::get<I>(object);
                 }
             };
-            template <typename T> struct members<T, std::enable_if_t<std::is_bounded_array_v<T>>> // Array interface.
+            template <typename M, std::size_t N> struct members<M[N]> // Array interface.
             {
-                static constexpr std::size_t count = std::extent_v<T>;
-                template <std::size_t I> static auto &at(T &object)
+                using T = M[N];
+                static constexpr std::size_t count = N;
+                template <std::size_t I> static constexpr auto &at(T &object)
                 {
                     return object[I];
                 }
-                template <std::size_t I> static const auto &at(const T &object)
+                template <std::size_t I> static constexpr const auto &at(const T &object)
                 {
                     return object[I];
                 }
@@ -279,7 +280,7 @@ namespace Refl
         // Non-staic members.
         template <typename T> inline constexpr bool members_known = Custom::members<std::remove_const_t<T>>::count != std::size_t(-1);
         template <typename T> inline constexpr std::size_t member_count = members_known<T> ? Custom::members<std::remove_const_t<T>>::count : 0;
-        template <std::size_t I, Meta::deduce..., typename T> auto &Member(T &object)
+        template <std::size_t I, Meta::deduce..., typename T> constexpr auto &Member(T &object)
         {
             return Custom::members<std::remove_const_t<T>>::template at<I>(object);
         }
