@@ -270,7 +270,7 @@ namespace Refl
     };
 
     template <typename T>
-    struct impl::ContainerElem<T, std::enable_if_t<impl::StdContainer::is_container<T>>>
+    struct impl::ContainerElem<T, std::enable_if_t<Meta::is_detected<impl::StdContainer::has_sane_begin_end, T>>> // Note that we can't use `impl::StdContainer::is_container<T>` here, since it relies on `ContainerElem`.
     {
         using type = std::remove_reference_t<decltype(*std::declval<T &>().begin())>;
     };
