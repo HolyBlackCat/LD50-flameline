@@ -31,7 +31,7 @@ namespace Refl
     class Interface_Struct : public InterfaceBasic<T>
     {
       public:
-        void ToString(const T &object, Stream::Output &output, const ToStringOptions &options) const override
+        void ToString(const T &object, Stream::Output &output, const ToStringOptions &options, impl::ToStringState state) const override
         {
             static_assert(Class::members_known<T>, "Can't convert T to string: its members are not reflected.");
 
@@ -39,9 +39,8 @@ namespace Refl
 
             output.WriteChar("({"[named_members]);
 
-            auto next_options = options;
-            if (options.pretty)
-                next_options.extra_indent += options.indent;
+            auto next_member_state = state.MemberOrElem(options);
+            auto next_base_state = state.BaseClass(options);
 
             // Force a single-line representation if member names aren't known and the struct has no members with 'non-short' representation.
             constexpr bool force_single_line = !Class::member_names_known<T> && []{
@@ -50,6 +49,13 @@ namespace Refl
                 {
                     constexpr auto i = index.value;
                     if (!impl::HasShortStringRepresentation<Class::member_type<T, i>>::value)
+                        ret = false;
+                });
+
+                Meta::cexpr_for<Meta::list_size<Class::combined_bases<T>>>([&](auto index)
+                {
+                    constexpr auto i = index.value;
+                    if (!impl::HasShortStringRepresentation<Meta::list_type_at<Class::combined_bases<T>, i>>::value)
                         ret = false;
                 });
                 return ret;
@@ -65,7 +71,7 @@ namespace Refl
                 {
                     first = false;
                     if (options.pretty && !force_single_line)
-                        output.WriteChar('\n').WriteChar(' ', next_options.extra_indent);
+                        output.WriteChar('\n').WriteChar(' ', state.CurIndent() + options.indent);
                 }
                 else
                 {
@@ -75,7 +81,7 @@ namespace Refl
                         if (force_single_line)
                             output.WriteChar(' ');
                         else
-                            output.WriteChar('\n').WriteChar(' ', next_options.extra_indent);
+                            output.WriteChar('\n').WriteChar(' ', state.CurIndent() + options.indent);
                     }
                 }
             };
@@ -100,17 +106,20 @@ namespace Refl
 
                     // We use a pointer cast instead of a reference one to catch cases where the derived class doesn't actually inherit from this base, but merely overloads the conversion operator.
                     const base_type &base_ref = *static_cast<const base_type *>(&object);
-                    Interface(base_ref).ToString(base_ref, output, next_options);
+                    Interface(base_ref).ToString(base_ref, output, options, next_base_state);
                 }
             };
 
             // Output virtual bases.
-            using virt_bases = Class::virtual_bases<T>;
-            Meta::cexpr_for<Meta::list_size<virt_bases>>([&](auto index)
+            if (state.NeedVirtualBases())
             {
-                constexpr auto i = index.value;
-                WriteBase(Meta::tag<Meta::list_type_at<virt_bases, i>>{});
-            });
+                using virt_bases = Class::virtual_bases<T>;
+                Meta::cexpr_for<Meta::list_size<virt_bases>>([&](auto index)
+                {
+                    constexpr auto i = index.value;
+                    WriteBase(Meta::tag<Meta::list_type_at<virt_bases, i>>{});
+                });
+            }
 
             // Output regular bases.
             using bases = Class::bases<T>;
@@ -140,22 +149,25 @@ namespace Refl
                             output.WriteChar('=');
                     }
 
-                    Interface(ref).ToString(ref, output, next_options);
+                    Interface(ref).ToString(ref, output, options, next_member_state);
                 }
             });
 
             // Output a trailing comma if we're using a multiline representation.
             if (!first && options.pretty && !force_single_line)
-                output.WriteString(",\n").WriteChar(' ', options.extra_indent);
+                output.WriteString(",\n").WriteChar(' ', state.CurIndent());
 
             output.WriteChar(")}"[named_members]);
         }
 
-        void FromString(T &object, Stream::Input &input, const FromStringOptions &options) const override
+        void FromString(T &object, Stream::Input &input, const FromStringOptions &options, impl::FromStringState state) const override
         {
             static_assert(Class::members_known<T>, "Can't convert string to T: its members are not reflected.");
 
             constexpr bool named_members = Class::member_names_known<T>;
+
+            auto next_member_state = state.MemberOrElem(options);
+            auto next_base_state = state.BaseClass(options);
 
             if constexpr (named_members)
             {
@@ -188,6 +200,7 @@ namespace Refl
                     // Check if this looks like a member or like a base class.
                     if (first_char == '{' || first_char == '(')
                     {
+                        // We got a base class.
                         std::size_t base_index = Class::CombinedBaseIndex<T>(name);
                         if (base_index == std::size_t(-1))
                             Program::Error(input.GetExceptionPrefix() + "Unknown base class: `" + name + "`.");
@@ -195,6 +208,9 @@ namespace Refl
                         Meta::with_cexpr_value<combined_base_count>(base_index, [&](auto index)
                         {
                             constexpr auto i = index.value;
+                            if (!state.NeedVirtualBases() && i >= Meta::list_size<Class::bases<T>>)
+                                Program::Error(input.GetExceptionPrefix() + "Virtual base class `" + name + "` must be mentioned in the most derived class, not here.");
+
                             if (obtained_bases[i])
                                 Program::Error(input.GetExceptionPrefix() + "Base class mentioned more than once: `" + name + "`.");
 
@@ -208,7 +224,7 @@ namespace Refl
                             {
                                 // We use a pointer cast instead of a reference one to catch cases where the derived class doesn't actually inherit from this base, but merely overloads the conversion operator.
                                 auto &base_ref = *static_cast<this_base *>(&object);
-                                Interface<this_base>().FromString(base_ref, input, options);
+                                Interface<this_base>().FromString(base_ref, input, options, next_base_state);
 
                                 obtained_bases[i] = true;
                             }
@@ -237,7 +253,7 @@ namespace Refl
                             else
                             {
                                 auto &member_ref = Class::Member<i>(object);
-                                Interface(member_ref).FromString(member_ref, input, options);
+                                Interface(member_ref).FromString(member_ref, input, options, next_member_state);
 
                                 obtained_members[i] = true;
                             }
@@ -277,6 +293,9 @@ namespace Refl
                         using this_base = Meta::list_type_at<combined_bases, i>;
                         if constexpr (!Class::class_has_attrib<this_base, Optional> && !impl::Class::skip_base<this_base>)
                         {
+                            if (!state.NeedVirtualBases() && i >= Meta::list_size<Class::bases<T>>)
+                                return;
+
                             if (!obtained_bases[i])
                                 Program::Error(input.GetExceptionPrefix() + "Base class `" + Class::name<this_base> + "` is missing.");
                         }
@@ -289,7 +308,7 @@ namespace Refl
 
                 bool first = true;
 
-                auto ReadEntry = [&](auto &ref)
+                auto ReadEntry = [&](auto &ref, decltype(next_member_state) next_state)
                 {
                     if (first)
                     {
@@ -303,18 +322,21 @@ namespace Refl
                         Utils::SkipWhitespaceAndComments(input);
                     }
 
-                    Interface(ref).FromString(ref, input, options);
+                    Interface(ref).FromString(ref, input, options, next_state);
                 };
 
                 // Read virtual bases.
-                using virt_bases = Class::virtual_bases<T>;
-                Meta::cexpr_for<Meta::list_size<virt_bases>>([&](auto index)
+                if (state.NeedVirtualBases())
                 {
-                    constexpr auto i = index.value;
-                    using base_type = Meta::list_type_at<virt_bases, i>;
-                    if constexpr (!impl::Class::skip_base<base_type>)
-                        ReadEntry(*static_cast<base_type *>(&object));
-                });
+                    using virt_bases = Class::virtual_bases<T>;
+                    Meta::cexpr_for<Meta::list_size<virt_bases>>([&](auto index)
+                    {
+                        constexpr auto i = index.value;
+                        using base_type = Meta::list_type_at<virt_bases, i>;
+                        if constexpr (!impl::Class::skip_base<base_type>)
+                            ReadEntry(*static_cast<base_type *>(&object), next_base_state);
+                    });
+                }
 
                 // Read regular bases.
                 using bases = Class::bases<T>;
@@ -323,7 +345,7 @@ namespace Refl
                     constexpr auto i = index.value;
                     using base_type = Meta::list_type_at<bases, i>;
                     if constexpr (!impl::Class::skip_base<base_type>)
-                        ReadEntry(*static_cast<base_type *>(&object));
+                        ReadEntry(*static_cast<base_type *>(&object), next_base_state);
                 });
 
                 // Read members.
@@ -332,7 +354,7 @@ namespace Refl
                     constexpr auto i = index.value;
                     using type = const Class::member_type<T, i>;
                     if constexpr (!impl::Class::skip_member<type>)
-                        ReadEntry(Class::Member<i>(object));
+                        ReadEntry(Class::Member<i>(object), next_member_state);
                 });
 
                 Utils::SkipWhitespaceAndComments(input);
@@ -342,22 +364,28 @@ namespace Refl
             }
         }
 
-        void ToBinary(const T &object, Stream::Output &output) const override
+        void ToBinary(const T &object, Stream::Output &output, const ToBinaryOptions &options, impl::ToBinaryState state) const override
         {
-            auto WriteEntry = [&](auto &ref)
+            auto next_member_state = state.MemberOrElem(options);
+            auto next_base_state = state.BaseClass(options);
+
+            auto WriteEntry = [&](auto &ref, decltype(next_member_state) next_state)
             {
-                Interface(ref).ToBinary(ref, output);
+                Interface(ref).ToBinary(ref, output, options, next_state);
             };
 
             // Write virtual bases.
-            using virt_bases = Class::virtual_bases<T>;
-            Meta::cexpr_for<Meta::list_size<virt_bases>>([&](auto index)
+            if (state.NeedVirtualBases())
             {
-                constexpr auto i = index.value;
-                using base_type = Meta::list_type_at<virt_bases, i>;
-                if constexpr (!impl::Class::skip_base<base_type>)
-                    WriteEntry(*static_cast<const base_type *>(&object));
-            });
+                using virt_bases = Class::virtual_bases<T>;
+                Meta::cexpr_for<Meta::list_size<virt_bases>>([&](auto index)
+                {
+                    constexpr auto i = index.value;
+                    using base_type = Meta::list_type_at<virt_bases, i>;
+                    if constexpr (!impl::Class::skip_base<base_type>)
+                        WriteEntry(*static_cast<const base_type *>(&object), next_base_state);
+                });
+            }
 
             // Write regular bases.
             using bases = Class::bases<T>;
@@ -366,7 +394,7 @@ namespace Refl
                 constexpr auto i = index.value;
                 using base_type = Meta::list_type_at<bases, i>;
                 if constexpr (!impl::Class::skip_base<base_type>)
-                    WriteEntry(*static_cast<const base_type *>(&object));
+                    WriteEntry(*static_cast<const base_type *>(&object), next_base_state);
             });
 
             // Write members.
@@ -375,26 +403,32 @@ namespace Refl
                 constexpr auto i = index.value;
                 using type = const Class::member_type<T, i>;
                 if constexpr (!impl::Class::skip_member<type>)
-                    WriteEntry(Class::Member<i>(object));
+                    WriteEntry(Class::Member<i>(object), next_member_state);
             });
         }
 
-        void FromBinary(T &object, Stream::Input &input, const FromBinaryOptions &options) const override
+        void FromBinary(T &object, Stream::Input &input, const FromBinaryOptions &options, impl::FromBinaryState state) const override
         {
-            auto ReadEntry = [&](auto &ref)
+            auto next_member_state = state.MemberOrElem(options);
+            auto next_base_state = state.BaseClass(options);
+
+            auto ReadEntry = [&](auto &ref, decltype(next_member_state) next_state)
             {
-                Interface(ref).FromBinary(ref, input, options);
+                Interface(ref).FromBinary(ref, input, options, next_state);
             };
 
             // Write virtual bases.
-            using virt_bases = Class::virtual_bases<T>;
-            Meta::cexpr_for<Meta::list_size<virt_bases>>([&](auto index)
+            if (state.NeedVirtualBases())
             {
-                constexpr auto i = index.value;
-                using base_type = Meta::list_type_at<virt_bases, i>;
-                if constexpr (!impl::Class::skip_base<base_type>)
-                    ReadEntry(*static_cast<base_type *>(&object));
-            });
+                using virt_bases = Class::virtual_bases<T>;
+                Meta::cexpr_for<Meta::list_size<virt_bases>>([&](auto index)
+                {
+                    constexpr auto i = index.value;
+                    using base_type = Meta::list_type_at<virt_bases, i>;
+                    if constexpr (!impl::Class::skip_base<base_type>)
+                        ReadEntry(*static_cast<base_type *>(&object), next_base_state);
+                });
+            }
 
             // Write regular bases.
             using bases = Class::bases<T>;
@@ -403,7 +437,7 @@ namespace Refl
                 constexpr auto i = index.value;
                 using base_type = Meta::list_type_at<bases, i>;
                 if constexpr (!impl::Class::skip_base<base_type>)
-                    ReadEntry(*static_cast<base_type *>(&object));
+                    ReadEntry(*static_cast<base_type *>(&object), next_base_state);
             });
 
             // Write members.
@@ -412,7 +446,7 @@ namespace Refl
                 constexpr auto i = index.value;
                 using type = const Class::member_type<T, i>;
                 if constexpr (!impl::Class::skip_member<type>)
-                    ReadEntry(Class::Member<i>(object));
+                    ReadEntry(Class::Member<i>(object), next_member_state);
             });
         }
     };

@@ -15,7 +15,7 @@ namespace Refl
     {
         using elem_t = typename T::value_type;
       public:
-        void ToString(const T &object, Stream::Output &output, const ToStringOptions &options) const override
+        void ToString(const T &object, Stream::Output &output, const ToStringOptions &options, impl::ToStringState state) const override
         {
             if (!object)
             {
@@ -24,11 +24,11 @@ namespace Refl
             else
             {
                 output.WriteChar(':');
-                Interface<elem_t>().ToString(*object, output, options);
+                Interface<elem_t>().ToString(*object, output, options, state.PartOfRepresentation(options));
             }
         }
 
-        void FromString(T &object, Stream::Input &input, const FromStringOptions &options) const override
+        void FromString(T &object, Stream::Input &input, const FromStringOptions &options, impl::FromStringState state) const override
         {
             if (input.Discard<Stream::if_present>('?'))
             {
@@ -48,21 +48,25 @@ namespace Refl
                 Program::Error(input.GetExceptionPrefix() + e.what());
             }
 
-            Interface<elem_t>().FromString(*object, input, options);
+            Interface<elem_t>().FromString(*object, input, options, state.PartOfRepresentation(options));
         }
 
-        void ToBinary(const T &object, Stream::Output &output) const override
+        void ToBinary(const T &object, Stream::Output &output, const ToBinaryOptions &options, impl::ToBinaryState state) const override
         {
+            auto next_state = state.PartOfRepresentation(options);
+
             bool exists = object.has_value();
-            Interface(exists).ToBinary(exists, output);
+            Interface(exists).ToBinary(exists, output, options, next_state);
             if (exists)
-                Interface<elem_t>().ToBinary(*object, output);
+                Interface<elem_t>().ToBinary(*object, output, options, next_state);
         }
 
-        void FromBinary(T &object, Stream::Input &input, const FromBinaryOptions &options) const override
+        void FromBinary(T &object, Stream::Input &input, const FromBinaryOptions &options, impl::FromBinaryState state) const override
         {
+            auto next_state = state.PartOfRepresentation(options);
+
             bool exists = 0;
-            Interface(exists).FromBinary(exists, input, options);
+            Interface(exists).FromBinary(exists, input, options, next_state);
             if (!exists)
             {
                 object = {};
@@ -78,7 +82,7 @@ namespace Refl
                 Program::Error(input.GetExceptionPrefix() + e.what());
             }
 
-            Interface<elem_t>().FromBinary(*object, input, options);
+            Interface<elem_t>().FromBinary(*object, input, options, next_state);
         }
     };
 

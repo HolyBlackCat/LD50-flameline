@@ -43,7 +43,7 @@ namespace Refl
         }
 
       public:
-        void ToString(const T &object, Stream::Output &output, const ToStringOptions &options) const override
+        void ToString(const T &object, Stream::Output &output, const ToStringOptions &options, impl::ToStringState state) const override
         {
             if (object.valueless_by_exception())
                 Program::Error(output.GetExceptionPrefix() + "Unable to serialize variant: Valueless by exception.");
@@ -56,11 +56,11 @@ namespace Refl
                 output.WriteString(Class::name<this_type>);
                 if (options.pretty)
                     output.WriteChar(' ');
-                Interface<this_type>().ToString(std::get<i>(object), output, options);
+                Interface<this_type>().ToString(std::get<i>(object), output, options, state.PartOfRepresentation(options));
             });
         }
 
-        void FromString(T &object, Stream::Input &input, const FromStringOptions &options) const override
+        void FromString(T &object, Stream::Input &input, const FromStringOptions &options, impl::FromStringState state) const override
         {
             std::string name = input.Extract(Stream::Char::SeqIdentifier{});
             std::size_t index = Utils::GetStringIndex<ElemNames>(name.c_str());
@@ -84,11 +84,11 @@ namespace Refl
                     Program::Error(input.GetExceptionPrefix() + e.what());
                 }
 
-                Interface<this_type>().FromString(*ptr, input, options);
+                Interface<this_type>().FromString(*ptr, input, options, state.PartOfRepresentation(options));
             });
         }
 
-        void ToBinary(const T &object, Stream::Output &output) const override
+        void ToBinary(const T &object, Stream::Output &output, const ToBinaryOptions &options, impl::ToBinaryState state) const override
         {
             if (object.valueless_by_exception())
                 Program::Error(output.GetExceptionPrefix() + "Unable to serialize variant: Valueless by exception.");
@@ -100,11 +100,11 @@ namespace Refl
             {
                 constexpr auto i = index.value;
                 using this_type = std::variant_alternative_t<i, T>;
-                Interface<this_type>().ToBinary(std::get<i>(object), output);
+                Interface<this_type>().ToBinary(std::get<i>(object), output, options, state.PartOfRepresentation(options));
             });
         }
 
-        void FromBinary(T &object, Stream::Input &input, const FromBinaryOptions &options) const override
+        void FromBinary(T &object, Stream::Input &input, const FromBinaryOptions &options, impl::FromBinaryState state) const override
         {
             auto index = input.ReadWithByteOrder<impl::variant_index_binary_t>(impl::variant_index_byte_order);
             if (Robust::greater_eq(index, std::variant_size_v<T>))
@@ -125,7 +125,7 @@ namespace Refl
                     Program::Error(input.GetExceptionPrefix() + e.what());
                 }
 
-                Interface<this_type>().FromBinary(*ptr, input, options);
+                Interface<this_type>().FromBinary(*ptr, input, options, state.PartOfRepresentation(options));
             });
         }
     };

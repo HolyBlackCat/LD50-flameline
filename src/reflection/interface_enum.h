@@ -120,9 +120,10 @@ namespace Refl
         using underlying = std::underlying_type_t<T>;
 
       public:
-        void ToString(const T &object, Stream::Output &output, const ToStringOptions &options) const override
+        void ToString(const T &object, Stream::Output &output, const ToStringOptions &options, impl::ToStringState state) const override
         {
-            (void)options;
+            (void)state;
+
             const auto &helper = impl::Enum::GetHelper<T>();
 
             const char *name = helper.ValueToName(object);
@@ -130,15 +131,17 @@ namespace Refl
             {
                 if (!helper.IsRelaxed())
                     Program::Error(output.GetExceptionPrefix(), "Unable to serialize enum: Invalid value: ", underlying(object), ".");
-                Interface<underlying>().ToString(underlying(object), output, options);
+                Interface<underlying>().ToString(underlying(object), output, options, state.PartOfRepresentation(options));
                 return;
             }
+
             output.WriteString(name);
         }
 
-        void FromString(T &object, Stream::Input &input, const FromStringOptions &options) const override
+        void FromString(T &object, Stream::Input &input, const FromStringOptions &options, impl::FromStringState state) const override
         {
-            (void)options;
+            (void)state;
+
             const auto &helper = impl::Enum::GetHelper<T>();
 
             if (helper.IsRelaxed())
@@ -147,7 +150,7 @@ namespace Refl
                 if (Stream::Char::IsDigit{}(ch) || ch == '+' || ch == '-')
                 {
                     underlying value = 0;
-                    Interface<underlying>().FromString(value, input, options);
+                    Interface<underlying>().FromString(value, input, options, state.PartOfRepresentation(options));
                     object = T(value);
                     return;
                 }
@@ -161,21 +164,25 @@ namespace Refl
             object = result;
         }
 
-        void ToBinary(const T &object, Stream::Output &output) const override
+        void ToBinary(const T &object, Stream::Output &output, const ToBinaryOptions &options, impl::ToBinaryState state) const override
         {
+            (void)state;
+
             const auto &helper = impl::Enum::GetHelper<T>();
             if (!helper.IsRelaxed() && helper.ValueToName(object) == nullptr)
                 Program::Error(output.GetExceptionPrefix(), "Unable to serialize enum: Invalid value: ", underlying(object), ".");
 
-            Interface<underlying>().ToBinary(underlying(object), output);
+            Interface<underlying>().ToBinary(underlying(object), output, options, state.PartOfRepresentation(options));
         }
 
-        void FromBinary(T &object, Stream::Input &input, const FromBinaryOptions &options) const override
+        void FromBinary(T &object, Stream::Input &input, const FromBinaryOptions &options, impl::FromBinaryState state) const override
         {
+            (void)state;
+
             const auto &helper = impl::Enum::GetHelper<T>();
 
             underlying result = 0;
-            Interface<underlying>().FromBinary(result, input, options);
+            Interface<underlying>().FromBinary(result, input, options, state.PartOfRepresentation(options));
 
             if (!helper.IsRelaxed() && helper.ValueToName(T(result)) == nullptr)
                 Program::Error(input.GetExceptionPrefix(), "Invalid enum value: ", result, ".");
@@ -254,6 +261,7 @@ namespace Refl
 #define REFL_ENUM_METADATA(name_, is_relaxed_, seq_) \
     struct MA_CAT(zrefl_EnumHelper_, name_) \
     { \
+        using type = name_; \
         inline static auto helper = ::Refl::impl::Enum::Helper<name_>({ REFL_ENUM_impl_pair_loop(seq_) }, is_relaxed_); \
     }; \
     [[maybe_unused]] inline static MA_CAT(zrefl_EnumHelper_, name_) zrefl_EnumFunc(name_) {return {};}

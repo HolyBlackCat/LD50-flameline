@@ -18,17 +18,21 @@ namespace Refl
     class Interface_Scalar : public InterfaceBasic<T>
     {
       public:
-        void ToString(const T &object, Stream::Output &output, const ToStringOptions &options) const override
+        void ToString(const T &object, Stream::Output &output, const ToStringOptions &options, impl::ToStringState state) const override
         {
             (void)options;
+            (void)state;
+
             char buf[Strings::ToStringMaxBufferLen()];
             Strings::ToString(buf, sizeof buf, object);
             output.WriteString(buf);
         }
 
-        void FromString(T &object, Stream::Input &input, const FromStringOptions &options) const override
+        void FromString(T &object, Stream::Input &input, const FromStringOptions &options, impl::FromStringState state) const override
         {
             (void)options;
+            (void)state;
+
             constexpr bool is_fp = std::is_floating_point_v<T>;
 
             auto category = Stream::Char::Is(is_fp ? "a real number" : "an integer", [](char ch)
@@ -50,14 +54,19 @@ namespace Refl
             }
         }
 
-        void ToBinary(const T &object, Stream::Output &output) const override
+        void ToBinary(const T &object, Stream::Output &output, const ToBinaryOptions &options, impl::ToBinaryState state) const override
         {
+            (void)options;
+            (void)state;
+
             output.WriteWithByteOrder<T>(impl::scalar_byte_order, object);
         }
 
-        void FromBinary(T &object, Stream::Input &input, const FromBinaryOptions &options) const override
+        void FromBinary(T &object, Stream::Input &input, const FromBinaryOptions &options, impl::FromBinaryState state) const override
         {
             (void)options;
+            (void)state;
+
             object = input.ReadWithByteOrder<T>(impl::scalar_byte_order);
         }
     };

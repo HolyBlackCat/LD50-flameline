@@ -17,8 +17,10 @@ namespace Refl
     class Interface_StdString : public InterfaceBasic<std::string>
     {
       public:
-        void ToString(const std::string &object, Stream::Output &output, const ToStringOptions &options) const override
+        void ToString(const std::string &object, Stream::Output &output, const ToStringOptions &options, impl::ToStringState state) const override
         {
+            (void)state;
+
             Strings::EscapeFlags flags = Strings::EscapeFlags::escape_double_quotes;
             if (options.multiline_strings)
                 flags = flags | Strings::EscapeFlags::multiline;
@@ -28,9 +30,11 @@ namespace Refl
             output.WriteByte('"');
         }
 
-        void FromString(std::string &object, Stream::Input &input, const FromStringOptions &options) const override
+        void FromString(std::string &object, Stream::Input &input, const FromStringOptions &options, impl::FromStringState state) const override
         {
             (void)options;
+            (void)state;
+
             input.Discard('"');
             std::string temp_str;
             while (true)
@@ -54,8 +58,11 @@ namespace Refl
             }
         }
 
-        void ToBinary(const std::string &object, Stream::Output &output) const override
+        void ToBinary(const std::string &object, Stream::Output &output, const ToBinaryOptions &options, impl::ToBinaryState state) const override
         {
+            (void)options;
+            (void)state;
+
             impl::container_length_binary_t len;
             if (Robust::conversion_fails(object.size(), len))
                 Program::Error(output.GetExceptionPrefix() + "The string is too long.");
@@ -64,8 +71,10 @@ namespace Refl
             output.WriteString(object);
         }
 
-        void FromBinary(std::string &object, Stream::Input &input, const FromBinaryOptions &options) const override
+        void FromBinary(std::string &object, Stream::Input &input, const FromBinaryOptions &options, impl::FromBinaryState state) const override
         {
+            (void)state;
+
             std::size_t len;
             if (Robust::conversion_fails(input.ReadWithByteOrder<impl::container_length_binary_t>(impl::container_length_byte_order), len))
                 Program::Error(input.GetExceptionPrefix() + "The string is too long.");

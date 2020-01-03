@@ -72,23 +72,21 @@ namespace Refl
         virtual void ForEach(const T &object, std::function<void(const elem_t &elem)> func) const = 0;
 
 
-        void ToString(const T &object, Stream::Output &output, const ToStringOptions &options) const override
+        void ToString(const T &object, Stream::Output &output, const ToStringOptions &options, impl::ToStringState state) const override
         {
             constexpr bool force_single_line = impl::HasShortStringRepresentation<elem_t>::value;
 
             output.WriteChar('[');
 
-            auto next_options = options;
-            if (options.pretty)
-                next_options.extra_indent += options.indent;
+            auto next_state = state.MemberOrElem(options);
 
             std::size_t index = 0, size = Size(object);
             ForEach(object, [&](const elem_t &elem)
             {
                 if (options.pretty && !force_single_line)
-                    output.WriteChar('\n').WriteChar(' ', next_options.extra_indent);
+                    output.WriteChar('\n').WriteChar(' ', state.CurIndent() + options.indent);
 
-                Interface<elem_t>().ToString(elem, output, next_options);
+                Interface<elem_t>().ToString(elem, output, options, next_state);
 
                 if (index != size-1 || (options.pretty && !force_single_line))
                 {
@@ -101,16 +99,18 @@ namespace Refl
             });
 
             if (options.pretty && !force_single_line && size > 0)
-                output.WriteChar('\n').WriteChar(' ', options.extra_indent);
+                output.WriteChar('\n').WriteChar(' ', state.CurIndent());
 
             output.WriteChar(']');
         }
 
-        void FromString(T &object, Stream::Input &input, const FromStringOptions &options) const override
+        void FromString(T &object, Stream::Input &input, const FromStringOptions &options, impl::FromStringState state) const override
         {
             Clear(object);
 
             input.Discard('[');
+
+            auto next_state = state.MemberOrElem(options);
 
             while (true)
             {
@@ -119,7 +119,7 @@ namespace Refl
                     break;
 
                 mutable_elem_t elem{};
-                Interface<mutable_elem_t>().FromString(elem, input, options);
+                Interface<mutable_elem_t>().FromString(elem, input, options, next_state);
 
                 try
                 {
@@ -140,20 +140,22 @@ namespace Refl
             }
         }
 
-        void ToBinary(const T &object, Stream::Output &output) const override
+        void ToBinary(const T &object, Stream::Output &output, const ToBinaryOptions &options, impl::ToBinaryState state) const override
         {
             impl::container_length_binary_t len;
             if (Robust::conversion_fails(object.size(), len))
                 Program::Error(output.GetExceptionPrefix() + "The container is too long.");
             output.WriteWithByteOrder<impl::container_length_binary_t>(impl::container_length_byte_order, len);
 
+            auto next_state = state.MemberOrElem(options);
+
             ForEach(object, [&](const elem_t &elem)
             {
-                Interface<elem_t>().ToBinary(elem, output);
+                Interface<elem_t>().ToBinary(elem, output, options, next_state);
             });
         }
 
-        void FromBinary(T &object, Stream::Input &input, const FromBinaryOptions &options) const override
+        void FromBinary(T &object, Stream::Input &input, const FromBinaryOptions &options, impl::FromBinaryState state) const override
         {
             std::size_t len;
             if (Robust::conversion_fails(input.ReadWithByteOrder<impl::container_length_binary_t>(impl::container_length_byte_order), len))
@@ -164,10 +166,12 @@ namespace Refl
             Clear(object);
             Reserve(object, len < max_reserved_elems ? len : max_reserved_elems);
 
+            auto next_state = state.MemberOrElem(options);
+
             while (len-- > 0)
             {
                 mutable_elem_t elem{};
-                Interface<mutable_elem_t>().FromBinary(elem, input, options);
+                Interface<mutable_elem_t>().FromBinary(elem, input, options, next_state);
 
                 try
                 {
