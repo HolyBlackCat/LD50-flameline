@@ -111,7 +111,7 @@ namespace Refl::Utils
         constexpr NameIndexPair() {}
         constexpr NameIndexPair(const char *name) : name(name) {}
 
-        constexpr bool operator==(const NameIndexPair &other) const // For `adjacent_find`.
+        constexpr bool operator==(const NameIndexPair &other) const
         {
             return cexpr_strcmp(name, other.name) == 0;
         }

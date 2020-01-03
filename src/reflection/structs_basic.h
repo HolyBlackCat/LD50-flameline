@@ -105,6 +105,7 @@ namespace Refl
                 template <typename T> using type_member_ptrs = typename T::member_ptrs;
                 template <typename T> using type_member_attribs = typename T::member_attribs;
                 template <typename T> using value_member_names_func = Meta::value_tag<T::member_name>;
+                template <typename T> using value_explicitly_polymorphic = Meta::value_tag<T::explicitly_polymorphic>;
             }
 
             // All of those should be SFINAE-friendly.
@@ -122,6 +123,8 @@ namespace Refl
             template <typename T> using member_attribs = impl::metadata_type_t<impl::type_member_attribs, T>;
             // `::value` is a function pointer `const char (*)(std::size_t index)`, which returns member names based on index.
             template <typename T> using member_name = impl::metadata_type_t<impl::value_member_names_func, T>;
+            // `::value` is true if the class has `REFL_POLYMORPHIC` on it.
+            template <typename T> using explicitly_polymorphic = impl::metadata_type_t<impl::value_explicitly_polymorphic, T>;
         }
 
         namespace Custom
@@ -260,6 +263,17 @@ namespace Refl
                     return Macro::member_name<T>::value(index);
                 }
             };
+
+            // Provides information on whether or not a class is explicitly declared as polymorphic (normally using `REFL_POLYMORPHIC`).
+            template <typename T, typename Void = void> struct explicitly_polymorphic
+            {
+                static_assert(std::is_void_v<Void>);
+                static constexpr bool value = false;
+            };
+            template <typename T> struct explicitly_polymorphic<T, Meta::void_type<Macro::explicitly_polymorphic<T>>>
+            {
+                static constexpr bool value = Macro::explicitly_polymorphic<T>::value;
+            };
         }
 
         // This is the low-level interface.
@@ -297,6 +311,10 @@ namespace Refl
                 return nullptr;
             return Custom::member_names<std::remove_const_t<T>>::at(i);
         }
+
+        // Check for presence of `REFL_POLYMORPHIC` on a class.
+        template <typename T> inline constexpr bool explicitly_polymorphic = Custom::explicitly_polymorphic<std::remove_const_t<T>>::value;
+
 
         // This is the higher-level interface.
 
@@ -401,6 +419,13 @@ namespace Refl
         template <typename T> [[nodiscard]] std::size_t BaseIndex        (const std::string &name) {return BaseIndex        <T>(name.c_str());}
         template <typename T> [[nodiscard]] std::size_t VirtualBaseIndex (const std::string &name) {return VirtualBaseIndex <T>(name.c_str());}
         template <typename T> [[nodiscard]] std::size_t CombinedBaseIndex(const std::string &name) {return CombinedBaseIndex<T>(name.c_str());}
+    }
+
+    namespace Polymorphic::impl
+    {
+        // Attachement point for polymorphic stuff.
+        // Does nothing unless `reflection/poly_storage_support.h` is included.
+        template <typename T, decltype(nullptr) = nullptr> struct RegisterType {};
     }
 }
 
@@ -564,6 +589,10 @@ Basic metadata, at the same scope as the class.
         // A list of virtual bases.
         using virt_bases = ::Meta::type_list<base3, base4, ...>;
 
+        // Should be present only if true.
+        // Indicates that the class was explicitly made polymorphic using `REFL_POLYMORPHIC`.
+        static constexpr bool explicitly_polymorphic = true;
+
         // If both `REFL_METADATA_ONLY` and `REFL_TERSE` are used,
         // members metadata will also be here.
         // It's will look exactly like the contents of `struct Helper` described below.
@@ -706,10 +735,12 @@ That's all.
 // `*bases_` are lists of base classes: `(base1,base2,...)` or `()` if empty, `*_if_not_empty_` are equal to `x` or empty,
 // `body_or_empty_` is `(unnamed_if_not_empty_,seq_)` or empty.
 #define REFL_STRUCT_impl_low(name_, tparams_seq_, bases_, fake_bases_, untracked_bases_, is_poly_if_not_empty_, is_final_if_not_empty_, attribs_, body_or_empty_, metadata_only_if_not_empty_) \
-    /* Unless we're generating metadata, declar the structure. */\
+    /* Unless we're generating metadata only, declare the structure. */\
     MA_IF_NOT_EMPTY_ELSE(MA_NULL, REFL_STRUCT_impl_low_decl, metadata_only_if_not_empty_) \
         (name_, tparams_seq_) \
     /* Define the primary metadata structure. */\
+    /* If this is a template, and we're in the metadata-only mode, this has to be a template as well. */\
+    MA_IF_NOT_EMPTY(REFL_STRUCT_impl_tparams_decl(tparams_seq_), metadata_only_if_not_empty_) \
     struct MA_CAT(zrefl_StructHelper_, name_) \
     { \
         /* A name. */\
@@ -722,21 +753,29 @@ That's all.
         using bases = ::Meta::type_list<REFL_STRUCT_impl_strip_leading_comma(REFL_STRUCT_impl_nonvirt_bases(MA_TR_C(MA_IDENTITY bases_) MA_TR_C(MA_IDENTITY fake_bases_)))>; \
         /* A list of virtual bases. */\
         using virt_bases = ::Meta::type_list<REFL_STRUCT_impl_strip_leading_comma(REFL_STRUCT_impl_virt_bases_with_prefix(,MA_TR_C(MA_IDENTITY bases_) MA_TR_C(MA_IDENTITY fake_bases_)))>; \
+        /* Indicates that the class was explicitly made polymorphic. */\
+        MA_IF_NOT_EMPTY(static constexpr bool explicitly_polymorphic = true;, is_poly_if_not_empty_) \
         /* If both `REFL_METADATA_ONLY` and `REFL_TERSE` are used, generate metadata */\
         /* for member variables here instead of its normal location. */\
         MA_IF_NOT_EMPTY_ELSE(MA_NULL, REFL_STRUCT_impl_low_extra_metadata, MA_INVERT_EMPTINESS(body_or_empty_) MA_INVERT_EMPTINESS(metadata_only_if_not_empty_)) \
-            (name_, MA_IDENTITY body_or_empty_) \
+            (name_ REFL_STRUCT_impl_tparams(tparams_seq_), MA_IDENTITY body_or_empty_) \
     }; \
     /* Define a helper function that returns the metadata structure. */\
     REFL_STRUCT_impl_tparams_decl(tparams_seq_) \
-    [[maybe_unused]] inline static MA_CAT(zrefl_StructHelper_, name_) zrefl_StructFunc(::Meta::tag<name_ REFL_STRUCT_impl_tparams(tparams_seq_)>) {return {};} \
+    [[maybe_unused]] inline static MA_CAT(zrefl_StructHelper_, name_) /* Return type. */\
+    MA_IF_NOT_EMPTY(REFL_STRUCT_impl_tparams(tparams_seq_), metadata_only_if_not_empty_) /* Template parameters of the return type. Those are only needed if it's a template and we're in metadata-only mode. */\
+    zrefl_StructFunc(::Meta::tag<name_ REFL_STRUCT_impl_tparams(tparams_seq_)>) {return {};} \
     /* Generate the beginning of the definition of the structure. */\
     /* It includes the struct name and a list of bases. */\
     MA_IF_NOT_EMPTY_ELSE(MA_NULL, REFL_STRUCT_impl_low_header, metadata_only_if_not_empty_) \
         (name_, tparams_seq_, bases_, untracked_bases_, is_poly_if_not_empty_, is_final_if_not_empty_) \
     /* If `REFL_TERSE` is used (and `REFL_METADATA_ONLY` is not), generate a simple body for the structure. */\
     MA_IF_NOT_EMPTY_ELSE(MA_NULL, REFL_STRUCT_impl_low_body, MA_INVERT_EMPTINESS(body_or_empty_) metadata_only_if_not_empty_) \
-        (MA_IDENTITY body_or_empty_)
+        (MA_IDENTITY body_or_empty_) \
+    /* If both `REFL_METADATA_ONLY` and `REFL_TERSE` are used, and this is not a template, */\
+    /* generate struct registration helper here, instead of it's normal location. */\
+    /* See `zrefl_RegistrationHelper` for the explanation on why we don't register templates. */\
+    MA_IF_NOT_EMPTY_ELSE(MA_NULL, REFL_STRUCT_impl_low_registration_helper, MA_INVERT_EMPTINESS(body_or_empty_) MA_INVERT_EMPTINESS(metadata_only_if_not_empty_) tparams_seq_)(name_) \
 
 // Internal. Helper for `REFL_STRUCT_impl_low`. Declares a structure, possibly with template parameters.
 #define REFL_STRUCT_impl_low_decl(name_, tparams_seq_) \
@@ -781,12 +820,16 @@ That's all.
 // Internal. Helper for `REFL_STRUCT_impl_low`. Used for generating field metadata if both `REFL_METADATA_ONLY` and `REFL_TERSE` are used.
 #define REFL_STRUCT_impl_low_extra_metadata(...) REFL_STRUCT_impl_low_extra_metadata_low(__VA_ARGS__)
 #define REFL_STRUCT_impl_low_extra_metadata_low(name, unnamed_if_not_empty, seq) \
-    using t = name; \
+    using t [[maybe_unused]] = name; \
     REFL_MEMBERS_impl_metadata_generic(seq) \
     MA_IF_NOT_EMPTY_ELSE(MA_NULL, REFL_STRUCT_impl_low_extra_metadata_low_names, unnamed_if_not_empty)(seq)
 
 #define REFL_STRUCT_impl_low_extra_metadata_low_names(seq) REFL_MEMBERS_impl_metadata_memname(seq)
 
+
+// Internal. Helper for `REFL_STRUCT_impl_low`. Generates a class registration helper. It's generated here only if both `REFL_METADATA_ONLY` and `REFL_TERSE` are used.
+// `name_` is the struct name. Note that at this point it can't be a template.
+#define REFL_STRUCT_impl_low_registration_helper(name_) REFL_MEMBERS_impl_metadata_registration_helper(name_, inline static)
 
 // Internal. Helper for `REFL_STRUCT_impl_low`. Generates a full list of template parameters (`template<...>`) that includes the default values.
 // `seq` is `(type,name[,init])...`. If `seq` is empty, expands to nothing.
@@ -896,7 +939,7 @@ That's all.
 #define REFL_MEMBERS_impl_meta_begin \
     auto zrefl_MembersHelper() const \
     { \
-        using t [[maybe_unused]] = std::remove_cv_t<std::remove_pointer_t<decltype(this)>>; \
+        using t [[maybe_unused]] = ::std::remove_cv_t<::std::remove_pointer_t<decltype(this)>>; \
         struct Helper \
         {
 
@@ -905,7 +948,28 @@ That's all.
         }; \
         return Helper{}; \
     } \
-    template <typename, typename> friend struct ::Refl::Class::Macro::impl::member_metadata;
+    template <typename, typename> friend struct ::Refl::Class::Macro::impl::member_metadata; \
+    /* If the class is polymorphic, register it as one.                      */\
+    /* This thing is all the way down there, in a separate function, because */\
+    /* it needs the class to be defined, as well as its metadata.            */\
+    /* Note that since it's placed in a non-static member function,          */\
+    /* the class won't be registered if it's a template, since the function  */\
+    /* will never be called. This is not a problem though, since we wouldn't */\
+    /* be able to diffirentiate between different instantiations of the      */\
+    /* template anyway, since we don't include template arguments in class   */\
+    /* names. If one day you decide that this has to change, you can         */\
+    /* instantiate this helper variable in an immediately-invoked lambda     */\
+    /* initializer of a non-static data member (to allow `decltype(*this)`), */\
+    /* marked with `[[no_unique_address]]`. This will cause it to be         */\
+    /* instantiated only if any constructor is instantiated, but it sounds   */\
+    /* like an acceptable tradeoff. The only alternative I'm aware of is     */\
+    /* putting it in a virtual function, since they are instantiated         */\
+    /* immediately even if not used. But that would make our classes         */\
+    /* unconditionally polymorphic, so it's not acceptable.                  */\
+    void zrefl_RegistrationHelper() \
+    { \
+        REFL_MEMBERS_impl_metadata_registration_helper(::std::remove_reference_t<decltype(*this)>,) \
+    }
 
 // Internal. Helper for `REFL_MEMBERS`. Declares variables themselves, without metadata.
 #define REFL_MEMBERS_impl_decl(...) REFL_MEMBERS_impl_decl_low(REFL_MEMBERS_impl_skip_first __VA_ARGS__)
@@ -1035,6 +1099,14 @@ That's all.
 #define REFL_MEMBERS_impl_metadata_memname_body_low(params, ...) MA_VA_FOR_EACH(, REFL_MEMBERS_impl_metadata_memname_string, MA_TR_C(__VA_ARGS__) )
 
 #define REFL_MEMBERS_impl_metadata_memname_string(data, index, name) #name,
+
+
+// Internal. Causes a template instantiation that registers the struct as polymorphic. (Not included in the common metadata).
+// `this_type_` is either the struct name itself, or something involving `decltype(*this)`.
+// `prefix_` is added to the decl-specifier-seq of the variable.
+// Note that this variable has to instantiate after all other metadata has been defined. Otherwise it's not going to work.
+#define REFL_MEMBERS_impl_metadata_registration_helper(this_type_, prefix_) \
+    [[maybe_unused]] prefix_ ::Refl::Polymorphic::impl::RegisterType<this_type_> zrefl_RegistrationHelperVar;
 
 
 #if 0 // Tests
