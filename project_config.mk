@@ -1,6 +1,5 @@
 # Sources
-SOURCE_DIRS := src/interface lib
-SOURCES := src/program/errors.cpp src/game/main.cpp
+SOURCE_DIRS := src lib
 
 # Object directory
 OBJECT_DIR := obj

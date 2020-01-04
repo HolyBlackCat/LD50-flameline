@@ -7,7 +7,7 @@
 #include "interface/gui.h"
 #include "interface/messagebox.h"
 #include "program/errors.h"
-#include "reflection/complete.h"
+#include "reflection/full.h"
 #include "utils/mat.h"
 #include "utils/readonly_data.h"
 
@@ -21,10 +21,6 @@ template <typename T> class Config
 
     template <typename X> void DisplayGuiLow(X &object, std::string name)
     {
-        static_assert(Refl::is_reflected<X>, "This type is not reflected.");
-        using refl_t = Refl::Interface<X>;
-        auto refl = refl_t(object);
-
         if constexpr (std::is_same_v<X, int>)
         {
             if (ImGui::InputInt(name.c_str(), &object))
@@ -80,15 +76,16 @@ template <typename T> class Config
             if (ImGui::Checkbox(name.c_str(), &object))
                 was_modified_in_gui = 1;
         }
-        else if constexpr (refl_t::is_structure)
+        else if constexpr (Refl::Class::members_known<X>)
         {
             if (ImGui::CollapsingHeader(name.c_str()))
             {
                 ImGui::Indent();
-                refl.for_each_field([&](auto index)
+                Meta::cexpr_for<Refl::Class::member_count<X>>([&](auto index)
                 {
-                    constexpr int i = index.value;
-                    DisplayGuiLow(refl.template field_value<i>(), refl.field_name(i));
+                    constexpr auto i = index.value;
+                    static_assert(Refl::Class::member_names_known<X>);
+                    DisplayGuiLow(Refl::Class::Member<i>(object), Refl::Class::MemberName<X>(i));
                 });
                 ImGui::Unindent();
             }
@@ -122,8 +119,7 @@ template <typename T> class Config
             try
             {
                 // Try parsing normally.
-                auto refl = Refl::Interface(object);
-                refl.from_string(file.string());
+                Refl::FromString(object, file);
 
                 // Success, we're done.
                 return;
@@ -136,8 +132,9 @@ template <typename T> class Config
                 bool partial_parsing_ok = 0;
                 try
                 {
-                    auto refl = Refl::Interface(object);
-                    refl.from_string(file.string(), Refl::partial);
+                    Refl::FromStringOptions opt;
+                    opt.ignore_missing_fields = true;
+                    Refl::FromString(object, file, opt);
                     partial_parsing_ok = 1;
                 }
                 catch (...) {}
@@ -155,13 +152,7 @@ template <typename T> class Config
         // We can't open the file, unable to parse the file, or file is incomplete.
         // Creating a new file.
 
-        auto refl = Refl::Interface(object);
-        std::string obj_string = refl.to_string(4);
-        try
-        {
-            Stream::SaveFile(file_name, obj_string);
-        }
-        catch (...) {}
+        Save();
     }
 
     const T &operator*() const {return object;}
@@ -180,10 +171,9 @@ template <typename T> class Config
     }
     void Save() const
     {
-        auto refl = Refl::Interface(object);
-        std::string obj_string = refl.to_string(4);
         try
         {
+            std::string obj_string = Refl::ToString(object);
             Stream::SaveFile(file_name, obj_string);
         }
         catch (...) {}

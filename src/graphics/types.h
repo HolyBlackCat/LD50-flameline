@@ -8,27 +8,6 @@
 
 namespace Graphics
 {
-    // Vertex attributes.
-
-    template <typename T> struct NormalizedAttribute
-    {
-        using type = T;
-        T denorm_value;
-    };
-
-    namespace impl
-    {
-        template <typename T> struct attribute_type {using type = T;};
-        template <typename T> struct attribute_type<NormalizedAttribute<T>> {using type = T;};
-
-        template <typename T> struct attribute_is_normalized : std::false_type {};
-        template <typename T> struct attribute_is_normalized<NormalizedAttribute<T>> : std::true_type {};
-    }
-
-    template <typename T> using attribute_type_t = typename impl::attribute_type<T>::type;
-    template <typename T> inline constexpr bool attribute_is_normalized_v = impl::attribute_is_normalized<T>::value;
-
-
     // GLSL support.
 
     template <typename T> std::string GlslTypeName()

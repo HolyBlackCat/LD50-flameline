@@ -2,7 +2,7 @@
 
 #include <limits>
 
-#include "reflection/full_without_poly.h"
+#include "reflection/full.h"
 #include "utils/poly_storage.h"
 #include "utils/type_names.h"
 

@@ -456,4 +456,38 @@ namespace Refl
     {
         using type = Interface_Struct<T>;
     };
+
+    template <typename T>
+    struct impl::HasShortStringRepresentation<T, std::enable_if_t<Class::members_known<T>>>
+    {
+        static constexpr bool value = []{
+            // If member names are known, representation is considered long.
+            if constexpr (Refl::Class::member_names_known<T>)
+            {
+                return false;
+            }
+            else
+            {
+                // Otherwise, check if representation of all bases and members is short.
+                bool value = true;
+
+                // Check members.
+                Meta::cexpr_for<Refl::Class::member_count<T>>([&](auto index)
+                {
+                    if (!impl::HasShortStringRepresentation<Refl::Class::member_type<T, index.value>>::value)
+                        value = false;
+                });
+
+                // Check bases.
+                using combined_bases = Refl::Class::combined_bases<T>;
+                Meta::cexpr_for<Meta::list_size<combined_bases>>([&](auto index)
+                {
+                    if (!impl::HasShortStringRepresentation<Meta::list_type_at<combined_bases, index.value>>::value)
+                        value = false;
+                });
+
+                return value;
+            }
+        }();
+    };
 }

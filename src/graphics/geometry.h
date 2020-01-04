@@ -359,7 +359,7 @@ namespace Graphics::Geom
             using index_t = typename T::index_t;
 
             vertex_view = DataView<vertex_t>::ToArbitraryObject(provider.IndexCount(), &provider,
-                Meta::cexpr_flags(provider.VertexPointerIfAvailable(), provider.IndexPointerIfAvailable())
+                Meta::with_cexpr_flags(provider.VertexPointerIfAvailable(), provider.IndexPointerIfAvailable())
                 >> [](auto contiguous_vertices, auto contiguous_indices)
                 {
                     constexpr bool have_vertex_ptr = contiguous_vertices;

@@ -1,21 +1,12 @@
 #pragma once
 
-#include "reflection/full_without_poly.h"
-#include "reflection/poly_storage_support.h"
+// See comments in `reflection/full_with_poly.h` on what headers to use.
 
-// This file is one of the few public reflection headers.
-//
-// .- full.h ---------------------------------.     .- short_macros.h ----------.
-// |                                          |     |                           |
-// |  .- full_without_poly.h --------------.  |     | Alternative short macros. |
-// |  |                                    |  |     '---------------------------'
-// |  | Serialization and deserialization. |  |
-// |  |                                    |  |
-// |  |  .- structs.h ----------------.    |  |
-// |  |  |                            |    |  |
-// |  |  | Class metadata inspection. |    |  |
-// |  |  '----------------------------'    |  |
-// |  '------------------------------------'  |
-// |                                          |
-// | Polymorphic class support.               |
-// '------------------------------------------'
+#include "reflection/interface_basic.h"
+#include "reflection/interface_container.h"
+#include "reflection/interface_enum.h"
+#include "reflection/interface_scalar.h"
+#include "reflection/interface_std_optional.h"
+#include "reflection/interface_std_string.h"
+#include "reflection/interface_std_variant.h"
+#include "reflection/interface_struct.h"

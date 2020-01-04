@@ -3,23 +3,25 @@
 #include <algorithm>
 
 #include "graphics/complete.h"
-#include "reflection/complete.h"
+#include "reflection/full.h"
 
 struct Render::Data
 {
-    ReflectStruct(Attribs, (
-        (fvec2)(pos),
-        (fvec4)(color),
-        (fvec2)(texcoord),
-        (fvec3)(factors),
-    ))
+    REFL_STRUCT( Attribs
+        REFL_AT_CLASS_SCOPE REFL_TERSE
+        REFL_DECL(fvec2) pos
+        REFL_DECL(fvec4) color
+        REFL_DECL(fvec2) texcoord
+        REFL_DECL(fvec3) factors
+    )
 
-    ReflectStruct(Uniforms, (
-        (Graphics::VertUniform<fmat4>)(matrix),
-        (Graphics::VertUniform<fvec2>)(tex_size),
-        (Graphics::FragUniform<Graphics::TexUnit>)(texture),
-        (Graphics::FragUniform<fmat4>)(color_matrix),
-    ))
+    REFL_STRUCT(Uniforms
+        REFL_AT_CLASS_SCOPE REFL_TERSE
+        REFL_DECL(Graphics::Uniform<fmat4> REFL_ATTR Graphics::Vert) matrix
+        REFL_DECL(Graphics::Uniform<fvec2> REFL_ATTR Graphics::Vert) tex_size
+        REFL_DECL(Graphics::Uniform<Graphics::TexUnit> REFL_ATTR Graphics::Frag) texture
+        REFL_DECL(Graphics::Uniform<fmat4> REFL_ATTR Graphics::Frag) color_matrix
+    )
 
     static constexpr const char *vertex_source = R"(
 varying vec4 v_color;

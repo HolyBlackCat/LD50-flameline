@@ -67,12 +67,11 @@ namespace Graphics
                 image = Image(out_image_file);
 
                 // Load description.
-                std::string desc_string = Stream::ReadOnlyData(out_desc_file).string();
+                auto new_desc_data = Stream::ReadOnlyData(out_desc_file);
 
                 // Parse description.
-                Desc new_desc; // We use a temporary instead of `description` because if conversion fails, we might need `description` to be empty to regenerate the atlas into it.
-                Refl::Interface(new_desc).from_string(desc_string.c_str());
-                desc = std::move(new_desc);
+                // We don't pass `desc` directly to `FromString` because if conversion fails, we might need `description` to be empty to regenerate the atlas into it.
+                desc = Refl::FromString<Desc>(new_desc_data);
 
                 return; // The atlas is loaded successfully.
             }
@@ -151,7 +150,7 @@ namespace Graphics
         // Save description.
         try
         {
-            std::string desc_string = Refl::Interface(desc).to_string(4);
+            std::string desc_string = Refl::ToString(desc, Refl::ToStringOptions::Pretty());
             Stream::SaveFile(out_desc_file, desc_string);
         }
         catch (...) {}

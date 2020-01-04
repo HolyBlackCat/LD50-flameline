@@ -8,7 +8,7 @@
 
 #include "graphics/image.h"
 #include "program/errors.h"
-#include "reflection/complete.h"
+#include "reflection/full.h"
 #include "utils/filesystem.h"
 #include "utils/mat.h"
 #include "utils/strings.h"
@@ -17,15 +17,17 @@ namespace Graphics
 {
     class TextureAtlas
     {
-        ReflectStruct(ImageDesc,(
-            (ivec2)(pos),
-            (ivec2)(size),
-            (using _refl_structure_tuple_tag = void;), // Enable terse string representation.
-        ))
+        REFL_STRUCT( ImageDesc
+            REFL_AT_CLASS_SCOPE
+            REFL_TERSE_WITHOUT_NAMES
+            REFL_DECL(ivec2) pos, size
+        )
 
-        ReflectStruct(Desc,(
-            (std::map<std::string, ImageDesc>)(images),
-        ))
+        REFL_STRUCT( Desc
+            REFL_AT_CLASS_SCOPE
+            REFL_TERSE
+            REFL_DECL(std::map<std::string, ImageDesc>) images
+        )
 
         Image image;
         Desc desc;

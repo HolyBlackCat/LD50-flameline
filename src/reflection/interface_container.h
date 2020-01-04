@@ -86,7 +86,7 @@ namespace Refl
                 if (options.pretty && !force_single_line)
                     output.WriteChar('\n').WriteChar(' ', state.CurIndent() + options.indent);
 
-                Interface<elem_t>().ToString(elem, output, options, next_state);
+                Interface<mutable_elem_t>().ToString(elem, output, options, next_state);
 
                 if (index != size-1 || (options.pretty && !force_single_line))
                 {
@@ -151,7 +151,7 @@ namespace Refl
 
             ForEach(object, [&](const elem_t &elem)
             {
-                Interface<elem_t>().ToBinary(elem, output, options, next_state);
+                Interface<mutable_elem_t>().ToBinary(elem, output, options, next_state);
             });
         }
 

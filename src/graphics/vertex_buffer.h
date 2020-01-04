@@ -7,7 +7,7 @@
 
 #include "graphics/types.h"
 #include "program/errors.h"
-#include "reflection/complete.h"
+#include "reflection/full.h"
 #include "utils/finally.h"
 #include "utils/mat.h"
 #include "utils/meta.h"
@@ -31,6 +31,9 @@ namespace Graphics
         dynamic_draw = GL_DYNAMIC_DRAW,
         stream_draw  = GL_STREAM_DRAW,
     };
+
+    // Indicates that the attribute is normalized.
+    struct Normalized : Refl::BasicAttribute {};
 
     class VertexBuffers
     {
@@ -82,27 +85,19 @@ namespace Graphics
                 return;
             BindStorage(handle);
 
-            constexpr bool is_reflected = Refl::is_reflected<T>;
-            int field_count;
-            if constexpr (is_reflected)
-                field_count = Refl::Interface<T>::field_count();
-            else
-                field_count = 0;
+            constexpr bool is_reflected = Refl::Class::members_known<T>;
+            constexpr auto field_count = Refl::Class::member_count<T>; // 0 if not reflected.
 
             SetActiveAttribCount(field_count);
 
             if constexpr (is_reflected)
             {
-                using refl_t = Refl::Interface<const T>;
-                refl_t refl(attributes);
-
                 int attrib_index = 0;
 
-                refl_t::for_each_field([&](auto index)
+                Meta::cexpr_for<Refl::Class::member_count<T>>([&](auto index)
                 {
-                    constexpr int i = index.value;
-                    using field_type_raw = typename refl_t::template field_type<i>;
-                    using field_type = attribute_type_t<field_type_raw>; // Strip wrappers like `NormalizedAttribute<T>`.
+                    constexpr auto i = index.value;
+                    using field_type = Refl::Class::member_type<T, i>;
                     using base_type = Math::vec_base_t<field_type>;
 
                     GLint type_enum;
@@ -128,8 +123,8 @@ namespace Graphics
                     else
                         static_assert(Meta::value<false, T, decltype(index)>, "Attributes of this type are not supported.");
 
-                    uintptr_t offset = reinterpret_cast<const char *>(&refl.template field_value<i>()) - reinterpret_cast<const char *>(&attributes);
-                    glVertexAttribPointer(attrib_index++, Math::vec_size_v<field_type>, type_enum, attribute_is_normalized_v<field_type_raw>, sizeof(T), (void *)offset);
+                    uintptr_t offset = reinterpret_cast<const char *>(&Refl::Class::Member<i>(attributes)) - reinterpret_cast<const char *>(&attributes);
+                    glVertexAttribPointer(attrib_index++, Math::vec_size_v<field_type>, type_enum, Refl::Class::member_has_attrib<T, i, Normalized>, sizeof(T), (void *)offset);
                 });
             }
 
@@ -165,7 +160,7 @@ namespace Graphics
         Data data;
 
       public:
-        static constexpr bool is_reflected = Refl::is_reflected<T>;
+        static constexpr bool is_reflected = Refl::Class::members_known<T>;
 
         VertexBuffer() {}
 

@@ -7,18 +7,21 @@
 #include "graphics/vertex_buffer.h"
 #include "graphics/viewport.h"
 #include "interface/window.h"
-#include "reflection/complete.h"
+#include "reflection/full.h"
 
 #ifdef IMP_RE_HAVE_FRAMEBUFFERS
 
 struct AdaptiveViewport::Data
 {
-    ReflectStruct(ShaderAttribs,(
-        (fvec2)(pos),
-    ))
-    ReflectStruct(ShaderUniforms,(
-        (Graphics::FragUniform<Graphics::TexUnit>)(texture),
-    ))
+    REFL_STRUCT( ShaderAttribs
+        REFL_AT_CLASS_SCOPE REFL_TERSE
+        REFL_DECL(fvec2) pos
+    )
+
+    REFL_STRUCT( ShaderUniforms
+        REFL_AT_CLASS_SCOPE REFL_TERSE
+        REFL_DECL(Graphics::Uniform<Graphics::TexUnit> REFL_ATTR Graphics::Frag) texture
+    )
 
     static constexpr const char *shader_vert_src = R"(
 varying vec2 v_texcoord;

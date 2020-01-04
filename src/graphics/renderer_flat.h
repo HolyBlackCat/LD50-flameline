@@ -9,7 +9,7 @@
 #include "graphics/texture.h"
 #include "graphics/transformations.h"
 #include "program/errors.h"
-#include "reflection/complete.h"
+#include "reflection/full.h"
 #include "utils/mat.h"
 #include "utils/meta.h"
 
@@ -25,12 +25,12 @@ namespace Graphics::Renderers
             // factors.z: 0 - additive blending, 255 - regular blending
 
             // Note that fields are declared in a weird order to improve packing.
-            Reflect(Vertex)
+            REFL_MEMBERS
             (
-                (fvec2)(pos)(={}),
-                (fvec2)(texcoord)(={}),
-                (NormalizedAttribute<u8vec4>)(color)(={}),
-                (NormalizedAttribute<u8vec3>)(factors)(={}),
+                REFL_DECL(fvec2 REFL_INIT{}) pos
+                REFL_DECL(fvec2 REFL_INIT{}) texcoord
+                REFL_DECL(u8vec4 REFL_INIT{} REFL_ATTR Normalized) color
+                REFL_DECL(u8vec3 REFL_INIT{} REFL_ATTR Normalized) factors
             )
 
             constexpr auto &GetTransformableVertexPosition()
@@ -74,11 +74,12 @@ namespace Graphics::Renderers
       private:
         Geom::Queue<Vertex, Index, Geom::triangles> queue;
 
-        ReflectStruct(Uniforms, (
-            (VertUniform<fmat4>)(matrix),
-            (Graphics::VertUniform<fvec2>)(tex_size),
-            (Graphics::FragUniform<TexUnit>)(texture),
-        ))
+        REFL_STRUCT( Uniforms
+            REFL_AT_CLASS_SCOPE REFL_TERSE
+            REFL_DECL(Uniform<fmat4> REFL_ATTR Vert) matrix
+            REFL_DECL(Uniform<fvec2> REFL_ATTR Vert) tex_size
+            REFL_DECL(Uniform<TexUnit> REFL_ATTR Frag) texture
+        )
 
         Uniforms uniforms; // Note that this has to be created before `shader`.
         Shader shader;

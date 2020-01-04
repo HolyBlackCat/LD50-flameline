@@ -129,12 +129,11 @@ namespace Refl
                 template <typename T> using type_member_ptrs = typename T::member_ptrs;
                 template <typename T> using type_member_attribs = typename T::member_attribs;
                 template <typename T> using value_member_names_func = Meta::value_tag<T::member_name>;
-                template <typename T> using value_explicitly_polymorphic = Meta::value_tag<T::explicitly_polymorphic()>;
+                template <typename T> using value_explicitly_polymorphic = Meta::value_tag<T::explicitly_polymorphic>;
             }
 
             // All of those should be SFINAE-friendly.
-            // `::value` is a `const char (*)()` that returns the class name.
-            // We can't call the function here, because the pointer to a function-local static array doesn't work as a template parameter.
+            // `::value` is a `const char *` pointing to the class name.
             template <typename T> using name = impl::metadata_type_t<impl::value_name, T>;
             // Returns attributes of a class as a `Refl::impl::Class::ClassAttr`.
             template <typename T> using class_attribs = impl::metadata_type_t<impl::type_class_attribs, T>;
@@ -165,7 +164,7 @@ namespace Refl
             };
             template <typename T> struct name<T, Meta::void_type<Macro::name<T>>>
             {
-                static constexpr const char *value = Macro::name<T>::value();
+                static constexpr const char *value = Macro::name<T>::value;
             };
             template <typename T> struct name<T, Meta::void_type<decltype(std::tuple_size<T>::value)>> // Tuple interface. Note that we don't use `tuple_size_v` here because it's not SFINAE-friendly.
             {
@@ -356,9 +355,9 @@ namespace Refl
             template <typename FirstBase, typename ...Bases, typename Out> struct rec_virt_bases_norm<Meta::type_list<FirstBase, Bases...>, Out>
             {
                 using type =
-                    typename rec_virt_bases_virt<direct_virtual_bases<FirstBase>,  // ^ 3. Recursively process virtual bases of the first base.
-                    typename rec_virt_bases_norm<bases<FirstBase>,          // | 2. Recursively process bases of the first base.
-                    typename rec_virt_bases_norm<Meta::type_list<Bases...>, // | 1. Process the remaining bases.
+                    typename rec_virt_bases_virt<direct_virtual_bases<FirstBase>, // ^ 3. Recursively process virtual bases of the first base.
+                    typename rec_virt_bases_norm<bases<FirstBase>,                // | 2. Recursively process bases of the first base.
+                    typename rec_virt_bases_norm<Meta::type_list<Bases...>,       // | 1. Process the remaining bases.
                 Out>::type>::type>::type;
             };
 
@@ -366,10 +365,10 @@ namespace Refl
             template <typename FirstVirtBase, typename ...VirtBases, typename Out> struct rec_virt_bases_virt<Meta::type_list<FirstVirtBase, VirtBases...>, Out>
             {
                 using type =
-                    typename rec_virt_bases_virt<direct_virtual_bases<FirstVirtBase>,  // ^ 4. Recursively process virtual bases of the first base.
-                    typename rec_virt_bases_norm<bases<FirstVirtBase>,          // | 3. Recursively process bases of the first base.
-                    typename rec_virt_bases_virt<Meta::type_list<VirtBases...>, // | 2. Process the remaining virtual bases. // Sic! Note `_virt` here. The `rec_virt_bases_norm` uses `_norm` here instead.
-                    Meta::list_copy_uniq<Meta::type_list<FirstVirtBase>,        // | 1. Add the first virtual base.
+                    typename rec_virt_bases_virt<direct_virtual_bases<FirstVirtBase>, // ^ 4. Recursively process virtual bases of the first base.
+                    typename rec_virt_bases_norm<bases<FirstVirtBase>,                // | 3. Recursively process bases of the first base.
+                    typename rec_virt_bases_virt<Meta::type_list<VirtBases...>,       // | 2. Process the remaining virtual bases. // Sic! Note `_virt` here. The `rec_virt_bases_norm` uses `_norm` here instead.
+                    Meta::list_copy_uniq<Meta::type_list<FirstVirtBase>,              // | 1. Add the first virtual base.
                 Out>>::type>::type>::type;
             };
         }
@@ -786,30 +785,37 @@ That's all.
     /* Unless we're generating metadata only, declare the structure. */\
     MA_IF_NOT_EMPTY_ELSE(MA_NULL, REFL_STRUCT_impl_low_decl, metadata_only_if_not_empty_) \
         (name_, tparams_seq_) \
-    /* Define a helper function that returns the metadata structure. */\
-    REFL_STRUCT_impl_tparams_decl(tparams_seq_) /* Template parameters. */\
-    [[maybe_unused]] MA_IF_NOT_EMPTY_ELSE(friend, inline, class_scope_if_not_empty_) auto zrefl_StructHelper(const name_ REFL_STRUCT_impl_tparams(tparams_seq_) &) \
+    /* Define the primary metadata structure. */\
+    /* Note that we can't define this struct inside of the function below. */\
+    /* It for some reason prevents metadata from being accessible in */\
+    /* enclosing class, if this class is defined at class scope. */\
+    /* If this is a template, and we're in the metadata-only mode, this has to be a template as well. */\
+    MA_IF_NOT_EMPTY(REFL_STRUCT_impl_tparams_decl(tparams_seq_), metadata_only_if_not_empty_) \
+    struct MA_CAT(zrefl_StructHelper_, name_) \
     { \
-        /* Define the primary metadata structure. */\
-        struct Helper \
-        { \
-            /* A name. */\
-            static constexpr const char *name() {return MA_STR(name_);}; \
-            /* Attribute list. */\
-            MA_IF_NOT_EMPTY(using attribs = ::Refl::impl::Class::ClassAttr<MA_IDENTITY attribs_>;, MA_IDENTITY attribs_) \
-            /* A list of bases. */\
-            using bases = ::Meta::type_list<REFL_STRUCT_impl_strip_leading_comma(REFL_STRUCT_impl_nonvirt_bases(MA_TR_C(MA_IDENTITY bases_) MA_TR_C(MA_IDENTITY fake_bases_)))>; \
-            /* A list of virtual bases. */\
-            using virt_bases = ::Meta::type_list<REFL_STRUCT_impl_strip_leading_comma(REFL_STRUCT_impl_virt_bases_with_prefix(,MA_TR_C(MA_IDENTITY bases_) MA_TR_C(MA_IDENTITY fake_bases_)))>; \
-            /* Indicates that the class was explicitly made polymorphic. */\
-            MA_IF_NOT_EMPTY(static constexpr bool explicitly_polymorphic() {return true;}, is_poly_if_not_empty_) \
-            /* If both `REFL_METADATA_ONLY` and `REFL_TERSE` are used, generate metadata */\
-            /* for member variables here instead of its normal location. */\
-            MA_IF_NOT_EMPTY_ELSE(MA_NULL, REFL_STRUCT_impl_low_extra_metadata, MA_INVERT_EMPTINESS(body_or_empty_) MA_INVERT_EMPTINESS(metadata_only_if_not_empty_)) \
-                (name_ REFL_STRUCT_impl_tparams(tparams_seq_), MA_IDENTITY body_or_empty_) \
-        }; \
-        return Helper{}; \
-    } \
+        /* A name. */\
+        /* (Note that an array is used instead of a pointer. A pointer couldn't be put into */\
+        /* a `Meta::value_tag`, so we'd need to change the implementation of `Refl::Class::Macro::name`.) */\
+        static constexpr char name[] = MA_STR(name_); \
+        /* Attribute list. */\
+        using attribs = ::Refl::impl::Class::ClassAttr<MA_IDENTITY attribs_>; \
+        /* A list of bases. */\
+        using bases = ::Meta::type_list<REFL_STRUCT_impl_strip_leading_comma(REFL_STRUCT_impl_nonvirt_bases(MA_TR_C(MA_IDENTITY bases_) MA_TR_C(MA_IDENTITY fake_bases_)))>; \
+        /* A list of virtual bases. */\
+        using virt_bases = ::Meta::type_list<REFL_STRUCT_impl_strip_leading_comma(REFL_STRUCT_impl_virt_bases_with_prefix(,MA_TR_C(MA_IDENTITY bases_) MA_TR_C(MA_IDENTITY fake_bases_)))>; \
+        /* Indicates that the class was explicitly made polymorphic. */\
+        MA_IF_NOT_EMPTY(static constexpr bool explicitly_polymorphic = true;, is_poly_if_not_empty_) \
+        /* If both `REFL_METADATA_ONLY` and `REFL_TERSE` are used, generate metadata */\
+        /* for member variables here instead of its normal location. */\
+        MA_IF_NOT_EMPTY_ELSE(MA_NULL, REFL_STRUCT_impl_low_extra_metadata, MA_INVERT_EMPTINESS(body_or_empty_) MA_INVERT_EMPTINESS(metadata_only_if_not_empty_)) \
+            (name_ REFL_STRUCT_impl_tparams(tparams_seq_), MA_IDENTITY body_or_empty_) \
+    }; \
+    /* Define a helper function that returns the metadata structure. */\
+    REFL_STRUCT_impl_tparams_decl(tparams_seq_) /* Template parameters. */ \
+    [[maybe_unused]] MA_IF_NOT_EMPTY_ELSE(friend, inline, class_scope_if_not_empty_) \
+    MA_CAT(zrefl_StructHelper_, name_) /* Return type. */\
+    MA_IF_NOT_EMPTY(REFL_STRUCT_impl_tparams(tparams_seq_), metadata_only_if_not_empty_) /* Template parameters of the return type. Those are only needed if it's a template and we're in metadata-only mode. */\
+    zrefl_StructHelper(const name_ REFL_STRUCT_impl_tparams(tparams_seq_) &) {return {};} \
     /* Generate the beginning of the definition of the structure. */\
     /* It includes the struct name and a list of bases. */\
     MA_IF_NOT_EMPTY_ELSE(MA_NULL, REFL_STRUCT_impl_low_header, metadata_only_if_not_empty_) \
@@ -982,17 +988,17 @@ That's all.
 
 // Internal. Helper for `REFL_MEMBERS`. Expands to the opening of the embedded metadata section.
 #define REFL_MEMBERS_impl_meta_begin \
-    auto zrefl_MembersHelper() const \
+    /* Note that we can't define this struct inside of the function below. */\
+    /* It for some reason prevents metadata from being accessible in */\
+    /* enclosing class, if this class is defined at class scope. */\
+    template <typename zrefl_ThisType> struct zrefl_MembersHelperType \
     { \
-        using t [[maybe_unused]] = ::std::remove_cv_t<::std::remove_pointer_t<decltype(this)>>; \
-        struct Helper \
-        {
+        using t [[maybe_unused]] = zrefl_ThisType;
 
 // Internal. Helper for `REFL_MEMBERS`. Expands to the ending of the embedded metadata section.
 #define REFL_MEMBERS_impl_meta_end \
-        }; \
-        return Helper{}; \
-    } \
+    }; \
+    auto zrefl_MembersHelper() const -> zrefl_MembersHelperType<::std::remove_cvref_t<decltype(*this)>> {return {};} \
     friend struct ::Refl::Class::Macro::impl::member_metadata_helpers; \
     /* If the class is polymorphic, register it as one.                      */\
     /* This thing is all the way down there, in a separate function, because */\

@@ -8,7 +8,7 @@
 #include <type_traits>
 #include <utility>
 
-#include "utils/robust_compare.h"
+#include "utils/robust_math.h"
 
 template <typename DefaultInt = int, typename DefaultReal = float>
 class Random
@@ -70,7 +70,10 @@ class Random
         {
             if constexpr (is_integral)
             {
-                return RobustCompare::int_clamp(std::llround(std::ceil(value)), min_limit, max_limit);
+                auto val = std::llround(std::ceil(value));
+                if (Robust::less(val, min_limit)) return min_limit;
+                if (Robust::greater(val, max_limit)) return max_limit;
+                return val;
             }
             else
             {
@@ -82,7 +85,10 @@ class Random
         {
             if constexpr (is_integral)
             {
-                return RobustCompare::int_clamp(std::llround(std::floor(value)), min_limit, max_limit);
+                auto val = std::llround(std::floor(value));
+                if (Robust::less(val, min_limit)) return min_limit;
+                if (Robust::greater(val, max_limit)) return max_limit;
+                return val;
             }
             else
             {

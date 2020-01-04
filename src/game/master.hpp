@@ -13,7 +13,7 @@
 #include "interface/window.h"
 #include "program/errors.h"
 #include "program/exit.h"
-#include "reflection/complete.h"
+#include "reflection/full_with_poly.h"
 #include "utils/adjust.h"
 #include "utils/check.h"
 #include "utils/clock.h"

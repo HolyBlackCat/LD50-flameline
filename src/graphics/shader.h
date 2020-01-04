@@ -9,7 +9,7 @@
 #include "graphics/texture.h"
 #include "graphics/types.h"
 #include "program/errors.h"
-#include "reflection/complete.h"
+#include "reflection/full.h"
 #include "utils/finally.h"
 #include "utils/meta.h"
 #include "utils/strings.h"
@@ -99,6 +99,14 @@ namespace Graphics
 
     template <typename T> class Uniform;
 
+    // Uniform attributes.
+
+    // Indicates that the uniform is for the vertex shader only.
+    struct Vert : Refl::BasicAttribute {};
+    // Indicates that the uniform is for the fragment shader only.
+    struct Frag : Refl::BasicAttribute {};
+
+
     class Shader
     {
         template <typename T> void AssignUniformLocation(Uniform<T> &uniform, int loc);
@@ -128,19 +136,20 @@ namespace Graphics
             }
             else
             {
+                static_assert(Refl::Class::member_names_known<T>);
+
                 std::string header;
 
-                using refl = Refl::Interface<T>;
-                refl::for_each_field([&](auto index)
+                Meta::cexpr_for<Refl::Class::member_count<T>>([&](auto index)
                 {
-                    constexpr int i = index.value;
-                    using field_type = typename refl::template field_type<i>;
+                    constexpr auto i = index.value;
+                    using field_type = Refl::Class::member_type<T, i>;
                     header += cfg.attribute;
                     header += ' ';
-                    header += GlslTypeName<Math::change_vec_base_t<attribute_type_t<field_type>, float>>();
+                    header += GlslTypeName<Math::change_vec_base_t<field_type, float>>();
                     header += ' ';
                     header += pref.attribute_prefix;
-                    header += refl::field_name(i);
+                    header += Refl::Class::MemberName<T>(i);
                     header += ";\n";
                 });
 
@@ -156,22 +165,26 @@ namespace Graphics
             }
             else
             {
+                static_assert(Refl::Class::member_names_known<T>);
+
                 std::string header;
 
-                using refl = Refl::Interface<T>;
-                refl::for_each_field([&](auto index)
+                Meta::cexpr_for<Refl::Class::member_count<T>>([&](auto index)
                 {
                     constexpr int i = index.value;
-                    using field_type_raw = typename refl::template field_type<i>;
-                    if ((field_type_raw::is_vertex && is_vertex) || (field_type_raw::is_fragment && !is_vertex))
+                    using field_type = typename Refl::Class::member_type<T, i>::type;
+                    constexpr bool uni_vert = Refl::Class::member_has_attrib<T, i, Vert>;
+                    constexpr bool uni_frag = Refl::Class::member_has_attrib<T, i, Frag>;
+                    static_assert(!(uni_vert && uni_frag), "Can't have both `Vert` and `Frag` attributes on a single member. To use it in both shaders, remove both attributes.");
+
+                    if ((!uni_vert || !uni_frag) || (uni_vert && is_vertex) || (uni_frag && !is_vertex))
                     {
-                        using field_type = typename field_type_raw::type;
                         header += cfg.uniform;
                         header += ' ';
                         header += GlslTypeName<std::remove_extent_t<field_type>>();
                         header += ' ';
                         header += pref.uniform_prefix;
-                        header += refl::field_name(i);
+                        header += Refl::Class::MemberName<T>(i);
                         if constexpr (std::is_array_v<field_type>)
                         {
                             header += '[';
@@ -194,12 +207,13 @@ namespace Graphics
             }
             else
             {
+                static_assert(Refl::Class::member_names_known<T>);
+
                 std::vector<std::string> ret;
 
-                using refl = Refl::Interface<T>;
-                refl::for_each_field([&](auto index)
+                Meta::cexpr_for<Refl::Class::member_count<T>>([&](auto index)
                 {
-                    ret.push_back(pref.attribute_prefix + refl::field_name(index.value));
+                    ret.push_back(pref.attribute_prefix + Refl::Class::MemberName<T>(index.value));
                 });
 
                 return ret;
@@ -302,12 +316,13 @@ namespace Graphics
             }
             else
             {
-                auto refl = Refl::Interface(uniforms);
-                refl.for_each_field([&](auto index)
+                static_assert(Refl::Class::member_names_known<UniformsT>);
+
+                Meta::cexpr_for<Refl::Class::member_count<UniformsT>>([&](auto index)
                 {
-                    constexpr int i = index.value;
+                    constexpr auto i = index.value;
                     // Note that we don't need to check the return value. Even if a uniform is not found and -1 location is returned, glUniform* will silently no-op on it.
-                    AssignUniformLocation(refl.template field_value<i>(), glGetUniformLocation(data.handle, (pref.uniform_prefix + refl.field_name(i)).c_str()));
+                    AssignUniformLocation(Refl::Class::Member<i>(uniforms), glGetUniformLocation(data.handle, (pref.uniform_prefix + Refl::Class::MemberName<UniformsT>(i)).c_str()));
                 });
             }
         }
@@ -369,10 +384,6 @@ namespace Graphics
         }
 
       public:
-        // Derived classes override those.
-        static constexpr bool is_vertex = 1;
-        static constexpr bool is_fragment = 1;
-
         using type_with_extent = T;
         using type = std::remove_extent_t<T>;
 
@@ -465,22 +476,6 @@ namespace Graphics
             #endif
             else static_assert(std::is_void_v<effective_type>, "Uniforms of this type are not supported.");
         }
-    };
-
-    template <typename T> class VertUniform : public Uniform<T>
-    {
-      public:
-        static constexpr bool is_fragment = 0;
-        using Uniform<T>::Uniform;
-        using Uniform<T>::operator=;
-    };
-
-    template <typename T> class FragUniform : public Uniform<T>
-    {
-      public:
-        static constexpr bool is_vertex = 0;
-        using Uniform<T>::Uniform;
-        using Uniform<T>::operator=;
     };
 
     template <typename T> inline void Shader::AssignUniformLocation(Uniform<T> &uniform, int loc)
