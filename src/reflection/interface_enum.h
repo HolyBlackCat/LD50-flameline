@@ -43,6 +43,7 @@ namespace Refl
             }
         };
 
+        // Contains metadata related to a single enum.
         template <typename T>
         class Helper
         {
@@ -103,12 +104,12 @@ namespace Refl
             }
         };
 
-        void zrefl_EnumFunc() = delete; // Dummy ADL target.
+        void zrefl_EnumHelper() = delete; // Dummy ADL target.
 
         template <typename T>
-        auto GetHelper() -> const decltype(zrefl_EnumFunc(std::declval<T>()).helper) &
+        auto GetHelper() -> const decltype(zrefl_EnumHelper(T{})) &
         {
-            return zrefl_EnumFunc(T{}).helper;
+            return zrefl_EnumHelper(T{});
         }
 
         template <typename T> using detect_enum = decltype(impl::Enum::GetHelper<T>());
@@ -209,21 +210,36 @@ namespace Refl
 
 // This enum is 'relaxed'.
 // Saving and loading unnamed numeric values is allowed.
-#define REFL_ENUM_RELAXED MA_PARAM(ReflIsRelaxed)
+#define REFL_RELAXED MA_PARAM(ReflIsRelaxed)
 #define MA_PARAMS_category_ReflEnum_X_ReflIsRelaxed
 #define MA_PARAMS_equal_ReflIsRelaxed_X_ReflIsRelaxed
 
 // Allows you to specify an underlying type for a enum.
-#define REFL_ENUM_TYPE MA_PARAM(ReflUnderlyingType)
+#define REFL_UNDERLYING_TYPE MA_PARAM(ReflUnderlyingType)
 #define MA_PARAMS_category_ReflEnum_X_ReflUnderlyingType
 #define MA_PARAMS_equal_ReflUnderlyingType_X_ReflUnderlyingType
 
+// This must be used if and only if the enum is defined at class scope.
+// Failure to do so causes a hard error.
+// We define it conditionally, because the same macro is used for structs.
+#ifndef REFL_AT_CLASS_SCOPE
+#define REFL_AT_CLASS_SCOPE MA_PARAM(ReflAtClassScope)
+#define MA_PARAMS_equal_ReflAtClassScope_X_ReflAtClassScope
+#endif
+#define MA_PARAMS_category_ReflEnum_X_ReflAtClassScope
+
+
 /* Declares a reflected enum.
  * Usage:
- *   REFL_ENUM( Name [REFL_ENUM_CLASS] [REFL_ENUM_RELAXED] [REFL_ENUM_TYPE Type] ,
+ *   REFL_ENUM( Name [ <params> ] ,
  *       ( Name1 [ , value1] )
  *       ( Name2 [ , value2] )
  *   )
+ * <params> is a space-separated list of optional parameters:
+ * `REFL_ENUM_CLASS` - makes this enum a `enum class`.
+ * `REFL_RELAXED` - allows saving and loading unnamed numeric values.
+ * `REFL_UNDERLYING_TYPE <type>` - Sets the underlying type.
+ * `REFL_AT_CLASS_SCOPE` - Must be used if and only if the enum is defined at class scope.
  * Optional parameters following the enum name can be reordered.
  * Parameter meaning is described above.
  */
@@ -234,11 +250,7 @@ namespace Refl
         MA_PARAMS_GET_ONE(, ReflEnum, ReflIsClass, ((name_params)), MA_PARAMS_DUMMY_EMPTY), \
         seq \
     ) \
-    REFL_ENUM_METADATA( \
-        MA_PARAMS_FIRST(((name_params))), \
-        MA_IF_NOT_EMPTY_ELSE(true, false, MA_PARAMS_GET_ONE(, ReflEnum, ReflIsRelaxed, ((name_params)), MA_PARAMS_DUMMY_EMPTY)), \
-        seq \
-    )
+    REFL_ENUM_METADATA_impl(((name_params)), seq)
 
 #define REFL_ENUM_impl(name_, maybe_type_, is_class_if_not_empty_, seq_) \
     enum MA_IF_NOT_EMPTY(class, is_class_if_not_empty_) name_ maybe_type_ { REFL_ENUM_impl_elem_loop(seq_) };
@@ -255,16 +267,28 @@ namespace Refl
 
 // Generates metadata for an existing enum.
 // Has to be in the same namespace/class as the enum.
-// `name_` is the enum type.
-// `is_relaxed_` is either `true` or `false`, see `REFL_ENUM_RELAXED` for an explanation.
-// `seq_` is a list of constants, see `REFL_ENUM` for explanation.
-#define REFL_ENUM_METADATA(name_, is_relaxed_, seq_) \
-    struct MA_CAT(zrefl_EnumHelper_, name_) \
+// Uses the same syntax as `REFL_ENUM`, except `REFL_ENUM_CLASS` and `REFL_UNDERLYING_TYPE` are ignored.
+#define REFL_ENUM_METADATA(name_params, seq) REFL_ENUM_METADATA_impl(((name_params)), seq)
+
+#define REFL_ENUM_METADATA_impl(name_params, seq) \
+    REFL_ENUM_METADATA_impl_low( \
+        MA_PARAMS_FIRST(name_params), \
+        MA_PARAMS_GET_ONE(, ReflEnum, ReflIsRelaxed, name_params, MA_PARAMS_DUMMY_EMPTY), \
+        MA_PARAMS_GET_ONE(, ReflEnum, ReflAtClassScope, name_params, MA_PARAMS_DUMMY_EMPTY), \
+        seq \
+    )
+
+#define REFL_ENUM_METADATA_impl_low(name_, is_relaxed_if_not_empty_, class_scope_if_not_empty_, seq_) \
+    /* This causes a hard error if `REFL_AT_CLASS_SCOPE` is not set, but the enum is at a class scope. */\
+    /* We don't need to manually check for the opposite, since we use a `friend` function in that case. */\
+    MA_IF_NOT_EMPTY_ELSE(, namespace {}, class_scope_if_not_empty_) \
+    [[maybe_unused]] MA_IF_NOT_EMPTY_ELSE(friend, inline, class_scope_if_not_empty_) \
+    const auto &zrefl_EnumHelper(name_) \
     { \
-        using type = name_; \
-        inline static auto helper = ::Refl::impl::Enum::Helper<name_>({ REFL_ENUM_impl_pair_loop(seq_) }, is_relaxed_); \
-    }; \
-    [[maybe_unused]] inline static MA_CAT(zrefl_EnumHelper_, name_) zrefl_EnumFunc(name_) {return {};}
+        using t [[maybe_unused]] = name_; \
+        static ::Refl::impl::Enum::Helper<name_> ret({ REFL_ENUM_impl_pair_loop(seq_) }, MA_IF_NOT_EMPTY_ELSE(true, false, is_relaxed_if_not_empty_)); \
+        return ret; \
+    }
 
 #define REFL_ENUM_impl_pair_loop(seq_) MA_APPEND_TO_VA_END(_end, REFL_ENUM_impl_pair_loop_a seq_)
 #define REFL_ENUM_impl_pair_loop_a(...) REFL_ENUM_impl_pair(__VA_ARGS__) REFL_ENUM_impl_pair_loop_b
@@ -272,4 +296,4 @@ namespace Refl
 #define REFL_ENUM_impl_pair_loop_a_end
 #define REFL_ENUM_impl_pair_loop_b_end
 #define REFL_ENUM_impl_pair(...) MA_CALL(REFL_ENUM_impl_pair0,__VA_ARGS__,)
-#define REFL_ENUM_impl_pair0(elem_, ...) {type::elem_, #elem_},
+#define REFL_ENUM_impl_pair0(elem_, ...) {t::elem_, #elem_},

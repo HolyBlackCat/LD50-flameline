@@ -1,11 +1,11 @@
 #pragma once
 
 // Enums
-#define ENUM          REFL_ENUM
-#define ENUM_CLASS    REFL_ENUM_CLASS
-#define ENUM_RELAXED  REFL_ENUM_RELAXED
-#define ENUM_TYPE     REFL_ENUM_TYPE
-#define ENUM_METADATA REFL_ENUM_METADATA
+#define ENUM            REFL_ENUM
+#define ENUM_CLASS      REFL_ENUM_CLASS
+#define RELAXED         REFL_RELAXED
+#define UNDERLYING_TYPE REFL_UNDERLYING_TYPE
+#define ENUM_METADATA   REFL_ENUM_METADATA
 
 // Structs
 #define STRUCT              REFL_STRUCT
@@ -16,6 +16,7 @@
 #define POLYMORPHIC         REFL_POLYMORPHIC
 #define FINAL               REFL_FINAL
 #define METADATA_ONLY       REFL_METADATA_ONLY
+#define AT_CLASS_SCOPE      REFL_AT_CLASS_SCOPE
 #define TERSE               REFL_TERSE
 #define TERSE_WITHOUT_NAMES REFL_TERSE_WITHOUT_NAMES
 #define DECL                REFL_DECL

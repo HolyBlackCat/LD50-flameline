@@ -23,6 +23,35 @@ namespace Refl
     {
         namespace impl
         {
+            // This contains some stateful template metaprogramming logic to ensure that
+            // classes that are not registered as polymorphic can't be used as ones.
+            // This is the last line of protection. It's checked only if all other tests
+            // give false positives. Usually it happens because `Derived` is a template
+            // or is a member of one.
+            namespace Registration
+            {
+                template <typename Base, typename Derived> struct tag
+                {
+                    friend constexpr bool zrefl_adl_CheckRegistration(tag);
+                };
+
+                // Instantiating this type registers a class.
+                template <typename Base, typename Derived> struct touch_to_register
+                {
+                    friend constexpr bool zrefl_adl_CheckRegistration(tag<Base, Derived>) {return true;}
+                };
+
+                void zrefl_adl_CheckRegistration() = delete; // Dummy ADL target.
+
+                // Instantiating this type triggers an assertion if `touch_to_register` wasn't instantiated first with the same parameters.
+                template <typename Base, typename Derived, typename = void> struct verify
+                {
+                    static_assert(Meta::value<false, Base, Derived>, "This derived class is not registered as polymorphic, probably because it's a template or a member of one. Those are never registered.");
+                };
+                template <typename Base, typename Derived> struct verify<Base, Derived, std::enable_if_t<zrefl_adl_CheckRegistration(tag<Base, Derived>{})>>
+                {};
+            }
+
             // This encapsulates most of the internal logic.
             class Data
             {
@@ -63,11 +92,12 @@ namespace Refl
                         // Required by `Poly::Storage`. Assigns correct values to the fields above.
                         template <typename Derived> constexpr void _make()
                         {
-                            // Refl::Class::Macro::impl::type_member_ptrs<typename Refl::Class::Macro::impl::nonmember_metadata<Derived>::type> foo;
-
                             static_assert(Class::members_known<Derived>, "Members of this derived class are not known.");
                             static_assert(Class::name_known<Derived>, "Name of this derived class is not known.");
                             static_assert(!Class::class_has_attrib<Derived, Refl::DontRegisterAsPolymorphic>, "This class was explicitly prevented from being registered as polymorphic.");
+
+                            // Compile-time check that the class was registered.
+                            [[maybe_unused]] Registration::verify<Base, Derived> registration_verifier;
 
                             // `zrefl_Index` has to be a pointer, since `derived_class_index` is assigned later, when the lists are finalized.
                             zrefl_Index = &derived_class_index<Derived>;
@@ -172,6 +202,9 @@ namespace Refl
                         static_assert(!std::is_const_v<Base> && !std::is_const_v<Derived>);
                         static_assert(std::is_polymorphic_v<Base>, "The base class must be polymorphic.");
                         static_assert(std::is_base_of_v<Base, Derived>, "This class is not derived from the base.");
+
+                        // This sets a compile-time registration flag.
+                        [[maybe_unused]] Registration::touch_to_register<Base, Derived> registration_helper;
 
                         if (finalized)
                             Program::HardError("Attempt to register polymorphic class `", Meta::TypeName<Derived>(), "` (derived from `", Meta::TypeName<Base>(), "`) after class lists were finalized.");

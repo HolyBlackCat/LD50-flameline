@@ -67,16 +67,16 @@ namespace Refl
 
                     // Checks if `zrefl_MembersHelper` is a direct member of `zrefl_MembersHelper`.
                     // ** WARNING **
-                    // This check is VERY FINICKY. It's written specifically to accept only directly defined member functions, and discard inherited ones.
+                    // This check is FINICKY. It's written specifically to accept only directly defined member functions, and discard inherited ones.
                     // If you rewrite it, BE SURE TO CHECK that it didn't start to accept inherited functions.
                     // Perform following test: Define a base using `REFL_STRUCT` with `REFL_TERSE`. Define a derived class manually,
                     // then use `REFL_STRUCT` with `REFL_METADATA_ONLY` and `REFL_TERSE` on it. Make sure `Class::members_known<Derived>` returns true on both,
                     // which indicates that everything works correctly. If it breaks, `metadata_type<Derived>` specializations become ambiguous,
                     // and `members_known<Derived>` starts to return `false`. If `members_known<Base>` starts to return `false` instead, it means that your
                     // test is never able to find the function.
-                    template <typename T, T> struct detect_member_metadata_helper {}; // No, `Meta::tag` doesn't work here.
-                    template <typename T> using detect_member_metadata =
-                        detect_member_metadata_helper<typename memptr_return_type<decltype(&T::zrefl_MembersHelper)>::type (T::*)() const, &T::zrefl_MembersHelper>; // Magic!
+                    template <typename T, T> struct detect_helper {}; // No, `Meta::tag` doesn't work here.
+                    template <typename T> using detect =
+                        detect_helper<typename memptr_return_type<decltype(&T::zrefl_MembersHelper)>::type (T::*)() const, &T::zrefl_MembersHelper>; // Magic!
 
                     template <typename T> using metadata_type = typename memptr_return_type<decltype(&T::zrefl_MembersHelper)>::type;
                 };
@@ -84,20 +84,20 @@ namespace Refl
                 // Obtains the internal (member) metadata type for T, one of the two possible metadata types.
                 // Should be SFINAE-friendly.
                 template <typename T, typename = void> struct member_metadata {};
-                template <typename T> struct member_metadata<T, Meta::void_type<member_metadata_helpers::detect_member_metadata<T>>> // No, we can't use `metadata_type<T>` here. Read the comment above.
+                template <typename T> struct member_metadata<T, Meta::void_type<member_metadata_helpers::detect<T>>> // No, we can't use `metadata_type<T>` here. Read the comment above.
                 {
                     using type = member_metadata_helpers::metadata_type<T>;
                 };
                 template <typename T> using member_metadata_t = typename member_metadata<T>::type;
 
-                void zrefl_StructFunc(); // Dummy ADL target.
+                void zrefl_StructHelper(); // Dummy ADL target.
 
                 // Obtains the external (non-member) metadata type for T, one of the two possible metadata types.
                 // Should be SFINAE-friendly.
                 template <typename T, typename = void> struct nonmember_metadata {};
-                template <typename T> struct nonmember_metadata<T, Meta::void_type<decltype(zrefl_StructFunc(Meta::tag<T>{}))>>
+                template <typename T> struct nonmember_metadata<T, Meta::void_type<decltype(zrefl_StructHelper(std::declval<const T &>()))>>
                 {
-                    using type = decltype(zrefl_StructFunc(Meta::tag<T>{}));
+                    using type = decltype(zrefl_StructHelper(std::declval<const T &>()));
                 };
                 template <typename T> using nonmember_metadata_t = typename nonmember_metadata<T>::type;
 
@@ -129,11 +129,12 @@ namespace Refl
                 template <typename T> using type_member_ptrs = typename T::member_ptrs;
                 template <typename T> using type_member_attribs = typename T::member_attribs;
                 template <typename T> using value_member_names_func = Meta::value_tag<T::member_name>;
-                template <typename T> using value_explicitly_polymorphic = Meta::value_tag<T::explicitly_polymorphic>;
+                template <typename T> using value_explicitly_polymorphic = Meta::value_tag<T::explicitly_polymorphic()>;
             }
 
             // All of those should be SFINAE-friendly.
-            // `::value` is a const char pointer to the class name.
+            // `::value` is a `const char (*)()` that returns the class name.
+            // We can't call the function here, because the pointer to a function-local static array doesn't work as a template parameter.
             template <typename T> using name = impl::metadata_type_t<impl::value_name, T>;
             // Returns attributes of a class as a `Refl::impl::Class::ClassAttr`.
             template <typename T> using class_attribs = impl::metadata_type_t<impl::type_class_attribs, T>;
@@ -145,7 +146,7 @@ namespace Refl
             template <typename T> using member_ptrs = impl::metadata_type_t<impl::type_member_ptrs, T>;
             // Returns a `Meta::type_list` of `Refl::impl::Class::Attr`, one per `REFL_DECL`.
             template <typename T> using member_attribs = impl::metadata_type_t<impl::type_member_attribs, T>;
-            // `::value` is a function pointer `const char (*)(std::size_t index)`, which returns member names based on index.
+            // `::value` is a `const char (*)(std::size_t index)` that returns member names based on index.
             template <typename T> using member_name = impl::metadata_type_t<impl::value_member_names_func, T>;
             // `::value` is true if the class has `REFL_POLYMORPHIC` on it.
             template <typename T> using explicitly_polymorphic = impl::metadata_type_t<impl::value_explicitly_polymorphic, T>;
@@ -164,7 +165,7 @@ namespace Refl
             };
             template <typename T> struct name<T, Meta::void_type<Macro::name<T>>>
             {
-                static constexpr const char *value = Macro::name<T>::value;
+                static constexpr const char *value = Macro::name<T>::value();
             };
             template <typename T> struct name<T, Meta::void_type<decltype(std::tuple_size<T>::value)>> // Tuple interface. Note that we don't use `tuple_size_v` here because it's not SFINAE-friendly.
             {
@@ -559,6 +560,8 @@ Allowed parameters are:
 * `REFL_POLYMORPHIC`
   Specifies that the structure is polymorphic, and has a virtual destructor.
   It's achieved by inheriting from `Meta::with_virtual_destructor<T>`.
+  If `reflection/poly_storage_support.h` is included, this structure
+  and the ones derived from it get additional capabilities.
   Can be used at most once per `REFL_STRUCT`.
 
 * `REFL_FINAL`
@@ -568,6 +571,10 @@ Allowed parameters are:
 * `REFL_METADATA_ONLY`
   Prevents structure definition from being generated, but the metadata
   is still generated. See the next section.
+
+* `REFL_AT_CLASS_SCOPE`
+  Must be used if and only if the structure is defined inside of an another structure.
+  Failure to do so causes a compile-time error.
 
 * `REFL_TERSE <body>`
   Causes a terse structure definition syntax to be used.
@@ -602,26 +609,31 @@ Below is the description of the metadata generated by the macros.
 
 Basic metadata, at the same scope as the class.
 
-    struct zrefl_StructHelper_##StructName
+    inline auto zrefl_StructHelper(const Z &)
     {
-        // Name.
-        static constexpr char name[] = "StructName";
-        // Class attributes.
-        using attribs = Refl::impl::Class::ClassAttr<ATTRIBS>;
-        // A list of bases.
-        using bases = ::Meta::type_list<base1, base2, ...>;
-        // A list of virtual bases.
-        using virt_bases = ::Meta::type_list<base3, base4, ...>;
+        struct Helper
+        {
+            // Name.
+            static constexpr const char *name() {return "StructName";};
 
-        // Should be present only if true.
-        // Indicates that the class was explicitly made polymorphic using `REFL_POLYMORPHIC`.
-        static constexpr bool explicitly_polymorphic = true;
+            // Class attributes. Can be absent if there are none.
+            using attribs = Refl::impl::Class::ClassAttr<ATTRIBS>;
 
-        // If both `REFL_METADATA_ONLY` and `REFL_TERSE` are used,
-        // members metadata will also be here.
-        // It's will look exactly like the contents of `struct Helper` described below.
-    };
-    inline static zrefl_StructHelper_##StructName zrefl_StructFunc(Meta::tag<StructName>) {return {};}
+            // A list of bases.
+            using bases = ::Meta::type_list<base1, base2, ...>;
+            // A list of virtual bases.
+            using virt_bases = ::Meta::type_list<base3, base4, ...>;
+
+            // Should be present only if true.
+            // Indicates that the class was explicitly made polymorphic using `REFL_POLYMORPHIC`.
+            static constexpr bool explicitly_polymorphic() {return true;}
+
+            // If both `REFL_METADATA_ONLY` and `REFL_TERSE` are used,
+            // members metadata will also be here.
+            // It's will look exactly like the contents of `struct Helper` described below.
+        };
+        return Helper{};
+    }
 
 Members metadata, inside of a class.
 
@@ -665,7 +677,6 @@ That's all.
 // the metadata, and with `virtual` in the struct definition. We can't simply have a
 // separate comma-separated list of virtual bases, since their names can contain commas
 // in template parameter lists.
-// Can't be used more than once per struct declaration.
 #define REFL_EXTENDS MA_PARAM(ReflBases)
 #define MA_PARAMS_category_ReflStruct_X_ReflBases
 #define MA_PARAMS_equal_ReflBases_X_ReflBases
@@ -674,7 +685,6 @@ That's all.
 // Specifies a list of untracked base classes for the struct.
 // Those bases will be invisible for the reflection (will not be added to metadata).
 // You can freely put access specifiers and `virtual` on those.
-// Can't be used more than once per struct declaration.
 #define REFL_SILENTLY_EXTENDS MA_PARAM(ReflUntrackedBases)
 #define MA_PARAMS_category_ReflStruct_X_ReflUntrackedBases
 #define MA_PARAMS_equal_ReflUntrackedBases_X_ReflUntrackedBases
@@ -684,7 +694,6 @@ That's all.
 // to the metadata, but not actually inherited from. Good for when you
 // indirectly inherit from those classes in a way that can't normally be detected.
 // Uses the same syntax as `REFL_EXTENDS`.
-// Can't be used more than once per struct declaration.
 #define REFL_ASSUME_EXTENDS MA_PARAM(ReflFakeBases)
 #define MA_PARAMS_category_ReflStruct_X_ReflFakeBases
 #define MA_PARAMS_equal_ReflFakeBases_X_ReflFakeBases
@@ -721,6 +730,16 @@ That's all.
 #define MA_PARAMS_equal_ReflMetadataOnly_X_ReflMetadataOnly
 
 // An optional parameter for `REFL_STRUCT`.
+// This must be present if and only if the struct is at class scope.
+// Failure to do it causes a hard error.
+// We define it conditionally, because the same macro is used for enums.
+#ifndef REFL_AT_CLASS_SCOPE
+#define REFL_AT_CLASS_SCOPE MA_PARAM(ReflAtClassScope)
+#define MA_PARAMS_equal_ReflAtClassScope_X_ReflAtClassScope
+#endif
+#define MA_PARAMS_category_ReflStruct_X_ReflAtClassScope
+
+// An optional parameter for `REFL_STRUCT`.
 // If present, must be the last parameter.
 // If present, replaces a struct body that would normally follow a `REFL_STRUCT` invocation.
 // The parameters is interpreted as a struct body, as if it was passed to `REFL_MEMBERS`.
@@ -745,7 +764,8 @@ That's all.
         MA_PARAMS_GET_ONE(, ReflStruct, ReflIsFinal, seq, MA_PARAMS_DUMMY_EMPTY), \
         (MA_PARAMS_GET_ONE(, ReflStruct, ReflAttr, seq, MA_PARAMS_IDENTITY)), \
         __VA_OPT__(REFL_STRUCT_impl_get_body(__VA_ARGS__)), \
-        MA_PARAMS_GET_ONE(, ReflStruct, ReflMetadataOnly, seq, MA_PARAMS_DUMMY_EMPTY) \
+        MA_PARAMS_GET_ONE(, ReflStruct, ReflMetadataOnly, seq, MA_PARAMS_DUMMY_EMPTY), \
+        MA_PARAMS_GET_ONE(, ReflStruct, ReflAtClassScope, seq, MA_PARAMS_DUMMY_EMPTY) \
     )
 
 // Internal. Helper for `REFL_STRUCT_impl`.
@@ -758,37 +778,38 @@ That's all.
 // `name_` is a class name. `tparams_seq_` is a sequence of template parameters: `(type,name[,init])...` or empty,
 // `*bases_` are lists of base classes: `(base1,base2,...)` or `()` if empty, `*_if_not_empty_` are equal to `x` or empty,
 // `body_or_empty_` is `(unnamed_if_not_empty_,seq_)` or empty.
-#define REFL_STRUCT_impl_low(name_, tparams_seq_, bases_, fake_bases_, untracked_bases_, is_poly_if_not_empty_, is_final_if_not_empty_, attribs_, body_or_empty_, metadata_only_if_not_empty_) \
+#define REFL_STRUCT_impl_low(name_, tparams_seq_, bases_, fake_bases_, untracked_bases_, is_poly_if_not_empty_, is_final_if_not_empty_, attribs_, body_or_empty_, metadata_only_if_not_empty_, class_scope_if_not_empty_) \
+    /* Make sure we know what scope we're at. */\
+    /* This causes a hard error if we're at class scope, but there is no `REFL_AT_CLASS_SCOPE`. */\
+    /* We don't need to check the opposite scenario here, because we use a friend function in that case. */\
+    MA_IF_NOT_EMPTY_ELSE(, namespace {}, class_scope_if_not_empty_) \
     /* Unless we're generating metadata only, declare the structure. */\
     MA_IF_NOT_EMPTY_ELSE(MA_NULL, REFL_STRUCT_impl_low_decl, metadata_only_if_not_empty_) \
         (name_, tparams_seq_) \
-    /* Define the primary metadata structure. */\
-    /* If this is a template, and we're in the metadata-only mode, this has to be a template as well. */\
-    MA_IF_NOT_EMPTY(REFL_STRUCT_impl_tparams_decl(tparams_seq_), metadata_only_if_not_empty_) \
-    struct MA_CAT(zrefl_StructHelper_, name_) \
-    { \
-        /* A name. */\
-        /* (Note that an array is used instead of a pointer. A pointer couldn't be put into */\
-        /* a `Meta::value_tag`, so we'd need to change the implementation of `Refl::Class::Macro::name`.) */\
-        static constexpr char name[] = MA_STR(name_); \
-        /* Attribute list. */\
-        using attribs = ::Refl::impl::Class::ClassAttr<MA_IDENTITY attribs_>; \
-        /* A list of bases. */\
-        using bases = ::Meta::type_list<REFL_STRUCT_impl_strip_leading_comma(REFL_STRUCT_impl_nonvirt_bases(MA_TR_C(MA_IDENTITY bases_) MA_TR_C(MA_IDENTITY fake_bases_)))>; \
-        /* A list of virtual bases. */\
-        using virt_bases = ::Meta::type_list<REFL_STRUCT_impl_strip_leading_comma(REFL_STRUCT_impl_virt_bases_with_prefix(,MA_TR_C(MA_IDENTITY bases_) MA_TR_C(MA_IDENTITY fake_bases_)))>; \
-        /* Indicates that the class was explicitly made polymorphic. */\
-        MA_IF_NOT_EMPTY(static constexpr bool explicitly_polymorphic = true;, is_poly_if_not_empty_) \
-        /* If both `REFL_METADATA_ONLY` and `REFL_TERSE` are used, generate metadata */\
-        /* for member variables here instead of its normal location. */\
-        MA_IF_NOT_EMPTY_ELSE(MA_NULL, REFL_STRUCT_impl_low_extra_metadata, MA_INVERT_EMPTINESS(body_or_empty_) MA_INVERT_EMPTINESS(metadata_only_if_not_empty_)) \
-            (name_ REFL_STRUCT_impl_tparams(tparams_seq_), MA_IDENTITY body_or_empty_) \
-    }; \
     /* Define a helper function that returns the metadata structure. */\
-    REFL_STRUCT_impl_tparams_decl(tparams_seq_) \
-    [[maybe_unused]] inline static MA_CAT(zrefl_StructHelper_, name_) /* Return type. */\
-    MA_IF_NOT_EMPTY(REFL_STRUCT_impl_tparams(tparams_seq_), metadata_only_if_not_empty_) /* Template parameters of the return type. Those are only needed if it's a template and we're in metadata-only mode. */\
-    zrefl_StructFunc(::Meta::tag<name_ REFL_STRUCT_impl_tparams(tparams_seq_)>) {return {};} \
+    REFL_STRUCT_impl_tparams_decl(tparams_seq_) /* Template parameters. */\
+    [[maybe_unused]] MA_IF_NOT_EMPTY_ELSE(friend, inline, class_scope_if_not_empty_) auto zrefl_StructHelper(const name_ REFL_STRUCT_impl_tparams(tparams_seq_) &) \
+    { \
+        /* Define the primary metadata structure. */\
+        struct Helper \
+        { \
+            /* A name. */\
+            static constexpr const char *name() {return MA_STR(name_);}; \
+            /* Attribute list. */\
+            MA_IF_NOT_EMPTY(using attribs = ::Refl::impl::Class::ClassAttr<MA_IDENTITY attribs_>;, MA_IDENTITY attribs_) \
+            /* A list of bases. */\
+            using bases = ::Meta::type_list<REFL_STRUCT_impl_strip_leading_comma(REFL_STRUCT_impl_nonvirt_bases(MA_TR_C(MA_IDENTITY bases_) MA_TR_C(MA_IDENTITY fake_bases_)))>; \
+            /* A list of virtual bases. */\
+            using virt_bases = ::Meta::type_list<REFL_STRUCT_impl_strip_leading_comma(REFL_STRUCT_impl_virt_bases_with_prefix(,MA_TR_C(MA_IDENTITY bases_) MA_TR_C(MA_IDENTITY fake_bases_)))>; \
+            /* Indicates that the class was explicitly made polymorphic. */\
+            MA_IF_NOT_EMPTY(static constexpr bool explicitly_polymorphic() {return true;}, is_poly_if_not_empty_) \
+            /* If both `REFL_METADATA_ONLY` and `REFL_TERSE` are used, generate metadata */\
+            /* for member variables here instead of its normal location. */\
+            MA_IF_NOT_EMPTY_ELSE(MA_NULL, REFL_STRUCT_impl_low_extra_metadata, MA_INVERT_EMPTINESS(body_or_empty_) MA_INVERT_EMPTINESS(metadata_only_if_not_empty_)) \
+                (name_ REFL_STRUCT_impl_tparams(tparams_seq_), MA_IDENTITY body_or_empty_) \
+        }; \
+        return Helper{}; \
+    } \
     /* Generate the beginning of the definition of the structure. */\
     /* It includes the struct name and a list of bases. */\
     MA_IF_NOT_EMPTY_ELSE(MA_NULL, REFL_STRUCT_impl_low_header, metadata_only_if_not_empty_) \
