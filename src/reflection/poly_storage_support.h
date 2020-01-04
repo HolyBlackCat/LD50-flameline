@@ -63,6 +63,9 @@ namespace Refl
                         // Required by `Poly::Storage`. Assigns correct values to the fields above.
                         template <typename Derived> constexpr void _make()
                         {
+                            // Refl::Class::Macro::impl::type_member_ptrs<typename Refl::Class::Macro::impl::nonmember_metadata<Derived>::type> foo;
+
+                            static_assert(Class::members_known<Derived>, "Members of this derived class are not known.");
                             static_assert(Class::name_known<Derived>, "Name of this derived class is not known.");
                             static_assert(!Class::class_has_attrib<Derived, Refl::DontRegisterAsPolymorphic>, "This class was explicitly prevented from being registered as polymorphic.");
 

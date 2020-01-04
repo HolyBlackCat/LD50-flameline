@@ -57,12 +57,36 @@ namespace Refl
 
             namespace impl
             {
+                // Combines stuff related to the internal (member) metadata, one of the two possible metadata types.
+                // We use a class to be able to `friend` it all at once.
+                struct member_metadata_helpers
+                {
+                    // Given a member function (const-qualified) pointer, returns it's return type.
+                    template <typename T> struct memptr_return_type {};
+                    template <typename T, typename C> struct memptr_return_type<T (C::*)() const> {using type = T;};
+
+                    // Checks if `zrefl_MembersHelper` is a direct member of `zrefl_MembersHelper`.
+                    // ** WARNING **
+                    // This check is VERY FINICKY. It's written specifically to accept only directly defined member functions, and discard inherited ones.
+                    // If you rewrite it, BE SURE TO CHECK that it didn't start to accept inherited functions.
+                    // Perform following test: Define a base using `REFL_STRUCT` with `REFL_TERSE`. Define a derived class manually,
+                    // then use `REFL_STRUCT` with `REFL_METADATA_ONLY` and `REFL_TERSE` on it. Make sure `Class::members_known<Derived>` returns true on both,
+                    // which indicates that everything works correctly. If it breaks, `metadata_type<Derived>` specializations become ambiguous,
+                    // and `members_known<Derived>` starts to return `false`. If `members_known<Base>` starts to return `false` instead, it means that your
+                    // test is never able to find the function.
+                    template <typename T, T> struct detect_member_metadata_helper {}; // No, `Meta::tag` doesn't work here.
+                    template <typename T> using detect_member_metadata =
+                        detect_member_metadata_helper<typename memptr_return_type<decltype(&T::zrefl_MembersHelper)>::type (T::*)() const, &T::zrefl_MembersHelper>; // Magic!
+
+                    template <typename T> using metadata_type = typename memptr_return_type<decltype(&T::zrefl_MembersHelper)>::type;
+                };
+
                 // Obtains the internal (member) metadata type for T, one of the two possible metadata types.
                 // Should be SFINAE-friendly.
-                template <typename T, typename = void> struct member_metadata {}; // WARNING: If you rename this class, don't forget to rename the friend declaration in the macros.
-                template <typename T> struct member_metadata<T, Meta::void_type<decltype(std::declval<const T &>().zrefl_MembersHelper())>>
+                template <typename T, typename = void> struct member_metadata {};
+                template <typename T> struct member_metadata<T, Meta::void_type<member_metadata_helpers::detect_member_metadata<T>>> // No, we can't use `metadata_type<T>` here. Read the comment above.
                 {
-                    using type = decltype(std::declval<const T &>().zrefl_MembersHelper());
+                    using type = member_metadata_helpers::metadata_type<T>;
                 };
                 template <typename T> using member_metadata_t = typename member_metadata<T>::type;
 
@@ -948,7 +972,7 @@ That's all.
         }; \
         return Helper{}; \
     } \
-    template <typename, typename> friend struct ::Refl::Class::Macro::impl::member_metadata; \
+    friend struct ::Refl::Class::Macro::impl::member_metadata_helpers; \
     /* If the class is polymorphic, register it as one.                      */\
     /* This thing is all the way down there, in a separate function, because */\
     /* it needs the class to be defined, as well as its metadata.            */\
