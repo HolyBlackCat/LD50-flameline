@@ -474,7 +474,7 @@ namespace Interface
                   case SDL_WINDOWEVENT_CLOSE:
                     data.exit_request_time = data.tick_counter;
                     break;
-                  case SDL_WINDOWEVENT_RESIZED:
+                  case SDL_WINDOWEVENT_SIZE_CHANGED:
                     if (data.tick_counter == 1)
                         break;
                     data.resize_time = data.tick_counter;

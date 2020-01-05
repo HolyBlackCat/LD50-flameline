@@ -174,7 +174,7 @@ namespace Audio
                 alSourcef(data.object->handle, AL_PITCH, p);
             return (ref)*this;
         }
-        ref loop(float l)
+        ref loop(bool l)
         {
             if (data.object)
                 alSourcei(data.object->handle, AL_LOOPING, l);

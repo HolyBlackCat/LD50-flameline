@@ -29,8 +29,8 @@ namespace Graphics::Renderers
             (
                 REFL_DECL(fvec2 REFL_INIT{}) pos
                 REFL_DECL(fvec2 REFL_INIT{}) texcoord
-                REFL_DECL(u8vec4 REFL_INIT{} REFL_ATTR Normalized) color
-                REFL_DECL(u8vec3 REFL_INIT{} REFL_ATTR Normalized) factors
+                REFL_DECL(fvec4 REFL_INIT{}) color
+                REFL_DECL(fvec3 REFL_INIT{}) factors
             )
 
             constexpr auto &GetTransformableVertexPosition()
@@ -40,13 +40,13 @@ namespace Graphics::Renderers
 
             Vertex() {}
 
-            Vertex(fvec2 pos, u8vec4 color, fvec2 texcoord, u8vec3 factors)
+            Vertex(fvec2 pos, fvec4 color, fvec2 texcoord, fvec3 factors)
                 : pos(pos), texcoord(texcoord), color{color}, factors{factors}
             {}
 
             [[nodiscard]] static Vertex Raw(fvec2 pos, fvec4 color, fvec2 texcoord, fvec3 factors)
             {
-                return Vertex(pos, iround(::clamp(color) * 255), texcoord, iround(::clamp(factors) * 255));
+                return Vertex(pos, color, texcoord, factors);
             }
 
             [[nodiscard]] static Vertex Color(fvec2 pos, fvec3 color, float alpha = 1, float beta = 1)
@@ -241,7 +241,7 @@ namespace Graphics::Renderers
 
             [[nodiscard]] auto CenterTex(fvec2 center_tex) const
             {
-                return CenterRel(center_tex / this->data.texture.tex_size);
+                return CenterRel(center_tex / this->data.tex_size);
             }
 
             [[nodiscard]] auto Centered() const
