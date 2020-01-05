@@ -7,16 +7,14 @@
 
 struct Render::Data
 {
-    REFL_STRUCT( Attribs
-        REFL_AT_CLASS_SCOPE REFL_TERSE
+    REFL_SIMPLE_STRUCT( Attribs
         REFL_DECL(fvec2) pos
         REFL_DECL(fvec4) color
         REFL_DECL(fvec2) texcoord
         REFL_DECL(fvec3) factors
     )
 
-    REFL_STRUCT(Uniforms
-        REFL_AT_CLASS_SCOPE REFL_TERSE
+    REFL_SIMPLE_STRUCT( Uniforms
         REFL_DECL(Graphics::Uniform<fmat4> REFL_ATTR Graphics::Vert) matrix
         REFL_DECL(Graphics::Uniform<fvec2> REFL_ATTR Graphics::Vert) tex_size
         REFL_DECL(Graphics::Uniform<Graphics::TexUnit> REFL_ATTR Graphics::Frag) texture

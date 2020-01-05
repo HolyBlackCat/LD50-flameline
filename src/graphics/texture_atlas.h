@@ -17,15 +17,11 @@ namespace Graphics
 {
     class TextureAtlas
     {
-        REFL_STRUCT( ImageDesc
-            REFL_AT_CLASS_SCOPE
-            REFL_TERSE_WITHOUT_NAMES
+        REFL_SIMPLE_STRUCT_WITHOUT_NAMES( ImageDesc
             REFL_DECL(ivec2) pos, size
         )
 
-        REFL_STRUCT( Desc
-            REFL_AT_CLASS_SCOPE
-            REFL_TERSE
+        REFL_SIMPLE_STRUCT( Desc
             REFL_DECL(std::map<std::string, ImageDesc>) images
         )
 

@@ -13,13 +13,11 @@
 
 struct AdaptiveViewport::Data
 {
-    REFL_STRUCT( ShaderAttribs
-        REFL_AT_CLASS_SCOPE REFL_TERSE
+    REFL_SIMPLE_STRUCT( ShaderAttribs
         REFL_DECL(fvec2) pos
     )
 
-    REFL_STRUCT( ShaderUniforms
-        REFL_AT_CLASS_SCOPE REFL_TERSE
+    REFL_SIMPLE_STRUCT( ShaderUniforms
         REFL_DECL(Graphics::Uniform<Graphics::TexUnit> REFL_ATTR Graphics::Frag) texture
     )
 

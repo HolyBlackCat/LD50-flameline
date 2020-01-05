@@ -74,8 +74,7 @@ namespace Graphics::Renderers
       private:
         Geom::Queue<Vertex, Index, Geom::triangles> queue;
 
-        REFL_STRUCT( Uniforms
-            REFL_AT_CLASS_SCOPE REFL_TERSE
+        REFL_SIMPLE_STRUCT( Uniforms
             REFL_DECL(Uniform<fmat4> REFL_ATTR Vert) matrix
             REFL_DECL(Uniform<fvec2> REFL_ATTR Vert) tex_size
             REFL_DECL(Uniform<TexUnit> REFL_ATTR Frag) texture
