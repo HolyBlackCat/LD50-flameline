@@ -46,7 +46,7 @@ namespace Refl
                 // Instantiating this type triggers an assertion if `touch_to_register` wasn't instantiated first with the same parameters.
                 template <typename Base, typename Derived, typename = void> struct verify
                 {
-                    static_assert(Meta::value<false, Base, Derived>, "This derived class is not registered as polymorphic, probably because it's a template or a member of one. Those are never registered.");
+                    static_assert(Meta::value<false, Base, Derived>, "This derived class is not registered as polymorphic for some reason, possibly because it's a template or a member of one. Those are never registered.");
                 };
                 template <typename Base, typename Derived> struct verify<Base, Derived, std::enable_if_t<zrefl_adl_CheckRegistration(tag<Base, Derived>{})>>
                 {};
@@ -296,22 +296,32 @@ namespace Refl
                 // Otherwise does nothing.
                 template <bool Enable, typename Base, typename Derived> struct DirectlyRegisterDerivedClass : Meta::value_tag<&touch_to_register_class<Base, Derived>> {};
                 template <typename Base, typename Derived> struct DirectlyRegisterDerivedClass<false, Base, Derived> {};
-
-                template <typename T> inline static constexpr bool is_suitable_base = Class::explicitly_polymorphic<T>;
-                template <typename T> inline static constexpr bool is_suitable_derived =
-                    std::is_polymorphic_v<T> && !std::is_abstract_v<T> && std::is_default_constructible_v<T> && !Class::class_has_attrib<T, DontRegisterAsPolymorphic>;
-
-                // If `Derived` is suitable (see `is_suitable_derived`), instantiating this type registers it for each its explicitly polymorphic base.
-                // Otherwise does nothing.
-                template <typename Derived, typename Bases = Class::combined_bases<Derived>, typename = void> struct RegisterForEachBaseIfNeeded {};
-                template <typename Derived, typename ...Bases> struct RegisterForEachBaseIfNeeded<Derived, Meta::type_list<Bases...>, std::enable_if_t<is_suitable_derived<Derived>>>
-                    : Data::DirectlyRegisterDerivedClass<is_suitable_base<Derived>, Derived, Derived>, // Register with the same class as the base.
-                      Data::DirectlyRegisterDerivedClass<is_suitable_base<Bases>, Bases, Derived>... // Register with actual bases.
-                {};
             };
 
+            template <typename T> inline static constexpr bool is_suitable_base = Class::explicitly_polymorphic<T>;
+            template <typename T> inline static constexpr bool is_suitable_derived =
+                std::is_polymorphic_v<T> && !std::is_abstract_v<T> && std::is_default_constructible_v<T> && !Class::class_has_attrib<T, DontRegisterAsPolymorphic>;
+
+            // If `Derived` is suitable (see `is_suitable_derived`), instantiating this type registers it for each its explicitly polymorphic base.
+            // Otherwise does nothing.
+            template <
+                typename Derived, typename Base,
+                typename NextBases = Meta::list_cat<Class::bases<Base>, Class::direct_virtual_bases<Base>>,
+                typename = void
+            >
+            struct RegisterForEachBaseIfNeeded {};
+
+            template <typename Derived, typename Base, typename ...NextBases>
+            struct RegisterForEachBaseIfNeeded<Derived, Base, Meta::type_list<NextBases...>, std::enable_if_t<is_suitable_derived<Derived>>>
+                : Data::DirectlyRegisterDerivedClass<is_suitable_base<Base>, Base, Derived>, // Register with this base.
+                  RegisterForEachBaseIfNeeded<Derived, NextBases>... // Check bases of this base.
+            {};
+
+            template <typename Derived, typename = void> struct RegisterTypeIfNeeded {};
+            template <typename Derived> struct RegisterTypeIfNeeded<Derived, std::enable_if_t<is_suitable_derived<Derived>>> : RegisterForEachBaseIfNeeded<Derived, Derived> {};
+
             // This attaches class registration function to the interface provided in `reflection/structs_basic.h`.
-            template <typename T> struct RegisterType<T, nullptr> : Data::RegisterForEachBaseIfNeeded<T> {};
+            template <typename T> struct RegisterType<T, nullptr> : RegisterTypeIfNeeded<T> {};
         }
 
 
