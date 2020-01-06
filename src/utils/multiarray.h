@@ -89,13 +89,13 @@ template <int D, typename T> class MultiArray
     {
         if (!pos_in_range(pos))
             return;
-        return unsafe_at(pos) = obj;
+        unsafe_at(pos) = obj;
     }
     void try_set(index_vec_t pos, type &&obj)
     {
         if (!pos_in_range(pos))
             return;
-        return unsafe_at(pos) = std::move(obj);
+        unsafe_at(pos) = std::move(obj);
     }
 
     [[nodiscard]] const type &unsafe_at(index_vec_t pos) const
