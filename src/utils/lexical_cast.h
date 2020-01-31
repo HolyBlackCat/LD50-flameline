@@ -13,12 +13,12 @@
 
 #include <double-conversion/double-conversion.h>
 
-#include "program/errors.h"
 #include "macros/check.h"
-#include "utils/escape.h"
-#include "utils/meta.h"
+#include "meta/misc.h"
+#include "meta/type_name.h"
+#include "program/errors.h"
+#include "strings/escape.h"
 #include "utils/robust_math.h"
-#include "utils/type_names.h"
 
 namespace Strings
 {

@@ -7,11 +7,11 @@
 #include <type_traits>
 #include <variant>
 
+#include "meta/misc.h"
 #include "program/errors.h"
 #include "reflection/interface_basic.h"
 #include "reflection/interface_scalar.h"
 #include "reflection/structs.h"
-#include "utils/meta.h"
 #include "utils/robust_math.h"
 
 namespace Refl

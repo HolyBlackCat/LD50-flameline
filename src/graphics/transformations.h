@@ -4,8 +4,8 @@
 #include <utility>
 
 #include "macros/check.h"
+#include "meta/misc.h"
 #include "utils/mat.h"
-#include "utils/meta.h"
 
 namespace Graphics
 {

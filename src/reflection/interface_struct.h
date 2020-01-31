@@ -9,13 +9,13 @@
 #include <type_traits>
 #include <utility>
 
+#include "macros/generated.h"
+#include "macros/named_macro_parameters.h"
+#include "meta/misc.h"
 #include "program/errors.h"
 #include "reflection/interface_basic.h"
 #include "reflection/structs.h"
-#include "macros/generated.h"
-#include "utils/meta.h"
-#include "macros/named_macro_parameters.h"
-#include "utils/strings.h"
+#include "strings/common.h"
 
 namespace Refl
 {

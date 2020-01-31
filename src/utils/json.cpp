@@ -4,7 +4,7 @@
 #include <limits>
 #include <ostream>
 
-#include "utils/strings.h"
+#include "strings/symbol_position.h"
 
 void Json::ParseSkipWhitespace(const char *&cur)
 {

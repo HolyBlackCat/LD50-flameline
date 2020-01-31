@@ -7,9 +7,9 @@
 #include <cglfl/cglfl.hpp>
 
 #include "graphics/vertex_buffer.h"
-#include "program/errors.h"
 #include "macros/finally.h"
-#include "utils/meta.h"
+#include "meta/misc.h"
+#include "program/errors.h"
 
 namespace Graphics
 {

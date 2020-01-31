@@ -3,9 +3,9 @@
 #include <exception>
 #include <string>
 
-#include "program/exit.h"
 #include "interface/messagebox.h"
-#include "utils/strings.h"
+#include "program/exit.h"
+#include "strings/common.h"
 
 namespace Program
 {

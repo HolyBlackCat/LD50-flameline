@@ -9,7 +9,7 @@
 #include "program/errors.h"
 #include "reflection/interface_basic.h"
 #include "reflection/interface_container.h"
-#include "utils/escape.h"
+#include "strings/escape.h"
 #include "utils/robust_math.h"
 
 namespace Refl

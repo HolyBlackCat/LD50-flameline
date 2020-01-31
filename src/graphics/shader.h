@@ -8,11 +8,11 @@
 
 #include "graphics/texture.h"
 #include "graphics/types.h"
+#include "macros/finally.h"
+#include "meta/misc.h"
 #include "program/errors.h"
 #include "reflection/full.h"
-#include "macros/finally.h"
-#include "utils/meta.h"
-#include "utils/strings.h"
+#include "strings/common.h"
 
 namespace Graphics
 {

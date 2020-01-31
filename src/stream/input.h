@@ -9,14 +9,15 @@
 #include <type_traits>
 #include <utility>
 
-#include "program/errors.h"
-#include "utils/byte_order.h"
 #include "macros/check.h"
-#include "utils/escape.h"
-#include "utils/memory_access.h"
-#include "utils/meta.h"
+#include "meta/misc.h"
+#include "program/errors.h"
 #include "stream/readonly_data.h"
-#include "utils/strings.h"
+#include "strings/common.h"
+#include "strings/escape.h"
+#include "strings/symbol_position.h"
+#include "utils/byte_order.h"
+#include "utils/memory_access.h"
 #include "utils/unicode.h"
 
 namespace Stream

@@ -7,9 +7,9 @@
 #include <type_traits>
 #include <utility>
 
+#include "meta/misc.h"
 #include "program/errors.h"
 #include "utils/mat.h"
-#include "utils/meta.h"
 
 template <int D, typename T>
 class MultiArray

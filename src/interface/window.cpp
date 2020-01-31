@@ -2,9 +2,9 @@
 
 #include <cglfl/cglfl.hpp>
 
-#include "program/errors.h"
 #include "macros/finally.h"
-#include "utils/strings.h"
+#include "program/errors.h"
+#include "strings/common.h"
 
 
 // Export some variables to advise video drivers to use the best available video card for the application.

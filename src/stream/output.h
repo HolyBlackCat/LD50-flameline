@@ -12,12 +12,13 @@
 #include <type_traits>
 #include <vector>
 
-#include "program/errors.h"
-#include "utils/byte_order.h"
 #include "macros/check.h"
 #include "macros/finally.h"
-#include "utils/meta.h"
+#include "meta/misc.h"
+#include "program/errors.h"
 #include "stream/readonly_data.h"
+#include "stream/save_to_file.h"
+#include "utils/byte_order.h"
 #include "utils/unicode.h"
 
 namespace Stream

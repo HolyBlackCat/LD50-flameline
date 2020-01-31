@@ -6,10 +6,10 @@
 #include <string_view>
 #include <utility>
 
-#include "reflection/utils.h"
 #include "macros/check.h"
+#include "meta/misc.h"
+#include "reflection/utils.h"
 #include "stream/input.h"
-#include "utils/meta.h"
 #include "stream/output.h"
 
 namespace Refl

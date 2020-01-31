@@ -9,9 +9,9 @@
 #include "graphics/image.h"
 #include "program/errors.h"
 #include "reflection/full.h"
+#include "strings/common.h"
 #include "utils/filesystem.h"
 #include "utils/mat.h"
-#include "utils/strings.h"
 
 namespace Graphics
 {

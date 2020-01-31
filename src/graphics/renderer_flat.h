@@ -8,10 +8,10 @@
 #include "graphics/texture_atlas.h"
 #include "graphics/texture.h"
 #include "graphics/transformations.h"
+#include "meta/misc.h"
 #include "program/errors.h"
 #include "reflection/full.h"
 #include "utils/mat.h"
-#include "utils/meta.h"
 
 namespace Graphics::Renderers
 {

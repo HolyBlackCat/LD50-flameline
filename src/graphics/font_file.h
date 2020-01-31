@@ -10,14 +10,14 @@
 
 #include "graphics/font.h"
 #include "graphics/image.h"
-#include "program/errors.h"
 #include "macros/finally.h"
-#include "utils/mat.h"
+#include "program/errors.h"
 #include "stream/readonly_data.h"
+#include "strings/common.h"
+#include "utils/mat.h"
 #include "utils/packing.h"
-#include "utils/strings.h"
-#include "utils/unicode.h"
 #include "utils/unicode_ranges.h"
+#include "utils/unicode.h"
 
 
 namespace Graphics

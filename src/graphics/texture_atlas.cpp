@@ -2,6 +2,8 @@
 
 #include <memory>
 
+#include "stream/readonly_data.h"
+#include "stream/save_to_file.h"
 #include "utils/packing.h"
 
 namespace Graphics

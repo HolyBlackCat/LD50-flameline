@@ -6,11 +6,11 @@
 #include <cglfl/cglfl.hpp>
 
 #include "graphics/types.h"
+#include "macros/finally.h"
+#include "meta/misc.h"
 #include "program/errors.h"
 #include "reflection/full.h"
-#include "macros/finally.h"
 #include "utils/mat.h"
-#include "utils/meta.h"
 
 namespace Graphics
 {

@@ -7,10 +7,10 @@
 #include <string>
 
 #include "program/errors.h"
+#include "strings/common.h"
 #include "utils/json.h"
 #include "utils/mat.h"
 #include "utils/multiarray.h"
-#include "utils/strings.h"
 
 namespace Tiled
 {
