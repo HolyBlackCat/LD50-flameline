@@ -3,15 +3,16 @@
 #include <algorithm>
 #include <array>
 #include <cstddef>
+#include <memory>
 #include <type_traits>
-#include <vector>
 #include <utility>
 
 #include "program/errors.h"
 #include "utils/mat.h"
 #include "utils/meta.h"
 
-template <int D, typename T> class MultiArray
+template <int D, typename T>
+class MultiArray
 {
   public:
     static constexpr int dimensions = D;
@@ -20,21 +21,25 @@ template <int D, typename T> class MultiArray
 
     using type = T;
     using index_t = std::ptrdiff_t;
-    using index_vec_t = vec<D, index_t>;
+    using index_vec_t = index_vec<D>;
 
   private:
     index_vec_t size_vec;
-    std::vector<type> storage;
+    std::unique_ptr<type[]> storage;
 
   public:
-    MultiArray(index_vec_t size_vec = index_vec_t(0)) : size_vec(size_vec), storage(size_vec.prod())
+    explicit MultiArray(index_vec_t size_vec = index_vec_t(0))
+        : size_vec(size_vec), storage(std::make_unique<type[]>(size_vec.prod()))
     {
         DebugAssert("Invalid multiarray size.", size_vec.min() >= 0);
     }
-    template <typename A, A ...I> MultiArray(Meta::value_list<I...>, std::array<type, index_vec_t(I...).prod()> data) : size_vec(I...), storage(data.begin(), data.end())
+    template <typename A, A ...I>
+    MultiArray(Meta::value_list<I...>, std::array<type, index_vec_t(I...).prod()> data)
+        : size_vec(I...), storage(std::make_unique<type[]>(data.size())) // Use `make_unique_default_init` here once it becomes available.
     {
         static_assert(std::is_integral_v<A>, "Indices must be integral.");
         static_assert(((I >= 0) && ...), "Invalid multiarray size.");
+        std::copy(data.begin(), data.end(), storage.get());
     }
 
     [[nodiscard]] index_vec_t size() const
@@ -62,13 +67,13 @@ template <int D, typename T> class MultiArray
 
         return storage[index];
     }
-    [[nodiscard]] type &throwing_at(index_vec_t pos)
+    [[nodiscard]] type &safe_throwing_at(index_vec_t pos)
     {
         if (!pos_in_range(pos))
             Program::Error("Multiarray index ", pos, " is out of range. The array size is ", size_vec, ".");
         return unsafe_at(pos);
     }
-    [[nodiscard]] type &nonthrowing_at(index_vec_t pos)
+    [[nodiscard]] type &safe_nonthrowing_at(index_vec_t pos)
     {
         if (!pos_in_range(pos))
             Program::HardError("Multiarray index ", pos, " is out of range. The array size is ", size_vec, ".");
@@ -102,13 +107,13 @@ template <int D, typename T> class MultiArray
     {
         return const_cast<MultiArray *>(this)->unsafe_at(pos);
     }
-    [[nodiscard]] const type &throwing_at(index_vec_t pos) const
+    [[nodiscard]] const type &safe_throwing_at(index_vec_t pos) const
     {
-        return const_cast<MultiArray *>(this)->throwing_at(pos);
+        return const_cast<MultiArray *>(this)->safe_throwing_at(pos);
     }
-    [[nodiscard]] const type &nonthrowing_at(index_vec_t pos) const
+    [[nodiscard]] const type &safe_nonthrowing_at(index_vec_t pos) const
     {
-        return const_cast<MultiArray *>(this)->nonthrowing_at(pos);
+        return const_cast<MultiArray *>(this)->safe_nonthrowing_at(pos);
     }
     [[nodiscard]] const type &clamped_at(index_vec_t pos) const
     {
@@ -129,14 +134,18 @@ template <int D, typename T> class MultiArray
 
     [[nodiscard]] index_t element_count() const
     {
-        return storage.size();
+        return size_vec.prod();
     }
     [[nodiscard]] type *elements()
     {
-        return storage.data();
+        return storage.get();
     }
     [[nodiscard]] const type *elements() const
     {
-        return storage.data();
+        return storage.get();
     }
 };
+
+template <typename T> using Array2D = MultiArray<2, T>;
+template <typename T> using Array3D = MultiArray<3, T>;
+template <typename T> using Array4D = MultiArray<4, T>;
