@@ -14,10 +14,10 @@
 
 #include "program/errors.h"
 #include "utils/byte_order.h"
-#include "utils/check.h"
-#include "utils/finally.h"
+#include "macros/check.h"
+#include "macros/finally.h"
 #include "utils/meta.h"
-#include "utils/readonly_data.h"
+#include "stream/readonly_data.h"
 #include "utils/unicode.h"
 
 namespace Stream

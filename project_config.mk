@@ -23,7 +23,7 @@ endif
 CXXFLAGS := -Wall -Wextra -pedantic-errors -std=c++2a
 LDFLAGS :=
 # Important flags
-override CXXFLAGS += -include src/utils/common.h -include src/program/parachute.h -Isrc -Ilib/include $(subst -Dmain,-DENTRY_POINT,$(sort $(deps_compiler_flags)))
+override CXXFLAGS += -include src/utils/common.h -include src/program/parachute.h -Isrc -Ilib/include $(subst -Dmain,-D_main_,$(sort $(deps_compiler_flags)))
 override CXXFLAGS += -Ilib/include/cglfl_gl3.2_core # OpenGL version
 override LDFLAGS += $(filter-out -mwindows,$(deps_linker_flags))
 
@@ -57,7 +57,7 @@ PRECOMPILED_HEADERS := src/game/*.cpp > src/game/master.hpp
 # Code generation
 GEN_CXXFLAGS := -std=c++2a -Wall -Wextra -pedantic-errors
 override generators_dir := gen
-override generated_headers := src/utils/mat.h src/utils/macro.h
-override generate_file = $(call host_native_path,$1) : $(generators_dir)/make_$(subst .,_,$(notdir $1)).cpp ; \
-	@+$(MAKE) -f gen/Makefile _gen_dir=$(generators_dir) _gen_target_file=$1 --no-print-directory
-$(foreach f,$(generated_headers),$(eval $(call generate_file,$f)))
+override generated_headers := math:src/utils/mat.h macros:src/macros/generated.h
+override generate_file = $(call host_native_path,$2) : $(generators_dir)/make_$1.cpp ; \
+	@+$(MAKE) -f gen/Makefile _gen_dir=$(generators_dir) _gen_source_file=make_$1 _gen_target_file=$2 --no-print-directory
+$(foreach f,$(generated_headers),$(eval $(call generate_file,$(word 1,$(subst :, ,$f)),$(word 2,$(subst :, ,$f)))))

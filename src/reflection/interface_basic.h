@@ -7,10 +7,10 @@
 #include <utility>
 
 #include "reflection/utils.h"
-#include "utils/check.h"
-#include "utils/input_stream.h"
+#include "macros/check.h"
+#include "stream/input.h"
 #include "utils/meta.h"
-#include "utils/output_stream.h"
+#include "stream/output.h"
 
 namespace Refl
 {

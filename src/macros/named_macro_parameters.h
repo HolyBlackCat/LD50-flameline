@@ -1,6 +1,6 @@
 #pragma once
 
-#include "utils/macro.h"
+#include "macros/generated.h"
 
 /* Support macros for mamed macro parameters.
  *

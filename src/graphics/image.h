@@ -5,9 +5,9 @@
 #include <utility>
 
 #include "program/errors.h"
-#include "utils/finally.h"
+#include "macros/finally.h"
 #include "utils/mat.h"
-#include "utils/readonly_data.h"
+#include "stream/readonly_data.h"
 
 #include <stb_image.h>
 #include <stb_image_write.h>

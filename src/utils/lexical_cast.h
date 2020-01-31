@@ -14,7 +14,7 @@
 #include <double-conversion/double-conversion.h>
 
 #include "program/errors.h"
-#include "utils/check.h"
+#include "macros/check.h"
 #include "utils/escape.h"
 #include "utils/meta.h"
 #include "utils/robust_math.h"

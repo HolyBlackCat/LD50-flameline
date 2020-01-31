@@ -8,7 +8,7 @@
 
 #include "graphics/texture.h"
 #include "program/errors.h"
-#include "utils/finally.h"
+#include "macros/finally.h"
 #include "utils/mat.h"
 
 namespace Graphics

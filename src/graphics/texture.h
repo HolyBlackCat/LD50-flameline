@@ -6,7 +6,7 @@
 #include <cglfl/cglfl.hpp>
 
 #include "graphics/image.h"
-#include "utils/finally.h"
+#include "macros/finally.h"
 #include "utils/mat.h"
 #include "utils/resource_allocator.h"
 

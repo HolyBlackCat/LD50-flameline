@@ -11,11 +11,11 @@
 
 #include "program/errors.h"
 #include "utils/byte_order.h"
-#include "utils/check.h"
+#include "macros/check.h"
 #include "utils/escape.h"
 #include "utils/memory_access.h"
 #include "utils/meta.h"
-#include "utils/readonly_data.h"
+#include "stream/readonly_data.h"
 #include "utils/strings.h"
 #include "utils/unicode.h"
 

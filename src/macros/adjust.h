@@ -3,7 +3,7 @@
 #include <type_traits>
 #include <utility>
 
-#include "utils/macro.h"
+#include "macros/generated.h"
 
 namespace Macro
 {

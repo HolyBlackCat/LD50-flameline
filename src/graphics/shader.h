@@ -10,7 +10,7 @@
 #include "graphics/types.h"
 #include "program/errors.h"
 #include "reflection/full.h"
-#include "utils/finally.h"
+#include "macros/finally.h"
 #include "utils/meta.h"
 #include "utils/strings.h"
 

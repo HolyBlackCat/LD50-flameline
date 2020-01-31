@@ -10,9 +10,9 @@
 #include "reflection/interface_basic.h"
 #include "reflection/interface_scalar.h"
 #include "utils/lexical_cast.h"
-#include "utils/macro.h"
+#include "macros/generated.h"
 #include "utils/meta.h"
-#include "utils/named_macro_parameters.h"
+#include "macros/named_macro_parameters.h"
 
 namespace Refl
 {

@@ -3,7 +3,7 @@
 #include <type_traits>
 #include <utility>
 
-#include "utils/check.h"
+#include "macros/check.h"
 #include "utils/mat.h"
 #include "utils/meta.h"
 

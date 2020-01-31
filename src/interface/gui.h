@@ -14,8 +14,8 @@
 
 #include "interface/window.h"
 #include "program/errors.h"
-#include "utils/finally.h"
-#include "utils/readonly_data.h"
+#include "macros/finally.h"
+#include "stream/readonly_data.h"
 #include "utils/meta.h"
 #include "utils/poly_storage.h"
 

@@ -2,7 +2,7 @@
 
 #include <functional>
 
-#include "utils/macro.h"
+#include "macros/generated.h"
 
 /* `class CoTask` is basically a poor man's coroutine.
  *

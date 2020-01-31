@@ -6,7 +6,7 @@
 #include <string>
 
 #include "program/errors.h"
-#include "utils/input_stream.h"
+#include "stream/input.h"
 
 namespace Refl::Utils
 {

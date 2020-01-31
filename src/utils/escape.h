@@ -10,7 +10,7 @@
 #include <utility>
 
 #include "program/errors.h"
-#include "utils/check.h"
+#include "macros/check.h"
 #include "utils/unicode.h"
 
 namespace Strings

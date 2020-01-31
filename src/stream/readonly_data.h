@@ -10,9 +10,8 @@
 
 #include "program/errors.h"
 #include "utils/archive.h"
-#include "utils/check.h"
-#include "utils/finally.h"
-#include "utils/meta.h"
+#include "macros/check.h"
+#include "macros/finally.h"
 #include "utils/strings.h"
 
 namespace Stream

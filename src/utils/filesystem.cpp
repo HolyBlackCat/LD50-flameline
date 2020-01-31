@@ -5,7 +5,7 @@
 #include <dirent.h>
 #include <sys/stat.h>
 
-#include "utils/finally.h"
+#include "macros/finally.h"
 #include "program/errors.h"
 
 namespace Filesystem

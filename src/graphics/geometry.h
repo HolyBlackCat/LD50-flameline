@@ -15,7 +15,7 @@
 #include "graphics/transformations.h"
 #include "graphics/vertex_buffer.h"
 #include "program/errors.h"
-#include "utils/check.h"
+#include "macros/check.h"
 #include "utils/meta.h"
 
 namespace Graphics::Geom

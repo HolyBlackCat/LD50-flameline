@@ -53,7 +53,7 @@ namespace States
     };
 }
 
-int ENTRY_POINT(int, char **)
+int _main_(int, char **)
 {
     { // Initialize
         ImGui::StyleColorsDark();

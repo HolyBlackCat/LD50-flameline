@@ -3,7 +3,7 @@
 #include <cglfl/cglfl.hpp>
 
 #include "program/errors.h"
-#include "utils/finally.h"
+#include "macros/finally.h"
 #include "utils/strings.h"
 
 

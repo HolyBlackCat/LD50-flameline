@@ -6,9 +6,9 @@
 
 #include "program/errors.h"
 #include "utils/byte_order.h"
-#include "utils/finally.h"
+#include "macros/finally.h"
 #include "utils/memory_access.h"
-#include "utils/readonly_data.h"
+#include "stream/readonly_data.h"
 
 namespace Audio
 {

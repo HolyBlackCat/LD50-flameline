@@ -8,7 +8,7 @@
 
 #include "audio/source.h"
 #include "program/errors.h"
-#include "utils/finally.h"
+#include "macros/finally.h"
 
 namespace Audio
 {

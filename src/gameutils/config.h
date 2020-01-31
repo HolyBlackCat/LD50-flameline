@@ -9,7 +9,7 @@
 #include "program/errors.h"
 #include "reflection/full.h"
 #include "utils/mat.h"
-#include "utils/readonly_data.h"
+#include "stream/readonly_data.h"
 
 template <typename T> class Config
 {

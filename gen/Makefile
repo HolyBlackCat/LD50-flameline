@@ -11,8 +11,8 @@ include Makefile
 
 # --- LOCATE FILES ---
 override target := $(_gen_target_file)
-override generator_source := $(_gen_dir)/make_$(subst .,_,$(notdir $(target))).cpp
-override generator_binary := $(common_object_dir)/make_$(subst .,_,$(notdir $(target)))$(host_extension_exe)
+override generator_source := $(_gen_dir)/$(_gen_source_file).cpp
+override generator_binary := $(common_object_dir)/$(_gen_source_file)$(host_extension_exe)
 override tmp_file := $(common_object_dir)/$(basename $(notdir $(target))).tmp$(suffix $(target))
 
 # --- TARGETS
