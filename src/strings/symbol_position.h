@@ -1,8 +1,8 @@
 #pragma once
 
+#include <cstdint>
 #include <string>
 #include <utility>
-#include <cstdint>
 
 #include "utils/unicode.h"
 
@@ -12,15 +12,47 @@ namespace Strings
 
     struct SymbolPosition
     {
-        int line = 0;
-        int column = 0;
+        int line = 1;
+        int column = 1;
 
         std::string ToString() const
         {
-            if (line == 0 && column == 0)
-                return "";
-            else
-                return Str(line, ':', column);
+            return Str(line, ':', column);
+        }
+
+        class State
+        {
+            friend SymbolPosition;
+            Unicode::Char prev_line_end = 0;
+          public:
+            State() {}
+        };
+
+        // It doesn't matter what exactly `ch` is, as long as it's not equal to '\r' or '\n';
+        void AddSymbol(Unicode::Char ch, State &state)
+        {
+            if (ch != '\n' && ch != '\r')
+            {
+                column++;
+                state.prev_line_end = 0;
+                return;
+            }
+
+            if (state.prev_line_end != 0 && ch != state.prev_line_end)
+            {
+                state.prev_line_end = 0;
+                return; // Skip the second byte of a line end.
+            }
+
+            state.prev_line_end = ch;
+            line++;
+            column = 1;
+        }
+
+        void AddSymbol(char ch, State &state)
+        {
+            // Yes, the cast will give huge negative values for negative characters, but it doesn't matter.
+            AddSymbol(Unicode::Char(ch), state);
         }
     };
 
@@ -31,39 +63,17 @@ namespace Strings
             std::swap(symbol, start);
 
         SymbolPosition ret;
-        ret.line = 1;
-        ret.column = 1;
-        std::uint32_t prev_line_end = 0;
-
-        auto lambda = [&](std::uint32_t ch)
-        {
-            if (ch != '\n' && ch != '\r')
-            {
-                ret.column++;
-                prev_line_end = 0;
-                return;
-            }
-
-            if (prev_line_end != 0 && ch != prev_line_end)
-            {
-                prev_line_end = 0;
-                return; // Skip a second byte of a line end.
-            }
-
-            prev_line_end = ch;
-            ret.line++;
-            ret.column = 1;
-        };
+        SymbolPosition::State state;
 
         if (bool(use_unicode))
         {
-            for (std::uint32_t ch : Unicode::Iterator(start, symbol))
-                lambda(ch);
+            for (Unicode::Char ch : Unicode::Iterator(start, symbol))
+                ret.AddSymbol(ch, state);
         }
         else
         {
             for (const char *ptr = start; ptr < symbol; ptr++)
-                lambda((unsigned char)*ptr);
+                ret.AddSymbol(*ptr, state);
         }
 
         return ret;

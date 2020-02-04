@@ -1,9 +1,10 @@
 #pragma once
 
 #include <cstddef>
+#include <optional>
+#include <string_view>
 #include <string>
 #include <type_traits>
-#include <string_view>
 #include <utility>
 
 #include "macros/check.h"
@@ -208,12 +209,34 @@ namespace Refl
 
     inline namespace Shorthands
     {
-        // Functions below use this wrapper for extra safety.
+        // Functions below use this wrapper for safery and convenience.
         // Otherwise e.g. `foo(ReadOnlydata)` could be called as `foo("bar")`, and would attempt to read `bar` as a file.
-        struct ReadOnlyDataWrapper
+        class InputStreamWrapper
         {
-            Stream::ReadOnlyData value;
-            ReadOnlyDataWrapper(Stream::ReadOnlyData value) : value(std::move(value)) {}
+            std::optional<Stream::Input> stream_storage;
+
+          public:
+            Stream::Input &stream;
+
+            InputStreamWrapper(Stream::Input &stream) : stream(stream) {}
+            InputStreamWrapper(Stream::Input &&stream) : stream(stream) {}
+
+            InputStreamWrapper(std::string_view str)
+                : stream_storage(std::in_place, Stream::ReadOnlyData::mem_reference(str)), stream(*stream_storage)
+            {}
+
+            InputStreamWrapper(const char *str) : InputStreamWrapper(std::string_view(str)) {}
+            InputStreamWrapper(const std::string &str) : InputStreamWrapper(std::string_view(str)) {}
+
+            // We use SFINAE to make sure this doesn't interfer with the copy/move ctors and with the string ctors.
+            template <typename T, CHECK(!std::is_convertible_v<T, std::string_view> && !std::is_same_v<std::remove_cvref_t<T>, InputStreamWrapper>)>
+            InputStreamWrapper(T &&param)
+                : stream_storage(std::in_place, std::forward<T>(param)), stream(*stream_storage)
+            {}
+
+            // We need this to manually write this ctor to adjust the `stream` reference.
+            // This prevents a move assignment from being generated, but we don't need it.
+            InputStreamWrapper(InputStreamWrapper &&other) noexcept : stream_storage(std::move(other.stream_storage)), stream(*stream_storage) {}
         };
 
 
@@ -232,33 +255,21 @@ namespace Refl
         }
 
 
-        // Skips any leading and trailing whitespace and comments. Expects `input_data` to have no junk at the end.
+        // Skips any leading and trailing whitespace and comments. Expects `input` to have no junk at the end.
         template <typename T, CHECK_EXPR(Interface<T>())>
-        void FromString(T &object, ReadOnlyDataWrapper input_data, const FromStringOptions &options = {})
+        void FromString(T &object, InputStreamWrapper input, const FromStringOptions &options = {})
         {
-            Stream::Input input(std::move(input_data.value), Stream::text_position);
-            Utils::SkipWhitespaceAndComments(input);
-            Interface(object).FromString(object, input, options, impl::FromStringState::InitialState());
-            Utils::SkipWhitespaceAndComments(input);
-            input.ExpectEnd();
-        }
-        template <typename T, CHECK_EXPR(Interface<T>())>
-        void FromString(T &object, std::string_view view, const FromStringOptions &options = {})
-        {
-            FromString(object, Stream::ReadOnlyData::mem_reference(view), options);
+            input.stream.WantLocationStyle(Stream::text_position);
+            Utils::SkipWhitespaceAndComments(input.stream);
+            Interface(object).FromString(object, input.stream, options, impl::FromStringState::InitialState());
+            Utils::SkipWhitespaceAndComments(input.stream);
+            input.stream.ExpectEnd();
         }
         template <typename T, CHECK_EXPR(void(Interface<T>()), T{})>
-        [[nodiscard]] T FromString(ReadOnlyDataWrapper input_data, const FromStringOptions &options = {})
+        [[nodiscard]] T FromString(InputStreamWrapper input, const FromStringOptions &options = {})
         {
             T ret{};
-            FromString(ret, std::move(input_data), options);
-            return ret;
-        }
-        template <typename T, CHECK_EXPR(void(Interface<T>()), T{})>
-        [[nodiscard]] T FromString(std::string_view view, const FromStringOptions &options = {})
-        {
-            T ret{};
-            FromString(ret, view, options);
+            FromString(ret, std::move(input), options);
             return ret;
         }
 
@@ -279,17 +290,17 @@ namespace Refl
 
         // Expects `input_data` to have no junk at the end.
         template <typename T, CHECK_EXPR(Interface<T>())>
-        void FromBinary(T &object, ReadOnlyDataWrapper input_data, const FromBinaryOptions &options = {})
+        void FromBinary(T &object, InputStreamWrapper input, const FromBinaryOptions &options = {})
         {
-            Stream::Input input(std::move(input_data.value), Stream::byte_offset);
-            Interface(object).FromBinary(object, input, options, impl::FromBinaryState::InitialState());
-            input.ExpectEnd();
+            input.stream.WantLocationStyle(Stream::byte_offset);
+            Interface(object).FromBinary(object, input.stream, options, impl::FromBinaryState::InitialState());
+            input.stream.ExpectEnd();
         }
         template <typename T, CHECK_EXPR(void(Interface<T>()), T{})>
-        [[nodiscard]] T FromBinary(ReadOnlyDataWrapper input_data, const FromBinaryOptions &options = {})
+        [[nodiscard]] T FromBinary(InputStreamWrapper input, const FromBinaryOptions &options = {})
         {
             T ret{};
-            FromBinary(ret, std::move(input_data), options);
+            FromBinary(ret, std::move(input), options);
             return ret;
         }
     }

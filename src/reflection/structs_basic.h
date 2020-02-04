@@ -397,7 +397,7 @@ namespace Refl
                 for (std::size_t i = 0; i < ret.size(); i++)
                     ret[i] = Class::MemberName<T>(i); // Using a qualified call to protect against accidental ADL.
                 return ret;
-            };
+            }
             template <typename L> constexpr auto StringList_Classes() // `L` is a `Meta::type_list` of classes.
             {
                 if constexpr (Meta::list_size<L> == 0)
@@ -413,7 +413,7 @@ namespace Refl
                         return name<type>;
                     });
                 }
-            };
+            }
         }
 
         // Those convert {member|base|virtual base} name to its index.

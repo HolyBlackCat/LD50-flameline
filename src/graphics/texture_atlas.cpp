@@ -68,12 +68,9 @@ namespace Graphics
                 // Load image.
                 image = Image(out_image_file);
 
-                // Load description.
-                auto new_desc_data = Stream::ReadOnlyData(out_desc_file);
-
-                // Parse description.
+                // Load and parse description.
                 // We don't pass `desc` directly to `FromString` because if conversion fails, we might need `description` to be empty to regenerate the atlas into it.
-                desc = Refl::FromString<Desc>(new_desc_data);
+                desc = Refl::FromString<Desc>(Stream::Input(out_desc_file));
 
                 return; // The atlas is loaded successfully.
             }

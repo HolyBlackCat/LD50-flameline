@@ -31,8 +31,8 @@ namespace Stream
 
         // Flushes bytes to the underlying object.
         // Can throw on failure.
-        // Will never be copied. If your lambda is not copyable, you can use `Meta::fake_copyable`.
-        using flush_func_t = std::function<void(const Output &, const std::uint8_t *, std::size_t)>;
+        // Will never be copied. If your functor is non-copyable, consider using `Meta::fake_copyable`.
+        using flush_func_t = std::function<void(Output &, const std::uint8_t *, std::size_t)>;
 
       private:
         struct Data
@@ -63,9 +63,13 @@ namespace Stream
             return *this;
         }
 
-        ~Output() noexcept(false) // Yeah, this can throw. Beware!
+        ~Output() // If `Flush` throws, the destructor swallows the exception.
         {
-            Flush();
+            try
+            {
+                Flush();
+            }
+            catch (...) {}
         }
 
         // Constructs a stream with an arbitrary underlying object.
@@ -83,7 +87,7 @@ namespace Stream
             auto deleter = [](FILE *file)
             {
                 // We don't check for errors here, since there is nothing we could do.
-                // And `file` is always closed, even if `fclose` doesn't return `0`
+                // And `file` is always closed anyway, even if `fclose` doesn't return `0`
                 std::fclose(file);
             };
 
@@ -205,13 +209,23 @@ namespace Stream
             ptr += segment_size;
             size -= segment_size;
 
-            // If there is more data, flush the buffer and then flush the data directly.
-            if (size > 0)
+            // If we have no more data to write, stop.
+            if (size == 0)
+                return *this;
+
+            Flush();
+
+            // If the remaining data fits in the buffer, put it there and stop.
+            // Note the `<` instead of `<=`, there is no point in putting the data in the buffer in that case.
+            if (size < data.buffer_capacity)
             {
-                Flush();
-                data.flush(*this, ptr, size);
+                std::copy_n(ptr, size, data.buffer.get());
+                data.buffer_pos = size;
+                return *this;
             }
 
+            // If there is too much data, bypass the buffer and flush it directly.
+            data.flush(*this, ptr, size);
             return *this;
         }
         Output &WriteBytes(const char *ptr, std::size_t size)

@@ -3,8 +3,11 @@
 #include <algorithm>
 #include <cstddef>
 #include <cstdint>
+#include <cstdio>
+#include <exception>
 #include <initializer_list>
 #include <memory>
+#include <optional>
 #include <string>
 #include <type_traits>
 #include <utility>
@@ -16,8 +19,10 @@
 #include "strings/common.h"
 #include "strings/escape.h"
 #include "strings/symbol_position.h"
+#include "utils/bit_manip.h"
 #include "utils/byte_order.h"
 #include "utils/memory_access.h"
+#include "utils/robust_math.h"
 #include "utils/unicode.h"
 
 namespace Stream
@@ -171,17 +176,152 @@ namespace Stream
 
     class Input
     {
+      public:
+        enum class capacity_t : std::size_t {};
+        static constexpr capacity_t default_capacity = capacity_t(512); // This is what `FILE *` appears to use by default.
+
+        // Retrieves bytes from the underlying object.
+        // Can throw on failure.
+        // Will never be copied. If your functor is non-copyable, consider using `Meta::fake_copyable`.
+        using read_func_t = std::function<void(Input &stream, std::size_t offset, std::size_t size, std::uint8_t *dst)>;
+
+      private:
+        struct Buffer
+        {
+            std::uint8_t *storage = nullptr;
+            std::size_t position = -1; // `-1` means 'unassigned'. Otherwise lower `log2(capacity)` bits must be set to 0.
+
+            std::uint8_t ReadByte(std::size_t byte_pos) const
+            {
+                return storage[byte_pos - position];
+            }
+
+            void Read(std::size_t pos, std::size_t size, std::uint8_t *target) const
+            {
+                std::copy_n(storage + (pos - position), size, target);
+            }
+        };
+
         struct Data
         {
-            ReadOnlyData file;
+            std::size_t buffer_capacity = -1; // This MUST be a power of two. 0 means that the stream is null.
+            std::unique_ptr<std::uint8_t[]> buffer_storage;
+            Buffer buffer_a, buffer_b;
+            bool last_accessed_buffer_is_b = true;
+
+            read_func_t read;
             std::size_t position = 0;
-            LocationStyle location_style = none;
+            std::size_t size = 0; // This value must be representable as `ptrdiff_t`.
+
+            std::optional<LocationStyle> location_style;
+
+            std::string name;
         };
         Data data;
 
-        void ThrowIfNoData(std::size_t bytes) const
+
+        struct FileHandleInfo
         {
-            if (data.position + bytes > data.file.size())
+            std::size_t pos, size;
+        };
+        // Collect some information about a file handle. Throws on failure.
+        static FileHandleInfo CollectFileHandleInfo(FILE *handle, bool file_is_pristine)
+        {
+            FileHandleInfo ret;
+
+            long file_pos_raw = 0;
+
+            if (!file_is_pristine)
+            {
+                std::ftell(handle);
+                if (file_pos_raw < 0)
+                    Program::Error("Unable to get current position in the file.");
+            }
+
+            if (std::fseek(handle, 0, SEEK_END))
+                Program::Error("Unable to seek in the file.");
+
+            auto file_size_raw = std::ftell(handle);
+            if (file_size_raw < 0)
+                Program::Error("Unable to get the size of the file.");
+            if (Robust::conversion_fails(file_size_raw, ret.size))
+                Program::Error("File is too large.");
+
+            // We don't need to check representability here, since we already did it for `file_size_raw`.
+            ret.pos = std::min(file_pos_raw, file_size_raw);
+
+            if (std::fseek(handle, file_pos_raw, SEEK_SET))
+                Program::Error("Unable to seek in the file.");
+
+            return ret;
+        }
+
+        // This is used to simplify writing functors for reading from files.
+        // Does everything a proper functor should do. Throws on failure.
+        static void FileHandleReader(FILE *handle, std::size_t &last_offset, Input &stream, std::size_t offset, std::size_t size, std::uint8_t *dst)
+        {
+            if (last_offset != offset && std::fseek(handle, offset, SEEK_SET))
+                Program::Error(stream.GetExceptionPrefix(), "Unable to seek in the file.");
+
+            if (std::fread(dst, size, 1, handle) != 1)
+            {
+                if (std::feof(handle))
+                    Program::Error(stream.GetExceptionPrefix(), "Unable to read from the file: EOF was reported.");
+                else
+                    Program::Error(stream.GetExceptionPrefix(), "Unable to read from the file: ", std::strerror(errno));
+            }
+
+            last_offset = offset + size;
+        }
+
+        // Rounds the position down to a multiple of the buffer capacity.
+        std::size_t PositionToSegmentOffset(std::size_t pos)
+        {
+            return pos & ~(data.buffer_capacity - std::size_t(1));
+        }
+
+        // `segment_offset` must be a multiple of the buffer capacity.
+        // Unconditionally overwrites the specified buffer with new data.
+        // Returns the reference to that buffer.
+        Buffer &LoadSegmentToBuffer(bool use_buffer_b, std::size_t segment_offset)
+        {
+            Buffer &buffer = use_buffer_b ? data.buffer_b : data.buffer_a;
+
+            std::size_t segment_size = std::min(data.size - segment_offset, data.buffer_capacity);
+            data.read(*this, segment_offset, segment_size, buffer.storage);
+
+            buffer.position = segment_offset;
+
+            return buffer;
+        }
+
+        // `segment_offset` must be a multiple of the buffer capacity.
+        // If the segment with the specified offset is already loaded, changes `last_accessed_buffer_is_b` to indicate that buffer.
+        // Otherwise overwrites one of the two buffers (the one that was accessed less recently that the other) with the new data, and
+        // changes `last_accessed_buffer_is_b` to indicate which buffer was overwritten.
+        Buffer &NeedSegment(std::size_t segment_offset)
+        {
+            if (data.buffer_a.position == segment_offset)
+            {
+                data.last_accessed_buffer_is_b = false;
+                return data.buffer_a;
+            }
+            if (data.buffer_b.position == segment_offset)
+            {
+                data.last_accessed_buffer_is_b = true;
+                return data.buffer_b;
+            }
+
+            bool use_buffer_b = !data.last_accessed_buffer_is_b;
+            Buffer &buffer = LoadSegmentToBuffer(use_buffer_b, segment_offset);
+            data.last_accessed_buffer_is_b = use_buffer_b;
+
+            return buffer;
+        }
+
+        void ThrowIfNoData(std::size_t bytes)
+        {
+            if (data.position + bytes > data.size)
                 Program::Error(GetExceptionPrefix() + "Unexpected end of input.");
         }
 
@@ -189,12 +329,106 @@ namespace Stream
         // Constructs an empty stream.
         Input() {}
 
-        // Attaches a stream to a memory file.
-        Input(ReadOnlyData file, LocationStyle location_style = none)
+        // Constructs a custom stream.
+        // `buffer_capacity` is rounded down to the nearest positive power of two.
+        Input(std::string name, std::size_t size, read_func_t read_func, capacity_t buffer_capacity = default_capacity)
         {
-            data.file = std::move(file);
-            data.location_style = location_style;
+            if (Robust::not_representable_as<std::ptrdiff_t>(size))
+                Program::Error("Unable to create an input stream `", name, "`: the specified size is too large.");
+
+            data.name = std::move(name);
+            data.size = size;
+            data.read = std::move(read_func);
+            data.buffer_capacity = BitManip::RoundDownToPositivePowerOfTwo(std::size_t(buffer_capacity));
+            data.buffer_storage = std::make_unique<std::uint8_t[]>(data.buffer_capacity * 2);
+            data.buffer_a.storage = data.buffer_storage.get();
+            data.buffer_b.storage = data.buffer_storage.get() + data.buffer_capacity;
         }
+
+        // Attaches the stream to a ReadOnlyData.
+        Input(ReadOnlyData source)
+        {
+            if (!source)
+                Program::Error("Attempt to bind an input stream to a null ReadOnlyData.");
+
+            data.name = source.name();
+            data.size = source.size();
+            // This holds the ownership of `source` and does nothing else.
+            // `source` is not moved because we need it below.
+            data.read = [source](const auto &...){(void)source;};
+            // The largest power-of-two capacity we can get.
+            // It will always be larger than `source.size()`, because the latter must be representable as `std::ptrdiff_t`.
+            data.buffer_capacity = std::numeric_limits<std::size_t>::max() / 2 + 1;
+            data.buffer_a.position = 0;
+            data.buffer_a.storage = const_cast<std::uint8_t *>(source.data()); // Since our functor is a no-op, this is safe.
+        }
+
+        // Attaches the stream to a file handle (without taking ownership).
+        // The current position of the new stream is set to match the current position in the file,
+        // but after that the stream expects the position in the file to not change between reads.
+        Input(std::string name, FILE *handle, capacity_t buffer_capacity = default_capacity)
+        {
+            FileHandleInfo info;
+
+            try
+            {
+                info = CollectFileHandleInfo(handle, false);
+            }
+            catch (std::exception &e)
+            {
+                Program::Error("Unable to attach an input stream `", name, "` to a file handle ", (void *)handle, ":\n", e.what());
+            }
+
+            auto lambda = [handle, last_offset = info.pos](Input &stream, std::size_t offset, std::size_t size, std::uint8_t *dst) mutable
+            {
+                FileHandleReader(handle, last_offset, stream, offset, size, dst);
+            };
+
+            *this = Input(std::move(name), info.size, std::move(lambda), buffer_capacity);
+
+            Seek(info.pos, absolute);
+        }
+
+        // Attaches the stream to a file.
+        Input(std::string file_name, capacity_t buffer_capacity = default_capacity)
+        {
+            auto deleter = [](FILE *file)
+            {
+                // We don't check for errors here, since there is nothing we could do.
+                // And `file` is always closed anyway, even if `fclose` doesn't return `0`
+                std::fclose(file);
+            };
+
+            std::unique_ptr<FILE, decltype(deleter)> handle(std::fopen(file_name.c_str(), "rb"));
+            if (!handle)
+                Program::Error("Unable to open `", file_name, "` for writing.");
+
+            FileHandleInfo info;
+
+            try
+            {
+                info = CollectFileHandleInfo(handle.get(), true);
+            }
+            catch (std::exception &e)
+            {
+                Program::Error("Unable to attach an input stream to `", file_name, "`:\n", e.what());
+            }
+
+            auto lambda = Meta::fake_copyable([handle = std::move(handle), last_offset = (std::size_t)0](Input &stream, std::size_t offset, std::size_t size, std::uint8_t *dst) mutable
+            {
+                FileHandleReader(handle.get(), last_offset, stream, offset, size, dst);
+            });
+
+            *this = Input(std::move(file_name), info.size, std::move(lambda), buffer_capacity);
+        }
+
+        // Attaches the stream to a file.
+        // Without this helper, `Input(ReadOnlyData source)` would cause an ambiguity.
+        Input(const char *file_name, capacity_t buffer_capacity = default_capacity) : Input(std::string(file_name), buffer_capacity) {}
+
+        // Attaches the stream to a file.
+        // Without this helper, `Input(ReadOnlyData source)` would cause an ambiguity.
+        Input(std::string_view file_name, capacity_t buffer_capacity = default_capacity) : Input(std::string(file_name), buffer_capacity) {}
 
         Input(Input &&other) noexcept : data(std::exchange(other.data, {})) {}
         Input &operator=(Input other) noexcept
@@ -205,20 +439,37 @@ namespace Stream
 
         [[nodiscard]] explicit operator bool() const
         {
-            return bool(data.file);
+            return bool(data.buffer_capacity);
         }
 
         // Returns a name of the data source the stream is bound to.
         [[nodiscard]] std::string GetTarget() const
         {
-            return data.file.name();
+            return data.name;
+        }
+
+        // Does nothing if a style is already selected.
+        Input &WantLocationStyle(LocationStyle style)
+        {
+            if (!data.location_style)
+                data.location_style = style;
+
+            return *this;
+        }
+
+        // Returns `none` by default.
+        [[nodiscard]] LocationStyle GetLocationStyle() const
+        {
+            return data.location_style.value_or(none);
         }
 
         // Returns a string describing current location in the stream.
-        // This function can be costly for some location flavors.
-        [[nodiscard]] std::string GetLocation() const
+        // This function can be costly for some location flavors, use it wisely.
+        // It's not `const` because it might need to read parts of the file.
+        [[nodiscard]] std::string GetLocation()
         {
-            switch (data.location_style)
+            auto style = GetLocationStyle();
+            switch (style)
             {
               case none:
               default:
@@ -227,19 +478,37 @@ namespace Stream
                 return Str("offset 0x", std::hex, std::uppercase, data.position);
               case text_position:
               case text_byte_position:
-                return Strings::GetSymbolPosition(data.file.data_char(), data.file.data_char() + data.position).ToString();
+                {
+                    std::size_t old_pos = Position();
+                    Seek(0, absolute);
+                    FINALLY( Seek(old_pos, absolute); ) // Roll back to the original posiiton, in case we end up in the middle of a multibyte character, or something throws.
+
+                    Strings::SymbolPosition pos;
+                    Strings::SymbolPosition::State pos_state;
+
+                    if (style == text_byte_position)
+                    {
+                        while (Position() < old_pos)
+                            pos.AddSymbol(ReadChar(), pos_state);
+                    }
+                    else
+                    {
+                        while (Position() < old_pos)
+                            pos.AddSymbol(ReadUnicodeChar(), pos_state);
+                    }
+
+                    return pos.ToString();
+                }
             }
         }
 
         // Uses `GetLocationString` to construct a prefix for exception messages.
-        [[nodiscard]] std::string GetExceptionPrefix() const
+        [[nodiscard]] std::string GetExceptionPrefix()
         {
             std::string ret = "In an input stream bound to `" + GetTarget() + "`";
 
             if (std::string loc = GetLocation(); loc.size() > 0)
-            {
                 ret += ", at " + loc;
-            }
 
             ret += ":\n";
             return ret;
@@ -250,15 +519,15 @@ namespace Stream
         void Seek(std::ptrdiff_t offset, PositionCategory category)
         {
             std::size_t base_pos =
-                category == relative ? data.position    :
-                category == end      ? data.file.size() : 0;
+                category == relative ? data.position :
+                category == end      ? data.size     : 0;
 
             std::size_t new_pos = base_pos + offset;
 
-            // Note the `>` rather than `<=`. Pointing to a single byte past the end of the file is allowed.
+            // Note the `>` rather than `>=`. Pointing to a single byte past the end of the file is allowed.
             // Note that we don't check for an overflow here. It shouldn't be necessary,
-            // as `file.size()` will be representable as `ptrdiff_t`, because the file resides in memory.
-            if (new_pos > data.file.size())
+            // since we require `data.size` to be representable as `ptrdiff_t`.
+            if (new_pos > data.size)
                 Program::Error(GetExceptionPrefix() + "Cursor position is out of bounds.");
 
             data.position = new_pos;
@@ -273,23 +542,23 @@ namespace Stream
         // Checks if the stream has more data available at the current cursor position.
         [[nodiscard]] bool MoreData() const
         {
-            return data.position < data.file.size();
+            return data.position < data.size;
         }
 
         // Throws if there is more data available at the current cursor position.
-        void ExpectEnd() const
+        void ExpectEnd()
         {
             if (MoreData())
                 Program::Error(GetExceptionPrefix() + "Unexpected junk at the end of input.");
         }
 
         // Returns the next byte, without advancing the cursor.
-        [[nodiscard]] std::uint8_t PeekByte() const
+        [[nodiscard]] std::uint8_t PeekByte()
         {
             ThrowIfNoData(1);
-            return data.file.data()[data.position];
+            return NeedSegment(PositionToSegmentOffset(data.position)).ReadByte(data.position);
         }
-        [[nodiscard]] char PeekChar() const
+        [[nodiscard]] char PeekChar()
         {
             return PeekByte();
         }
@@ -297,8 +566,9 @@ namespace Stream
         // Reads a single byte.
         [[nodiscard]] std::uint8_t ReadByte()
         {
-            ThrowIfNoData(1);
-            return data.file.data()[data.position++];
+            std::uint8_t ret = PeekByte();
+            data.position++; // If this would go out of bounds, `PeekByte()` would throw.
+            return ret;
         }
         [[nodiscard]] char ReadChar()
         {
@@ -352,8 +622,32 @@ namespace Stream
         // Reads a sequence of bytes.
         void Read(std::uint8_t *buffer, std::size_t size)
         {
+            if (size == 0)
+                return;
             ThrowIfNoData(size);
-            std::copy_n(data.file.data() + data.position, size, buffer);
+
+            std::size_t first_segment = PositionToSegmentOffset(data.position);
+            std::size_t last_segment = PositionToSegmentOffset(data.position + size - 1);
+
+            if (first_segment == last_segment)
+            {
+                // The entire range fits into a single segment, load it.
+                NeedSegment(first_segment).Read(data.position, size, buffer);
+            }
+            else
+            {
+                // Otherwise load the first and the last segments, and use a single unbuffered read for everything in between.
+                std::size_t second_segment = first_segment + data.buffer_capacity;
+
+                std::size_t first_size = second_segment - data.position;
+                NeedSegment(first_segment).Read(data.position, first_size, buffer);
+
+                data.read(*this, second_segment, last_segment - second_segment, buffer + first_size);
+
+                std::size_t last_size = data.position + size - last_segment;
+                NeedSegment(last_segment).Read(last_segment, last_size, buffer + size - last_size);
+            }
+
             data.position += size;
         }
         void Read(char *buffer, std::size_t size)
