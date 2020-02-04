@@ -7,7 +7,7 @@
 #include <sstream>
 #include <type_traits>
 
-#define VERSION "3.1.8"
+#define VERSION "3.1.9"
 
 #pragma GCC diagnostic ignored "-Wpragmas" // Silence GCC warning about the next line disabling a warning that GCC doesn't have.
 #pragma GCC diagnostic ignored "-Wstring-plus-int" // Silence clang warning about `1+R"()"` pattern.
@@ -448,8 +448,8 @@ int main(int argc, char **argv)
                             output("[[nodiscard]] constexpr const type &operator[](int i) const {return *(type *)((char *)this + sizeof(type)*i);}\n");
 
                             // As array
-                            output("[[nodiscard]] type *as_array() {return &x;};\n");
-                            output("[[nodiscard]] const type *as_array() const {return &x;};\n");
+                            output("[[nodiscard]] type *as_array() {return &x;}\n");
+                            output("[[nodiscard]] const type *as_array() const {return &x;}\n");
                         }
 
                         { // Boolean
@@ -723,8 +723,8 @@ int main(int argc, char **argv)
                             output("[[nodiscard]] constexpr const member_type &operator[](int i) const {return *(member_type *)((char *)this + sizeof(member_type)*i);}\n");
 
                             // As array
-                            output("[[nodiscard]] type *as_array() {return &x.x;};\n");
-                            output("[[nodiscard]] const type *as_array() const {return &x.x;};\n");
+                            output("[[nodiscard]] type *as_array() {return &x.x;}\n");
+                            output("[[nodiscard]] const type *as_array() const {return &x.x;}\n");
                         }
 
                         { // Resize

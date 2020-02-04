@@ -202,7 +202,7 @@ namespace Poly
             Low() {}
 
             Low(Low &&other) noexcept : data(std::exchange(other.data, {})) {}
-            Low &operator=(Low other) noexcept {std::swap(data, other.data); return *this;};
+            Low &operator=(Low other) noexcept {std::swap(data, other.data); return *this;}
 
             ~Low() {}
 

@@ -20,7 +20,7 @@ endif
 
 
 # Flags
-CXXFLAGS := -Wall -Wextra -pedantic-errors -std=c++2a
+CXXFLAGS := -std=c++2a -pedantic-errors -Wall -Wextra -Wdeprecated -Wextra-semi
 LDFLAGS :=
 # Important flags
 override CXXFLAGS += -include src/utils/common.h -include src/program/parachute.h -Isrc -Ilib/include $(subst -Dmain,-D_main_,$(sort $(deps_compiler_flags)))
