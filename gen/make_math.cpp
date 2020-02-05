@@ -7,7 +7,7 @@
 #include <sstream>
 #include <type_traits>
 
-#define VERSION "3.1.9"
+#define VERSION "3.1.10"
 
 #pragma GCC diagnostic ignored "-Wpragmas" // Silence GCC warning about the next line disabling a warning that GCC doesn't have.
 #pragma GCC diagnostic ignored "-Wstring-plus-int" // Silence clang warning about `1+R"()"` pattern.
@@ -272,8 +272,6 @@ int main(int argc, char **argv)
 
                 // Checks if none of `P...` are vector types.
                 template <typename ...P> inline constexpr bool no_vectors_v = !(is_vector_v<P> || ...);
-                // SFINAE helper. Returns `nullptr` if none of `P...` are vectors, otherwise causes a soft error.
-                template <typename ...P> inline constexpr decltype(nullptr) valid_if_no_vectors = std::enable_if_t<no_vectors_v<P...>, decltype(nullptr)>{};
 
                 // Check if `T` is a matrix type (possibly const).
                 template <typename T> struct is_matrix_impl : std::false_type {};
@@ -1619,34 +1617,39 @@ int main(int argc, char **argv)
                 // Some of them are imported from `std` and extended to operate on vectors. Some are custom.
 
                 using std::abs;
-                template <typename T, decltype(nullptr) = valid_if_no_vectors<T>> [[nodiscard]] T abs(T x)
+                template <typename T, std::nullptr_t = std::enable_if_t<!no_vectors_v<T>, std::nullptr_t>{}>
+                [[nodiscard]] T abs(T x)
                 {
                     return apply_elementwise([](auto val){return std::abs(val);}, x);
                 }
 
                 using std::round;
-                template <typename T, decltype(nullptr) = valid_if_no_vectors<T>> [[nodiscard]] T round(T x)
+                template <typename T, std::nullptr_t = std::enable_if_t<!no_vectors_v<T>, std::nullptr_t>{}>
+                [[nodiscard]] T round(T x)
                 {
                     static_assert(std::is_floating_point_v<vec_base_t<T>>, "Argument must be floating-point.");
                     return apply_elementwise([](auto val){return std::round(val);}, x);
                 }
 
                 using std::floor;
-                template <typename T, decltype(nullptr) = valid_if_no_vectors<T>> [[nodiscard]] T floor(T x)
+                template <typename T, std::nullptr_t = std::enable_if_t<!no_vectors_v<T>, std::nullptr_t>{}>
+                [[nodiscard]] T floor(T x)
                 {
                     static_assert(std::is_floating_point_v<vec_base_t<T>>, "Argument must be floating-point.");
                     return apply_elementwise([](auto val){return std::floor(val);}, x);
                 }
 
                 using std::ceil;
-                template <typename T, decltype(nullptr) = valid_if_no_vectors<T>> [[nodiscard]] T ceil(T x)
+                template <typename T, std::nullptr_t = std::enable_if_t<!no_vectors_v<T>, std::nullptr_t>{}>
+                [[nodiscard]] T ceil(T x)
                 {
                     static_assert(std::is_floating_point_v<vec_base_t<T>>, "Argument must be floating-point.");
                     return apply_elementwise([](auto val){return std::ceil(val);}, x);
                 }
 
                 using std::trunc;
-                template <typename T, decltype(nullptr) = valid_if_no_vectors<T>> [[nodiscard]] T trunc(T x)
+                template <typename T, std::nullptr_t = std::enable_if_t<!no_vectors_v<T>, std::nullptr_t>{}>
+                [[nodiscard]] T trunc(T x)
                 {
                     static_assert(std::is_floating_point_v<vec_base_t<T>>, "Argument must be floating-point.");
                     return apply_elementwise([](auto val){return std::trunc(val);}, x);
@@ -1714,7 +1717,7 @@ int main(int argc, char **argv)
                 }
 
                 using std::pow;
-                template <typename A, typename B, decltype(nullptr) = valid_if_no_vectors<A, B>>
+                template <typename A, typename B, std::nullptr_t = std::enable_if_t<!no_vectors_v<A, B>, std::nullptr_t>{}>
                 [[nodiscard]] auto pow(A a, B b)
                 {
                     return apply_elementwise([](auto val_a, auto val_b){return std::pow(val_a, val_b);}, a, b);
