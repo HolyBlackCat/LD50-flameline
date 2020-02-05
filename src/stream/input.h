@@ -403,6 +403,10 @@ namespace Stream
             if (!handle)
                 Program::Error("Unable to open `", file_name, "` for writing.");
 
+            // This function can fail, but it doesn't report errors in any way.
+            // Even if it did, we would still ignore it.
+            std::setbuf(handle.get(), 0);
+
             FileHandleInfo info;
 
             try
