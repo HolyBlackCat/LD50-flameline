@@ -236,7 +236,9 @@ namespace Refl
 
             // We need this to manually write this ctor to adjust the `stream` reference.
             // This prevents a move assignment from being generated, but we don't need it.
-            InputStreamWrapper(InputStreamWrapper &&other) noexcept : stream_storage(std::move(other.stream_storage)), stream(*stream_storage) {}
+            InputStreamWrapper(InputStreamWrapper &&other) noexcept
+                : stream_storage(std::move(other.stream_storage)), stream(stream_storage ? *stream_storage : other.stream)
+            {}
         };
 
 
