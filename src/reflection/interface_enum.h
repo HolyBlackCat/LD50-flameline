@@ -12,7 +12,7 @@
 #include "program/errors.h"
 #include "reflection/interface_basic.h"
 #include "reflection/interface_scalar.h"
-#include "utils/lexical_cast.h"
+#include "strings/lexical_cast.h"
 
 namespace Refl
 {

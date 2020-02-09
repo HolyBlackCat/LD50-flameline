@@ -237,7 +237,7 @@ namespace Strings
     [[nodiscard]] std::string ToString(T number)
     {
         char buf[ToStringMaxBufferLen()];
-        bool ok = ToString(buf, sizeof buf, number);
+        [[maybe_unused]] bool ok = ToString(buf, sizeof buf, number);
         DebugAssert("The internal buffer allocated by `ToString` ended up being too small, huh.", ok);
         return buf;
     }
