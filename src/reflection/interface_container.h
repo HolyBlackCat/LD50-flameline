@@ -64,11 +64,9 @@ namespace Refl
 
         // Inserts an element to the end of a container.
         // If the container doesn't allow duplicate elements and this one is a duplicate, should do nothing.
-        virtual void PushBack(T &object, const elem_t &elem) const = 0;
         virtual void PushBack(T &object, elem_t &&elem) const = 0;
 
         // Iterates over the container.
-        virtual void ForEach(      T &object, std::function<void(      elem_t &elem)> func) const = 0;
         virtual void ForEach(const T &object, std::function<void(const elem_t &elem)> func) const = 0;
 
 
@@ -235,15 +233,9 @@ namespace Refl
 
         virtual void Clear(T &object) const override
         {
-            object = {};
-        }
-
-        virtual void PushBack(T &object, const elem_t &elem) const override
-        {
-            if constexpr (has_push_back)
-                object.push_back(elem);
-            else
-                object.insert(elem);
+            // Note that `= {}` is not good enough, since it appears to
+            // invoke the `initializer_list`, which requires elements to be copyable.
+            object = T{};
         }
 
         virtual void PushBack(T &object, elem_t &&elem) const override
@@ -252,12 +244,6 @@ namespace Refl
                 object.push_back(std::move(elem));
             else
                 object.insert(std::move(elem));
-        }
-
-        virtual void ForEach(T &object, std::function<void(elem_t &elem)> func) const override
-        {
-            for (auto it = object.begin(); it != object.end(); it++)
-                func(*it);
         }
 
         virtual void ForEach(const T &object, std::function<void(const elem_t &elem)> func) const override
