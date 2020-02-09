@@ -16,6 +16,7 @@
 #include "macros/finally.h"
 #include "meta/misc.h"
 #include "program/errors.h"
+#include "stream/better_fopen.h"
 #include "stream/readonly_data.h"
 #include "stream/save_to_file.h"
 #include "utils/byte_order.h"
@@ -91,7 +92,7 @@ namespace Stream
                 std::fclose(file);
             };
 
-            std::unique_ptr<FILE, decltype(deleter)> handle(std::fopen(file_name.c_str(), SaveModeStringRepresentation(mode)));
+            std::unique_ptr<FILE, decltype(deleter)> handle(better_fopen(file_name.c_str(), SaveModeStringRepresentation(mode)));
             if (!handle)
                 Program::Error("Unable to open `" + file_name + "` for writing.");
 

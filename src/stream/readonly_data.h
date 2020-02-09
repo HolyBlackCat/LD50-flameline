@@ -11,6 +11,7 @@
 #include "macros/check.h"
 #include "macros/finally.h"
 #include "program/errors.h"
+#include "stream/better_fopen.h"
 #include "stream/utils.h"
 #include "strings/common.h"
 #include "utils/archive.h"
@@ -118,7 +119,7 @@ namespace Stream
             ReadOnlyData ret;
             ret.ref = std::make_shared<Data>();
 
-            FILE *file = std::fopen(file_name.c_str(), "rb");
+            FILE *file = better_fopen(file_name.c_str(), "rb");
             if (!file)
                 Program::Error("Unable to open file `", file_name, "`.");
             FINALLY( std::fclose(file); )

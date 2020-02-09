@@ -9,6 +9,7 @@
 
 #include "macros/finally.h"
 #include "program/errors.h"
+#include "stream/better_fopen.h"
 #include "stream/utils.h"
 #include "utils/archive.h"
 
@@ -35,7 +36,7 @@ namespace Stream
     // Saves a block of memory to a file. Throws on failure.
     inline void SaveFile(std::string file_name, const std::uint8_t *begin, const std::uint8_t *end, SaveMode mode = overwrite)
     {
-        FILE *file = std::fopen(file_name.c_str(), SaveModeStringRepresentation(mode));
+        FILE *file = better_fopen(file_name.c_str(), SaveModeStringRepresentation(mode));
         if (!file)
             Program::Error("Unable to open file `", file_name, "` for writing.");
         FINALLY( std::fclose(file); )

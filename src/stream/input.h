@@ -15,6 +15,7 @@
 #include "macros/check.h"
 #include "meta/misc.h"
 #include "program/errors.h"
+#include "stream/better_fopen.h"
 #include "stream/readonly_data.h"
 #include "strings/common.h"
 #include "strings/escape.h"
@@ -399,9 +400,9 @@ namespace Stream
                 std::fclose(file);
             };
 
-            std::unique_ptr<FILE, decltype(deleter)> handle(std::fopen(file_name.c_str(), "rb"));
+            std::unique_ptr<FILE, decltype(deleter)> handle(better_fopen(file_name.c_str(), "rb"));
             if (!handle)
-                Program::Error("Unable to open `", file_name, "` for writing.");
+                Program::Error("Unable to open `", file_name, "` for reading.");
 
             // This function can fail, but it doesn't report errors in any way.
             // Even if it did, we would still ignore it.
