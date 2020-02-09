@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cctype>
+#include <cstddef>
 #include <cstdio>
 #include <iomanip>
 #include <sstream>
@@ -71,6 +72,24 @@ namespace Strings
         if (str.size() < prefix.size()) // We don't want `str.size() - prefix.size()` to overflow.
             return 0;
         return str.compare(str.size() - prefix.size(), prefix.size(), prefix) == 0;
+    }
+
+    [[nodiscard]] inline std::string Replace(std::string_view source, std::string_view a, std::string_view b)
+    {
+        std::string ret;
+
+        std::size_t cur_pos;
+        std::size_t last_pos = 0;
+
+        while ((cur_pos = source.find(a, last_pos)) != std::string::npos)
+        {
+            ret.append(source, last_pos, cur_pos - last_pos);
+            ret += b;
+            last_pos = cur_pos + a.length();
+        }
+
+        ret += source.substr(last_pos);
+        return ret;
     }
 }
 
