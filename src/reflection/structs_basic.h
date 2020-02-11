@@ -1104,7 +1104,8 @@ That's all.
 // Generates an attribute list as a part of the common metadata for member variables.
 #define REFL_MEMBERS_impl_metadata_generic_low_attribs(...) \
     using member_attribs = ::Meta::type_list< \
-        MA_APPEND_TO_VA_END(_end, REFL_MEMBERS_impl_metadata_memattr_loop_0 __VA_ARGS__) \
+        /* can't use `MA_IDENTITY` here, since it would conflict with the same macro in `REFL_STRUCT_impl_low_base` */\
+        MA_IDENTITY2( MA_NULL MA_APPEND_TO_VA_END(_end, REFL_MEMBERS_impl_metadata_memattr_loop_a __VA_ARGS__) () ) \
     >;
 
 
@@ -1132,10 +1133,8 @@ That's all.
 
 // Internal. Helper for `REFL_MEMBERS_impl_metadata_generic_low`.
 // Generates attribute information for member variables.
-#define REFL_MEMBERS_impl_metadata_memattr_loop_0(...)   REFL_MEMBERS_impl_metadata_memattr_body(__VA_ARGS__) REFL_MEMBERS_impl_metadata_memattr_loop_a
-#define REFL_MEMBERS_impl_metadata_memattr_loop_a(...) , REFL_MEMBERS_impl_metadata_memattr_body(__VA_ARGS__) REFL_MEMBERS_impl_metadata_memattr_loop_b
-#define REFL_MEMBERS_impl_metadata_memattr_loop_b(...) , REFL_MEMBERS_impl_metadata_memattr_body(__VA_ARGS__) REFL_MEMBERS_impl_metadata_memattr_loop_a
-#define REFL_MEMBERS_impl_metadata_memattr_loop_0_end
+#define REFL_MEMBERS_impl_metadata_memattr_loop_a(...) REFL_MEMBERS_impl_metadata_memattr_body(__VA_ARGS__) REFL_MEMBERS_impl_metadata_memattr_loop_b
+#define REFL_MEMBERS_impl_metadata_memattr_loop_b(...) REFL_MEMBERS_impl_metadata_memattr_body(__VA_ARGS__) REFL_MEMBERS_impl_metadata_memattr_loop_a
 #define REFL_MEMBERS_impl_metadata_memattr_loop_a_end
 #define REFL_MEMBERS_impl_metadata_memattr_loop_b_end
 
@@ -1146,10 +1145,12 @@ That's all.
     MA_IF_NOT_EMPTY_ELSE(REFL_MEMBERS_impl_metadata_memattr_body_low, MA_NULL, params)(MA_PARAMS_GET_ONE(, ReflMemberDecl, ReflAttr, params, MA_PARAMS_PARENS), __VA_ARGS__)
 
 #define REFL_MEMBERS_impl_metadata_memattr_body_low(maybe_attr, ...) \
+    (,) \
     ::Refl::impl::Class::Attr< \
         MA_VA_FOR_EACH(, REFL_MEMBERS_impl_metadata_memattr_plus1, MA_TR_C(__VA_ARGS__)), \
         ::Meta::type_list<MA_IF_NOT_EMPTY(MA_IDENTITY maybe_attr, maybe_attr)> \
-    >
+    > \
+    MA_IDENTITY
 
 #define REFL_MEMBERS_impl_metadata_memattr_plus1(data, index, name) +1
 

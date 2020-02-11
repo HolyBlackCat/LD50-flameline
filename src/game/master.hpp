@@ -20,6 +20,7 @@
 #include "program/errors.h"
 #include "program/exit.h"
 #include "reflection/full_with_poly.h"
+#include "reflection/short_macros.h"
 #include "strings/common.h"
 #include "strings/format.h"
 #include "utils/clock.h"
