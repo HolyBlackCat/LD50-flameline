@@ -2,8 +2,8 @@
 
 #define SDL_MAIN_HANDLED
 
-#ifndef ENTRY_POINT
-#define ENTRY_POINT main
+#ifndef _main_
+#define _main_ main
 #endif
 
 /* How to override a platform flag?
