@@ -55,9 +55,8 @@
 #     * `make clean`          - Deletes all object files, precompiled headers, and the executable.
 #                               Also erases the information about the last used mode.
 #     * `make commands`       - Generate `compile_commands.json`. Mode-specific flags are ignored.
-#     * `make commands_fixed` - Generate `compile_commands.json` with deliberately broken commands for some files.
-#                               When using VS Code with Clangd, this helps to disable Clangd for specific files to avoid unwanted warnings.
-#                               See commends on the declaration of `commands_fixed` for usage details.
+#                               You can add `EXCLUDE_FILES=...` and `EXCLUDE_DIRS=...` to exclude some of the sources.
+#                               If `LINKER_MODE` is set to `CXX` (normally in `project_config.mk`), then `.h` files will be treated as C++ sources.
 #     * `make clean_commands` - Delete `compile_commands.json`.
 #     * `make clean_everything` - Does `make clean clean_deps clean_commands`, effectively cleaning the repository.
 #                                 Also removes the object directory, which should be empty at this point.
@@ -608,8 +607,11 @@ $(OBJECT_DIR)/%.rc.o: %.rc
 
 # Helpers for generating compile_commands.json
 # Note that we avoid using `:=` on some variables here because they aren't used often.
-EXCLUDE_FILES :=
-EXCLUDE_DIRS :=
+EXCLUDE_FILES :=# Override those when invoking `make commands`.
+EXCLUDE_DIRS  :=# ^
+
+override assume_h_files_are_cpp := $(filter CXX,$(LINKER_MODE))
+
 ifneq ($(and $(filter windows,$(HOST_OS)),$(filter linux,$(HOST_SHELL))),)
 # If we're on windows and use linux-style shell, we need to fix the path. `/c/foo/bar` -> `c:/foo/bar`
 override current_dir = $(subst <, ,$(subst $(space),/,$(strip $(join $(subst /, ,$(subst $(space),<,$(CURDIR))),:))))
@@ -617,13 +619,12 @@ else
 override current_dir = $(CURDIR)
 endif
 override EXCLUDE_FILES += $(foreach d,$(EXCLUDE_DIRS),$(call rwildcard,$d,*.c *.cpp *.h *.hpp))
-override include_files = $(filter-out $(EXCLUDE_FILES), $(SOURCES))
+override include_files = $(filter-out $(EXCLUDE_FILES),$(SOURCES) $(foreach d,$(SOURCE_DIRS),$(call rwildcard,$d,*.h *.hpp)))
 override get_file_headers = $(foreach x,$(pch_all_entries),$(if $(filter $(call pch_entry_file_patterns,$x),$1),-include $(call pch_entry_header,$x)))
 override get_file_local_flags = $(foreach x,$(subst |, ,$(subst $(space),<,$(FILE_SPECIFIC_FLAGS))),$(if $(filter $(subst *,%,$(subst <, ,$(word 1,$(subst >, ,$x)))),$1),$(subst <, ,$(word 2,$(subst >, ,$x)))))
 override file_command = && $(call echo,{"directory": "$(current_dir)"$(comma) "file": "$(current_dir)/$3"$(comma) "command": "$(strip $1 $2 $(call get_file_headers,$3) $3)"}$(comma)) >>compile_commands.json
-override all_commands = $(foreach f,$(filter %.c,$(include_files)),$(call file_command,$(C_COMPILER),$(CFLAGS) $(call get_file_local_flags,$3),$f)) \
-						$(foreach f,$(filter %.cpp,$(include_files)),$(call file_command,$(CXX_COMPILER),$(CXXFLAGS) $(call get_file_local_flags,$3),$f))
-override all_stub_commands = $(foreach file,$(EXCLUDE_FILES),$(call file_command,,,$(file)))
+override all_commands = $(foreach f,$(filter %.c $(if $(assume_h_files_are_cpp),,%.h),$(include_files)),$(call file_command,$(C_COMPILER),$(CFLAGS) $(call get_file_local_flags,$3),$f)) \
+						$(foreach f,$(filter %.cpp %.hpp $(if $(assume_h_files_are_cpp),%.h),$(include_files)),$(call file_command,$(CXX_COMPILER),$(CXXFLAGS) $(call get_file_local_flags,$3),$f))
 
 # Public: generate `compile_commands.json`.
 # Any target-specific flags are ignored.
@@ -631,14 +632,6 @@ override all_stub_commands = $(foreach file,$(EXCLUDE_FILES),$(call file_command
 commands: __no_mode_needed
 	@$(call echo,[Generating] compile_commands.json)
 	@$(call echo,[) >compile_commands.json $(all_commands) && $(call echo,]) >>compile_commands.json
-	@$(call echo,[Done])
-
-# Public: same as `commands`, but `compile_commands.json` will contain invalid commands for `EXCLUDE_FILES` and all files from `EXCLUDE_DIRS`.
-# This helps to get rid on unwanted warnings in files not under your control when using clangd, by disabling clangd on those excluded files.
-.PHONY: commands_fixed
-commands_fixed: __no_mode_needed
-	@$(call echo,[Generating] compile_commands.json (fixed))
-	@$(call echo,[) >compile_commands.json $(all_commands) $(all_stub_commands) && $(call echo,]) >>compile_commands.json
 	@$(call echo,[Done])
 
 # Public: remove compile_commands.json.
