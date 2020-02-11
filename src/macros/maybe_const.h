@@ -3,7 +3,7 @@
 /* Example usage:
  *   MAYBE_CONST( CV int &GetX() CV {...} )
  * This macro has a major limitation: CV can't appear inside of ().
- * It might be possible to fix this (for a limited level of nested parens) with some heavy macros.
+ * I doubt a fix is possible.
  */
 
 #define MAYBE_CONST(...) IMPL_MAYBE_CONST( ((__VA_ARGS__)) )
