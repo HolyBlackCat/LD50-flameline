@@ -79,7 +79,7 @@ namespace Graphics
         // Pass empty string as `source_dir` to disallow regeneration.
         TextureAtlas(ivec2 target_size, const std::string &source_dir, const std::string &out_image_file, const std::string &out_desc_file, bool add_gaps = 1);
 
-        const std::string SourceDirectory() const
+        const std::string &SourceDirectory() const
         {
             return source_dir;
         }
@@ -97,11 +97,11 @@ namespace Graphics
         {
             auto it = desc.images.find(name);
             if (it == desc.images.end())
-                return 0;
+                return false;
 
             target.pos = it->second.pos;
             target.size = it->second.size;
-            return 1;
+            return true;
         }
 
         Region Get(const std::string &name) const

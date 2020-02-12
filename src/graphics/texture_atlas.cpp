@@ -95,30 +95,37 @@ namespace Graphics
             image_count++;
         });
 
-        // Load images and construct rectangle list for packing.
-        std::vector<std::string> name_list;
-        name_list.reserve(image_count);
-
-        std::vector<Image> image_list;
-        image_list.reserve(image_count);
-
-        std::vector<Packing::Rect> rect_list;
-        rect_list.reserve(image_count);
+        // Load images.
+        struct Elem
+        {
+            std::string name;
+            Image image;
+        };
+        std::vector<Elem> elem_list;
+        elem_list.reserve(image_count);
 
         Filesystem::ForEachObject(source_tree, [&](const Filesystem::TreeNode &node)
         {
             if (node.info.category != Filesystem::file)
                 return;
 
+            auto &new_elem = elem_list.emplace_back();
+
             // Save image name, but first strip source directory name from it.
-            name_list.push_back(node.path.substr(source_dir.size() + 1)); // `+ 1` is for `/`.
+            new_elem.name = node.path.substr(source_dir.size() + 1); // `+ 1` is for `/`.
 
             // Load image.
-            image_list.push_back(Image(node.path));
-
-            // Make rectangle.
-            rect_list.emplace_back(image_list.back().Size());
+            new_elem.image = Image(node.path);
         });
+
+        // Sort images by name. Otherwise the order sometimes turns out different on different platforms.
+        std::sort(elem_list.begin(), elem_list.end(), [](const Elem &a, const Elem &b){return a.name < b.name;});
+
+        // Construct rectangle list for packing.
+        std::vector<Packing::Rect> rect_list;
+        rect_list.reserve(image_count);
+        for (const Elem &elem : elem_list)
+            rect_list.push_back(elem.image.Size());
 
         // Try packing rectangles.
         if (Packing::PackRects(target_size, rect_list.data(), rect_list.size(), add_gaps))
@@ -126,17 +133,17 @@ namespace Graphics
 
         // Construct description and final image.
         image = Image(target_size, u8vec4(0));
-        for (size_t i = 0; i < image_list.size(); i++)
+        for (size_t i = 0; i < elem_list.size(); i++)
         {
             // Add image to description.
             ImageDesc image_desc;
             image_desc.pos = rect_list[i].pos;
-            image_desc.size = image_list[i].Size(); // Note that we don't extract sizes from rectangles, since those sizes might include gap size.
-            if (!desc.images.insert({std::move(name_list[i]), image_desc}).second)
+            image_desc.size = elem_list[i].image.Size(); // Note that we don't extract sizes from rectangles, since those sizes might include gap size.
+            if (!desc.images.insert({std::move(elem_list[i].name), image_desc}).second)
                 Program::Error("Internal error while generating description for texture atlas for `", source_dir, "`: Duplicate image paths.");
 
             // Copy this image to target image.
-            image.UnsafeDrawImage(image_list[i], image_desc.pos);
+            image.UnsafeDrawImage(elem_list[i].image, image_desc.pos);
         }
 
         // Save final image.
