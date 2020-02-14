@@ -17,6 +17,7 @@
 #include "program/errors.h"
 #include "stream/better_fopen.h"
 #include "stream/readonly_data.h"
+#include "stream/utils.h"
 #include "strings/common.h"
 #include "strings/escape.h"
 #include "strings/symbol_position.h"
@@ -178,7 +179,6 @@ namespace Stream
     class Input
     {
       public:
-        enum class capacity_t : std::size_t {};
         static constexpr capacity_t default_capacity = capacity_t(512); // This is what `FILE *` appears to use by default.
 
         // Retrieves bytes from the underlying object.
@@ -217,6 +217,8 @@ namespace Stream
             std::optional<LocationStyle> location_style;
 
             std::string name;
+
+            ReadOnlyData readonly_data_storage; // Optional. Set if the stream is based on a ReadOnlyData.
         };
         Data data;
 
@@ -354,14 +356,13 @@ namespace Stream
 
             data.name = source.name();
             data.size = source.size();
-            // This holds the ownership of `source` and does nothing else.
-            // `source` is not moved because we need it below.
-            data.read = [source](const auto &...){(void)source;};
             // The largest power-of-two capacity we can get.
             // It will always be larger than `source.size()`, because the latter must be representable as `std::ptrdiff_t`.
             data.buffer_capacity = std::numeric_limits<std::size_t>::max() / 2 + 1;
             data.buffer_a.position = 0;
-            data.buffer_a.storage = const_cast<std::uint8_t *>(source.data()); // Since our functor is a no-op, this is safe.
+            data.buffer_a.storage = const_cast<std::uint8_t *>(source.data()); // Since our functor is a null, this is safe.
+
+            data.readonly_data_storage = std::move(source);
         }
 
         // Attaches the stream to a file handle (without taking ownership).
@@ -519,6 +520,42 @@ namespace Stream
             return ret;
         }
 
+        // Reads all available data to memory and returns it. The result is not cached, so avoid calling this function more than once.
+        // If the stream was created from a `ReadOnlyData`, doesn't copy anything and returns the internal object of this type.
+        [[nodiscard]] ReadOnlyData ReadToMemory()
+        {
+            if (!*this)
+                return {};
+
+            if (data.readonly_data_storage)
+                return data.readonly_data_storage;
+
+            return ReadOnlyData::copy_from_function(data.name, data.size, [&](std::uint8_t *dst)
+            {
+                data.read(*this, 0, data.size, dst);
+            });
+        }
+        // Reads all available data to memory. Then the underlying data source is closed, and the stream starts to operate on memory instead.
+        ReadOnlyData CacheToMemory()
+        {
+            if (data.readonly_data_storage)
+                return data.readonly_data_storage;
+
+            auto readonly_data = ReadToMemory();
+
+            std::size_t pos = Position();
+            *this = Input(readonly_data);
+            Seek(pos, absolute);
+
+            return readonly_data;
+        }
+
+        // File size. This should always be representable as `ptrdiff_t`.
+        [[nodiscard]] std::size_t Size() const
+        {
+            return data.size;
+        }
+
         // Moves the cursor.
         // Throws if it ends up out of bounds.
         void Seek(std::ptrdiff_t offset, PositionCategory category)
@@ -542,6 +579,12 @@ namespace Stream
         [[nodiscard]] std::size_t Position() const
         {
             return data.position;
+        }
+
+        // Returns the amount of remaining bytes.
+        [[nodiscard]] std::size_t RemainingBytes() const
+        {
+            return data.size - data.position;
         }
 
         // Checks if the stream has more data available at the current cursor position.

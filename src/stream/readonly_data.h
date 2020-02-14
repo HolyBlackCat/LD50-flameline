@@ -7,6 +7,7 @@
 #include <memory>
 #include <string>
 #include <type_traits>
+#include <utility>
 
 #include "macros/check.h"
 #include "macros/finally.h"
@@ -39,19 +40,11 @@ namespace Stream
 
         ReadOnlyData(std::string file_name)
         {
-            *this = file(file_name);
+            *this = file(std::move(file_name));
         }
         ReadOnlyData(const char *file_name) // This allows implicit conversions from string literals.
         {
             *this = file(file_name);
-        }
-        ReadOnlyData(const std::uint8_t *begin, const std::uint8_t *end) // Doesn't copy the data (calls `mem_reference()`) under the hood.
-        {
-            *this = mem_reference(begin, end);
-        }
-        ReadOnlyData(const char *begin, const char *end) // Doesn't copy the data (calls `mem_reference()`) under the hood.
-        {
-            *this = mem_reference(begin, end);
         }
 
         // Stores a reference to an existing memory block.
@@ -78,6 +71,24 @@ namespace Stream
         {
             auto pointer = reinterpret_cast<const std::uint8_t *>(std::data(container));
             return mem_reference(pointer, pointer + std::size(container));
+        }
+
+        template <typename F, CHECK_EXPR(std::declval<F>()((std::uint8_t *)nullptr))>
+        [[nodiscard]] static ReadOnlyData copy_from_function(std::string name, std::size_t size, F &&func) // `func` is `void func(std::uint8_t *)`.
+        {
+            ReadOnlyData ret;
+            ret.ref = std::make_shared<Data>();
+
+            ret.ref->storage = std::make_unique<std::uint8_t[]>(size+1); // Plus one byte for a null-terminator.
+            std::forward<F>(func)(ret.ref->storage.get());
+            ret.ref->storage[size] = '\0';
+
+            ret.ref->begin = ret.ref->storage.get();
+            ret.ref->end = ret.ref->storage.get() + size;
+            ret.ref->extra_null_terminator = true;
+
+            ret.ref->name = std::move(name);
+            return ret;
         }
 
         // Copies an existing memory block, adds a null-terminator.
@@ -141,7 +152,7 @@ namespace Stream
             ret.ref->begin = ret.ref->storage.get();
             ret.ref->end = ret.ref->begin + size;
             ret.ref->extra_null_terminator = true;
-            ret.ref->name = file_name;
+            ret.ref->name = std::move(file_name);
 
             return ret;
         }

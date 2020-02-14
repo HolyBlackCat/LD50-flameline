@@ -19,6 +19,7 @@
 #include "stream/better_fopen.h"
 #include "stream/readonly_data.h"
 #include "stream/save_to_file.h"
+#include "stream/utils.h"
 #include "utils/byte_order.h"
 #include "utils/unicode.h"
 
@@ -27,7 +28,6 @@ namespace Stream
     class Output
     {
       public:
-        enum class capacity_t : std::size_t {};
         static constexpr capacity_t default_capacity = capacity_t(512); // This is what `FILE *` appears to use by default.
 
         // Flushes bytes to the underlying object.

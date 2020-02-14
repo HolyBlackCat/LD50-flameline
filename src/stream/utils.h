@@ -1,10 +1,13 @@
 #pragma once
 
+#include <cstddef>
 #include <iterator>
 #include <type_traits>
 
 namespace Stream
 {
+    enum class capacity_t : std::size_t {};
+
     namespace impl
     {
         // Checks if `T` is a container consisting of single-byte arithmetic objects.
