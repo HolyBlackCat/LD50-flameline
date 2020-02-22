@@ -7,7 +7,7 @@
 #include <sstream>
 #include <type_traits>
 
-#define VERSION "3.1.10"
+#define VERSION "3.1.11"
 
 #pragma GCC diagnostic ignored "-Wpragmas" // Silence GCC warning about the next line disabling a warning that GCC doesn't have.
 #pragma GCC diagnostic ignored "-Wstring-plus-int" // Silence clang warning about `1+R"()"` pattern.
@@ -1732,14 +1732,14 @@ int main(int argc, char **argv)
                 }
 
                 // Returns a `min` or `max` value of the parameters.
-                template <typename ...P> constexpr larger_t<P...> min(P ... params)
+                template <typename ...P> [[nodiscard]] constexpr larger_t<P...> min(P ... params)
                 {
                     if constexpr (no_vectors_v<P...>)
                     $   return std::min({larger_t<P...>(params)...});
                     else
                     $   return apply_elementwise(min<vec_base_t<P>...>, params...);
                 }
-                template <typename ...P> constexpr larger_t<P...> max(P ... params)
+                template <typename ...P> [[nodiscard]] constexpr larger_t<P...> max(P ... params)
                 {
                     if constexpr (no_vectors_v<P...>)
                     $   return std::max({larger_t<P...>(params)...});
@@ -1788,13 +1788,53 @@ int main(int argc, char **argv)
                     }
                 };
 
-                // Finds an intersection point of two vectors.
-                template <typename T> vec2<T> intersection_point(vec2<T> a1, vec2<T> a2, vec2<T> b1, vec2<T> b2)
+                // Shrinks a vector as little as possible to give it specific proportions.
+                // Always returns a floating-point type.
+                template <typename A, typename B> [[nodiscard]] auto shrink_to_proportions(A value, B proportions)
                 {
-                    static_assert(std::is_floating_point_v<vec_base_t<T>>, "Arguments must be floating-point.");
+                    static_assert(is_vector_v<A> && is_vector_v<B> && vec_size_v<A> == vec_size_v<B>, "Arguments must be vectors of same size.");
+                    using type = larger_t<floating_point_t<A>,floating_point_t<B>>;
+                    return (type(value) / type(proportions)).min() * type(proportions);
+                }
+                // Expands a vector as little as possible to give it specific proportions.
+                // Always returns a floating-point type.
+                template <typename A, typename B> [[nodiscard]] auto expand_to_proportions(A value, B proportions)
+                {
+                    static_assert(is_vector_v<A> && is_vector_v<B> && vec_size_v<A> == vec_size_v<B>, "Arguments must be vectors of same size.");
+                    using type = larger_t<floating_point_t<A>,floating_point_t<B>>;
+                    return (type(value) / type(proportions)).max() * type(proportions);
+                }
+
+                // Finds an intersection point of two lines.
+                template <typename T> [[nodiscard]] vec2<T> line_intersection(vec2<T> a1, vec2<T> a2, vec2<T> b1, vec2<T> b2)
+                {
+                    static_assert(std::is_floating_point_v<T>, "Arguments must be floating-point.");
                     auto delta_a = a2 - a1;
                     auto delta_b = b2 - b1;
                     return ((a1.y - b1.y) * delta_b.x - (a1.x - b1.x) * delta_b.y) / (delta_a.x * delta_b.y - delta_a.y * delta_b.x) * delta_a + a1;
+                }
+
+                // Projects a point onto a line. `dir` is assumed to be normalized.
+                template <int D, typename T> [[nodiscard]] vec<D,T> project_onto_line_norm(vec<D,T> point, vec<D,T> dir)
+                {
+                    static_assert(std::is_floating_point_v<T>, "Arguments must be floating-point.");
+                    return dir * point.dot(dir);
+                }
+                // Projects a point onto a line.
+                template <int D, typename T> [[nodiscard]] vec<D,T> project_onto_line(vec<D,T> point, vec<D,T> dir)
+                {
+                    return project_onto_line_norm(point, dir.norm());
+                }
+
+                // Projects a point onto a plane. `plane_normal` is assumed to be normalized.
+                template <typename T> [[nodiscard]] vec3<T> project_onto_plane_norm(vec3<T> point, vec3<T> plane_normal)
+                {
+                    return point - project_onto_line_norm(point, plane_normal);
+                }
+                // Projects a point onto a plane.
+                template <typename T> [[nodiscard]] vec3<T> project_onto_plane(vec3<T> point, vec3<T> plane_normal)
+                {
+                    return project_onto_plane_norm(point, plane_normal.norm());
                 }
             )");
         });
