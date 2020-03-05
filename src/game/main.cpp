@@ -13,49 +13,80 @@ Render r = adjust_(Render(0x2000, shader_config), SetTexture(texture_main), SetM
 
 Input::Mouse mouse;
 
-namespace States
+struct State : Program::DefaultBasicState
 {
-    struct Base : Meta::with_virtual_destructor<Base>
+    void Resize()
     {
-        virtual void Tick() = 0;
-        virtual void Render() const = 0;
-    };
+        adaptive_viewport.Update();
+        mouse.SetMatrix(adaptive_viewport.GetDetails().MouseMatrixCentered());
+    }
 
-    Poly::Storage<Base> current_state;
+    int last_second = -1;
+    int tick_counter = 0, frame_counter = 0;
+    Metronome metronome = Metronome(60);
 
-    struct Game : Base
+    Metronome *GetTickMetronome() override
     {
-        float angle = 0;
+        return &metronome;
+    }
 
-        Game()
+    int GetFpsCap() override
+    {
+        if (Interface::Window::IsOpen() && Interface::Window::Get().VSyncMode() == Interface::VSync::disabled)
+            return 60;
+        else
+            return 0;
+    }
+
+    void EndFrame() override
+    {
+        int cur_second = SDL_GetTicks() / 1000;
+        if (cur_second == last_second)
+            return;
+
+        last_second = cur_second;
+        std::cout << "TPS: " << tick_counter << "\n";
+        std::cout << "FPS: " << frame_counter << "\n\n";
+        tick_counter = 0;
+        frame_counter = 0;
+    }
+
+    void Tick() override
+    {
+        tick_counter++;
+
+        // window.ProcessEvents();
+        window.ProcessEvents({gui_controller.EventHook()});
+
+        if (window.Resized())
         {
-
+            Resize();
+            Graphics::Viewport(window.Size());
         }
+        if (window.ExitRequested())
+            Program::Exit();
 
-        void Tick() override
-        {
-            angle += 0.01;
-            ImGui::ShowDemoWindow();
-        }
+        gui_controller.PreTick();
+        HighLevelTick();
+    }
 
-        void Render() const override
-        {
-            Graphics::SetClearColor(fvec3(0));
-            Graphics::Clear();
+    void Render() override
+    {
+        frame_counter++;
+
+        gui_controller.PreRender();
+        adaptive_viewport.BeginFrame();
+        HighLevelRender();
+        adaptive_viewport.FinishFrame();
+        Graphics::CheckErrors();
+        gui_controller.PostRender();
+
+        window.SwapBuffers();
+    }
 
 
-            r.BindShader();
-
-            r.iquad(mouse.pos(), ivec2(32)).center().rotate(window.Ticks() / 100.).color(mouse.left.down() ? fvec3(1,0.5,0) : fvec3(0,0.5,1));
-
-            r.Finish();
-        }
-    };
-}
-
-int _main_(int, char **)
-{
-    { // Initialize
+    void Init()
+    {
         ImGui::StyleColorsDark();
 
         // Load various small fonts
@@ -69,45 +100,31 @@ int _main_(int, char **)
         Graphics::Blending::FuncNormalPre();
     }
 
-    auto Resize = [&]
+    float angle = 0;
+
+    void HighLevelTick()
     {
-        adaptive_viewport.Update();
-        mouse.SetMatrix(adaptive_viewport.GetDetails().MouseMatrixCentered());
-    };
-    Resize();
-
-    States::current_state = Poly::derived<States::Game>;
-
-    Metronome metronome(60);
-    Clock::DeltaTimer delta_timer;
-
-    while (1)
-    {
-        uint64_t delta = delta_timer();
-        while (metronome.Tick(delta))
-        {
-            // window.ProcessEvents();
-            window.ProcessEvents({gui_controller.EventHook()});
-
-            if (window.Resized())
-            {
-                Resize();
-                Graphics::Viewport(window.Size());
-            }
-            if (window.ExitRequested())
-                Program::Exit();
-
-            gui_controller.PreTick();
-            States::current_state->Tick();
-        }
-
-        gui_controller.PreRender();
-        adaptive_viewport.BeginFrame();
-        States::current_state->Render();
-        adaptive_viewport.FinishFrame();
-        Graphics::CheckErrors();
-        gui_controller.PostRender();
-
-        window.SwapBuffers();
+        angle += 0.01;
+        ImGui::ShowDemoWindow();
     }
+
+    void HighLevelRender()
+    {
+        Graphics::SetClearColor(fvec3(0));
+        Graphics::Clear();
+
+        r.BindShader();
+
+        r.iquad(mouse.pos(), ivec2(32)).center().rotate(angle).color(mouse.left.down() ? fvec3(1,0.5,0) : fvec3(0,0.5,1));
+
+        r.Finish();
+    }
+};
+
+int _main_(int, char **)
+{
+    State loop_state;
+    loop_state.Init();
+    loop_state.Resize();
+    loop_state.RunMainLoop();
 }

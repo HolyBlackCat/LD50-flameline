@@ -19,6 +19,7 @@
 #include "meta/misc.h"
 #include "program/errors.h"
 #include "program/exit.h"
+#include "program/main_loop.h"
 #include "reflection/full_with_poly.h"
 #include "reflection/short_macros.h"
 #include "strings/common.h"
