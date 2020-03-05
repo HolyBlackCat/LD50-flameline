@@ -116,6 +116,7 @@ namespace Interface
 
         static SDL_Window *GetHandleOrNull(); // Unlike `Get()`, this doesn't throw if there is no window.
 
+        static bool IsOpen();
         static Window &Get(); // This will throw if there is no window.
 
         SDL_Window *Handle() const;

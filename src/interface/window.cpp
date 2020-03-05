@@ -288,6 +288,11 @@ namespace Interface
         return instance->data.handle;
     }
 
+    bool Window::IsOpen()
+    {
+        return bool(instance);
+    }
+
     Window &Window::Get() // This will throw if there is no window.
     {
         if (!instance)
