@@ -32,10 +32,7 @@ struct State : Program::DefaultBasicState
 
     int GetFpsCap() override
     {
-        if (Interface::Window::IsOpen() && Interface::Window::Get().VSyncMode() == Interface::VSync::disabled)
-            return 60;
-        else
-            return 0;
+        return 60 * NeedFpsCap();
     }
 
     void EndFrame() override

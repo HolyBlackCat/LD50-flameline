@@ -8,6 +8,7 @@
 
 #include <SDL_timer.h>
 
+#include "interface/window.h"
 #include "macros/finally.h"
 #include "utils/clock.h"
 #include "utils/metronome.h"
@@ -31,11 +32,13 @@ namespace Program
 
         void RunMainLoop()
         {
+            // Protect against double entry.
             if (loop_running)
                 return;
-
             loop_running = true;
             FINALLY( loop_running = false; )
+
+            // Run the loop.
             while (RunSingleFrame()) {}
         }
     };
@@ -44,11 +47,20 @@ namespace Program
     {
       protected:
         bool stop = false;
+        bool executing_frame = false;
         std::uint64_t frame_start = -1;
 
       public:
         // Returns the metronome, or `nullptr` if want to run one tick per frame.
         virtual Metronome *GetTickMetronome() {return nullptr;}
+
+        [[nodiscard]] static bool NeedFpsCap()
+        {
+            if (Interface::Window::IsOpen() && Interface::Window::Get().VSyncMode() == Interface::VSync::disabled)
+                return 60;
+            else
+                return 0;
+        }
 
         // Returns target FPS. `<= 0` if not limited.
         virtual int GetFpsCap() {return 0;}
@@ -57,12 +69,18 @@ namespace Program
         // FPS is capped by adding a delay after frames that are too short.
         // The delay will be partially created using a `sleep` function, and partially using a busy loop.
         // This function returns the preferred duration of the busy loop.
-        // Returning -1 prevents the busy loop from being used, which lowers CPU load but might make the timing less precise.
-        // Returning a large value prevents `sleep` from being used, which increases CPU loads but inproves precision.
+        // If it returns -1, the busy loop will not be used. It lowers CPU load, but might make the timing less precise.
+        // If it returns 0, the busy loop will be used as little as possible.
+        // If it returns a large value, `sleep` will not be used at all, which increases CPU loads but improves precision.
         virtual int GetFpsCapPreferredBusyLoopDurationMs() {return 1;}
 
         bool RunSingleFrame() override
         {
+            if (executing_frame)
+                return !stop;
+            executing_frame = true;
+            FINALLY( executing_frame = false; )
+
             // Load some basic config from state.
             auto *metronome = GetTickMetronome();
             auto fps_cap = GetFpsCap();
@@ -107,15 +125,22 @@ namespace Program
                 std::uint64_t desired_frame_len = 1.0 / fps_cap * clock_ticks_per_sec;
                 std::uint64_t frame_end = Clock::Time(), frame_len = frame_end - frame_start;
 
+                // If necessary, add a delay.
                 if (frame_len < desired_frame_len)
                 {
-                    auto busy_loop_len_ms = GetFpsCapPreferredBusyLoopDurationMs();
-                    bool busy_loop_allowed = busy_loop_len_ms > 0;
+                    int sleep_ms = (desired_frame_len - frame_len) * 1000 / clock_ticks_per_sec;
 
-                    int sleep_ms = int((desired_frame_len - frame_len) * 1000 / clock_ticks_per_sec) - busy_loop_len_ms;
+                    auto busy_loop_len_ms = GetFpsCapPreferredBusyLoopDurationMs();
+                    bool busy_loop_allowed = busy_loop_len_ms >= 0;
+
+                    if (busy_loop_allowed)
+                        sleep_ms -= busy_loop_len_ms;
+
+                    // Sleep.
                     if (sleep_ms > 0)
                         SDL_Delay(sleep_ms);
 
+                    // Busy loop.
                     if (busy_loop_allowed)
                     {
                         std::uint64_t busy_loop_end = frame_start + desired_frame_len;
