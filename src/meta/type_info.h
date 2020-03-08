@@ -3,6 +3,8 @@
 #include <array>
 #include <cstddef>
 
+#include "meta/constexpr_hash.h"
+
 namespace Meta
 {
     namespace impl
@@ -63,12 +65,14 @@ namespace Meta
         return name;
     }
 
+    // Returns the type name.
     template <typename T>
     [[nodiscard]] const char *TypeName()
     {
         static constexpr auto name = CexprTypeName<T>();
         return name.data();
     }
+    // Returns the type name. The parameter is used only to deduce `T`.
     template <typename T>
     [[nodiscard]] const char *TypeName(const T &)
     {
@@ -147,4 +151,16 @@ namespace Meta
             return TypeName<T>();
         }
     */
+
+    // Returns a hash of the type name.
+    // `hash_t` is `uint32_t`.
+    template <typename T>
+    [[nodiscard]] constexpr hash_t TypeHash(hash_t seed = 0)
+    {
+        constexpr auto name = CexprTypeName<T>();
+        return cexpr_hash(name.data(), name.size() - 1/*null-terminator*/, seed);
+    }
+
+    // Hash test:
+    // static_assert(TypeHash<int>() == 3464699359);
 }

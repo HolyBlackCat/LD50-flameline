@@ -2,7 +2,7 @@
 
 #include <limits>
 
-#include "meta/type_name.h"
+#include "meta/type_info.h"
 #include "reflection/full.h"
 #include "utils/poly_storage.h"
 

@@ -15,7 +15,7 @@
 
 #include "macros/check.h"
 #include "meta/misc.h"
-#include "meta/type_name.h"
+#include "meta/type_info.h"
 #include "program/errors.h"
 #include "strings/escape.h"
 #include "utils/robust_math.h"
