@@ -28,47 +28,35 @@ namespace Sig
         // The remote receives `OnUnbind(remote_moved)`, followed by `OnBind(remote_moved)`.
     };
 
-    // Inherit `Connection` state from this class to indicate that it has callbacks that must be called.
-    // The callbacks must be equivalent to:
-    //   void Callback_OnBind(Connection *this_con, Cause cause);
-    //   void Callback_OnUnbind(Connection *this_con, remote_t *old_remote, Cause cause);
-    //
-    // When those callbacks are called, the related connections are already in a valid state.
-    // But still, it's a bad idea to connect/disconnect them from the callbacks. If you do so, you might
-    // receive the new callbacks in a weird order.
-    //
-    // The callbacks must not throw, doing so will call `std::terminate`.
-    //
-    // Note that making those callbacks virtual functions of `Connection` wasn't possible, since we need to call some of them from the destructor.
-    struct ConnectionStateWithCallbacks {};
 
-    // Contains a state of type `A`, and a pointer to an object of symmetric type `Connection<B,A>` (called a "remote").
+    // Contains a pointer to an object of symmetric type `Connection<B,A>` (called a "remote").
     // The pointers are always symmetric. If the pointer is not null, then the pointer of remote points back to that object.
     // If the current object is destroyed, bound to a different object, or moved, the remote is notified and its pointer is adjusted accordingly.
+    // This class is meant to be used together with macros from `macros/member_downcast.h`.
+    // This class is an abstract base. Use `Sig::Connection` or make a similar derived class to be able to set come callbacks.
     template <typename A, typename B>
-    class Connection
+    class BasicConnection
     {
       public:
-        using value_t = A;
-        using remote_t = Connection<B, A>;
-        using remote_value_t = B;
+        using tag_t = A;
+        using remote_tag_t = B;
+        using remote_t = BasicConnection<B, A>;
 
       private:
-        friend Connection<B, A>;
+        friend BasicConnection<B, A>;
 
-        [[no_unique_address]] value_t value{};
         remote_t *remote = nullptr;
 
-        void OnBind(Cause cause) noexcept
-        {
-            if constexpr (std::is_base_of_v<ConnectionStateWithCallbacks, A>)
-                value.Callback_OnBind(this, cause);
-        }
-        void OnUnbind(remote_t *old_remote, Cause cause) noexcept
-        {
-            if constexpr (std::is_base_of_v<ConnectionStateWithCallbacks, A>)
-                value.Callback_OnUnbind(this, std::as_const(old_remote), cause);
-        }
+        // Note that those callbacks are called AFTER changing the connections. Because of that you
+        // can e.g. get `OnUnbind` for a connection that's no longer null.
+        //
+        // When those callbacks are called, the related connections are already in a valid state.
+        // But still, it's a bad idea to connect/disconnect them from the callbacks. If you do so, you might
+        // receive the new callbacks in a weird order.
+        //
+        // The callbacks must not throw, doing so will call `std::terminate`.
+        virtual void OnBind(Cause cause) noexcept = 0;
+        virtual void OnUnbind(remote_t *old_remote, Cause cause) noexcept = 0;
 
         void AssertBound() const
         {
@@ -114,7 +102,7 @@ namespace Sig
             }
 
             remote_t *old_remote = LowUnbindSilent();
-            Connection *target_old_remote = target->LowUnbindSilent();
+            BasicConnection *target_old_remote = target->LowUnbindSilent();
 
             remote = target;
             target->remote = this;
@@ -133,28 +121,32 @@ namespace Sig
             target->OnBind(bind_target_cause);
         }
 
-      public:
-        Connection() {}
-        Connection(value_t value) : value(std::move(value)) {}
-        Connection(value_t value, remote_t &remote) : Connection(value) {Bind(remote);}
+      protected:
+        // Derived classes need to call this from their destructors.
+        void Destroy()
+        {
+            LowUnbind(Cause::destroyed, Cause::remote_destroyed);
+        }
 
-        Connection(Connection &&other) noexcept
-            : value(std::move(other.value))
+      public:
+        BasicConnection() {}
+        BasicConnection(remote_t &remote) {Bind(remote);}
+
+        BasicConnection(BasicConnection &&other) noexcept
         {
             LowBind(other.remote, Cause::unspecified, Cause::unspecified, Cause::remote_moved, Cause::moved, Cause::moved, Cause::remote_moved);
         }
 
-        Connection &operator=(Connection &&other) noexcept
+        BasicConnection &operator=(BasicConnection &&other) noexcept
         {
-            // No selft-assignment check needed.
-            value = std::move(other.value);
+            // No self-assignment check needed.
             LowBind(other.remote, Cause::unspecified, Cause::unspecified, Cause::remote_moved, Cause::moved, Cause::moved, Cause::remote_moved);
             return *this;
         }
 
-        ~Connection()
+        ~BasicConnection()
         {
-            LowUnbind(Cause::destroyed, Cause::remote_destroyed);
+            DebugAssert("The destructor of a class inherited from Sig::Connection didn't call `this->Destroy()`.", !IsBound());
         }
 
         // If `target` is null, acts as `Unbind`. Otherwise acts as `Bind`.
@@ -182,7 +174,6 @@ namespace Sig
         [[nodiscard]] bool IsBound() const {return bool(remote);}
         [[nodiscard]] bool IsBoundTo(const remote_t &target) {return remote == &target;}
 
-
         // Returns a pointer to the bound object, or null if nothing is bound.
         [[nodiscard]]       remote_t *RemotePointerOrNull()       {return remote;}
         [[nodiscard]] const remote_t *RemotePointerOrNull() const {return remote;}
@@ -191,19 +182,36 @@ namespace Sig
         // If no object is bound, an assertion is triggered.
         [[nodiscard]]       remote_t &Remote()       {AssertBound(); return *remote;}
         [[nodiscard]] const remote_t &Remote() const {AssertBound(); return *remote;}
+    };
 
+    // See `Sig::BasicConnection` for usage.
+    template <typename A, typename B>
+    class Connection final : public BasicConnection<A, B>
+    {
+        // If you want to inherit your own class from `BasicConnection`, start with this dummy implementation.
 
-        // Returns a reference to the value that the current object holds.
-        [[nodiscard]]       value_t &Value()       {return value;}
-        [[nodiscard]] const value_t &Value() const {return value;}
+        virtual void OnBind(Cause cause) noexcept override
+        {
+            (void)cause;
+        }
+        virtual void OnUnbind(BasicConnection<B, A> *old_remote, Cause cause) noexcept override
+        {
+            (void)old_remote;
+            (void)cause;
+        }
 
-        // Returns a reference to the value that the bound object holds.
-        // If no object is bound, an assertion is triggered.
-        [[nodiscard]]       remote_value_t &RemoteValue()       {AssertBound(); return remote->value;}
-        [[nodiscard]] const remote_value_t &RemoteValue() const {AssertBound(); return remote->value;}
+      public:
+        using BasicConnection<A, B>::BasicConnection;
+
+        Connection(Connection &&) = default;
+        Connection &operator=(Connection &&) = default;
+
+        ~Connection()
+        {
+            this->Destroy(); // This line is important.
+        }
     };
 }
-
 
 // Uncomment to enable automatic tests.
 #if false
@@ -246,23 +254,37 @@ namespace Sig
             return "??";
         }
 
-        struct GenericMember : ConnectionStateWithCallbacks
+
+        struct TagA {};
+        struct TagB {};
+
+
+        template <typename A, typename B>
+        class CustomConnection final : public BasicConnection<A, B>
         {
-            void Callback_OnBind(void *this_con, Cause cause)
+            virtual void OnBind(Cause cause) noexcept override
             {
-                *ss << GetVarName(this_con) << ".OnBind(" << CauseToString(cause) << ")\n";
+                *ss << GetVarName(this) << ".OnBind(" << CauseToString(cause) << ")\n";
             }
-            void Callback_OnUnbind(void *this_con, void *old_remote, Cause cause)
+            virtual void OnUnbind(BasicConnection<B, A> *old_remote, Cause cause) noexcept override
             {
-                *ss << GetVarName(this_con) << ".OnUnbind(" << GetVarName(old_remote) << "," << CauseToString(cause) << ")\n";
+                *ss << GetVarName(this) << ".OnUnbind(" << GetVarName(old_remote) << "," << CauseToString(cause) << ")\n";
+            }
+
+          public:
+            using BasicConnection<A, B>::BasicConnection;
+
+            CustomConnection(CustomConnection &&) = default;
+            CustomConnection &operator=(CustomConnection &&) = default;
+
+            ~CustomConnection()
+            {
+                this->Destroy(); // This line is important.
             }
         };
 
-        struct MemberA : GenericMember {};
-        struct MemberB : GenericMember {};
-
-        using ConA = Connection<MemberA, MemberB>;
-        using ConB = Connection<MemberB, MemberA>;
+        using ConA = CustomConnection<TagA, TagB>;
+        using ConB = CustomConnection<TagB, TagA>;
 
         void RunTestCase(std::string name, bool (*func)(), std::string result)
         {
