@@ -683,7 +683,7 @@ ifneq ($(strip $(if $(MAKECMDGOALS),$(filter $(targets_requiring_deps_info),$(MA
 override library_pack_path = $(LIBRARY_PACK_DIR)/$(LIBRARY_PACK_NAME)
 
 # A pattern for a dependency archive.
-override library_pack_archive_pattern = ./$(LIBRARY_PACK_NAME)_*.tar.gz
+override library_pack_archive_pattern = ./$(LIBRARY_PACK_NAME)_prebuilt_*.tar.gz
 override library_pack_archive_pattern_display = $(subst *,<platform>,$(library_pack_archive_pattern))
 
 # Same as $(PKGCONFIG), but with some commands to set proper library paths.
@@ -726,7 +726,8 @@ $(lib_pack_info_file):
 		$(eval override _local_archive_path := $(wildcard $(library_pack_archive_pattern)))\
 		$(if $(filter 1,$(words $(_local_archive_path))),\
 			$(info [Deps] Unpacking `$(_local_archive_path)`...)\
-				$(call safe_shell_exec,$(call mkdir,$(library_pack_path)) && tar -C $(LIBRARY_PACK_DIR) -xf $(_local_archive_path)),\
+				$(call safe_shell_exec,$(call mkdir,$(library_pack_path)) && tar -C $(LIBRARY_PACK_DIR) -xf $(_local_archive_path))\
+				$(info [Deps] Done. This file is no longer needed, you can remove it.),\
 			$(error Prebuilt dependencies not found in `$(library_pack_path)`.\
     			$(lf)I can install them for you; I need `$(library_pack_archive_pattern_display)` in the current directory)))
 	$(erase_shared_libraries)
