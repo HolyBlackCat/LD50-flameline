@@ -2,31 +2,32 @@
 
 /* Example usage:
  *   MAYBE_CONST( CV int &GetX() CV {...} )
- * This macro has a major limitation: CV can't appear inside of ().
- * I doubt a fix is possible.
+ * This expands to:
+ *         int &GetX()       {...}
+ *   const int &GetX() const {...}
+ *
+ * Note that if `CV` appears inside of parentheses, those parentheses must be preceeded by `CV_IN`.
+ * Example:
+ *   MAYBE_CONST( CV int &Foo CV_IN(CV int &x); )
+ * This expands to:
+ *         int &Foo(      int &x);
+ *   const int &Foo(const int &x);
  */
+#define MAYBE_CONST(...) IMPL_CV_maybe_const( (IMPL_CV_null,__VA_ARGS__)() )
+#define CV )(IMPL_CV_identity,
+#define CV_IN(...) )(IMPL_CV_p_open,)(IMPL_CV_null,__VA_ARGS__)(IMPL_CV_p_close,)(IMPL_CV_null,
 
-#define MAYBE_CONST(...) IMPL_MAYBE_CONST( ((__VA_ARGS__)) )
-#define CV ))((
-// Double parens are probably an overkill, but I want this to be extra robust.
+#define IMPL_CV_null(...)
+#define IMPL_CV_identity(...) __VA_ARGS__
+#define IMPL_CV_p_open(...) (
+#define IMPL_CV_p_close(...) )
 
-#define IMPL_MAYBE_CONST(seq) \
-    IMPL_MAYBE_CONST_end(IMPL_MAYBE_CONST_a seq) \
-    IMPL_MAYBE_CONST_end(IMPL_MAYBE_CONST_const_0 seq)
+#define IMPL_CV_maybe_const(seq) IMPL_CV_a seq IMPL_CV_const_a seq
 
-#define IMPL_MAYBE_CONST_identity(...) __VA_ARGS__
+#define IMPL_CV_body(cv, m, ...) m(cv) __VA_ARGS__
 
-#define IMPL_MAYBE_CONST_end(...) IMPL_MAYBE_CONST_end_(__VA_ARGS__)
-#define IMPL_MAYBE_CONST_end_(...) __VA_ARGS__##_end
+#define IMPL_CV_a(...) __VA_OPT__(IMPL_CV_body(,__VA_ARGS__) IMPL_CV_b)
+#define IMPL_CV_b(...) __VA_OPT__(IMPL_CV_body(,__VA_ARGS__) IMPL_CV_a)
 
-#define IMPL_MAYBE_CONST_a(elem) IMPL_MAYBE_CONST_identity elem IMPL_MAYBE_CONST_b
-#define IMPL_MAYBE_CONST_b(elem) IMPL_MAYBE_CONST_identity elem IMPL_MAYBE_CONST_a
-#define IMPL_MAYBE_CONST_a_end
-#define IMPL_MAYBE_CONST_b_end
-
-#define IMPL_MAYBE_CONST_const_0(elem)       IMPL_MAYBE_CONST_identity elem IMPL_MAYBE_CONST_const_a
-#define IMPL_MAYBE_CONST_const_a(elem) const IMPL_MAYBE_CONST_identity elem IMPL_MAYBE_CONST_const_b
-#define IMPL_MAYBE_CONST_const_b(elem) const IMPL_MAYBE_CONST_identity elem IMPL_MAYBE_CONST_const_a
-// Note that we don't need `IMPL_MAYBE_CONST_const_0_end`, since the sequence is never empty.
-#define IMPL_MAYBE_CONST_const_a_end
-#define IMPL_MAYBE_CONST_const_b_end
+#define IMPL_CV_const_a(...) __VA_OPT__(IMPL_CV_body(const,__VA_ARGS__) IMPL_CV_const_b)
+#define IMPL_CV_const_b(...) __VA_OPT__(IMPL_CV_body(const,__VA_ARGS__) IMPL_CV_const_a)
