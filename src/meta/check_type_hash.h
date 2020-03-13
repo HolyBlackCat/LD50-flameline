@@ -28,8 +28,9 @@ namespace Meta
             {
                 constexpr Support(Meta::hash_t hash) : hash(hash) {}
 
+                volatile Meta::hash_t hash;
               public:
-                const volatile Meta::hash_t hash;
+                const volatile Meta::hash_t &Get() const {return hash;}
 
                 // cvref-qualifiers on T are ignored.
                 template <typename T>
@@ -38,8 +39,13 @@ namespace Meta
                     return Support(Meta::TypeHash<std::remove_cvref_t<T>>(hash_seed));
                 }
 
-                constexpr Support(const Support &other) : hash(other.hash) {}
-                constexpr Support &operator=(const Support &) {return *this;} // This does nothing intentionally.
+                Support(const Support &other) : hash(other.hash) {}
+                Support &operator=(const Support &) {return *this;} // This does nothing intentionally.
+
+                ~Support()
+                {
+                    hash = 0;
+                }
             };
 
             #ifdef TYPE_HASH_CHECKS_ENABLED
@@ -56,7 +62,7 @@ namespace Meta
                 #ifdef TYPE_HASH_CHECKS_ENABLED
                 static_assert(std::is_class_v<T>, "The parameter must have a class type.");
                 static_assert(impl::TypeId::stores_hash<T>::value, "This type doesn't store its hash. Add `STORE_TYPE_HASH` to the class body.");
-                return object._type_hash_storage_.hash == TypeHash<T>(hash_seed);
+                return object._type_hash_storage_.Get() == TypeHash<T>(hash_seed);
                 #else
                 (void)object;
                 return true;

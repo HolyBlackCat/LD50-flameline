@@ -208,9 +208,19 @@ namespace Sig
 
         ~Connection()
         {
-            this->Destroy(); // This line is important.
+            // This line is important!
+            // Every non-abstract class that inherits from `BasicConnection` has to have
+            // it in its destructor, even if its parent already has it.
+            this->Destroy();
         }
     };
+
+    // Alternative to `x.Bind(y)`.
+    template <typename A, typename B>
+    void Bind(BasicConnection<A, B> &x, BasicConnection<B, A> &y)
+    {
+        x.Bind(y);
+    }
 }
 
 // Uncomment to enable automatic tests.
