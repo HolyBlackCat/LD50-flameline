@@ -92,7 +92,7 @@ namespace cglfl
             }
             else if constexpr (std::is_floating_point_v<T>)
             {
-                std::snprintf(buffer, sizeof buffer, "%17g", (double)object);
+                std::snprintf(buffer, sizeof buffer, "%.17g", (double)object);
             }
             else if constexpr (std::is_pointer_v<T>)
             {
