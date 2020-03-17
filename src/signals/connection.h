@@ -3,6 +3,7 @@
 #include <type_traits>
 #include <utility>
 
+#include "macros/maybe_const.h"
 #include "program/errors.h"
 
 namespace Sig
@@ -29,13 +30,18 @@ namespace Sig
     };
 
 
+    // Common non-template base class for all connections.
+    struct GenericConnection {};
+
+
     // Contains a pointer to an object of symmetric type `Connection<B,A>` (called a "remote").
     // The pointers are always symmetric. If the pointer is not null, then the pointer of remote points back to that object.
     // If the current object is destroyed, bound to a different object, or moved, the remote is notified and its pointer is adjusted accordingly.
     // This class is meant to be used together with macros from `macros/member_downcast.h`.
-    // This class is an abstract base. Use `Sig::Connection` or make a similar derived class to be able to set come callbacks.
+    // This class is an abstract base, use references to it for function parameters.
+    // `Sig::Connection` inherits from this class, you probably want to use it. Inheriting custom classes from this one is not recommended.
     template <typename A, typename B>
-    class BasicConnection
+    class BasicConnection : public GenericConnection
     {
       public:
         using tag_t = A;
@@ -70,7 +76,7 @@ namespace Sig
             if (!remote)
                 return nullptr;
 
-            DebugAssert("Sig::Connect consistency check failed.", this == remote->remote);
+            DebugAssert("`Sig::Connection` consistency check failed.", this == remote->remote);
 
             remote_t *old_remote = remote;
             remote->remote = nullptr;
@@ -146,7 +152,7 @@ namespace Sig
 
         ~BasicConnection()
         {
-            DebugAssert("The destructor of a class inherited from Sig::Connection didn't call `this->Destroy()`.", !IsBound());
+            DebugAssert("The destructor of the most derived class didn't call `this->Destroy()`.", !IsBound());
         }
 
         // If `target` is null, acts as `Unbind`. Otherwise acts as `Bind`.
@@ -174,30 +180,59 @@ namespace Sig
         [[nodiscard]] bool IsBound() const {return bool(remote);}
         [[nodiscard]] bool IsBoundTo(const remote_t &target) {return remote == &target;}
 
-        // Returns a pointer to the bound object, or null if nothing is bound.
-        [[nodiscard]]       remote_t *RemotePointerOrNull()       {return remote;}
-        [[nodiscard]] const remote_t *RemotePointerOrNull() const {return remote;}
+        MAYBE_CONST(
+            // Returns a pointer to the bound object, or null if nothing is bound.
+            [[nodiscard]] CV remote_t *RemotePointerOrNull() CV {return remote;}
 
-        // Returns a reference to the bound object.
-        // If no object is bound, an assertion is triggered.
-        [[nodiscard]]       remote_t &Remote()       {AssertBound(); return *remote;}
-        [[nodiscard]] const remote_t &Remote() const {AssertBound(); return *remote;}
+            // Returns a reference to the bound object.
+            // If no object is bound, an assertion is triggered.
+            [[nodiscard]] CV remote_t &Remote() CV {AssertBound(); return *remote;}
+
+            // Downcasts (using `static_cast`) this object to `T`.
+            template <typename T>
+            [[nodiscard]] CV T &UnsafeDowncast() CV
+            {
+                static_assert(!std::is_const_v<T> && std::is_base_of_v<BasicConnection, T>);
+                return *static_cast<CV T *>(this);
+            }
+        )
     };
 
-    // See `Sig::BasicConnection` for usage.
+
+    // Provides connection callback types.
+    // Also serves as a base class of `ConnectionCallbacks`.
     template <typename A, typename B>
+    struct BasicConnectionCallbacks
+    {
+        using bind_t = void(BasicConnection<A, B> &object, Cause cause);
+        using unbind_t = void(BasicConnection<A, B> &object, BasicConnection<B, A> *old_remote, Cause cause);
+    };
+
+    // Encapsulates bind/unbind callbacks for connections.
+    // `Bind` and/or `Unbind` can be null, then they're ignored.
+    template <typename A, typename B, typename BasicConnectionCallbacks<A,B>::bind_t *Bind, typename BasicConnectionCallbacks<A,B>::unbind_t *Unbind>
+    struct ConnectionCallbacks : BasicConnectionCallbacks<A, B>
+    {
+        static constexpr auto OnBind = Bind;
+        static constexpr auto OnUnbind = Unbind;
+    };
+
+
+    // A non-abstract class derived from `Sig::BasicConnection`. See `Sig::BasicConnection` for usage.
+    // `Callbacks` is 0 or more `ConnectionCallbacks<A, B, Bind, Unbind>`.
+    template <typename A, typename B, typename ...Callbacks>
     class Connection final : public BasicConnection<A, B>
     {
-        // If you want to inherit your own class from `BasicConnection`, start with this dummy implementation.
+        static_assert(((std::is_base_of_v<BasicConnectionCallbacks<A, B>, Callbacks> && !std::is_same_v<BasicConnectionCallbacks<A, B>, Callbacks>) && ...),
+                      "Each of `Callbacks` must be `ConnectionCallbacks<A, B, ...>`.");
 
         virtual void OnBind(Cause cause) noexcept override
         {
-            (void)cause;
+            ((Callbacks::OnBind ? Callbacks::OnBind(*this, cause) : void()), ...);
         }
         virtual void OnUnbind(BasicConnection<B, A> *old_remote, Cause cause) noexcept override
         {
-            (void)old_remote;
-            (void)cause;
+            ((Callbacks::OnUnbind ? Callbacks::OnUnbind(*this, old_remote, cause) : void()), ...);
         }
 
       public:
@@ -213,6 +248,15 @@ namespace Sig
             // it in its destructor, even if its parent already has it.
             this->Destroy();
         }
+
+
+        // Adds a pair of callbacks after the existing ones, returns the modified type.
+        template <typename BasicConnectionCallbacks<A,B>::bind_t *Bind, typename BasicConnectionCallbacks<A,B>::unbind_t *Unbind>
+        using with_callbacks_after = Connection<A, B, Callbacks..., ConnectionCallbacks<A, B, Bind, Unbind>>;
+
+        // Adds a pair of callbacks before the existing ones, returns the modified type.
+        template <typename BasicConnectionCallbacks<A,B>::bind_t *Bind, typename BasicConnectionCallbacks<A,B>::unbind_t *Unbind>
+        using with_callbacks_before = Connection<A, B, ConnectionCallbacks<A, B, Bind, Unbind>, Callbacks...>;
     };
 
     // Alternative to `x.Bind(y)`.
@@ -223,7 +267,7 @@ namespace Sig
     }
 }
 
-// Uncomment to enable automatic tests.
+// Set to `true` to enable automatic tests.
 #if false
 
 #include <iostream>
@@ -265,36 +309,21 @@ namespace Sig
         }
 
 
+        template <typename A, typename B> void OnBind(BasicConnection<A, B> &object, Cause cause)
+        {
+            *ss << GetVarName(&object) << ".OnBind(" << CauseToString(cause) << ")\n";
+        }
+        template <typename A, typename B> void OnUnbind(BasicConnection<A, B> &object, BasicConnection<B, A> *old_remote, Cause cause)
+        {
+            *ss << GetVarName(&object) << ".OnUnbind(" << GetVarName(old_remote) << "," << CauseToString(cause) << ")\n";
+        }
+
+
         struct TagA {};
         struct TagB {};
 
-
-        template <typename A, typename B>
-        class CustomConnection final : public BasicConnection<A, B>
-        {
-            virtual void OnBind(Cause cause) noexcept override
-            {
-                *ss << GetVarName(this) << ".OnBind(" << CauseToString(cause) << ")\n";
-            }
-            virtual void OnUnbind(BasicConnection<B, A> *old_remote, Cause cause) noexcept override
-            {
-                *ss << GetVarName(this) << ".OnUnbind(" << GetVarName(old_remote) << "," << CauseToString(cause) << ")\n";
-            }
-
-          public:
-            using BasicConnection<A, B>::BasicConnection;
-
-            CustomConnection(CustomConnection &&) = default;
-            CustomConnection &operator=(CustomConnection &&) = default;
-
-            ~CustomConnection()
-            {
-                this->Destroy(); // This line is important.
-            }
-        };
-
-        using ConA = CustomConnection<TagA, TagB>;
-        using ConB = CustomConnection<TagB, TagA>;
+        using ConA = Connection<TagA, TagB>::with_callbacks_after<OnBind, OnUnbind>;
+        using ConB = Connection<TagB, TagA>::with_callbacks_after<OnBind, OnUnbind>;
 
         void RunTestCase(std::string name, bool (*func)(), std::string result)
         {
