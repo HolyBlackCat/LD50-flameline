@@ -54,7 +54,7 @@ namespace Meta
             // This ensures that inherited class members don't count.
             template <typename T, typename = void> struct stores_hash : std::false_type {};
             template <typename T> struct stores_hash<T,
-                std::enable_if_t<std::is_same_v<const Support T::*, decltype(&T::_type_hash_storage_)>>> : std::true_type {};
+                std::enable_if_t<std::is_same_v<Support T::*, decltype(&T::_type_hash_storage_)>>> : std::true_type {};
             #endif
 
             template <typename T> [[nodiscard]] static constexpr bool CheckHash(const T &object)
@@ -87,7 +87,7 @@ namespace Meta
 // In debug builds this increases class size by 4.
 #define STORE_TYPE_HASH \
     friend ::Meta::impl::TypeId; \
-    const ::Meta::impl::TypeId::Support _type_hash_storage_ = ::Meta::impl::TypeId::Support::Make<decltype(*this)>();
+    ::Meta::impl::TypeId::Support _type_hash_storage_ = ::Meta::impl::TypeId::Support::Make<decltype(*this)>();
 #else
 #define STORE_TYPE_HASH
 #endif

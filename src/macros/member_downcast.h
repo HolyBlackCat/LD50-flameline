@@ -57,5 +57,5 @@ namespace Macro::MemberDowncast
     }
 }
 
-#define MEMBER_DOWNCAST_PTR(_class, _member_name, _member) ::Macro::MemberDowncast::Ptr<_class, decltype(_class::_member_name), offsetof(_class, _member_name)>(_member)
-#define MEMBER_DOWNCAST(_class, _member_name, _member) ::Macro::MemberDowncast::Ref<_class, decltype(_class::_member_name), offsetof(_class, _member_name)>(_member)
+#define MEMBER_DOWNCAST_PTR(_class, _member_name, ...) ::Macro::MemberDowncast::Ptr<_class, decltype(_class::_member_name), offsetof(_class, _member_name)>(__VA_ARGS__)
+#define MEMBER_DOWNCAST(_class, _member_name, ...) ::Macro::MemberDowncast::Ref<_class, decltype(_class::_member_name), offsetof(_class, _member_name)>(__VA_ARGS__)
