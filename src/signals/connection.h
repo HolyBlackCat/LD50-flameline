@@ -40,6 +40,7 @@ namespace Sig
     // This class is meant to be used together with macros from `macros/member_downcast.h`.
     // This class is an abstract base, use references to it for function parameters.
     // `Sig::Connection` inherits from this class, you probably want to use it. Inheriting custom classes from this one is not recommended.
+    // You probably don't want to make instances of this class `const`, since when accessed through a remote connection, the constness will be ignored.
     template <typename A, typename B>
     class BasicConnection : public GenericConnection
     {
@@ -128,7 +129,13 @@ namespace Sig
         }
 
       protected:
-        // Derived classes need to call this from their destructors.
+        // Derived classes must call this in move constructors.
+        void MoveFrom(BasicConnection &other)
+        {
+            LowBind(other.remote, Cause::unspecified, Cause::unspecified, Cause::remote_moved, Cause::moved, Cause::moved, Cause::remote_moved);
+        }
+
+        // Derived classes must call this in destructors.
         void Destroy()
         {
             LowUnbind(Cause::destroyed, Cause::remote_destroyed);
@@ -136,19 +143,17 @@ namespace Sig
 
       public:
         BasicConnection() {}
-        BasicConnection(remote_t &remote) {Bind(remote);}
 
-        BasicConnection(BasicConnection &&other) noexcept
-        {
-            LowBind(other.remote, Cause::unspecified, Cause::unspecified, Cause::remote_moved, Cause::moved, Cause::moved, Cause::remote_moved);
-        }
+        // We can't implement this, because it would have to call `MoveFrom(other);`,
+        // which invokes callbacks. Since callbacks are virtual functions, they
+        // don't work properly in the constructors of this class.
+        // Derived classes should implement move constructor using `MoveFrom(...)`.
+        BasicConnection(BasicConnection &&) = delete;
 
-        BasicConnection &operator=(BasicConnection &&other) noexcept
-        {
-            // No self-assignment check needed.
-            LowBind(other.remote, Cause::unspecified, Cause::unspecified, Cause::remote_moved, Cause::moved, Cause::moved, Cause::remote_moved);
-            return *this;
-        }
+        // Not implemented for consistency with the move constructor.
+        // Derived classes should implement this using `MoveFrom(...)`.
+        // A self-assignment check is not necessary.
+        BasicConnection &operator=(BasicConnection &&) = delete;
 
         ~BasicConnection()
         {
@@ -156,23 +161,25 @@ namespace Sig
         }
 
         // If `target` is null, acts as `Unbind`. Otherwise acts as `Bind`.
-        void BindPointer(remote_t *target)
+        BasicConnection &BindPointer(remote_t *target)
         {
             LowBind(target, Cause::unspecified, Cause::unspecified, Cause::unspecified, Cause::unspecified, Cause::unspecified, Cause::unspecified);
+            return *this;
         }
 
         // Binds this object to a remote one.
         // `a.Bind(b)` is equivalent to `b.Bind(a)`.
         // If any of the two objects are currently bound to something else, those bindings are discarded.
-        void Bind(remote_t &target)
+        BasicConnection &Bind(remote_t &target)
         {
-            BindPointer(&target);
+            return BindPointer(&target);
         }
 
         // If the current object is bound to something, this binding is discarded.
-        void Unbind()
+        BasicConnection &Unbind()
         {
             LowUnbind(Cause::unspecified, Cause::unspecified);
+            return *this;
         }
 
 
@@ -204,12 +211,16 @@ namespace Sig
     template <typename A, typename B>
     struct BasicConnectionCallbacks
     {
-        using bind_t = void(BasicConnection<A, B> &object, Cause cause);
-        using unbind_t = void(BasicConnection<A, B> &object, BasicConnection<B, A> *old_remote, Cause cause);
+        // `noexcept` is not strictly necessary here, because virtual callback functions
+        // from `BasicConnection` are noexcept anyway. But it forces user to declare their
+        // callbacks as `noexcept`, which helps to remind them that they must not throw.
+        using bind_t = void(BasicConnection<A, B> &object, Cause cause) noexcept;
+        using unbind_t = void(BasicConnection<A, B> &object, BasicConnection<B, A> *old_remote, Cause cause) noexcept;
     };
 
     // Encapsulates bind/unbind callbacks for connections.
     // `Bind` and/or `Unbind` can be null, then they're ignored.
+    // Callbacks must be noexcept.
     template <typename A, typename B, typename BasicConnectionCallbacks<A,B>::bind_t *Bind, typename BasicConnectionCallbacks<A,B>::unbind_t *Unbind>
     struct ConnectionCallbacks : BasicConnectionCallbacks<A, B>
     {
@@ -238,8 +249,17 @@ namespace Sig
       public:
         using BasicConnection<A, B>::BasicConnection;
 
-        Connection(Connection &&) = default;
-        Connection &operator=(Connection &&) = default;
+        Connection(Connection &&other)
+        {
+            // Every non-abstract class that inherits from `BasicConnection` has to do this.
+            this->MoveFrom(other);
+        }
+        Connection &operator=(Connection &&other)
+        {
+            // Every non-abstract class that inherits from `BasicConnection` has to do this.
+            this->MoveFrom(other);
+            return *this;
+        }
 
         ~Connection()
         {
@@ -248,6 +268,9 @@ namespace Sig
             // it in its destructor, even if its parent already has it.
             this->Destroy();
         }
+
+        // The base class.
+        using basic_connection_t = BasicConnection<A, B>;
 
 
         // Adds a pair of callbacks after the existing ones, returns the modified type.
@@ -309,11 +332,11 @@ namespace Sig
         }
 
 
-        template <typename A, typename B> void OnBind(BasicConnection<A, B> &object, Cause cause)
+        template <typename A, typename B> void OnBind(BasicConnection<A, B> &object, Cause cause) noexcept
         {
             *ss << GetVarName(&object) << ".OnBind(" << CauseToString(cause) << ")\n";
         }
-        template <typename A, typename B> void OnUnbind(BasicConnection<A, B> &object, BasicConnection<B, A> *old_remote, Cause cause)
+        template <typename A, typename B> void OnUnbind(BasicConnection<A, B> &object, BasicConnection<B, A> *old_remote, Cause cause) noexcept
         {
             *ss << GetVarName(&object) << ".OnUnbind(" << GetVarName(old_remote) << "," << CauseToString(cause) << ")\n";
         }

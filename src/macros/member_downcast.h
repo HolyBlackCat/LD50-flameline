@@ -29,6 +29,8 @@ by an `offsetof` (and does a few `static_assert`s). STORE_TYPE_HASH expands to n
 
 In debug builds however, `STORE_TYPE_HASH` expands to a member variable containing the enclosing class type hash.
 This variable is checked by the casts, so invalid casts are detected at runtime.
+
+Note that the second parameter (the member name) can accept a `.`-separated chain of members.
 */
 
 #include "meta/check_type_hash.h"
