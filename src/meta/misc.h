@@ -175,7 +175,7 @@ namespace Meta
     template <typename A, typename B> using copy_qualifiers = typename impl::copy_qualifiers<A, B>::type;
 
 
-    // Pre-C++20 replacement for `std::is_detected`.
+    // A replacement for `std::experimental::is_detected`.
 
     namespace impl
     {
@@ -184,6 +184,22 @@ namespace Meta
     }
 
     template <template <typename...> typename A, typename ...B> inline constexpr bool is_detected = impl::is_detected<void, A, B...>::value;
+
+
+    // Checks if a type is a specialization of a template.
+    // `is_specialization_of<A, B>` is true if `A` is `B<P...>`, where `P...` are some types.
+
+    namespace impl
+    {
+        template <typename A, template <typename...> typename B>
+        struct is_specialization_of : std::false_type {};
+
+        template <template <typename...> typename T, typename ...P>
+        struct is_specialization_of<T<P...>, T> : std::true_type {};
+    }
+
+    template <typename A, template <typename...> typename B>
+    inline constexpr bool is_specialization_of = impl::is_specialization_of<A, B>::value;
 
 
     // An object wrapper that moves the underlying object even when copied.
