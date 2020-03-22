@@ -210,7 +210,9 @@ namespace Meta
     {
         mutable T value;
 
-        constexpr fake_copyable(T &&value = {}) : value(std::move(value)) {}
+        constexpr fake_copyable() {}
+        constexpr fake_copyable(const T &value) : value(value) {}
+        constexpr fake_copyable(T &&value) : value(std::move(value)) {}
 
         constexpr fake_copyable(const fake_copyable &other) : value(std::move(other.value)) {}
         constexpr fake_copyable(fake_copyable &&other) : value(std::move(other.value)) {}
@@ -226,6 +228,34 @@ namespace Meta
     };
 
     template <typename T> fake_copyable(T) -> fake_copyable<T>;
+
+
+    // Checks if A is the same type as B, or if A is `void`.
+
+    template <typename A, typename B> inline constexpr bool is_same_or_void_v = std::is_void_v<A> || std::is_same_v<A, B>;
+
+
+    // A helper function that invokes a callback.
+    // It expects the callback to either have the same return type as the type of the first parameter, or void. Otherwise a static assertion is triggered.
+    // The callback is invoked, and if returns a non-void type, its return value is returned from this function.
+    // Otherwise the value of the first parameter is returned.
+
+    template <deduce..., typename F, typename R, typename ...P>
+    R invoke_and_get_return_value_or(const R &default_val, F &&func, P &&... params)
+    {
+        using ret_t = decltype(std::forward<F>(func)(std::forward<P>(params)...));
+        static_assert(is_same_or_void_v<ret_t, R>, "The return type of the callback must either be void or match the type of the first parameter.");
+        if constexpr (std::is_void_v<ret_t>)
+        {
+            std::forward<F>(func)(std::forward<P>(params)...);
+            return default_val;
+        }
+        else
+        {
+            // The cast is necessary if `R` is an lvalue reference.
+            return static_cast<R>(std::forward<F>(func)(std::forward<P>(params)...));
+        }
+    }
 
 
     // Constexpr replacement for the for loop.
