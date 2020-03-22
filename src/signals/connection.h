@@ -282,11 +282,12 @@ namespace Sig
         using with_callbacks_before = Connection<A, B, ConnectionCallbacks<A, B, Bind, Unbind>, Callbacks...>;
     };
 
-    // Alternative to `x.Bind(y)`.
+    // Alternative to `x.Bind(y)`. Returns a reference to `x`.
     template <typename A, typename B>
-    void Bind(BasicConnection<A, B> &x, BasicConnection<B, A> &y)
+    BasicConnection<A, B> &Bind(BasicConnection<A, B> &x, BasicConnection<B, A> &y)
     {
         x.Bind(y);
+        return x;
     }
 }
 

@@ -27,7 +27,7 @@ namespace Sig
     // Stores a `Sig::Connection` (`C`), and an arbitrary state (`S`).
     // Can be used instead of `MEMBER_DOWNCAST` in simple cases.
     // Also useful to implement consistent handling of remote `Sig::Connection` and `Sig::ConnectionList` objects.
-    template <typename S, typename C>
+    template <typename C, typename S>
     struct ConnectionWithState
     {
         static_assert(std::is_base_of_v<GenericConnection, C>, "`C` must be a specialization of `Sig::Connection`.");
@@ -39,7 +39,7 @@ namespace Sig
         [[no_unique_address]] impl::ConnectionStateWrapper<S> state;
     };
 
-    // Given a reference to a connection stored in a `Sig::ConnectionWithState<S, ...>`,
+    // Given a reference to a connection stored in a `Sig::ConnectionWithState<..., S>`,
     // returns a reference to the state that's stored alongside it.
     // If the connection is NOT stored in a `ConnectionWithState`, or if the specified state type is incorrect,
     // you either trigger an assertion (in debug builds, using `Meta::AssertTypeHash`) or get UB (in release builds).
@@ -48,8 +48,8 @@ namespace Sig
     {
         char *connection_ptr = reinterpret_cast<char *>(&connection);
 
-        // We expect `ConnectionWithState<S, Connection<A,B>>` and `ConnectionWithState<S, ???>` to have `state` at the same offset.
-        using offset_calc_helper = ConnectionWithState<S, Connection<A, B>>;
+        // We expect `ConnectionWithState<Connection<A,B>, S>` and `ConnectionWithState<???, S>` to have `state` at the same offset.
+        using offset_calc_helper = ConnectionWithState<Connection<A, B>, S>;
         constexpr auto offset = std::ptrdiff_t(offsetof(offset_calc_helper, state)) - std::ptrdiff_t(offsetof(offset_calc_helper, connection));
 
         auto &wrapper = *reinterpret_cast<impl::ConnectionStateWrapper<S> *>(connection_ptr + offset);

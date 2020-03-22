@@ -16,7 +16,7 @@ namespace Sig
 {
     // Stores a list of `Sig::Connection`s.
     // The connections are automatically removed from the list if they lose their binding.
-    // Each connection is wrapped in `ConnectionWithState<State, ...>`, so `GetConnectionState` can be applied to them (see `signals/connection_state.h`).
+    // Each connection is wrapped in `ConnectionWithState<..., State>`, so `GetConnectionState` can be applied to them (see `signals/connection_state.h`).
     // You probably don't want to make instances of this class `const`, since when accessed through a remote connection, the constness will be ignored.
     template <typename OriginalConnection, typename State = EmptyState>
     class ConnectionList
@@ -60,10 +60,13 @@ namespace Sig
             struct Entry
             {
                 STORE_TYPE_HASH
-                ConnectionWithState<State, custom_connection_t> con_with_state;
+                ConnectionWithState<custom_connection_t, State> con_with_state;
                 Data *data_ptr = nullptr;
 
-                Entry(remote_t &remote)
+                // Use with the care. The connection has to be connected immediately after being constructed.
+                Entry(Data *data_ptr, decltype(nullptr)) : data_ptr(data_ptr) {}
+
+                Entry(Data *data_ptr, remote_t &remote) : data_ptr(data_ptr)
                 {
                     con_with_state.connection.Bind(remote);
                 }
@@ -85,11 +88,19 @@ namespace Sig
             Data(const Data &) = delete;
             Data &operator=(const Data &) = delete;
 
-            void InsertConnection(remote_t &remote)
+            // Use with the care. The connection has to be connected immediately after being constructed.
+            [[nodiscard]] basic_connection_t &AddEmptyConnection()
             {
                 currently_resizing_connections = true;
                 FINALLY( currently_resizing_connections = false; )
-                connections.emplace_back(remote).data_ptr = this;
+                return connections.emplace_back(this, nullptr).con_with_state.connection;
+            }
+
+            basic_connection_t &AddConnection(remote_t &remote)
+            {
+                currently_resizing_connections = true;
+                FINALLY( currently_resizing_connections = false; )
+                return connections.emplace_back(this, remote).con_with_state.connection;
             }
 
             void RemoveConnection(typename std::vector<Entry>::const_iterator iter)
@@ -111,12 +122,14 @@ namespace Sig
         };
         std::unique_ptr<Data> data;
 
-        static typename Data::Entry &DowncastConnectionToEntry(basic_connection_t &connection)
-        {
-            auto &custom_con = static_cast<custom_connection_t &>(connection);
-            using Entry = typename Data::Entry; // `MEMBER_DOWNCAST` doesn't like `typename`, so we need the alias.
-            return MEMBER_DOWNCAST(Entry, con_with_state.connection, custom_con);
-        }
+        MAYBE_CONST(
+            static CV typename Data::Entry &DowncastConnectionToEntry CV_IN(CV basic_connection_t &connection)
+            {
+                CV auto &custom_con = static_cast<CV custom_connection_t &>(connection);
+                using Entry = typename Data::Entry; // `MEMBER_DOWNCAST` doesn't like `typename`, so we need the alias.
+                return MEMBER_DOWNCAST(Entry, con_with_state.connection, custom_con);
+            }
+        )
 
       public:
         ConnectionList() {}
@@ -135,22 +148,41 @@ namespace Sig
             return *this;
         }
 
-        ~ConnectionList() {}
-
-        // Given a reference to a connection stored in a list, returns a reference to the list.
-        // If the connection is not stored in a list you either trigger an assertion (in debug builds) or get UB (in release builds).
-        [[nodiscard]] static ConnectionList &DowncastConnectionToList(basic_connection_t &connection)
+        ~ConnectionList()
         {
-            return *DowncastConnectionToEntry(connection).data_ptr->main_class_ptr;
+            DebugAssert("Sig::ConnectionList contains an empty connection.",[&]{
+                if (!data)
+                    return true;
+                for (const auto &entry : data->GetConnectionList())
+                {
+                    if (!entry.con_with_state.connection)
+                        return false;
+                }
+                return true;
+            }());
         }
 
-        // Adds a connection to the list.
-        void InsertConnection(remote_t &remote)
+        // Adds a connection to the list, bound to the specified remote.
+        // Returns the new connection.
+        basic_connection_t &AddConnection(remote_t &remote)
         {
             if (!data)
                 data = std::make_unique<Data>(this);
 
-            data->InsertConnection(remote);
+            return data->AddConnection(remote);
+        }
+        // Adds a connection to the list, targeting another list.
+        // Returns the new connection.
+        template <typename T, typename S>
+        basic_connection_t &AddConnection(ConnectionList<T, S> &remote_list)
+        {
+            if (!data)
+                data = std::make_unique<Data>(this);
+
+            basic_connection_t &ret = data->AddEmptyConnection();
+            FINALLY_ON_THROW( RemoveConnection(ret); )
+            remote_list.AddConnection(ret);
+            return ret;
         }
 
         // Removes a connection already existing in the list.
@@ -177,8 +209,16 @@ namespace Sig
         }
 
         MAYBE_CONST(
-            // `func` is `bool func(CV basic_connection_t &)`.
-            // If it returns false, the loop stops and the function also returns `false`.
+            // Given a reference to a connection stored in a list, returns a reference to the list.
+            // If the connection is not stored in a list you either trigger an assertion (in debug builds) or get UB (in release builds).
+            [[nodiscard]] static CV ConnectionList &DowncastConnectionToList CV_IN(CV basic_connection_t &connection)
+            {
+                return *DowncastConnectionToEntry(connection).data_ptr->main_class_ptr;
+            }
+
+            // `func` is `bool|void func(CV basic_connection_t &)`.
+            // Returning `void` is equivalent to returning `true`.
+            // If it returns `false`, the loop stops and the function also returns `false`.
             template <typename F>
             bool ForEachConnection(F &&func) CV
             {
@@ -191,7 +231,7 @@ namespace Sig
                         // but stripping constness from specific vector elements is fine.
                         using cv_entry_t = CV typename Data::Entry;
                         auto &con = static_cast<CV basic_connection_t &>(const_cast<cv_entry_t &>(entry).con_with_state.connection);
-                        if (bool(func(con)) == false)
+                        if (Meta::invoke_and_get_return_value_or(true, func, con) == false)
                             return false;
                     }
                 }
@@ -201,14 +241,23 @@ namespace Sig
         )
     };
 
+    // Connects `list` and `con`. Returns a reference to the new connection added to `list`.
     template <typename C, typename S, typename A, typename B>
-    void Bind(ConnectionList<C, S> &list, BasicConnection<A, B> &con)
+    BasicConnection<A, B> &Bind(ConnectionList<C, S> &list, BasicConnection<B, A> &con)
     {
-        list.InsertConnection(con);
+        return list.AddConnection(con);
     }
+    // Connects `con` and `list`. Returns a reference to `con`.
     template <typename C, typename S, typename A, typename B>
-    void Bind(BasicConnection<A, B> &con, ConnectionList<C, S> &list)
+    BasicConnection<A, B> &Bind(BasicConnection<A, B> &con, ConnectionList<C, S> &list)
     {
-        list.InsertConnection(con);
+        list.AddConnection(con);
+        return con;
+    }
+    // Connects `list1` and `list2`. Returns a reference to the new connection added to `list1`.
+    template <typename C1, typename S1, typename C2, typename S2>
+    typename C1::basic_connection_t &Bind(ConnectionList<C1, S1> &list1, ConnectionList<C2, S2> &list2)
+    {
+        return list1.AddConnection(list2);
     }
 }
