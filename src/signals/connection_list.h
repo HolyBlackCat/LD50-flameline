@@ -110,6 +110,17 @@ namespace Sig
                 connections.erase(iter);
             }
 
+            void RemoveLastConnections(std::size_t count)
+            {
+                currently_resizing_connections = true;
+                FINALLY( currently_resizing_connections = false; )
+
+                if (count >= connections.size())
+                    connections.clear();
+                else
+                    connections.erase(connections.end() - count, connections.end());
+            }
+
             const std::vector<Entry> &GetConnectionList() const
             {
                 return connections;
@@ -191,6 +202,17 @@ namespace Sig
         {
             const auto &entry = DowncastConnectionToEntry(const_cast<basic_connection_t &>(con));
             data->RemoveConnection(data->GetConnectionList().begin() + (&entry - data->GetConnectionList().data()));
+        }
+
+        // Removes the last `count` connections.
+        // If there are less than `count` connections, all connections are removed.
+        // Note that unlike `Clear()`, `RemoveLastConnections(-1)` doesn't free the internal state, so it should be a bit faster.
+        void RemoveLastConnections(std::size_t count)
+        {
+            if (!data)
+                return;
+
+            data->RemoveLastConnections(count);
         }
 
         [[nodiscard]] std::size_t ConnectionCount() const

@@ -92,28 +92,28 @@ namespace Sig
 
         // Assumes `sig_con` is connected.
         template <typename R, typename ...P, typename ...Params>
-        R InvokeSignal(const BasicSigCon &sig_con, Params &&... params)
+        R InvokeSignal(BasicSigCon &sig_con, Params &&... params)
         {
-            const BasicSlotCon &slot_con = sig_con.Remote();
+            BasicSlotCon &slot_con = sig_con.Remote();
 
-            const SigState<R(P...)> &sig_state = GetConnectionState<SigState<R(P...)>>(sig_con);
-            const SlotState &slot_state = GetConnectionState<SlotState>(slot_con);
+            SigState<R(P...)> &sig_state = GetConnectionState<SigState<R(P...)>>(sig_con);
+            SlotState &slot_state = GetConnectionState<SlotState>(slot_con);
 
-            const void *target_object = nullptr;
+            void *target_object = nullptr;
             switch (slot_state.mode)
             {
               case SlotState::Mode::absolute:
-                target_object = reinterpret_cast<const void *>(slot_state.pointer_or_offset);
+                target_object = reinterpret_cast<void *>(slot_state.pointer_or_offset);
                 break;
               case SlotState::Mode::relative_to_state:
-                target_object = reinterpret_cast<const char *>(&slot_state) + slot_state.pointer_or_offset;
+                target_object = reinterpret_cast<char *>(&slot_state) + slot_state.pointer_or_offset;
                 break;
               case SlotState::Mode::relative_to_list:
-                target_object = reinterpret_cast<const char *>(&SlotList::DowncastConnectionToList(slot_con)) + slot_state.pointer_or_offset;
+                target_object = reinterpret_cast<char *>(&SlotList::DowncastConnectionToList(slot_con)) + slot_state.pointer_or_offset;
                 break;
             }
 
-            return sig_state.func(const_cast<void *>(target_object), std::forward<Params>(params)...);
+            return sig_state.func(target_object, std::forward<Params>(params)...);
         }
 
 
@@ -144,20 +144,20 @@ namespace Sig
     {
         friend impl::SigSlotHelper;
 
-        impl::SigConWithState<R(P...)> con_with_state;
+        mutable impl::SigConWithState<R(P...)> con_with_state;
 
         using optional_ret_or_void_t = std::conditional_t<std::is_void_v<R>, void, std::optional<R>>;
 
         template <typename ...Params> static constexpr bool parameters_are_usable = impl::pack_is_convertible_v<Meta::type_list<Params...>, Meta::type_list<P...>>;
 
       public:
-        void DisconnectSlots()
+        void DisconnectSlot()
         {
             con_with_state.connection.Unbind();
         }
 
         template <typename ...Params, CHECK(parameters_are_usable<Params...>)>
-        optional_ret_or_void_t operator()(Params &&... params) const
+        optional_ret_or_void_t operator()(Params &&... params)
         {
             if (!con_with_state.connection)
                 return optional_ret_or_void_t(); // `return {};` wouldn't work for `R = void`.
@@ -176,7 +176,7 @@ namespace Sig
     {
         friend impl::SigSlotHelper;
 
-        impl::SigList<R(P...)> connections;
+        mutable impl::SigList<R(P...)> connections;
 
         // Note `Params &` instead of `Params`. We can't forward the parameters because the callback can be called several times.
         template <typename ...Params> static constexpr bool parameters_are_usable = impl::pack_is_convertible_v<Meta::type_list<Params &...>, Meta::type_list<P...>>;
@@ -186,14 +186,18 @@ namespace Sig
         {
             connections.Clear();
         }
+        void DisconnectLastAttachedSlots(std::size_t count)
+        {
+            connections.RemoveLastConnections(count);
+        }
 
         // Invokes each connected slot, and applies the callback to the returned values.
         // `callback` is `void|bool callback(const R & <or equivalent>)`. Returning `void` is equivalent to returning true.
         // If the callback returns false, the function exits immediately and returns false. Otherwise it returns true.
         template <typename ...Params, typename C, CHECK(parameters_are_usable<Params...> && Meta::is_same_or_void_v<decltype(std::declval<C>()(std::declval<R>())), bool>)>
-        bool operator()(tag_pass_to_t, C &&callback, Params &&... params) const
+        bool operator()(tag_pass_to_t, C &&callback, Params &&... params)
         {
-            return connections.ForEachConnection([&](const impl::BasicSigCon &sig_con)
+            return connections.ForEachConnection([&](impl::BasicSigCon &sig_con)
             {
                 return callback(impl::InvokeSignal<R, P...>(sig_con, params...)); // Note lack of forwarding.
             });
@@ -202,9 +206,9 @@ namespace Sig
         // Invokes each connected slot, and inserts the returned values into a container.
         // The container class must provide a suitable `insert` or `push_back` function.
         template <typename ...Params, typename C, CHECK(parameters_are_usable<Params...> && impl::can_append_to<C, R>)>
-        void operator()(tag_insert_into_t, C &container, Params &&... params) const
+        void operator()(tag_insert_into_t, C &container, Params &&... params)
         {
-            connections.ForEachConnection([&](const impl::BasicSigCon &sig_con)
+            connections.ForEachConnection([&](impl::BasicSigCon &sig_con)
             {
                 impl::AppendTo(container, impl::InvokeSignal<R, P...>(sig_con, params...)); // Note lack of forwarding.
             });
@@ -212,9 +216,9 @@ namespace Sig
 
         // Invokes each connected slot, and discards the return values.
         template <typename ...Params, CHECK(parameters_are_usable<Params...>)>
-        void operator()(Params &&... params) const
+        void operator()(Params &&... params)
         {
-            connections.ForEachConnection([&](const impl::BasicSigCon &sig_con)
+            connections.ForEachConnection([&](impl::BasicSigCon &sig_con)
             {
                 impl::InvokeSignal<R, P...>(sig_con, params...); // Note lack of forwarding.
             });
@@ -230,7 +234,7 @@ namespace Sig
         impl::SlotConWithState con_with_state;
 
       public:
-        void DisconnectSignals()
+        void DisconnectSignal()
         {
             con_with_state.connection.Unbind();
         }
@@ -247,6 +251,10 @@ namespace Sig
         {
             connections.Clear();
         }
+        void DisconnectLastAttachedSignals(std::size_t count)
+        {
+            connections.RemoveLastConnections(count);
+        }
     };
 
 
@@ -255,19 +263,19 @@ namespace Sig
         struct SigSlotHelper
         {
             template <typename R, typename ...P>
-            static BasicSigCon &GetSigCon(MonoSignal<R(P...)> &sig)
+            static BasicSigCon &GetSigCon(const MonoSignal<R(P...)> &sig)
             {
                 return sig.con_with_state.connection;
             }
 
             template <typename R, typename ...P>
-            static SigList<R(P...)> &GetSigCon(Signal<R(P...)> &sig)
+            static SigList<R(P...)> &GetSigCon(const Signal<R(P...)> &sig)
             {
                 return sig.connections;
             }
 
             template <typename S>
-            static BasicSigCon &Connect(S &sig, MonoSlot &slot, bool relative, std::uintptr_t pointer_or_offset)
+            static BasicSigCon &Connect(const S &sig, MonoSlot &slot, bool relative, std::uintptr_t pointer_or_offset)
             {
                 BasicSigCon &ret = Bind(SigSlotHelper::GetSigCon(sig), slot.con_with_state.connection);
                 SlotState &state = slot.con_with_state.state.value;
@@ -277,7 +285,7 @@ namespace Sig
             }
 
             template <typename S>
-            static BasicSigCon &Connect(S &sig, Slot &slot, bool relative, std::uintptr_t pointer_or_offset)
+            static BasicSigCon &Connect(const S &sig, Slot &slot, bool relative, std::uintptr_t pointer_or_offset)
             {
                 BasicSigCon &ret = Bind(SigSlotHelper::GetSigCon(sig), slot.connections);
                 SlotState &state = GetConnectionState<SlotState>(ret.Remote());
@@ -319,7 +327,7 @@ namespace Sig
         };
 
         template <typename R, typename ...P, typename Sig, typename Slot, typename O, typename C, AddressMode AddrMode>
-        void ConnectLow(Sig &signal, Slot &slot, O *object, C &&callback, Meta::value_tag<AddrMode>)
+        void ConnectLow(const Sig &signal, Slot &slot, O *object, C &&callback, Meta::value_tag<AddrMode>)
         {
             if constexpr (AddrMode == AddressMode::unused)
                 static_assert(std::is_invocable_r_v<R, std::remove_cvref_t<C>, P...>, "Invalid callback.");
@@ -377,13 +385,13 @@ namespace Sig
         }
 
         template <typename R, typename ...P, typename ...Params>
-        void Connect(MonoSignal<R(P...)> &signal, Params &&... params)
+        void Connect(const MonoSignal<R(P...)> &signal, Params &&... params)
         {
             // `impl::` prevents ADL.
             impl::ConnectLow<R, P...>(signal, std::forward<Params>(params)...);
         }
         template <typename R, typename ...P, typename ...Params>
-        void Connect(Signal<R(P...)> &signal, Params &&... params)
+        void Connect(const Signal<R(P...)> &signal, Params &&... params)
         {
             // `impl::` prevents ADL.
             impl::ConnectLow<R, P...>(signal, std::forward<Params>(params)...);
@@ -392,7 +400,7 @@ namespace Sig
 
     // Connect a signal to an object derived from a slot. The derived object will be passed to the callback.
     template <typename Sig, typename Slot, typename C, CHECK(impl::is_signal_v<Sig> && impl::is_derived_from_slot_v<Slot>)>
-    void Connect(Sig &signal, Slot &slot_like, C &&callback)
+    void Connect(const Sig &signal, Slot &slot_like, C &&callback)
     {
         impl::Connect(signal, static_cast<impl::slot_base_t<Slot> &>(slot_like), &slot_like, std::forward<C>(callback), Meta::value_tag<impl::AddressMode::relative>{});
     }
@@ -402,7 +410,7 @@ namespace Sig
 
     // Connect a signal to a slot, and pass a custom object to the callback. That object is assumed to always be located at a fixed offset relative to the slot.
     template <typename Sig, typename Slot, typename O, typename C, CHECK(impl::is_signal_v<Sig> && impl::is_slot_v<Slot>)>
-    void Connect(Sig &signal, Slot &slot, tag_relative_to_slot_t, O &object, C &&callback)
+    void Connect(const Sig &signal, Slot &slot, tag_relative_to_slot_t, O &object, C &&callback)
     {
         impl::Connect(signal, slot, &object, std::forward<C>(callback), Meta::value_tag<impl::AddressMode::relative>{});
     }
@@ -412,14 +420,14 @@ namespace Sig
 
     // Connect a signal to a slot, and pass a custom object to the callback. That object is assumed to have a fixed address.
     template <typename Sig, typename Slot, typename O, typename C, CHECK(impl::is_signal_v<Sig> && impl::is_slot_v<Slot>)>
-    void Connect(Sig &signal, Slot &slot, tag_fixed_location_t, O &object, C &&callback)
+    void Connect(const Sig &signal, Slot &slot, tag_fixed_location_t, O &object, C &&callback)
     {
         impl::Connect(signal, slot, &object, std::forward<C>(callback), Meta::value_tag<impl::AddressMode::absolute>{});
     }
 
     // No additional objects will be passed to the callback.
     template <typename Sig, typename Slot, typename C, CHECK(impl::is_signal_v<Sig> && impl::is_slot_v<Slot>)>
-    void Connect(Sig &signal, Slot &slot, C &&callback)
+    void Connect(const Sig &signal, Slot &slot, C &&callback)
     {
         impl::Connect(signal, slot, (void *)nullptr, std::forward<C>(callback), Meta::value_tag<impl::AddressMode::unused>{});
     }
