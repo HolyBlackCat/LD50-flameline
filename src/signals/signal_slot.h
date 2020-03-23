@@ -15,6 +15,74 @@
 #include "signals/connection_list.h"
 #include "signals/connection_state.h"
 
+/*   Signals and slots
+ * Signals and slots is a convenient way to send messages between objects.
+ *
+ * Signals can be *connected* to slots.
+ * Signals have type `Sig::[Mono]Signal<return_type(param_types...)>`. Slots have type `Sig::[Mono]Slot`.
+ * `Mono...` signals and slots can only be connected to a single slot or signal respectively, but are slightly more optimized.
+ *
+ * Signals and slots are connected using `Sig::Connect()`.
+ * Usage:
+ *     Sig::Connect(signal, slot_or_object, [mode, object,] callback);
+ * Where:
+ * - `signal` is an lvalue of type `[Mono]Signal<R(P...)>`.
+ *   If it's a `MonoSignal`, then it must be non-const. It's required because connecting to a `MonoSignal` is
+ *   potentially destructive, since it removes the previous connection.
+ * - `slot_or_object` is a non-const lvalue of type `[Mono]Slot`, or a class derived from those.
+ *   If it's a `MonoSlot` or derived from one, then connecting to it removes the previous connection.
+ *   If it's derived from `[Mono]Slot` (rather than being one), then the call is equivalent to
+ *   `Sig::Connect(signal, static_cast<[Mono]Slot &>(slot_or_object), Sig::relative_to_slot, slot_or_object, callback)`.
+ *   See the description of `callback` for details.
+ * - `mode`, if it's present, must be `Sig::relative_to_slot` or `Sig::fixed_location`.
+ *   See the description of `callback` for details.
+ * - `object`, if it's present, is a reference to an arbitrary object that will be passed to the callback.
+ *   See the description of `callback` for details.
+ * - `callback` is the callback that will be associated with this signal/slot connection.
+ *   First of all, the callback with be invoked using `std::invoke`, which makes it possible to use
+ *   member function pointers (and even pointers to members) as callbacks.
+ *   If `Sig::Connect` was called without specifying `mode` and `object` (and if `slot_or_object` is
+ *   a `[Mono]Slot` rather than class derived from one), then the callback will invoked with the parameters
+ *   specified in the template parameters of the signal.
+ *   If `mode` and `object` are specified (of if `slot_or_object` is derived from a slot), then `object`
+ *   (or `slot_or_object` if `object` is not specified) will be passed as an additional first parameter to the callback.
+ *   `mode` describes what should happen if the slot is moved. If `mode` is `Sig::fixed_location`, then nothing happens
+ *   to the address of `object`. If it's `Sig::relative_to_slot`, then the `object` is assumed to have been moved with
+ *   the slot (it's assumed to be located at a fixed offset relative to the address of the slot).
+ *
+ * Signals and slots are disconnected automatically when destructed. They can also be disconnected manually, see class definitions for details.
+ *
+ * Signals have `operator()` overloaded, with the parameters specified in their template parameters (roughly, see class definitions for details).
+ * Calling `operator()` invokes callbacks associated with all connections attached to the signal.
+ *
+ * Example:
+ *     struct A
+ *     {
+ *         Sig::Signal<void(int)> signal;
+ *     };
+ *
+ *     struct B : Sig::Slot
+ *     {
+ *         int value = 42;
+ *
+ *         void foo(int param)
+ *         {
+ *             std::cout << value * param << '\n';
+ *         }
+ *     };
+ *
+ *     int main()
+ *     {
+ *         A a;
+ *         B b;
+ *
+ *         a.signal(10); // Does nothing.
+ *         Sig::Connect(a.signal, b, &B::foo);
+ *         a.signal(10); // Prints `420`.
+ *     }
+ */
+
+
 namespace Sig
 {
     namespace impl
@@ -306,14 +374,15 @@ namespace Sig
         };
 
 
-        // Check if `T` is a specialization of `MonoSignal` or `Signal`.
-        template <typename T> inline constexpr bool is_signal_v = Meta::is_specialization_of<T, MonoSignal> || Meta::is_specialization_of<T, Signal>;
+        // Check if `T` is a specialization of `MonoSignal` (strictly non-const) or `Signal` (possibly const).
+        // We require `MonoSignal`s to be non-const because connecting to them can be destructive (removes previous connection).
+        template <typename T> inline constexpr bool is_connectable_signal_v = Meta::is_specialization_of<T, MonoSignal> || Meta::is_specialization_of<std::remove_const_t<T>, Signal>;
 
         // Check if `T` is `MonoSlot` or `Slot`.
         template <typename T> inline constexpr bool is_slot_v = std::is_same_v<T, MonoSlot> || std::is_same_v<T, Slot>;
 
         // Check if `T` is derived from `MonoSlot` or `Slot`.
-        template <typename T> inline constexpr bool is_derived_from_slot_v = !is_slot_v<T> && (std::is_base_of_v<MonoSlot, T> || std::is_base_of_v<Slot, T>);
+        template <typename T> inline constexpr bool is_derived_from_slot_v = !is_slot_v<T> && !std::is_const_v<T> && (std::is_base_of_v<MonoSlot, T> || std::is_base_of_v<Slot, T>);
 
         // If `T` is derived from `MonoSlot` or `Slot`, expands to `MonoSlot` or `Slot` respectively. Otherwise expands to `void`.
         template <typename T> using slot_base_t = std::conditional_t<is_derived_from_slot_v<T>, std::conditional_t<std::is_base_of_v<MonoSlot, T>, MonoSlot, Slot>, void>;
@@ -399,8 +468,8 @@ namespace Sig
     }
 
     // Connect a signal to an object derived from a slot. The derived object will be passed to the callback.
-    template <typename Sig, typename Slot, typename C, CHECK(impl::is_signal_v<Sig> && impl::is_derived_from_slot_v<Slot>)>
-    void Connect(const Sig &signal, Slot &slot_like, C &&callback)
+    template <typename Sig, typename Slot, typename C, CHECK(impl::is_connectable_signal_v<Sig> && impl::is_derived_from_slot_v<Slot>)>
+    void Connect(Sig &signal, Slot &slot_like, C &&callback)
     {
         impl::Connect(signal, static_cast<impl::slot_base_t<Slot> &>(slot_like), &slot_like, std::forward<C>(callback), Meta::value_tag<impl::AddressMode::relative>{});
     }
@@ -409,8 +478,8 @@ namespace Sig
     inline constexpr tag_relative_to_slot_t relative_to_slot;
 
     // Connect a signal to a slot, and pass a custom object to the callback. That object is assumed to always be located at a fixed offset relative to the slot.
-    template <typename Sig, typename Slot, typename O, typename C, CHECK(impl::is_signal_v<Sig> && impl::is_slot_v<Slot>)>
-    void Connect(const Sig &signal, Slot &slot, tag_relative_to_slot_t, O &object, C &&callback)
+    template <typename Sig, typename Slot, typename O, typename C, CHECK(impl::is_connectable_signal_v<Sig> && impl::is_slot_v<Slot>)>
+    void Connect(Sig &signal, Slot &slot, tag_relative_to_slot_t, O &object, C &&callback)
     {
         impl::Connect(signal, slot, &object, std::forward<C>(callback), Meta::value_tag<impl::AddressMode::relative>{});
     }
@@ -419,15 +488,15 @@ namespace Sig
     inline constexpr tag_fixed_location_t fixed_location;
 
     // Connect a signal to a slot, and pass a custom object to the callback. That object is assumed to have a fixed address.
-    template <typename Sig, typename Slot, typename O, typename C, CHECK(impl::is_signal_v<Sig> && impl::is_slot_v<Slot>)>
-    void Connect(const Sig &signal, Slot &slot, tag_fixed_location_t, O &object, C &&callback)
+    template <typename Sig, typename Slot, typename O, typename C, CHECK(impl::is_connectable_signal_v<Sig> && impl::is_slot_v<Slot>)>
+    void Connect(Sig &signal, Slot &slot, tag_fixed_location_t, O &object, C &&callback)
     {
         impl::Connect(signal, slot, &object, std::forward<C>(callback), Meta::value_tag<impl::AddressMode::absolute>{});
     }
 
     // No additional objects will be passed to the callback.
-    template <typename Sig, typename Slot, typename C, CHECK(impl::is_signal_v<Sig> && impl::is_slot_v<Slot>)>
-    void Connect(const Sig &signal, Slot &slot, C &&callback)
+    template <typename Sig, typename Slot, typename C, CHECK(impl::is_connectable_signal_v<Sig> && impl::is_slot_v<Slot>)>
+    void Connect(Sig &signal, Slot &slot, C &&callback)
     {
         impl::Connect(signal, slot, (void *)nullptr, std::forward<C>(callback), Meta::value_tag<impl::AddressMode::unused>{});
     }
