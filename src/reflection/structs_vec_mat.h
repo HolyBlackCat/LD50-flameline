@@ -21,10 +21,6 @@ namespace Refl::Class::Custom
         {
             return object.template get<I>();
         }
-        template <std::size_t I> static constexpr const auto &at(const T &object)
-        {
-            return object.template get<I>();
-        }
     };
 
     template <std::size_t W, std::size_t H, typename M> struct name<Math::mat<W, H, M>>
@@ -43,10 +39,6 @@ namespace Refl::Class::Custom
             else if constexpr (I % W == 2) v = &object.z;
             else                           v = &object.w;
             return v->template get<I / W>();
-        }
-        template <std::size_t I> static constexpr const auto &at(const T &object)
-        {
-            return at<I>(const_cast<T &>(object));
         }
     };
 }

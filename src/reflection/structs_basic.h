@@ -217,19 +217,11 @@ namespace Refl
                 {
                     return object.*Meta::list_value_at<Macro::member_ptrs<T>, I>;
                 }
-                template <std::size_t I> static constexpr const auto &at(const T &object)
-                {
-                    return object.*Meta::list_value_at<Macro::member_ptrs<T>, I>;
-                }
             };
             template <typename T> struct members<T, Meta::void_type<decltype(std::tuple_size<T>::value)>> // Tuple interface. Note that we don't use `tuple_size_v` here because it's not SFINAE-friendly.
             {
                 static constexpr std::size_t count = std::tuple_size_v<T>;
                 template <std::size_t I> static constexpr auto &at(T &object)
-                {
-                    return std::get<I>(object);
-                }
-                template <std::size_t I> static constexpr const auto &at(const T &object)
                 {
                     return std::get<I>(object);
                 }
@@ -239,10 +231,6 @@ namespace Refl
                 using T = M[N];
                 static constexpr std::size_t count = N;
                 template <std::size_t I> static constexpr auto &at(T &object)
-                {
-                    return object[I];
-                }
-                template <std::size_t I> static constexpr const auto &at(const T &object)
                 {
                     return object[I];
                 }
@@ -318,9 +306,14 @@ namespace Refl
         // Non-staic members.
         template <typename T> inline constexpr bool members_known = Custom::members<std::remove_const_t<T>>::count != std::size_t(-1);
         template <typename T> inline constexpr std::size_t member_count = members_known<T> ? Custom::members<std::remove_const_t<T>>::count : 0;
-        template <std::size_t I, Meta::deduce..., typename T> constexpr auto &Member(T &object)
+        template <std::size_t I, Meta::deduce..., typename T> constexpr decltype(auto) Member(T &&object)
         {
-            return Custom::members<std::remove_const_t<T>>::template at<I>(object);
+            using class_t = std::remove_cvref_t<T>;
+            auto &ref = Custom::members<class_t>::template at<I>(const_cast<class_t &>(object));
+            using member_t = std::remove_reference_t<decltype(ref)>;
+            using member_cv_t = std::conditional_t<std::is_const_v<std::remove_reference_t<T>>, const member_t, member_t>;
+            using member_cvref_t = std::conditional_t<std::is_reference_v<T>, member_cv_t &, member_cv_t &&>;
+            return static_cast<member_cvref_t>(ref);
         }
 
         // Member attributes.
