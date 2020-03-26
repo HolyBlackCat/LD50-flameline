@@ -3,8 +3,9 @@
 #include <ctime>
 #include <map>
 #include <string>
-#include <vector>
+#include <type_traits>
 #include <utility>
+#include <vector>
 
 #include "graphics/image.h"
 #include "program/errors.h"
@@ -54,14 +55,14 @@ namespace Graphics
             }
         };
 
-        class ImageList
+        class RegionList
         {
             friend class TextureAtlas;
 
             std::vector<Region> list;
 
           public:
-            ImageList() {}
+            RegionList() {}
 
             // [] wraps around for easier animation.
             Region &operator[](int index)
@@ -111,9 +112,9 @@ namespace Graphics
                 Program::Error("No image `", name, "` in texture atlas for `", source_dir, "`.");
             return ret;
         }
-        ImageList GetList(const std::string &prefix, int first_index, const std::string &suffix, int count = -1) const
+        RegionList GetList(const std::string &prefix, int first_index, const std::string &suffix, int count = -1) const
         {
-            ImageList ret;
+            RegionList ret;
 
             int offset = 0;
             while (offset != count)
@@ -134,6 +135,34 @@ namespace Graphics
             }
 
             return ret;
+        }
+
+        // Fills a reflected struct `object` with region data.
+        // `object` has to have its members reflected.
+        // The only allowed member types are `Region` and `RegionList`.
+        template <typename T> void InitRegions(T &object, std::string suffix) const
+        {
+            static_assert(Refl::Class::members_known<T> && Refl::Class::member_names_known<T>, "Members of this class are not reflected.");
+
+            Meta::cexpr_for<Refl::Class::member_count<T>>([&](auto index)
+            {
+                constexpr auto i = index.value;
+                using member_t = Refl::Class::member_type<T, i>;
+                member_t &member = Refl::Class::Member<i>(object);
+                // Refl::Class::MemberName<T>(i)
+                if constexpr (std::is_same_v<member_t, Region>)
+                {
+                    member = Get(Refl::Class::MemberName<T>(i) + suffix);
+                }
+                else if constexpr (std::is_same_v<member_t, RegionList>)
+                {
+                    member = GetList(Refl::Class::MemberName<T>(i), 0, suffix);
+                }
+                else
+                {
+                    static_assert(Meta::value<false, decltype(index)>, "This type is not supported. Must be `Graphics::TextureAtlas::{Region|RegionList}`.");
+                }
+            });
         }
     };
 }
