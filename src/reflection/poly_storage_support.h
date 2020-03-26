@@ -223,14 +223,25 @@ namespace Refl
 
                     // Converts a class name to its index.
                     // This assumes the list is already finalized.
-                    // Throws if the name is invalid.
-                    static std::size_t ClassNameToIndex(const char *name)
+                    // If the name is invalid, returns -1.
+                    static std::size_t ClassNameToIndexIfValid(const char *name)
                     {
                         auto &list = NameToFuncList();
                         auto it = std::lower_bound(list.begin(), list.end(), name);
                         if (it == list.end() || *it != name)
-                            Program::Error("Unknown polymorphic class name: `", name, "`.");
+                            return -1;
                         return it - list.begin();
+                    }
+
+                    // Converts a class name to its index.
+                    // This assumes the list is already finalized.
+                    // Throws if the name is invalid.
+                    static std::size_t ClassNameToIndex(const char *name)
+                    {
+                        std::size_t ret = ClassNameToIndexIfValid(name);
+                        if (ret == std::size_t(-1))
+                            Program::Error("Unknown polymorphic class name: `", name, "`.");
+                        return ret;
                     }
 
                     // Constructs a class given its index.
@@ -285,10 +296,18 @@ namespace Refl
                     return BaseData<Base>::ConstructFromIndex(index);
                 }
 
-                // Constructs an object given its name. Throws on failure.
-                template <typename Base> static Poly::Storage<Base, PolyStorageData<Base>> ConstructFromName(const char *name)
+                // Returns the index of the class named `name`, derived from `Base`.
+                // Throws of failure.
+                template <typename Base> static std::size_t NameToIndex(const char *name)
                 {
-                    return BaseData<Base>::ConstructFromIndex(BaseData<Base>::ClassNameToIndex(name));
+                    return BaseData<Base>::ClassNameToIndex(name);
+                }
+
+                // Returns the index of the class named `name`, derived from `Base`.
+                // Returns -1 on failure.
+                template <typename Base> static std::size_t NameToIndexIfValid(const char *name)
+                {
+                    return BaseData<Base>::ClassNameToIndexIfValid(name);
                 }
 
 
@@ -359,6 +378,40 @@ namespace Refl
             return object.dynamic().zrefl_Name;
         }
 
+        // Returns the index of the class named `name`, derived from `T`.
+        // Throws on failure.
+        template <typename T> [[nodiscard]] std::size_t NameToIndex(const char *name)
+        {
+            impl::Data::FinalizeIfNeeded();
+            return impl::Data::NameToIndex<T>(name);
+        }
+        template <typename T> [[nodiscard]] std::size_t NameToIndex(const std::string &name)
+        {
+            return NameToIndex<T>(name.c_str());
+        }
+
+        // Returns the index of the class named `name`, derived from `T`.
+        // Returns `-1` if the name is invalid.
+        template <typename T> [[nodiscard]] std::size_t NameToIndexIfValid(const char *name)
+        {
+            impl::Data::FinalizeIfNeeded();
+            return impl::Data::NameToIndexIfValid<T>(name);
+        }
+        template <typename T> [[nodiscard]] std::size_t NameToIndexIfValid(const std::string &name)
+        {
+            return NameToIndexIfValid<T>(name.c_str());
+        }
+
+        // Checks if there's a reflected class named `name`, derived from `T`.
+        template <typename T> [[nodiscard]] bool NameIsValid(const char *name)
+        {
+            return NameToIndexIfValid<T>(name) != std::size_t(-1);
+        }
+        template <typename T> [[nodiscard]] bool NameIsValid(const std::string &name)
+        {
+            return NameIsValid<T>(name);
+        }
+
         // Constructs an object given its index.
         // Throws if the index is invalid or if the constructor throws.
         // Passing `-1` as an index causes a null object to be returned.
@@ -375,10 +428,7 @@ namespace Refl
         // Passing a null pointer as the name causes a null object to be returned.
         template <typename T> [[nodiscard]] PolyStorage<T> ConstructFromName(const char *name)
         {
-            impl::Data::FinalizeIfNeeded();
-            if (!name)
-                return nullptr;
-            return impl::Data::ConstructFromName<T>(name);
+            return ConstructFromIndex<T>(NameToIndex<T>(name));
         }
         template <typename T> [[nodiscard]] PolyStorage<T> ConstructFromName(const std::string &name)
         {
