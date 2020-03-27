@@ -7,7 +7,7 @@
 #include <sstream>
 #include <type_traits>
 
-#define VERSION "3.1.11"
+#define VERSION "3.1.12"
 
 #pragma GCC diagnostic ignored "-Wpragmas" // Silence GCC warning about the next line disabling a warning that GCC doesn't have.
 #pragma GCC diagnostic ignored "-Wstring-plus-int" // Silence clang warning about `1+R"()"` pattern.
@@ -549,6 +549,12 @@ int main(int argc, char **argv)
 
                                 // Rotate by 90 degree increments
                                 output("[[nodiscard]] constexpr vec rot90(int steps = 1) const {switch (steps & 3) {default: return *this; case 1: return {-y,x}; case 2: return -*this; case 3: return {y,-x};}}\n");
+
+                                // Return one of the 4 main directions, `vec2(1,0).rot90(index)`
+                                output("[[nodiscard]] static constexpr vec dir4(int index) {return vec(1,0).rot90(index);}\n");
+
+                                // Return one of the 8 main directions (including diagonals).
+                                output("[[nodiscard]] static constexpr vec dir8(int index) {vec array[8]{vec(1,0),vec(1,1),vec(0,1),vec(-1,1),vec(-1,0),vec(-1,-1),vec(0,-1),vec(1,-1)}; return array[index & 7];}\n");
                             }
                         }
 
@@ -571,8 +577,8 @@ int main(int argc, char **argv)
                             if (w == 2)
                                 output("template <typename TT> [[nodiscard]] constexpr auto cross(const vec2<TT> &o) const {return x * o.y - y * o.x;}\n");
 
-                            // Delta (aka inverse minus)
-                            output("template <typename TT> [[nodiscard]] constexpr auto delta(vec",w,"<TT> v) const {return v - *this;}\n");
+                            // Delta_to (aka inverse minus)
+                            output("template <typename TT> [[nodiscard]] constexpr auto delta_to(vec",w,"<TT> v) const {return v - *this;}\n");
                         }
 
                         { // Tie
