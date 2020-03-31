@@ -347,14 +347,12 @@ namespace Graphics
             };
 
             // Save the default glyph.
-            if (!(entry.flags & entry.no_default_glyph))
+            if (!(entry.flags & entry.no_default_glyph) && !entry.glyphs->Contains(Unicode::default_char))
                 AddGlyph(Unicode::default_char);
 
             // Save the rest of the glyphs.
-            entry.glyphs->ForEachValue([&](uint32_t ch)
-            {
+            for (uint32_t ch : *entry.glyphs)
                 AddGlyph(ch);
-            });
         }
 
         // Pack rectangles.

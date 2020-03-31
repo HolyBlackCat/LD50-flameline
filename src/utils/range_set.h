@@ -1,140 +1,180 @@
 #pragma once
 
-#include <map>
+#include <algorithm>
+#include <initializer_list>
 #include <type_traits>
 #include <utility>
+#include <vector>
 
-#include "utils/mat.h"
+#include "utils/simple_iterator.h"
 
-template <typename T> class RangeSet
+template <typename T>
+class RangeSet
 {
     static_assert(std::is_integral_v<T>, "The template parameter must be integral.");
 
-    std::map<T, T> map; // This map countains non-overlapping inclusive ranges.
-    T values = 0;
+  public:
+    using elem_type = T;
 
-    using iterator_t = typename decltype(map)::iterator;
+    struct Range
+    {
+        T begin = 1;
+        T end = 0; // The end is inclusive!
 
-    void SetEndOfRange(iterator_t it, const T &new_end)
-    {
-        values += new_end - it->second; // This should work even with unsigned wraparound.
-        it->second = new_end;
-    }
-    void SetEndOfRangeToMax(iterator_t it, const T &new_end)
-    {
-        if (new_end > it->second)
-            SetEndOfRange(it, new_end);
-    }
-    void EraseRange(iterator_t it)
-    {
-        values -= it->second - it->first + 1;
-        map.erase(it);
-    }
+        constexpr Range() {}
+        constexpr Range(T value) : begin(value), end(value) {}
 
-    void TryMergingAdjacent(iterator_t a, iterator_t &b) // Makes `b` equal to `a` if the ranges had to be merged. Note that only `b` is passed by reference.
-    {
-        if (a->second >= b->first-1)
+        [[nodiscard]] constexpr static Range OffsetAndSize(T begin, T size)
         {
-            SetEndOfRangeToMax(a, b->second);
-            EraseRange(b);
-            b = a;
+            return HalfOpen(begin, begin + size);
         }
-    }
+        [[nodiscard]] constexpr static Range HalfOpen(T begin, T end)
+        {
+            return Inclusive(begin, end - 1);
+        }
+        [[nodiscard]] constexpr static Range Inclusive(T begin, T end)
+        {
+            Range ret;
+            ret.begin = begin;
+            ret.end = end;
+            return ret;
+        }
+
+        // Returns true if the range is valid and non-empty.
+        [[nodiscard]] constexpr explicit operator bool() const
+        {
+            return begin <= end;
+        }
+
+        [[nodiscard]] constexpr bool Contains(T value) const
+        {
+            return value >= begin && value <= end;
+        }
+    };
+
+  private:
+    mutable std::vector<Range> ranges; // None of those ranges can be empty.
+    mutable bool dirty = false;
+
+    struct IteratorState
+    {
+        typename std::vector<Range>::const_iterator range_iter{}, range_iter_end{};
+        elem_type value{};
+
+        IteratorState() {}
+        IteratorState(const std::vector<Range> &vec) : range_iter(vec.begin()), range_iter_end(vec.end())
+        {
+            if (!Finished())
+                value = range_iter->begin;
+        }
+
+        bool Finished() const
+        {
+            return range_iter == range_iter_end;
+        }
+
+        const T &operator()(std::false_type) const
+        {
+            return value;
+        }
+        void operator()(std::true_type)
+        {
+            bool last_value = value >= range_iter->end; // Can't compare after incrementing, because it might overflow.
+
+            value++;
+
+            if (last_value)
+            {
+                range_iter++;
+                if (!Finished())
+                    value = range_iter->begin;
+            }
+        }
+
+        bool operator==(const IteratorState &other) const
+        {
+            bool finished = Finished();
+            bool other_finished = other.Finished();
+            if (finished && other_finished)
+                return true;
+            if (finished != other_finished)
+                return false;
+            return range_iter == other.range_iter && value == other.value;
+        }
+    };
 
   public:
     RangeSet() {}
-    RangeSet(const T &value)
+
+    RangeSet(const Range &range) {Add(range);}
+    RangeSet(std::vector<Range> ranges) : ranges(std::move(ranges)) {}
+
+    RangeSet &Add(Range range)
     {
-        Add(value);
-    }
-    RangeSet(const T &first, const T &second)
-    {
-        Add(first, second);
-    }
-    RangeSet(const std::pair<T, T> &range)
-    {
-        Add(range);
-    }
-    RangeSet(std::initializer_list<std::pair<T,T>> ranges)
-    {
-        for (auto range : ranges)
-            Add(range);
+        if (!range)
+            return *this;
+
+        ranges.push_back(range);
+        dirty = true;
+        return *this;
     }
 
-    void Add(const T &value)
+    // Sort ranges and merge overlapping ones.
+    // Normally you don't need to call this function, this is done automatically.
+    const RangeSet &Normalize() const
     {
-        Add(value, value);
-    }
-    void Add(const T &first, const T &last) // The range is inclusive.
-    {
-        // Try inserting.
-        auto [it_cur, inserted] = map.insert({first, last});
+        if (!dirty || ranges.empty()) // The code below assumes `ranges.size() > 0`.
+            return *this;
 
-        if (inserted)
+        // Sort ranges by `begin`.
+        std::sort(ranges.begin(), ranges.end(), [](const Range &a, const Range &b)
         {
-            // Update value count.
-            values += last - first + 1;
+            return a.begin < b.begin;
+        });
 
-            // Check for intersections with previous range.
-            if (it_cur != map.begin())
-                TryMergingAdjacent(std::prev(it_cur), it_cur);
-        }
-        else
+        std::size_t new_size = 1; // Note that we start from 1.
+        for (std::size_t i = 1; i < ranges.size(); i++) // Also start from 1 here.
         {
-            // Update end of the existing range.
-            SetEndOfRangeToMax(it_cur, last);
+            auto &last_range = ranges[new_size-1];
+            auto &this_range = ranges[i];
+
+            if (last_range.end + 1 >= this_range.begin)
+            {
+                if (last_range.end < this_range.end)
+                    last_range.end = this_range.end;
+            }
+            else
+            {
+                ranges[new_size++] = ranges[i];
+            }
         }
+        ranges.resize(new_size);
 
-        // Check for intersections with next range.
-        if (auto it_next = std::next(it_cur); it_next != map.end())
-            TryMergingAdjacent(it_cur, it_next);
-    }
-    void Add(const std::pair<T,T> &range)
-    {
-        Add(range.first, range.second);
-    }
-    void Add(std::initializer_list<std::pair<T,T>> ranges)
-    {
-        for (auto range : ranges)
-            Add(range);
+        return *this;
     }
 
-    void Clear()
+    [[nodiscard]] auto begin() const
     {
-        map = {};
-        values = 0;
+        Normalize();
+        return SimpleIterator::Forward<IteratorState>(ranges);
+    }
+    [[nodiscard]] auto end() const
+    {
+        // No need to normalize here.
+        return SimpleIterator::Forward<IteratorState>();
     }
 
-    int RangeCount() const
+    // Returns the list of ranges, sorted and without overlapping.
+    [[nodiscard]] const std::vector<Range> &Ranges() const
     {
-        return map.size();
-    }
-    T ValueCount() const
-    {
-        return values;
+        Normalize();
+        return ranges;
     }
 
-    template <typename F> void ForEachRange(F &&func/* void(const T &begin, const T &end) */) const // Both ends of ranges are inclusive.
+    [[nodiscard]] bool Contains(T value) const
     {
-        for (auto [begin, end] : map)
-            func(begin, end);
-    }
-    template <typename F> void ForEachValue(F &&func/* void(const T &value) */) const
-    {
-        for (auto [begin, end] : map)
-        for (auto it = begin; it <= end; it++)
-            func(it);
-    }
-
-    [[nodiscard]] RangeSet operator+(const RangeSet &other) const
-    {
-        RangeSet ret = *this;
-        ret += other;
-        return ret;
-    }
-    RangeSet &operator+=(const RangeSet &other)
-    {
-        for (auto range : other.map)
-            Add(range.first, range.second);
+        Normalize();
+        auto range_iter = std::lower_bound(ranges.begin(), ranges.end(), value, [](const Range &range, T value){return range.end < value;});
+        return range_iter != ranges.end() && range_iter->Contains(value);
     }
 };
