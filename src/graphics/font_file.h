@@ -191,12 +191,21 @@ namespace Graphics
             return bool(FT_Get_Char_Index(data.ft_font, ch)) || ch == Unicode::default_char;
         }
 
-        enum RenderMode
+        enum RenderFlags
         {
-            normal = FT_LOAD_TARGET_NORMAL,
-            light  = FT_LOAD_TARGET_LIGHT,
-            mono   = FT_LOAD_TARGET_MONO, // `mono` means "monochrome", not "monospaced".
+            none                       = 0,
+            monochrome                 = 1 << 0, // Render without antialiasing. Combine with `hinting_mode_monochrome` for best results.
+            avoid_bitmaps              = 1 << 1, // If the font contains both bitmaps and outlines (aka vector characters)
+            hinting_disable            = 1 << 2, // Completely disable hinting.
+            hinting_prefer_autohinter  = 1 << 3, // Prefer auto-hinter over the hinting instructions built into the font.
+            hinting_disable_autohinter = 1 << 4, // Disable auto-hinter. (It's already avoided by default.)
+            hinting_mode_light         = 1 << 5, // Alternative hinting mode.
+            hinting_mode_monochrome    = 1 << 6, // Hinting mode for monochrome rendering.
+
+            monochrome_with_hinting = monochrome | hinting_mode_monochrome,
         };
+        friend constexpr RenderFlags operator|(RenderFlags a, RenderFlags b) {return RenderFlags(int(a) | int(b));}
+        friend constexpr RenderFlags operator&(RenderFlags a, RenderFlags b) {return RenderFlags(int(a) & int(b));}
 
         struct GlyphData
         {
@@ -206,21 +215,31 @@ namespace Graphics
         };
 
         // Throws on failure. In particular, throws if the font has no such glyph.
-        GlyphData GetGlyph(uint32_t ch, RenderMode mode) const
+        GlyphData GetGlyph(uint32_t ch, RenderFlags flags) const
         {
             try
             {
                 if (!HasGlyph(ch))
                     Program::Error("No such glyph.");
 
-                if (FT_Load_Char(data.ft_font, ch, FT_LOAD_RENDER | mode))
+                long loading_flags = 0;
+                if (flags & avoid_bitmaps             ) loading_flags |= FT_LOAD_NO_BITMAP;
+                if (flags & hinting_disable           ) loading_flags |= FT_LOAD_NO_HINTING;
+                if (flags & hinting_prefer_autohinter ) loading_flags |= FT_LOAD_FORCE_AUTOHINT;
+                if (flags & hinting_disable_autohinter) loading_flags |= FT_LOAD_NO_AUTOHINT;
+                if (flags & hinting_mode_light        ) loading_flags |= FT_LOAD_TARGET_LIGHT;
+                if (flags & hinting_mode_monochrome   ) loading_flags |= FT_LOAD_TARGET_MONO;
+
+                FT_Render_Mode render_mode = (flags & monochrome) ? FT_RENDER_MODE_MONO : FT_RENDER_MODE_NORMAL;
+
+                if (FT_Load_Char(data.ft_font, ch, loading_flags) != 0 || FT_Render_Glyph(data.ft_font->glyph, render_mode) != 0)
                 {
                     if (ch != Unicode::default_char)
                         Program::Error("Unknown error.");
 
                     // We can't render the default character (aka [?]), try the plain question mark instead.
                     if (HasGlyph('?'))
-                        return GetGlyph('?', mode);
+                        return GetGlyph('?', flags);
 
                     // Return an empty glyph.
                     GlyphData ret;
@@ -278,7 +297,7 @@ namespace Graphics
             }
             catch (std::exception &e)
             {
-                Program::Error("Unable to render glyph ", ch, " for font `", data.file.name(), "`: ", e.what());
+                Program::Error("Unable to render glyph ", ch, " for font `", data.file.name(), "`:\n", e.what());
             }
         }
     };
@@ -297,12 +316,12 @@ namespace Graphics
         Font *target = 0;
         const FontFile *source = 0;
         const Unicode::CharSet *glyphs = 0;
-        FontFile::RenderMode render_mode = FontFile::normal;
+        FontFile::RenderFlags render_flags = FontFile::none;
         Flags flags = none;
 
         FontAtlasEntry() {}
-        FontAtlasEntry(Font &target, const FontFile &source, const Unicode::CharSet &glyphs, FontFile::RenderMode render_mode = FontFile::normal, Flags flags = none)
-            : target(&target), source(&source), glyphs(&glyphs), render_mode(render_mode), flags(flags) {}
+        FontAtlasEntry(Font &target, const FontFile &source, const Unicode::CharSet &glyphs, FontFile::RenderFlags render_flags = FontFile::none, Flags flags = none)
+            : target(&target), source(&source), glyphs(&glyphs), render_flags(render_flags), flags(flags) {}
     };
 
     inline void MakeFontAtlas(Image &image, ivec2 pos, ivec2 size, const std::vector<FontAtlasEntry> &entries, bool add_gaps = 1) // Throws on failure.
@@ -333,7 +352,7 @@ namespace Graphics
                     return;
 
                 // Copy glyph to the font.
-                FontFile::GlyphData glyph_data = entry.source->GetGlyph(ch, entry.render_mode);
+                FontFile::GlyphData glyph_data = entry.source->GetGlyph(ch, entry.render_flags);
                 Font::Glyph &font_glyph = (ch != Unicode::default_char ? entry.target->Insert(ch) : entry.target->DefaultGlyph());
                 font_glyph.size = glyph_data.image.Size();
                 font_glyph.offset = glyph_data.offset;
