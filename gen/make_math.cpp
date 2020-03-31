@@ -7,7 +7,7 @@
 #include <sstream>
 #include <type_traits>
 
-#define VERSION "3.1.12"
+#define VERSION "3.1.13"
 
 #pragma GCC diagnostic ignored "-Wpragmas" // Silence GCC warning about the next line disabling a warning that GCC doesn't have.
 #pragma GCC diagnostic ignored "-Wstring-plus-int" // Silence clang warning about `1+R"()"` pattern.
@@ -1317,14 +1317,16 @@ int main(int argc, char **argv)
                             T vec_cur = T(0);
                             bool finished = 1;
 
-                            iterator() {}
                             iterator(T vec_begin, T vec_end) : vec_begin(vec_begin), vec_end(vec_end), vec_cur(vec_begin), finished((vec_begin >= vec_end).any()) {}
+
                           @public:
                             using difference_type   = std::ptrdiff_t;
                             using value_type        = T;
                             using pointer           = const T *;
                             using reference         = const T &;
                             using iterator_category = std::forward_iterator_tag;
+
+                            iterator() {}
 
                             iterator &operator++()
                             {
