@@ -225,6 +225,11 @@ namespace Meta
         {
             return value(std::forward<P>(params)...);
         }
+        template <typename ...P>
+        decltype(auto) operator()(P &&... params) const
+        {
+            return value(std::forward<P>(params)...);
+        }
     };
 
     template <typename T> fake_copyable(T) -> fake_copyable<T>;
