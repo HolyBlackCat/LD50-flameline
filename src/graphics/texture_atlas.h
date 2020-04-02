@@ -137,7 +137,7 @@ namespace Graphics
             return ret;
         }
 
-        // Fills a reflected struct `object` with region data.
+        // Fills `object` with region data.
         // `object` has to have its members reflected.
         // The only allowed member types are `Region` and `RegionList`.
         template <typename T> void InitRegions(T &object, std::string suffix) const
