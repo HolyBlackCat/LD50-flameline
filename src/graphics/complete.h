@@ -11,6 +11,7 @@
 #include "graphics/image.h"
 #include "graphics/index_buffer.h"
 #include "graphics/renderer_flat.h"
+#include "graphics/scissor.h"
 #include "graphics/shader.h"
 #include "graphics/simple_render_queue.h"
 #include "graphics/text.h"
