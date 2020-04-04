@@ -3,8 +3,8 @@
 #include <algorithm>
 #include <array>
 #include <cstddef>
-#include <memory>
 #include <type_traits>
+#include <vector>
 #include <utility>
 
 #include "meta/misc.h"
@@ -25,21 +25,17 @@ class MultiArray
 
   private:
     index_vec_t size_vec;
-    std::unique_ptr<type[]> storage;
+    std::vector<type> storage;
 
   public:
-    explicit MultiArray(index_vec_t size_vec = index_vec_t(0))
-        : size_vec(size_vec), storage(std::make_unique<type[]>(size_vec.prod()))
+    MultiArray(index_vec_t size_vec = index_vec_t(0)) : size_vec(size_vec), storage(size_vec.prod())
     {
         DebugAssert("Invalid multiarray size.", size_vec.min() >= 0);
     }
-    template <typename A, A ...I>
-    MultiArray(Meta::value_list<I...>, std::array<type, index_vec_t(I...).prod()> data)
-        : size_vec(I...), storage(std::make_unique<type[]>(data.size())) // Use `make_unique_default_init` here once it becomes available.
+    template <typename A, A ...I> MultiArray(Meta::value_list<I...>, std::array<type, index_vec_t(I...).prod()> data) : size_vec(I...), storage(data.begin(), data.end())
     {
         static_assert(std::is_integral_v<A>, "Indices must be integral.");
         static_assert(((I >= 0) && ...), "Invalid multiarray size.");
-        std::copy(data.begin(), data.end(), storage.get());
     }
 
     [[nodiscard]] index_vec_t size() const
@@ -134,15 +130,15 @@ class MultiArray
 
     [[nodiscard]] index_t element_count() const
     {
-        return size_vec.prod();
+        return storage.size();
     }
     [[nodiscard]] type *elements()
     {
-        return storage.get();
+        return storage.data();
     }
     [[nodiscard]] const type *elements() const
     {
-        return storage.get();
+        return storage.data();
     }
 };
 
