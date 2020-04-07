@@ -75,18 +75,20 @@ namespace Refl
                     // and `members_known<Derived>` starts to return `false`. If `members_known<Base>` starts to return `false` instead, it means that your
                     // test is never able to find the function.
                     template <typename T, T> struct detect_helper {}; // No, `Meta::tag` doesn't work here.
-                    template <typename T> using detect =
-                        detect_helper<typename memptr_return_type<decltype(&T::zrefl_MembersHelper)>::type (T::*)() const, &T::zrefl_MembersHelper>; // Magic!
+                    template <typename T>
+                    static detect_helper<typename memptr_return_type<decltype(&T::zrefl_MembersHelper)>::type (T::*)() const, &T::zrefl_MembersHelper> // Magic!
+                    detect(); // Can't use a type alias here, because then Clang appears to check private-ness of `zrefl_MembersHelper` in the context of the user.
 
-                    template <typename T> using metadata_type = typename memptr_return_type<decltype(&T::zrefl_MembersHelper)>::type;
+                    template <typename T>
+                    static typename memptr_return_type<decltype(&T::zrefl_MembersHelper)>::type metadata_type(); // See the comment above on why we can't use a type alias here.
                 };
 
                 // Obtains the internal (member) metadata type for T, one of the two possible metadata types.
                 // Should be SFINAE-friendly.
                 template <typename T, typename = void> struct member_metadata {};
-                template <typename T> struct member_metadata<T, Meta::void_type<member_metadata_helpers::detect<T>>> // No, we can't use `metadata_type<T>` here. Read the comment above.
+                template <typename T> struct member_metadata<T, Meta::void_type<decltype(member_metadata_helpers::detect<T>())>> // No, we can't use `metadata_type<T>` here. Read the comment above.
                 {
-                    using type = member_metadata_helpers::metadata_type<T>;
+                    using type = decltype(member_metadata_helpers::metadata_type<T>());
                 };
                 template <typename T> using member_metadata_t = typename member_metadata<T>::type;
 

@@ -157,7 +157,18 @@ namespace Refl
                 return cur_indent;
             }
         };
+
+        struct UniversalInitialState
+        {
+            template <typename T, CHECK_EXPR(T::InitialState())>
+            [[nodiscard]] operator T() const
+            {
+                return T::InitialState();
+            }
+        };
     }
+    // Pass this as `state` parameter to `{To|From}{String|Binary}` interface functions.
+    inline constexpr impl::UniversalInitialState initial_state;
 
 
     template <typename T>
@@ -245,7 +256,7 @@ namespace Refl
         template <typename T, CHECK_EXPR(Interface<T>())>
         void ToString(const T &object, Stream::Output &output, const ToStringOptions &options = {})
         {
-            Interface(object).ToString(object, output, options, impl::ToStringState::InitialState());
+            Interface(object).ToString(object, output, options, initial_state);
         }
         template <typename T, CHECK_EXPR(Interface<T>())>
         [[nodiscard]] std::string ToString(const T &object, const ToStringOptions &options = {})
@@ -263,7 +274,7 @@ namespace Refl
         {
             input.stream.WantLocationStyle(Stream::text_position);
             Utils::SkipWhitespaceAndComments(input.stream);
-            Interface(object).FromString(object, input.stream, options, impl::FromStringState::InitialState());
+            Interface(object).FromString(object, input.stream, options, initial_state);
             Utils::SkipWhitespaceAndComments(input.stream);
             input.stream.ExpectEnd();
         }
@@ -278,7 +289,7 @@ namespace Refl
         template <typename T, CHECK_EXPR(Interface<T>())>
         void ToBinary(const T &object, Stream::Output &output, const ToBinaryOptions &options = {})
         {
-            Interface(object).ToBinary(object, output, options, impl::ToBinaryState::InitialState());
+            Interface(object).ToBinary(object, output, options, initial_state);
         }
         template <typename C, typename T, CHECK_EXPR(void(Interface<T>()), Stream::Output::Container(std::declval<C &>()))>
         [[nodiscard]] C ToBinary(const T &object, const ToBinaryOptions &options = {})
@@ -295,7 +306,7 @@ namespace Refl
         void FromBinary(T &object, InputStreamWrapper input, const FromBinaryOptions &options = {})
         {
             input.stream.WantLocationStyle(Stream::byte_offset);
-            Interface(object).FromBinary(object, input.stream, options, impl::FromBinaryState::InitialState());
+            Interface(object).FromBinary(object, input.stream, options, initial_state);
             input.stream.ExpectEnd();
         }
         template <typename T, CHECK_EXPR(void(Interface<T>()), T{})>
