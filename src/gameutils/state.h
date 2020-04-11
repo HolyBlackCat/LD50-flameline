@@ -13,6 +13,10 @@ namespace State
 
     REFL_STRUCT( BasicState REFL_POLYMORPHIC )
     {
+        BasicState() = default;
+        BasicState(BasicState &&) = default;
+        BasicState &operator=(BasicState &&) = default;
+
         virtual void Tick(const NextState &next_state) = 0;
         virtual void Render() const = 0;
     };
