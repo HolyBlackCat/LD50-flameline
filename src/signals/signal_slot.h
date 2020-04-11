@@ -219,6 +219,11 @@ namespace Sig
         template <typename ...Params> static constexpr bool parameters_are_usable = impl::pack_is_convertible_v<Meta::type_list<Params...>, Meta::type_list<P...>>;
 
       public:
+        [[nodiscard]] explicit operator bool() const
+        {
+            return bool(con_with_state.connection);
+        }
+
         void DisconnectSlot()
         {
             con_with_state.connection.Unbind();
@@ -250,6 +255,11 @@ namespace Sig
         template <typename ...Params> static constexpr bool parameters_are_usable = impl::pack_is_convertible_v<Meta::type_list<Params &...>, Meta::type_list<P...>>;
 
       public:
+        [[nodiscard]] explicit operator bool() const
+        {
+            return bool(connections.ConnectionCount());
+        }
+
         void DisconnectSlots()
         {
             connections.Clear();
@@ -302,6 +312,11 @@ namespace Sig
         impl::SlotConWithState con_with_state;
 
       public:
+        [[nodiscard]] explicit operator bool() const
+        {
+            return bool(con_with_state.connection);
+        }
+
         void DisconnectSignal()
         {
             con_with_state.connection.Unbind();
@@ -315,6 +330,11 @@ namespace Sig
         impl::SlotList connections;
 
       public:
+        [[nodiscard]] explicit operator bool() const
+        {
+            return bool(connections.ConnectionCount());
+        }
+
         void DisconnectSignals()
         {
             connections.Clear();
