@@ -124,4 +124,5 @@ int _main_(int, char **)
     loop_state.Init();
     loop_state.Resize();
     loop_state.RunMainLoop();
+    return 0;
 }
