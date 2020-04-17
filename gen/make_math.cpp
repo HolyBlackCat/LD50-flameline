@@ -7,7 +7,7 @@
 #include <sstream>
 #include <type_traits>
 
-#define VERSION "3.1.13"
+#define VERSION "3.1.14"
 
 #pragma GCC diagnostic ignored "-Wpragmas" // Silence GCC warning about the next line disabling a warning that GCC doesn't have.
 #pragma GCC diagnostic ignored "-Wstring-plus-int" // Silence clang warning about `1+R"()"` pattern.
@@ -1852,7 +1852,8 @@ int main(int argc, char **argv)
         section("namespace Export", []
         {
             output(1+R"(
-                using namespace Vector; // Vector and matrix definitions.
+                using Vector::vec; // Vector and matrix definitions. We use this instead of `using namespace Vector` to avoid bringing ...
+                using Vector::mat; // ... the overloaded operators into the global namespace, mostly for better error messages and build speed.
                 using namespace Alias; // Convenient type aliases.
                 using namespace Common; // Common functions.
 
