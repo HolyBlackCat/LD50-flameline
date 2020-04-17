@@ -6,8 +6,8 @@
 
 namespace BitManip
 {
-    // Returns true if `value` is a non-negative power of two (possibly 0).
-    template <typename T> [[nodiscard]] bool IsPowerOfTwo(T value)
+    // Returns true if `value` is a non-negative power of two, or 0.
+    template <typename T> [[nodiscard]] constexpr bool IsPowerOfTwoOrZero(T value)
     {
         static_assert(std::is_integral_v<T>);
 
@@ -20,7 +20,7 @@ namespace BitManip
 
     // Returns `log2(value)`, truncated.
     // For non-positive values returns 0.
-    template <typename T> [[nodiscard]] T Log2Truncated(T value)
+    template <typename T> [[nodiscard]] constexpr T Log2Truncated(T value)
     {
         if constexpr (std::is_signed_v<T>)
             if (value < 0)
@@ -37,7 +37,7 @@ namespace BitManip
     }
 
     // Returns the largest power of two less or equal to `value` (but never less than 1).
-    template <typename T> [[nodiscard]] T RoundDownToPositivePowerOfTwo(T value)
+    template <typename T> [[nodiscard]] constexpr T RoundDownToPositivePowerOfTwo(T value)
     {
         return T(1) << Log2Truncated(value);
     }
