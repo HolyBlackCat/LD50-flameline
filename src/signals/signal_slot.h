@@ -9,6 +9,7 @@
 
 #include "macros/check.h"
 #include "macros/finally.h"
+#include "meta/assignable_wrapper.h"
 #include "meta/misc.h"
 #include "program/errors.h"
 #include "signals/connection.h"
@@ -444,20 +445,21 @@ namespace Sig
 
             struct Functor
             {
-                std::remove_cvref_t<C> callback;
+                Meta::AssignableWrapper<std::remove_cvref_t<C>> callback;
 
                 Functor(C &&callback) : callback(std::forward<C>(callback)) {}
 
                 Functor(Functor &&) = default;
                 Functor &operator=(Functor &&) = default;
 
-                Functor(const Functor &)
+                Functor(const Functor &other) : callback(std::move(other.callback))
                 {
                     DebugAssert("Attempt to copy a signal/slot internal callback.", false);
                 }
-                Functor &operator=(const Functor &)
+                Functor &operator=(const Functor &other)
                 {
                     DebugAssert("Attempt to copy a signal/slot internal callback.", false);
+                    callback = std::move(other.callback);
                     return *this;
                 }
 
