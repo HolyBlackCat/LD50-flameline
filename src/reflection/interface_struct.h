@@ -22,9 +22,12 @@ namespace Refl
     namespace impl::Class
     {
         // Indicates if a specific base class should be skipped when [de]serializing.
-        template <typename T> inline constexpr bool skip_base = Refl::Class::member_count<T> == 0; // No members or they aren't known.
+        // Is true when: No members or they are not known, and no known non-virtual bases.
+        template <typename T> inline constexpr bool skip_base = Refl::Class::member_count<T> == 0 && Meta::list_size<Refl::Class::bases<T>> == 0;
         // Indicates if a specific field type should be skipped when [de]serializing.
-        template <typename T> inline constexpr bool skip_member = Refl::Class::members_known<T> && Refl::Class::member_count<T> == 0; // No members.
+        // Is true when: Known to have 0 members, and no known bases (virtual or not).
+        // Note that it's false if members are not known, because then we want to get an error.
+        template <typename T> inline constexpr bool skip_member = Refl::Class::members_known<T> && Refl::Class::member_count<T> == 0 && Meta::list_size<Refl::Class::combined_bases<T>> == 0;
     }
 
     template <typename T>
