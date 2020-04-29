@@ -1,21 +1,26 @@
 #pragma once
 
+#include <algorithm>
+#include <array>
+#include <deque>
 #include <iostream>
+#include <map>
+#include <type_traits>
+#include <utility>
+#include <vector>
 
 #include "audio/complete.h"
 #include "gameutils/adaptive_viewport.h"
-#include "gameutils/config.h"
 #include "gameutils/render.h"
-#include "gameutils/tiled_map.h"
 #include "graphics/complete.h"
 #include "input/complete.h"
 #include "interface/gui.h"
 #include "interface/window.h"
 #include "macros/adjust.h"
-#include "macros/adjust.h"
-#include "macros/check.h"
 #include "macros/check.h"
 #include "macros/finally.h"
+#include "macros/maybe_const.h"
+#include "macros/named_loops.h"
 #include "meta/misc.h"
 #include "program/errors.h"
 #include "program/exit.h"
@@ -24,7 +29,11 @@
 #include "reflection/short_macros.h"
 #include "strings/common.h"
 #include "strings/format.h"
+#include "strings/lexical_cast.h"
 #include "utils/clock.h"
+#include "utils/mat.h"
 #include "utils/metronome.h"
+#include "utils/multiarray.h"
 #include "utils/poly_storage.h"
 #include "utils/random.h"
+#include "utils/simple_iterator.h"
