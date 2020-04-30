@@ -21,13 +21,42 @@ namespace Refl
 {
     namespace impl::Class
     {
+        template <typename T, bool IsBase>
+        constexpr bool ShouldSkipLow()
+        {
+            // By default - skip.
+            bool skip = true;
+
+            // If it's not a base class, and we don't know the members, then don't skip.
+            // Bases with unknown members are skipped.
+            if (!IsBase && !Refl::Class::members_known<T>)
+                skip = false;
+
+            // It at least one of the members is not skipped, then don't skip.
+            Meta::cexpr_for<Refl::Class::member_count<T>>([&](auto index)
+            {
+                constexpr auto i = index.value;
+                if (!ShouldSkipLow<Refl::Class::member_type<T, i>, false>())
+                    skip = false;
+            });
+
+            // It at least one of the bases is not skipped, then don't skip.
+            // If the class itself is a base class, don't consider virtual bases.
+            using base_list = std::conditional_t<IsBase, Refl::Class::bases<T>, Refl::Class::combined_bases<T>>;
+            Meta::cexpr_for<Meta::list_size<base_list>>([&](auto index)
+            {
+                constexpr auto i = index.value;
+                if (!ShouldSkipLow<Meta::list_type_at<base_list, i>, true>())
+                    skip = false;
+            });
+
+            return skip;
+        }
+
         // Indicates if a specific base class should be skipped when [de]serializing.
-        // Is true when: No members or they are not known, and no known non-virtual bases.
-        template <typename T> inline constexpr bool skip_base = Refl::Class::member_count<T> == 0 && Meta::list_size<Refl::Class::bases<T>> == 0;
+        template <typename T> inline constexpr bool skip_base = ShouldSkipLow<T, true>();
         // Indicates if a specific field type should be skipped when [de]serializing.
-        // Is true when: Known to have 0 members, and no known bases (virtual or not).
-        // Note that it's false if members are not known, because then we want to get an error.
-        template <typename T> inline constexpr bool skip_member = Refl::Class::members_known<T> && Refl::Class::member_count<T> == 0 && Meta::list_size<Refl::Class::combined_bases<T>> == 0;
+        template <typename T> inline constexpr bool skip_member = ShouldSkipLow<T, false>();
     }
 
     template <typename T>
