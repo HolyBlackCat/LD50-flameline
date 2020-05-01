@@ -23,7 +23,7 @@ endif
 CXXFLAGS := -std=c++2a -pedantic-errors -Wall -Wextra -Wdeprecated -Wextra-semi
 LDFLAGS :=
 # Important flags
-override CXXFLAGS += -include src/utils/common.h -include src/program/parachute.h -Isrc -Ilib/include $(subst -Dmain,-D_main_,$(sort $(deps_compiler_flags)))
+override CXXFLAGS += -include src/program/common_macros.h -include src/program/parachute.h -Isrc -Ilib/include $(subst -Dmain,-DENTRY_POINT_OVERRIDE,$(sort $(deps_compiler_flags)))
 override CXXFLAGS += -Ilib/include/cglfl_gl3.2_core # OpenGL version
 override LDFLAGS += $(filter-out -mwindows,$(deps_linker_flags))
 

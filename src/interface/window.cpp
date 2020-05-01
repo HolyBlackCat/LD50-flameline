@@ -4,11 +4,12 @@
 
 #include "macros/finally.h"
 #include "program/errors.h"
+#include "program/platform.h"
 #include "strings/common.h"
 
 
 // Export some variables to advise video drivers to use the best available video card for the application.
-OnPlatform(WINDOWS)
+PLATFORM_IF(windows)
 (
     extern "C"
     {
@@ -96,7 +97,7 @@ namespace Interface
     Window::Window(std::string title, ivec2 size, FullscreenMode mode, const WindowSettings &settings)
     {
         constexpr const char *extra_error_details =
-            OnPlatform(PC)
+            PLATFORM_IF(pc)
             (
                 "\n"
                 "If you have several video cards, change your video driver settings\n"
@@ -104,7 +105,7 @@ namespace Interface
                 "If it doesn't help, try updating your video card driver.\n"
                 "If it doesn't help as well, your video card is probably too old to run this application.";
             )
-            OnPlatform(MOBILE)
+            PLATFORM_IF(mobile)
             (
                 "\n"
                 "Your device doesn't support this application.";

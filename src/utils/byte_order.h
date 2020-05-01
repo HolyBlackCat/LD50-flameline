@@ -5,11 +5,13 @@
 #include <cstdint>
 #include <type_traits>
 
+#include "program/platform.h"
+
 namespace ByteOrder
 {
     enum Order {little, big};
 
-    inline constexpr Order native = OnPlatform(LITTLE_ENDIAN)( little ) OnPlatform(BIG_ENDIAN)( big );
+    inline constexpr Order native = PLATFORM_IF(little_endian)( little ) PLATFORM_IF(big_endian)( big );
 
     inline void SwapBytes(std::uint8_t *data, std::size_t len)
     {
