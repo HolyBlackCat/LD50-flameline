@@ -211,6 +211,8 @@ namespace Refl
     {
         return {};
     }
+    // A convenience overload for deducing T.
+    // Note that this overload MUST NOT be called in an unqualified manner, to prevent unwanted ADL.
     template <typename T>
     auto Interface(const T &) -> typename impl::SelectInterface<std::remove_cv_t<T>>::type
     {
@@ -256,7 +258,7 @@ namespace Refl
         template <typename T, CHECK_EXPR(Interface<T>())>
         void ToString(const T &object, Stream::Output &output, const ToStringOptions &options = {})
         {
-            Interface(object).ToString(object, output, options, initial_state);
+            Refl::Interface(object).ToString(object, output, options, initial_state); // A qualified call prevents unwanted ADL.
         }
         template <typename T, CHECK_EXPR(Interface<T>())>
         [[nodiscard]] std::string ToString(const T &object, const ToStringOptions &options = {})
@@ -274,7 +276,7 @@ namespace Refl
         {
             input.stream.WantLocationStyle(Stream::text_position);
             Utils::SkipWhitespaceAndComments(input.stream);
-            Interface(object).FromString(object, input.stream, options, initial_state);
+            Refl::Interface(object).FromString(object, input.stream, options, initial_state); // A qualified call prevents unwanted ADL.
             Utils::SkipWhitespaceAndComments(input.stream);
             input.stream.ExpectEnd();
         }
@@ -289,7 +291,7 @@ namespace Refl
         template <typename T, CHECK_EXPR(Interface<T>())>
         void ToBinary(const T &object, Stream::Output &output, const ToBinaryOptions &options = {})
         {
-            Interface(object).ToBinary(object, output, options, initial_state);
+            Refl::Interface(object).ToBinary(object, output, options, initial_state); // A qualified call prevents unwanted ADL.
         }
         template <typename C, typename T, CHECK_EXPR(void(Interface<T>()), Stream::Output::Container(std::declval<C &>()))>
         [[nodiscard]] C ToBinary(const T &object, const ToBinaryOptions &options = {})
@@ -306,7 +308,7 @@ namespace Refl
         void FromBinary(T &object, InputStreamWrapper input, const FromBinaryOptions &options = {})
         {
             input.stream.WantLocationStyle(Stream::byte_offset);
-            Interface(object).FromBinary(object, input.stream, options, initial_state);
+            Refl::Interface(object).FromBinary(object, input.stream, options, initial_state); // A qualified call prevents unwanted ADL.
             input.stream.ExpectEnd();
         }
         template <typename T, CHECK_EXPR(void(Interface<T>()), T{})>

@@ -56,7 +56,7 @@ namespace Refl
             auto next_state = state.PartOfRepresentation(options);
 
             bool exists = object.has_value();
-            Interface(exists).ToBinary(exists, output, options, next_state);
+            Interface<bool>().ToBinary(exists, output, options, next_state);
             if (exists)
                 Interface<elem_t>().ToBinary(*object, output, options, next_state);
         }
@@ -66,7 +66,7 @@ namespace Refl
             auto next_state = state.PartOfRepresentation(options);
 
             bool exists = 0;
-            Interface(exists).FromBinary(exists, input, options, next_state);
+            Interface<bool>().FromBinary(exists, input, options, next_state);
             if (!exists)
             {
                 object = {};
