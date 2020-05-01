@@ -23,7 +23,7 @@ namespace Strings
         strip_cr              = 1 << 2, // Remove `\r`.
         multiline_without_cr  = multiline | strip_cr,
         escape_single_quotes  = 1 << 3, // Escape '.
-        escape_double_quotes  = 1 << 3, // Escape ".
+        escape_double_quotes  = 1 << 4, // Escape ".
     };
     [[nodiscard]] inline EscapeFlags operator&(EscapeFlags a, EscapeFlags b) {return EscapeFlags(int(a) & int(b));}
     [[nodiscard]] inline EscapeFlags operator|(EscapeFlags a, EscapeFlags b) {return EscapeFlags(int(a) | int(b));}
@@ -187,7 +187,7 @@ namespace Strings
                   case 'u':
                     {
                         if (ReadSeveralSymbols(4, IsHexDigit) != 4)
-                            Program::Error("Expected at least 4 hex digits after `\\u`");
+                            Program::Error("Expected 4 hex digits after `\\u`");
 
                         unsigned int value = 0;
                         std::sscanf(buffer.data(), "%x", &value);
@@ -201,7 +201,7 @@ namespace Strings
                   case 'U':
                     {
                         if (ReadSeveralSymbols(8, IsHexDigit) != 8)
-                            Program::Error("Expected at least 8 hex digits after `\\U`");
+                            Program::Error("Expected 8 hex digits after `\\U`");
 
                         unsigned int value = 0;
                         std::sscanf(buffer.data(), "%x", &value);
