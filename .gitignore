@@ -7,6 +7,8 @@ bin/*.dll
 bin/*.so
 bin/*.so.*
 obj/**
-compile_commands.json
+*.tar.gz
+*.zip
 gmon.out
+compile_commands.json
 .clangd/**
