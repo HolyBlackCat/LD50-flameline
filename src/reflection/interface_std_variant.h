@@ -52,7 +52,7 @@ namespace Refl
             {
                 constexpr auto i = index.value;
                 using this_type = std::variant_alternative_t<i, T>;
-                static_assert(Class::name_known<this_type>, "Name of this base class is not known.");
+                static_assert(Class::name_known<this_type>, "All variant alternatives must be classes with known names.");
                 output.WriteString(Class::name<this_type>);
                 if (options.pretty)
                     output.WriteChar(' ');
