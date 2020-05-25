@@ -18,4 +18,4 @@ It's licensed under **ZLIB license**. Feel free to use it.
 
 ---
 
-Currently we're targeting Clang 9.0.0. GCC 9.x might also work. MSVC is not supported.
+Currently I'm targeting Clang 10.0.0 (with GCC 10's libstdc++). GCC 10 may or may not work with minor adjustments. MSVC .
