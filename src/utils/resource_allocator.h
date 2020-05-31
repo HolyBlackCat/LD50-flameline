@@ -62,7 +62,8 @@ class ResourceAllocator
         return Capacity() - ObjectsAllocated();
     }
 
-    void Reserve(type new_capacity) // This can only increase capacity.
+    // This can only increase capacity.
+    void Reserve(type new_capacity)
     {
         if (new_capacity <= Capacity())
             return;
@@ -95,7 +96,8 @@ class ResourceAllocator
         return data.indices[object] < ObjectsAllocated();
     }
 
-    type Allocate() // Allocates an object. Increases capacity if necessary.
+    // Allocates an object. Increases capacity if necessary.
+    type Allocate()
     {
         if (data.pos >= Capacity())
             ReserveMore();
@@ -103,7 +105,8 @@ class ResourceAllocator
         return data.values[data.pos++];
     }
 
-    void AllocateObject(type object) // Attempts to allocate a specific object, throws on failure. Increases capacity if necessary.
+    // Attempts to allocate a specific object, throws on failure. Increases capacity if necessary.
+    void AllocateObject(type object)
     {
         if (IsAllocated(object))
             Program::Error("Attempt to allocate object `", object, "` that is already allocated.");
@@ -119,7 +122,8 @@ class ResourceAllocator
         std::swap(data.indices[this_value], data.indices[last_value]);
     }
 
-    void Free(type object) // Frees an object. Throws if `object` wasn't allocated.
+     // Frees an object. Throws if `object` wasn't allocated.
+    void Free(type object)
     {
         if (!IsAllocated(object))
             Program::Error("Attempt to free object `", object, "` that wasn't allocated.");
@@ -133,12 +137,14 @@ class ResourceAllocator
         std::swap(data.indices[this_value], data.indices[last_value]);
     }
 
-    void FreeAllObjects() // Frees all objects while maintaining capacity.
+    // Frees all objects while maintaining capacity.
+    void FreeAllObjects()
     {
         data.pos = 0;
     }
 
-    type GetAllocatedObject(type pos) const // pos < ObjectsAllocated()
+    // Allows iterating over all allocated objects. `0 <= pos < ObjectsAllocated()`
+    type GetAllocatedObject(type pos) const
     {
         if (pos < 0 || pos >= ObjectsAllocated())
             Program::Error("Allocated object index is out of range.");
@@ -146,9 +152,10 @@ class ResourceAllocator
         return data.indices[pos];
     }
 
-    type GetFreeObject(type pos) const // pos < RemainingCapacity()
+    // Allows iterating over all non-allocated objects. `0 <= pos < RemainingCapacity()`.
+    type GetFreeObject(type pos) const
     {
-        if (pos < 0 || pos >= RemainingCapacity()())
+        if (pos < 0 || pos >= RemainingCapacity())
             Program::Error("Free object index is out of range.");
 
         return data.indices[ObjectsAllocated() + pos];
