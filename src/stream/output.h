@@ -68,6 +68,8 @@ namespace Stream
         {
             try
             {
+                DebugAssert("Suggest flushing the stream before destroying it.\nNot doing so in a release build will silently ignore any possible exceptions.", data.buffer_pos == 0);
+
                 Flush();
             }
             catch (...) {}
@@ -98,12 +100,12 @@ namespace Stream
 
             // This function can fail, but it doesn't report errors in any way.
             // Even if it did, we would still ignore it.
-            std::setbuf(handle.get(), 0);
+            std::setbuf(handle.get(), nullptr);
 
             *this = Output(std::move(file_name),
                 Meta::fake_copyable([handle = std::move(handle)](const Output &object, const std::uint8_t *data, std::size_t size)
                 {
-                    if (!std::fwrite(data, 1, size, handle.get()))
+                    if (!std::fwrite(data, size, 1, handle.get()))
                         Program::Error(object.GetExceptionPrefix() + "Unable to write to file.");
                 }),
                 capacity);
@@ -116,7 +118,7 @@ namespace Stream
             return Output(Str("File handle 0x", std::hex, std::uintptr_t(handle)),
                 [handle](const Output &object, const std::uint8_t *data, std::size_t size)
                 {
-                    if (!std::fwrite(data, 1, size, handle))
+                    if (!std::fwrite(data, size, 1, handle))
                         Program::Error(object.GetExceptionPrefix() + "Unable to write to file.");
                 },
                 capacity);
@@ -156,7 +158,11 @@ namespace Stream
         }
 
         // Flushes the stream.
-        // Normally you don't need to do it manually.
+        // Normally you don't need to do it manually, except before destroying the stream.
+        // Explicit flush before destroying is needed because it can throw, and doing so from the destructor
+        // is a bad idea (and silently ignoring the exception isn't good too).
+        // In a debug build, destroying an unflushed stream raises an assertion;
+        // in a release build it's flushed automatically, ignoring any possible exceptions.
         void Flush()
         {
             if (data.buffer_pos > 0)
@@ -229,7 +235,7 @@ namespace Stream
             data.flush(*this, ptr, size);
             return *this;
         }
-        Output &WriteBytes(const char *ptr, std::size_t size)
+        Output &WriteString(const char *ptr, std::size_t size)
         {
             return WriteBytes(reinterpret_cast<const std::uint8_t *>(ptr), size);
         }
@@ -238,11 +244,11 @@ namespace Stream
         // The null-terminator is not written.
         Output &WriteString(const char *string)
         {
-            return WriteBytes(string, std::strlen(string));
+            return WriteString(string, std::strlen(string));
         }
         Output &WriteString(const std::string &string)
         {
-            return WriteBytes(string.data(), string.size());
+            return WriteString(string.data(), string.size());
         }
 
         // Writes an arithmetic value with a specified byte order.

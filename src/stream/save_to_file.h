@@ -7,6 +7,7 @@
 #include <memory>
 #include <utility>
 
+#include "macros/check.h"
 #include "macros/finally.h"
 #include "program/errors.h"
 #include "stream/better_fopen.h"

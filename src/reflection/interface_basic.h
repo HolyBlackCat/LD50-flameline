@@ -266,6 +266,7 @@ namespace Refl
             std::string ret;
             Stream::Output output = Stream::Output::Container(ret);
             ToString(object, output, options);
+            output.Flush();
             return ret;
         }
 
@@ -297,7 +298,7 @@ namespace Refl
         [[nodiscard]] C ToBinary(const T &object, const ToBinaryOptions &options = {})
         {
             C ret;
-            auto output = Stream::Output::Container(ret);
+            Stream::Output output = Stream::Output::Container(ret);
             ToBinary(object, output, options);
             output.Flush();
             return ret;
