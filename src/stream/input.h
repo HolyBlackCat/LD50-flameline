@@ -172,8 +172,8 @@ namespace Stream
     {
         one, // Exactly one.
         any, // Any amount.
-        if_present, // If present.
-        at_least_one, // At least one.
+        if_present, // Zero or one.
+        at_least_one, // One or more.
     };
 
     class Input
@@ -205,7 +205,7 @@ namespace Stream
 
         struct Data
         {
-            std::size_t buffer_capacity = -1; // This MUST be a power of two. 0 means that the stream is null.
+            std::size_t buffer_capacity = 0; // This MUST be a power of two. 0 means that the stream is null.
             std::unique_ptr<std::uint8_t[]> buffer_storage;
             Buffer buffer_a, buffer_b;
             bool last_accessed_buffer_is_b = true;
@@ -236,7 +236,7 @@ namespace Stream
 
             if (!file_is_pristine)
             {
-                std::ftell(handle);
+                file_pos_raw = std::ftell(handle);
                 if (file_pos_raw < 0)
                     Program::Error("Unable to get current position in the file.");
             }
@@ -288,6 +288,8 @@ namespace Stream
         // Returns the reference to that buffer.
         Buffer &LoadSegmentToBuffer(bool use_buffer_b, std::size_t segment_offset)
         {
+            DebugAssert("Invalid segment offset.", PositionToSegmentOffset(segment_offset) == segment_offset);
+
             Buffer &buffer = use_buffer_b ? data.buffer_b : data.buffer_a;
 
             std::size_t segment_size = std::min(data.size - segment_offset, data.buffer_capacity);
@@ -407,7 +409,7 @@ namespace Stream
 
             // This function can fail, but it doesn't report errors in any way.
             // Even if it did, we would still ignore it.
-            std::setbuf(handle.get(), 0);
+            std::setbuf(handle.get(), nullptr);
 
             FileHandleInfo info;
 
@@ -543,9 +545,17 @@ namespace Stream
 
             auto readonly_data = ReadToMemory();
 
+            // Save some parameters of the stream.
             std::size_t pos = Position();
+            auto location_style = data.location_style;
+
+            // Replace the stream.
             *this = Input(readonly_data);
+
+            // Restore the parameters.
             Seek(pos, absolute);
+            if (location_style)
+                WantLocationStyle(*location_style);
 
             return readonly_data;
         }
@@ -765,10 +775,10 @@ namespace Stream
 
         // Reads matching characters from the input.
         // `mode` affects how many characters are read, and whether or not reading 0 characters causes an exception.
-        // If `append_to` is not `nullptr`, the matching characters are appended to it.
+        // `append_to` can either be `nullptr` or a pointer to a container to which the matching characters are appended.
         // Returns the amount of characters processed.
         template <ExtractMode mode = at_least_one, typename T, CHECK(impl::is_appendable_byte_seq_ptr_or_null_v<T>)>
-        std::size_t Extract(const Char::Category &category, T append_to) // `append_to` can be null.
+        std::size_t Extract(const Char::Category &category, T append_to)
         {
             constexpr bool several = mode == at_least_one || mode == any;
             constexpr bool throw_if_none = mode == at_least_one || mode == one;
@@ -845,7 +855,13 @@ namespace Stream
                 {
                     Seek(pos, absolute);
                     if constexpr (mode == one)
-                        Program::Error(GetExceptionPrefix() + "Expected \"" + Strings::Escape(std::string_view(reinterpret_cast<const char *>(bytes), count)) + "\".");
+                    {
+                        // If the amount of characters is small, include them in the exception message.
+                        if (count <= 16)
+                            Program::Error(GetExceptionPrefix() + "Expected \"" + Strings::Escape(std::string_view(reinterpret_cast<const char *>(bytes), count)) + "\".");
+                        else
+                            Program::Error(GetExceptionPrefix() + "Unexpected sequence of bytes.");
+                    }
                     return false;
                 }
                 SkipOne();
