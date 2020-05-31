@@ -181,7 +181,7 @@ class Random
 
     // Clang doesn't want to do CTAD without this guide, even though it seems redundant. It seems like a Clang bug, but I'm not sure.
     // GCC, on the other hand, works without the guide and refuses to compile it (because it's not at namespace scope), which is certainly a GCC bug.
-    PLATFORM_IF(gcc)( template <typename F> Function(F &&) -> Function<F>; )
+    PLATFORM_IF(clang)( template <typename F> Function(F &&) -> Function<F>; )
 
   public:
     using generator_t = std::mt19937;
