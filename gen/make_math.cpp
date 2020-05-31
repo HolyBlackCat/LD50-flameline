@@ -7,7 +7,7 @@
 #include <sstream>
 #include <type_traits>
 
-#define VERSION "3.1.15"
+#define VERSION "3.1.16"
 
 #pragma GCC diagnostic ignored "-Wpragmas" // Silence GCC warning about the next line disabling a warning that GCC doesn't have.
 #pragma GCC diagnostic ignored "-Wstring-plus-int" // Silence clang warning about `1+R"()"` pattern.
@@ -1766,12 +1766,12 @@ int main(int argc, char **argv)
                 }
 
                 // Performs linear interpolation. Returns `a * (1-factor) + b * factor`.
-                template <typename F, typename T> [[nodiscard]] constexpr auto mix(F factor, T a, T b)
+                template <typename F, typename A, typename B> [[nodiscard]] constexpr auto mix(F factor, A a, B b)
                 {
                     static_assert(std::is_floating_point_v<vec_base_t<F>>, "`factor` must be floating-point.");
-                    static_assert(!is_vector_v<F> || !is_vector_v<T> || vec_size_v<F> == vec_size_v<T>, "If both `factor` and the values are vectors, they must have the same size.");
                     // No special handling required for the parameters being vectors.
-                    return a * (1-factor) + b * factor;
+                    using type = larger_t<A, B>;
+                    return type(a) * (1-factor) + type(b) * factor;
                 }
 
                 // Returns a `min` or `max` value of the parameters.
