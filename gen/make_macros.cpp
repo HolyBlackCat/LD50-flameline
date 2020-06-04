@@ -11,7 +11,7 @@
 #pragma GCC diagnostic ignored "-Wpragmas" // Silence GCC warning about the next line disabling a warning that GCC doesn't have.
 #pragma GCC diagnostic ignored "-Wstring-plus-int" // Silence clang warning about `1+R"()"` pattern.
 
-#define VERSION "1.1.0"
+#define VERSION "1.1.1"
 
 namespace data
 {
@@ -160,8 +160,8 @@ int main(int argc, char **argv)
                 // Stops the compilation with a specific error message.
                 // `msg` should be a string literal.
                 // This implementation works on both GCC and Clang.
-                #define MA_ABORT(msg) MA_ABORT_(GCC error msg)
-                #define MA_ABORT_(msg) _Pragma(MA_STR(msg))
+                #define MA_ABORT(msg) MA_ABORT_impl(GCC error msg)
+                #define MA_ABORT_impl(msg) _Pragma(MA_STR(msg))
                 // Same as `MA_ABORT`, but calling it with no parameters does nothing.
                 #define MA_ABORT_IF_NOT_EMPTY(...) __VA_OPT__(MA_ABORT(__VA_ARGS__))
             )");
@@ -246,9 +246,9 @@ int main(int argc, char **argv)
             output(1+R"(
 
                 // Expand to some basic symbols.
-                #define MA_COMMA() ,
-                #define MA_SEMICOLON() ;
-                #define MA_PLUS() +
+                #define MA_COMMA(...) ,
+                #define MA_SEMICOLON(...) ;
+                #define MA_PLUS(...) +
 
                 // If `...` is not empty, adds a trailing comma to it.
                 #define MA_TR_C(...) __VA_OPT__(__VA_ARGS__,)
