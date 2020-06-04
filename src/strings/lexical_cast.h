@@ -61,7 +61,7 @@ namespace Strings
         template <typename T>
         [[noreturn]] void ConversionFailure(std::string_view str, std::string_view message = "")
         {
-            Program::Error("Unable to convert `", Escape(str), "` to ", Meta::TypeName<T>(), message.empty() ? "." : std::string(": ").append(message).append("."));
+            Program::Error("Unable to convert `", Escape(str), "` to ", Meta::TypeName<T>(), message.empty() ? "." : FMT(": {}.", message));
         }
 
         inline constexpr const char *string_inf = "inf", *string_nan = "nan";

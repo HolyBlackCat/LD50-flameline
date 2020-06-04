@@ -39,7 +39,11 @@
 
 #include <cstddef>
 #include <initializer_list>
+#include <iterator>
 #include <string_view>
+#include <string>
+#include <type_traits>
+#include <utility>
 
 #include <fmt/format.h>
 #include <fmt/ostream.h>
@@ -52,37 +56,66 @@
 using fmt::literals::operator""_a;
 
 
-// Internal, used by the macros below.
-namespace Strings::impl::Format
+namespace Strings
 {
-    // Constructs a format string by concatenating the strings from `list`.
-    // Writes the string into `output` if it's not null, without a null terminator. Returns the string length.
-    // Each string in the list must be prefixed either with `\f` or `\a`. The prefixes are removed during concatenation.
-    // In `\a` strings, braces are escaped. `\f` strings are not modified.
-    // `C` is a character type, normally `char`.
-    template <typename C>
-    constexpr std::size_t MakeString(std::initializer_list<std::basic_string_view<C>> list, C *output = nullptr)
+    namespace impl::Format
     {
-        std::size_t len = 0;
-        for (std::basic_string_view<C> elem : list)
+        template <typename T>
+        inline constexpr T default_format_string[] = {'{', '}', '\0'};
+    }
+
+    // A simple function that concatenates `params` and writes them to the `iterator`.
+    // Uses libfmt, with the default format for all types.
+    template <typename C = char, typename T, typename ...P>
+    T ConcatTo(T iterator, const P &... params)
+    {
+        ((iterator = fmt::format_to(iterator, impl::Format::default_format_string<C>, params)), ...);
+        return iterator;
+    }
+
+    // A simple function that concatenates `params` and returns the result as a string.
+    // Uses libfmt, with the default format for all types.
+    template <typename C = char, typename ...P>
+    [[nodiscard]] std::basic_string<C> Concat(const P &... params)
+    {
+        std::basic_string<C> ret;
+        ConcatTo<C>(std::back_inserter(ret), params...);
+        return ret;
+    }
+
+
+    // Internal, used by the macros below.
+    namespace impl::Format
+    {
+        // Constructs a format string by concatenating the strings from `list`.
+        // Writes the string into `output` if it's not null, without a null terminator. Returns the string length.
+        // Each string in the list must be prefixed either with `\f` or `\a`. The prefixes are removed during concatenation.
+        // In `\a` strings, braces are escaped. `\f` strings are not modified.
+        // `C` is a character type, normally `char`.
+        template <typename C>
+        constexpr std::size_t MakeString(std::initializer_list<std::basic_string_view<C>> list, C *output = nullptr)
         {
-            bool escape = elem[0] == '\a';
-
-            for (std::size_t i = 1/*sic*/; i < elem.size(); i++)
+            std::size_t len = 0;
+            for (std::basic_string_view<C> elem : list)
             {
-                if (output)
-                    *output++ = elem[i];
-                len++;
+                bool escape = elem[0] == '\a';
 
-                if (escape && (elem[i] == '{' || elem[i] == '}'))
+                for (std::size_t i = 1/*sic*/; i < elem.size(); i++)
                 {
                     if (output)
                         *output++ = elem[i];
                     len++;
+
+                    if (escape && (elem[i] == '{' || elem[i] == '}'))
+                    {
+                        if (output)
+                            *output++ = elem[i];
+                        len++;
+                    }
                 }
             }
+            return len;
         }
-        return len;
     }
 }
 

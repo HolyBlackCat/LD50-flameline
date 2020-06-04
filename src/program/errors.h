@@ -5,7 +5,7 @@
 
 #include "interface/messagebox.h"
 #include "program/exit.h"
-#include "strings/common.h"
+#include "strings/format.h"
 
 namespace Program
 {
@@ -25,14 +25,16 @@ namespace Program
         throw std::runtime_error(message);
     }
 
-    template <typename ...P> [[noreturn]] void HardError(const P &... params)
+    template <typename ...P>
+    [[noreturn]] void HardError(const P &... params)
     {
-        HardError(Str(params...));
+        HardError(Strings::Concat(params...));
     }
 
-    template <typename ...P> [[noreturn]] void Error(const P &... params)
+    template <typename ...P>
+    [[noreturn]] void Error(const P &... params)
     {
-        Error(Str(params...));
+        Error(Strings::Concat(params...));
     }
 
     void SetErrorHandlers(bool only_if_not_set_before = 1);

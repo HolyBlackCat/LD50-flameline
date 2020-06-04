@@ -10,13 +10,16 @@
 
 namespace Strings
 {
-    template <typename ...P> [[nodiscard]] std::string Str(const P &... params)
+    // Passes all parameters to a temporary string stream, and returns the resulting string.
+    template <typename C = char, typename ...P>
+    [[nodiscard]] std::basic_string<C> StreamConcat(const P &... params)
     {
-        std::ostringstream stream;
+        std::basic_ostringstream<C> stream;
         (stream << ... << params);
         return stream.str();
     }
 
+    // Trims the string by removing any leading and trailing whitespace.
     [[nodiscard]] inline std::string_view Trim(std::string_view str)
     {
         static constexpr char chars_to_remove[] = " \n\r\t\v\f";
@@ -27,12 +30,12 @@ namespace Strings
     }
 
     // Trims the string, and either replaces any sequences of whitespace characters with single spaces, or removes them completely.
-    // Whitespace sequence is not removed only if it has letters on both sides. Unknown characters (>= 128) are considered to be letters.
+    // A whitespace sequences is removed completely unless on both sides it has has letters, numbers, or unknown characters (>= 128).
     [[nodiscard]] inline std::string Condense(std::string_view str)
     {
         auto IsLetter = [&](unsigned char ch)
         {
-            return std::isalpha(ch) || ch >= 128;
+            return std::isalnum(ch) || ch >= 128;
         };
 
         str = Trim(str);
@@ -92,5 +95,3 @@ namespace Strings
         return ret;
     }
 }
-
-using Strings::Str;

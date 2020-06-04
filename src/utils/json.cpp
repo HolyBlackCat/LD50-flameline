@@ -41,7 +41,7 @@ std::string Json::ParseStringLow(const char *&cur)
 
         // Error on non-printable character.
         if (*cur > '\0' && *cur < ' ')
-            Program::Error("Invalid character in a string: 0x", std::hex, std::setfill('0'), std::setw(2), (int)(unsigned char)*cur, ".");
+            Program::Error("Invalid character in a string: ", STR(((unsigned char)*cur)"#02x"), ".");
 
         cur++;
     }
