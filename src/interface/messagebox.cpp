@@ -36,7 +36,7 @@ namespace Interface
 
         if (SDL_ShowSimpleMessageBox(flags, title.c_str(), message.c_str(), Window::GetHandleOrNull()))
         {
-            std::cerr << "Unable to show a message box!\n" << title << '\n' << message << '\n';
+            std::cerr << "Unable to show a message box! Printing the content instead:\n### " << title << " ###\n" << message << '\n';
         }
     }
 
