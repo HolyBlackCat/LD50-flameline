@@ -18,6 +18,7 @@
 #include "meta/type_info.h"
 #include "program/errors.h"
 #include "strings/escape.h"
+#include "strings/format.h"
 #include "utils/robust_math.h"
 
 namespace Strings
@@ -337,7 +338,7 @@ namespace Strings
             bool bad_separator = separator_pos == 0 || separator_pos == str.size() - 1 ||
                 std::isspace((unsigned char)str[separator_pos-1]) || std::isspace((unsigned char)str[separator_pos+1]);
             if (bad_separator)
-                impl::ConversionFailure<T>(str, Str("incorrect usage of ", impl::char_long_double_parts_sep));
+                impl::ConversionFailure<T>(str, STR("incorrect usage of ", (impl::char_long_double_parts_sep)));
 
             return (long double)FromString<double>(str.substr(0, separator_pos)) + FromString<double>(str.substr(separator_pos+1));
         }

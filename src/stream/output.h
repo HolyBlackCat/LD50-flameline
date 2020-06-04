@@ -20,6 +20,7 @@
 #include "stream/readonly_data.h"
 #include "stream/save_to_file.h"
 #include "stream/utils.h"
+#include "strings/format.h"
 #include "utils/byte_order.h"
 #include "utils/unicode.h"
 
@@ -115,7 +116,7 @@ namespace Stream
         // The stream doesn't own the handle.
         [[nodiscard]] static Output FileHandle(FILE *handle, capacity_t capacity = default_capacity)
         {
-            return Output(Str("File handle 0x", std::hex, std::uintptr_t(handle)),
+            return Output(STR("File handle ", ((void *)handle)),
                 [handle](const Output &object, const std::uint8_t *data, std::size_t size)
                 {
                     if (!std::fwrite(data, size, 1, handle))
@@ -132,7 +133,7 @@ namespace Stream
         >
         [[nodiscard]] static Output Container(T &container, capacity_t capacity = default_capacity)
         {
-            return Output(Str("Container at 0x", std::hex, std::uintptr_t(&container)),
+            return Output(STR("Container at ", ((void *)&container)),
                 [&container](const Output &, const std::uint8_t *data, std::size_t size)
                 {
                     container.insert(container.end(), data, data + size);

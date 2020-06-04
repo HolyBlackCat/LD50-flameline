@@ -5,7 +5,7 @@
 #include "macros/finally.h"
 #include "program/errors.h"
 #include "program/platform.h"
-#include "strings/common.h"
+#include "strings/format.h"
 
 
 // Export some variables to advise video drivers to use the best available video card for the application.
@@ -25,7 +25,7 @@ namespace Interface
         std::string ret;
 
         if (gl_major || gl_minor)
-            ret = Str("OpenGL ", gl_major, ".", gl_minor);
+            ret = FMT("OpenGL {}.{}", gl_major, gl_minor);
         else
             ret = "Any OpenGL version";
 
@@ -51,17 +51,17 @@ namespace Interface
         }
 
         if (msaa > 1)
-            ret += Str(", ", msaa, "x MSAA");
+            ret += FMT(", {}x MSAA", msaa);
 
         if (color_bits != 0 || depth_bits != 0 || stencil_bits != 0)
         {
             ret += ", bits per pixel:";
-            if (color_bits.r != 0) ret += Str(" r=", color_bits.r);
-            if (color_bits.g != 0) ret += Str(" g=", color_bits.g);
-            if (color_bits.b != 0) ret += Str(" b=", color_bits.b);
-            if (color_bits.a != 0) ret += Str(" a=", color_bits.a);
-            if (depth_bits   != 0) ret += Str(" depth=", depth_bits);
-            if (stencil_bits != 0) ret += Str(" stencil=", stencil_bits);
+            if (color_bits.r != 0) ret += FMT(" r={}", color_bits.r);
+            if (color_bits.g != 0) ret += FMT(" g={}", color_bits.g);
+            if (color_bits.b != 0) ret += FMT(" b={}", color_bits.b);
+            if (color_bits.a != 0) ret += FMT(" a={}", color_bits.a);
+            if (depth_bits   != 0) ret += FMT(" depth={}", depth_bits);
+            if (stencil_bits != 0) ret += FMT(" stencil={}", stencil_bits);
         }
 
         return ret;
@@ -117,7 +117,7 @@ namespace Interface
 
         // Initialize SDL
         if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_EVENTS))
-            Program::Error(Str("Unable to initialize SDL.\nMessage: ", SDL_GetError()));
+            Program::Error(STR("Unable to initialize SDL.\nMessage: ", (SDL_GetError())));
         FINALLY_ON_THROW( SDL_Quit(); )
 
         // Position

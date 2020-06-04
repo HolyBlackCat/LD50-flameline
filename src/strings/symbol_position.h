@@ -4,6 +4,7 @@
 #include <string>
 #include <utility>
 
+#include "strings/format.h"
 #include "utils/unicode.h"
 
 namespace Strings
@@ -17,7 +18,7 @@ namespace Strings
 
         std::string ToString() const
         {
-            return Str(line, ':', column);
+            return FMT("{}:{}", line, column);
         }
 
         class State

@@ -20,6 +20,7 @@
 #include "stream/utils.h"
 #include "strings/common.h"
 #include "strings/escape.h"
+#include "strings/format.h"
 #include "strings/symbol_position.h"
 #include "utils/bit_manip.h"
 #include "utils/byte_order.h"
@@ -483,7 +484,7 @@ namespace Stream
               default:
                 return "";
               case byte_offset:
-                return Str("offset 0x", std::hex, std::uppercase, data.position);
+                return STR("offset ", (data.position)"#X");
               case text_position:
               case text_byte_position:
                 {

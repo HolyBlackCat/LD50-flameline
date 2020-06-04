@@ -13,7 +13,7 @@
 #include "macros/finally.h"
 #include "program/errors.h"
 #include "stream/readonly_data.h"
-#include "strings/common.h"
+#include "strings/format.h"
 #include "utils/mat.h"
 #include "utils/packing.h"
 #include "utils/unicode_ranges.h"
@@ -79,9 +79,9 @@ namespace Graphics
                     size.y = size.x;
                 std::string requested_size;
                 if (size.x == size.y)
-                    requested_size = Str(size.y);
+                    requested_size = STR((size.y));
                 else
-                    requested_size = Str(size.x, 'x', size.y);
+                    requested_size = STR((size.x), "x", (size.y));
 
                 // Get the list of available sizes.
                 std::string size_list;
@@ -93,13 +93,13 @@ namespace Graphics
                     ivec2 this_size(data.ft_font->available_sizes[i].width, data.ft_font->available_sizes[i].height);
 
                     if (this_size.x == this_size.y)
-                        size_list += Str(this_size.y);
+                        size_list += STR((this_size.y));
                     else
-                        size_list += Str(this_size.x, 'x', this_size.y);
+                        size_list += STR((this_size.x), "x", (this_size.y));
                 }
 
-                Program::Error("Bitmap font `", data.file.name(), "`", index != 0 ? Str("[",index,"]") : "", " doesn't support size ", requested_size, ".",
-                               size_list.empty() ? "" : Str("\nAvailable sizes are: ", size_list, "."));
+                Program::Error(STR("Bitmap font `", (data.file.name()), "`", (index != 0 ? STR("[",(index),"]") : ""), " doesn't support size ", (requested_size), ".",
+                               (size_list.empty() ? "" : STR("\nAvailable sizes are: ", (size_list), "."))));
             }
 
             open_font_count++; // This must remain at the bottom of the constructor in case something throws.

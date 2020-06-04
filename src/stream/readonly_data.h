@@ -14,7 +14,7 @@
 #include "program/errors.h"
 #include "stream/better_fopen.h"
 #include "stream/utils.h"
-#include "strings/common.h"
+#include "strings/format.h"
 #include "utils/archive.h"
 
 namespace Stream
@@ -56,7 +56,7 @@ namespace Stream
             ret.ref->begin = begin;
             ret.ref->end = end;
 
-            ret.ref->name = Str("Reference to ", end - begin, " bytes at 0x", std::hex, std::uintptr_t(begin));
+            ret.ref->name = STR("Reference to ", (end - begin), " bytes at ", ((void *)begin));
 
             return ret;
         }
@@ -107,7 +107,7 @@ namespace Stream
             ret.ref->end = ret.ref->begin + size;
             ret.ref->extra_null_terminator = true;
 
-            ret.ref->name = Str("Copy of ", size-1, " bytes from 0x", std::hex, std::uintptr_t(begin));
+            ret.ref->name = STR("Copy of ", (size-1), " bytes from ", ((void *)begin));
 
             return ret;
         }

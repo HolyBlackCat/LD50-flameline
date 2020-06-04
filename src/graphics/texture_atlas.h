@@ -10,7 +10,7 @@
 #include "graphics/image.h"
 #include "program/errors.h"
 #include "reflection/full.h"
-#include "strings/common.h"
+#include "strings/format.h"
 #include "utils/filesystem.h"
 #include "utils/mat.h"
 
@@ -120,7 +120,7 @@ namespace Graphics
             while (offset != count)
             {
                 int index = first_index + offset;
-                std::string name = Str(prefix, index, suffix);
+                std::string name = STR((prefix), (index), (suffix));
 
                 Region image;
                 if (!GetOpt(name, image))

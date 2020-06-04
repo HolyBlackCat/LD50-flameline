@@ -12,6 +12,7 @@
 #include "meta/misc.h"
 #include "program/errors.h"
 #include "reflection/full.h"
+#include "strings/format.h"
 #include "strings/common.h"
 
 namespace Graphics
@@ -61,7 +62,7 @@ namespace Graphics
         {
             return
             {
-                Str("#version ", ver, " compatibility"),
+                FMT("#version {} compatibility", ver),
                 "/* vertex */",
                 "/* fragment */",
                 "attribute",
@@ -72,7 +73,7 @@ namespace Graphics
         {
             return
             {
-                Str("#version ", ver),
+                FMT("#version {}", ver),
                 "/* vertex */\n#define varying out",
                 "/* fragment */\n"
                     "out vec4 _gl_FragData[gl_MaxDrawBuffers];\n" // A single leading underscore is allowed, I've checked.

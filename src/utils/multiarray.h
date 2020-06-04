@@ -9,6 +9,7 @@
 
 #include "meta/misc.h"
 #include "program/errors.h"
+#include "strings/format.h"
 #include "utils/mat.h"
 
 template <int D, typename T>
@@ -50,7 +51,7 @@ class MultiArray
 
     [[nodiscard]] type &unsafe_at(index_vec_t pos)
     {
-        DebugAssert(Str("Multiarray indices out of range. Indices are ", pos, " but the array size is ", size_vec, "."), pos_in_range(pos));
+        DebugAssert(STR("Multiarray indices out of range. Indices are ", (pos), " but the array size is ", (size_vec), "."), pos_in_range(pos));
 
         index_t index = 0;
         index_t factor = 1;

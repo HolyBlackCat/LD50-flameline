@@ -10,6 +10,7 @@
 #include "reflection/full.h"
 #include "stream/readonly_data.h"
 #include "stream/save_to_file.h"
+#include "strings/format.h"
 #include "utils/mat.h"
 
 template <typename T> class Config
@@ -182,7 +183,7 @@ template <typename T> class Config
 
     void DisplayGui()
     {
-        if (ImGui::Begin(Str("Config: ", file_name).c_str()))
+        if (ImGui::Begin(STR("Config: ", (file_name)).c_str()))
         {
             auto refl = Refl::Interface<T>(object);
 
