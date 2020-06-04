@@ -454,11 +454,11 @@ namespace Sig
 
                 Functor(const Functor &other) : callback(std::move(other.callback))
                 {
-                    DebugAssert("Attempt to copy a signal/slot internal callback.", false);
+                    ASSERT(false, "Attempt to copy a signal/slot internal callback.");
                 }
                 Functor &operator=(const Functor &other)
                 {
-                    DebugAssert("Attempt to copy a signal/slot internal callback.", false);
+                    ASSERT(false, "Attempt to copy a signal/slot internal callback.");
                     callback = std::move(other.callback);
                     return *this;
                 }

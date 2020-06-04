@@ -67,7 +67,7 @@ namespace Sig
 
         void AssertBound() const
         {
-            DebugAssert("Attempt to use a null Sig::Connect.", IsBound());
+            ASSERT(IsBound(), "Attempt to use a null Sig::Connect.");
         }
 
         // Destroys current binding, if any. Doesn't invoke callbacks.
@@ -77,7 +77,7 @@ namespace Sig
             if (!remote)
                 return nullptr;
 
-            DebugAssert("`Sig::Connection` consistency check failed.", this == remote->remote);
+            ASSERT(this == remote->remote, "`Sig::Connection` consistency check failed.");
 
             remote_t *old_remote = remote;
             remote->remote = nullptr;
@@ -157,7 +157,7 @@ namespace Sig
 
         ~BasicConnection()
         {
-            DebugAssert("The destructor of the most derived class didn't call `this->Destroy()`.", !IsBound());
+            ASSERT(!IsBound(), "The destructor of the most derived class didn't call `this->Destroy()`.");
         }
 
         // If `target` is null, acts as `Unbind`. Otherwise acts as `Bind`.

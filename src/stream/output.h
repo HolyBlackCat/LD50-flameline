@@ -69,7 +69,7 @@ namespace Stream
         {
             try
             {
-                DebugAssert("Suggest flushing the stream before destroying it.\nNot doing so in a release build will silently ignore any possible exceptions.", data.buffer_pos == 0);
+                ASSERT(data.buffer_pos == 0, "Suggest flushing the stream before destroying it.\nNot doing so in a release build will silently ignore any possible exceptions.");
 
                 Flush();
             }

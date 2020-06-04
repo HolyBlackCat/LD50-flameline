@@ -46,7 +46,7 @@ namespace Graphics::Geom
 
         void GetVerticesFlat(std::size_t begin, std::size_t end, vertex_t *dest) const
         {
-            DebugAssert("Invalid vertex range.", begin <= end && end <= VertexCountFlat());
+            ASSERT(begin <= end && end <= VertexCountFlat(), "Invalid vertex range.");
             GetVerticesFlatLow(begin, end, dest);
         }
 
@@ -96,12 +96,12 @@ namespace Graphics::Geom
 
         void GetVertices(std::size_t begin, std::size_t end, vertex_t *dest) const
         {
-            DebugAssert("Invalid vertex range.", begin <= end && end <= VertexCount());
+            ASSERT(begin <= end && end <= VertexCount(), "Invalid vertex range.");
             GetVerticesLow(begin, end, dest);
         }
         void GetIndices(std::size_t begin, std::size_t end, index_t *dest) const
         {
-            DebugAssert("Invalid index range.", begin <= end && end <= IndexCount());
+            ASSERT(begin <= end && end <= IndexCount(), "Invalid index range.");
             GetIndicesLow(begin, end, dest);
         }
 
@@ -124,7 +124,7 @@ namespace Graphics::Geom
                 for (std::size_t i = 0; i < added_index_count; i++)
                 {
                     index_t &this_index = indices[i + old_index_count];
-                    DebugAssert("Vertex index overflow.", index_t(this_index + old_vertex_count) >= this_index);
+                    ASSERT(index_t(this_index + old_vertex_count) >= this_index, "Vertex index overflow.");
                     this_index += old_vertex_count;
                 }
             }
@@ -273,13 +273,13 @@ namespace Graphics::Geom
 
         bool IsContiguous() const
         {
-            DebugAssert("Attempt to use a null `DataView` instance.", *this);
+            ASSERT(*this, "Attempt to use a null `DataView` instance.");
             return bool(pointer);
         }
 
         void MakeContiguousIfNeeded()
         {
-            DebugAssert("Attempt to use a null `DataView` instance.", *this);
+            ASSERT(*this, "Attempt to use a null `DataView` instance.");
 
             if (IsContiguous())
                 return;
@@ -294,14 +294,14 @@ namespace Graphics::Geom
 
         std::size_t Size() const
         {
-            DebugAssert("Attempt to use a null `DataView` instance.", *this);
+            ASSERT(*this, "Attempt to use a null `DataView` instance.");
             return size;
         }
 
         // Can return null if no contiguous storage is available.
         const type *PointerIfAvailable() const
         {
-            DebugAssert("Attempt to use a null `DataView` instance.", *this);
+            ASSERT(*this, "Attempt to use a null `DataView` instance.");
             return pointer;
         }
 
@@ -309,14 +309,14 @@ namespace Graphics::Geom
         // If necessary, copies data to an internal storage first.
         const type *Pointer() const
         {
-            DebugAssert("Attempt to use a null `DataView` instance.", *this);
+            ASSERT(*this, "Attempt to use a null `DataView` instance.");
             MakeContiguousIfNeeded();
             return pointer;
         }
 
         void GetElements(std::size_t begin, std::size_t end, type *dest) const
         {
-            DebugAssert("Attempt to use a null `DataView` instance.", *this);
+            ASSERT(*this, "Attempt to use a null `DataView` instance.");
 
             if (pointer)
                 std::copy(pointer + begin, pointer + end, dest);
@@ -380,7 +380,7 @@ namespace Graphics::Geom
                             else
                                 provider.GetIndices(i, i+1, &index);
 
-                            DebugAssert("Invalid vertex index.", index < provider.VertexCount());
+                            ASSERT(index < provider.VertexCount(), "Invalid vertex index.");
 
                             if constexpr (have_vertex_ptr)
                                 *dest = vertex_ptr[index];
@@ -447,7 +447,7 @@ namespace Graphics::Geom
             index_view = DataView<index_t>::ToArbitraryObject(provider.VertexCountFlat(), nullptr,
                 [](const void *, std::size_t begin, std::size_t end, index_t *dest)
                 {
-                    DebugAssert("Vertex index is too large for this type.", end == 0 || end - 1 <= std::numeric_limits<index_t>::max());
+                    ASSERT(end == 0 || end - 1 <= std::numeric_limits<index_t>::max(), "Vertex index is too large for this type.");
                     std::iota(dest, dest + end - begin, index_t(begin));
                 });
         }
@@ -515,7 +515,7 @@ namespace Graphics::Geom
                         provider.GetIndices(i, i+1, &index);
 
                         if constexpr (sizeof index > sizeof(index_t))
-                            DebugAssert("Vertex index is too large for this type.", index <= std::numeric_limits<index_t>::max());
+                            ASSERT(index <= std::numeric_limits<index_t>::max(), "Vertex index is too large for this type.");
 
                         *dest++ = index;
                     }
@@ -889,7 +889,7 @@ namespace Graphics::Geom
         QueueFlat(std::size_t primitive_capacity)
             : vertices(primitive_capacity * int(P)), vertex_buffer(primitive_capacity * int(P), nullptr, dynamic_draw)
         {
-            DebugAssert("Invalid render queue capacity.", primitive_capacity > 0);
+            ASSERT(primitive_capacity > 0, "Invalid render queue capacity.");
         }
 
         explicit operator bool() const
@@ -915,7 +915,7 @@ namespace Graphics::Geom
             std::size_t vertices_provided = view.VertexCountFlat();
             if (vertices_provided == 0)
                 return;
-            DebugAssert("Inserted vertex count is not a multiple of the primitive size.", vertices_provided % int(P) == 0);
+            ASSERT(vertices_provided % int(P) == 0, "Inserted vertex count is not a multiple of the primitive size.");
 
             if (RemainingVertexCapacity() == 0)
                 Flush();
@@ -996,8 +996,8 @@ namespace Graphics::Geom
             : vertices(vertex_capacity), vertex_buffer(vertex_capacity, nullptr, dynamic_draw),
             indices(primitive_index_capacity * int(P)), index_buffer(primitive_index_capacity * int(P), nullptr, dynamic_draw)
         {
-            DebugAssert("Invalid render queue capacity.", vertex_capacity >= int(P) && primitive_index_capacity > 0);
-            DebugAssert("Render queue capacity is too large for this index type.", vertex_capacity - 1 <= std::numeric_limits<index_t>::max());
+            ASSERT(vertex_capacity >= int(P) && primitive_index_capacity > 0, "Invalid render queue capacity.");
+            ASSERT(vertex_capacity - 1 <= std::numeric_limits<index_t>::max(), "Render queue capacity is too large for this index type.");
         }
 
         explicit operator bool() const
@@ -1036,7 +1036,7 @@ namespace Graphics::Geom
             std::size_t indices_provided = view.IndexCount();
             if (indices_provided == 0)
                 return;
-            DebugAssert("Inserted index count is not a multiple of the primitive size.", indices_provided % int(P) == 0);
+            ASSERT(indices_provided % int(P) == 0, "Inserted index count is not a multiple of the primitive size.");
 
             std::size_t vertices_provided = view.VertexCount();
             if (vertices_provided > VertexCapacity())

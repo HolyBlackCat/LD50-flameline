@@ -78,7 +78,7 @@ namespace Meta
     void AssertTypeHash(const T &object)
     {
         (void)object;
-        DebugAssert("Type hash check failed.", impl::TypeId::CheckHash(object));
+        ASSERT(impl::TypeId::CheckHash(object), "Type hash check failed.");
     }
 }
 

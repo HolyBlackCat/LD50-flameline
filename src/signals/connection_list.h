@@ -161,7 +161,7 @@ namespace Sig
 
         ~ConnectionList()
         {
-            DebugAssert("Sig::ConnectionList contains an empty connection.",[&]{
+            ASSERT([&]{
                 if (!data)
                     return true;
                 for (const auto &entry : data->GetConnectionList())
@@ -170,7 +170,7 @@ namespace Sig
                         return false;
                 }
                 return true;
-            }());
+            }(), "Sig::ConnectionList contains an empty connection.");
         }
 
         // Adds a connection to the list, bound to the specified remote.

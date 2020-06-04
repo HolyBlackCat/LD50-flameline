@@ -388,7 +388,7 @@ namespace Interface
         // Draws the gui.
         void ShowWindow()
         {
-            DebugAssert("Attempt to use a null instance of ImGuiFreetypeFontConfigurator.", *this);
+            ASSERT(*this, "Attempt to use a null instance of ImGuiFreetypeFontConfigurator.");
             if (!*this)
                 return;
 

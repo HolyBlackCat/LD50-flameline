@@ -150,7 +150,7 @@ namespace Graphics
         }
         void Activate()
         {
-            DebugAssert("Attempt to use a null texture unit.", *this);
+            ASSERT(*this, "Attempt to use a null texture unit.");
             if (!*this)
                 return;
             ActivateIndex(data.index);
@@ -162,7 +162,7 @@ namespace Graphics
 
         TexUnit &&AttachHandle(GLuint handle)
         {
-            DebugAssert("Attempt to use a null texture unit.", *this);
+            ASSERT(*this, "Attempt to use a null texture unit.");
             if (!*this)
                 return std::move(*this);
 
@@ -193,7 +193,7 @@ namespace Graphics
 
         TexUnit &&Interpolation(InterpolationMode mode)
         {
-            DebugAssert("Attempt to use a texture unit without an attached texture.", HasAttachedHandle());
+            ASSERT(HasAttachedHandle(), "Attempt to use a texture unit without an attached texture.");
             if (!HasAttachedHandle())
                 return std::move(*this);
 
@@ -210,7 +210,7 @@ namespace Graphics
 
         TexUnit &&WrapX(WrapMode mode)
         {
-            DebugAssert("Attempt to use a texture unit without an attached texture.", HasAttachedHandle());
+            ASSERT(HasAttachedHandle(), "Attempt to use a texture unit without an attached texture.");
             if (!HasAttachedHandle())
                 return std::move(*this);
 
@@ -220,7 +220,7 @@ namespace Graphics
         }
         TexUnit &&WrapY(WrapMode mode)
         {
-            DebugAssert("Attempt to use a texture unit without an attached texture.", HasAttachedHandle());
+            ASSERT(HasAttachedHandle(), "Attempt to use a texture unit without an attached texture.");
             if (!HasAttachedHandle())
                 return std::move(*this);
 
@@ -249,7 +249,7 @@ namespace Graphics
         }
         TexUnit &&SetData(GLenum internal_format, GLenum format, GLenum type, ivec2 size, const uint8_t *pixels = 0)
         {
-            DebugAssert("Attempt to use a texture unit without an attached texture.", HasAttachedHandle());
+            ASSERT(HasAttachedHandle(), "Attempt to use a texture unit without an attached texture.");
             if (!HasAttachedHandle())
                 return std::move(*this);
 
@@ -259,7 +259,7 @@ namespace Graphics
         }
         TexUnit &&SetData(const Image &image)
         {
-            DebugAssert("Attempt to use a null image.", image);
+            ASSERT(image, "Attempt to use a null image.");
             SetData(image.Size(), image.Data());
             return std::move(*this);
         }
@@ -271,7 +271,7 @@ namespace Graphics
         }
         TexUnit &&SetDataPart(GLenum format, GLenum type, ivec2 pos, ivec2 size, const uint8_t *pixels)
         {
-            DebugAssert("Attempt to use a texture unit without an attached texture.", HasAttachedHandle());
+            ASSERT(HasAttachedHandle(), "Attempt to use a texture unit without an attached texture.");
             if (!HasAttachedHandle())
                 return std::move(*this);
 

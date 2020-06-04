@@ -123,11 +123,11 @@ Render::Quad_t::~Quad_t()
     if (!queue)
         return;
 
-    DebugAssert("2D poly renderer: Quad with no texture nor color specified.", data.has_texture || data.has_color);
-    DebugAssert("2D poly renderer: Quad with absolute corner coodinates with a center specified.", data.abs_pos + data.has_center < 2);
-    DebugAssert("2D poly renderer: Quad with absolute texture coordinates mode but no texture coordinates specified.", data.abs_tex_pos <= data.has_texture);
-    DebugAssert("2D poly renderer: Quad with texture and color, but without a mixing factor.", (data.has_texture && data.has_color) == data.has_tex_color_fac);
-    DebugAssert("2D poly renderer: Quad with a matrix but without a center specified.", data.has_matrix <= data.has_center);
+    ASSERT(data.has_texture || data.has_color, "2D poly renderer: Quad with no texture nor color specified.");
+    ASSERT(data.abs_pos + data.has_center < 2, "2D poly renderer: Quad with absolute corner coodinates with a center specified.");
+    ASSERT(data.abs_tex_pos <= data.has_texture, "2D poly renderer: Quad with absolute texture coordinates mode but no texture coordinates specified.");
+    ASSERT((data.has_texture && data.has_color) == data.has_tex_color_fac, "2D poly renderer: Quad with texture and color, but without a mixing factor.");
+    ASSERT(data.has_matrix <= data.has_center, "2D poly renderer: Quad with a matrix but without a center specified.");
 
     if (data.abs_pos)
         data.size -= data.pos;
@@ -209,8 +209,8 @@ Render::Triangle_t::~Triangle_t()
     if (!queue)
         return;
 
-    DebugAssert("2D poly renderer: Triangle with no texture nor color specified.", data.has_texture || data.has_color);
-    DebugAssert("2D poly renderer: Triangle with texture and color, but without a mixing factor.", (data.has_texture && data.has_color) == data.has_tex_color_fac);
+    ASSERT(data.has_texture || data.has_color, "2D poly renderer: Triangle with no texture nor color specified.");
+    ASSERT((data.has_texture && data.has_color) == data.has_tex_color_fac, "2D poly renderer: Triangle with texture and color, but without a mixing factor.");
 
     Render::Data::Attribs out[3];
 

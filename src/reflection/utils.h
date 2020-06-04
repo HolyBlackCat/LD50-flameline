@@ -143,7 +143,7 @@ namespace Refl::Utils
             }
 
             std::sort(array.begin(), array.end());
-            DebugAssert("Duplicate string in a static list.", std::adjacent_find(array.begin(), array.end()) == array.end());
+            ASSERT(std::adjacent_find(array.begin(), array.end()) == array.end(), "Duplicate string in a static list.");
             return array;
         }();
         auto it = std::lower_bound(array.begin(), array.end(), name);

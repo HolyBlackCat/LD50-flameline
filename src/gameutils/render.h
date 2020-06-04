@@ -104,7 +104,7 @@ class Render
 
         ref tex(fvec2 pos, fvec2 size)
         {
-            DebugAssert("2D poly renderer: Quad_t texture specified twice.", !data.has_texture);
+            ASSERT(!data.has_texture, "2D poly renderer: Quad_t texture specified twice.");
             data.has_texture = 1;
 
             data.tex_pos = pos;
@@ -118,7 +118,7 @@ class Render
         }
         ref center(fvec2 c)
         {
-            DebugAssert("2D poly renderer: Quad_t center specified twice.", !data.has_center);
+            ASSERT(!data.has_center, "2D poly renderer: Quad_t center specified twice.");
             data.has_center = 1;
 
             data.center = c;
@@ -127,7 +127,7 @@ class Render
         }
         ref pixel_center(fvec2 c) // Same as `center()`, but the coordinates are always measured in pixels instead of texels even if a texture is specified.
         {
-            DebugAssert("2D poly renderer: Quad_t center specified twice.", !data.has_center);
+            ASSERT(!data.has_center, "2D poly renderer: Quad_t center specified twice.");
             data.has_center = 1;
 
             data.center = c;
@@ -179,7 +179,7 @@ class Render
         }
         ref color(fvec3 c)
         {
-            DebugAssert("2D poly renderer: Quad_t color specified twice.", !data.has_color);
+            ASSERT(!data.has_color, "2D poly renderer: Quad_t color specified twice.");
             data.has_color = 1;
 
             for (auto &it : data.colors)
@@ -188,7 +188,7 @@ class Render
         }
         ref color(fvec3 a, fvec3 b, fvec3 c, fvec3 d)
         {
-            DebugAssert("2D poly renderer: Quad_t color specified twice.", !data.has_color);
+            ASSERT(!data.has_color, "2D poly renderer: Quad_t color specified twice.");
             data.has_color = 1;
 
             data.colors[0] = a;
@@ -199,7 +199,7 @@ class Render
         }
         ref mix(float x) // 0 - fill with color, 1 - use texture
         {
-            DebugAssert("2D poly renderer: Quad_t texture/color factor specified twice.", !data.has_tex_color_fac);
+            ASSERT(!data.has_tex_color_fac, "2D poly renderer: Quad_t texture/color factor specified twice.");
             data.has_tex_color_fac = 1;
 
             for (auto &it : data.tex_color_factors)
@@ -208,7 +208,7 @@ class Render
         }
         ref mix(float a, float b, float c, float d)
         {
-            DebugAssert("2D poly renderer: Quad_t texture/color factor specified twice.", !data.has_tex_color_fac);
+            ASSERT(!data.has_tex_color_fac, "2D poly renderer: Quad_t texture/color factor specified twice.");
             data.has_tex_color_fac = 1;
 
             data.tex_color_factors[0] = a;
@@ -315,7 +315,7 @@ class Render
 
         ref tex(fvec2 a, fvec2 b, fvec2 c)
         {
-            DebugAssert("2D poly renderer: Triangle_t texture specified twice.", !data.has_texture);
+            ASSERT(!data.has_texture, "2D poly renderer: Triangle_t texture specified twice.");
             data.has_texture = 1;
 
             data.tex_pos[0] = a;
@@ -367,7 +367,7 @@ class Render
         }
         ref color(fvec3 a, fvec3 b, fvec3 c)
         {
-            DebugAssert("2D poly renderer: Triangle_t color specified twice.", !data.has_color);
+            ASSERT(!data.has_color, "2D poly renderer: Triangle_t color specified twice.");
             data.has_color = 1;
 
             data.colors[0] = a;
@@ -381,7 +381,7 @@ class Render
         }
         ref mix(float a, float b, float c)
         {
-            DebugAssert("2D poly renderer: Triangle_t texture/color factor specified twice.", !data.has_tex_color_fac);
+            ASSERT(!data.has_tex_color_fac, "2D poly renderer: Triangle_t texture/color factor specified twice.");
             data.has_tex_color_fac = 1;
 
             data.tex_color_factors[0] = a;

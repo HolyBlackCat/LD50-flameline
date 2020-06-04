@@ -1,6 +1,7 @@
 #include "errors.h"
 
 #include <csignal>
+#include <exception>
 #include <type_traits>
 
 namespace Program

@@ -43,7 +43,7 @@ namespace Graphics
 
             Attachment(const TexObject &texture)
             {
-                DebugAssert("Attempt to use a null texture.", texture);
+                ASSERT(texture, "Attempt to use a null texture.");
                 type = GL_TEXTURE_2D;
                 handle = texture.Handle();
             }
@@ -117,7 +117,7 @@ namespace Graphics
 
         void Bind() const
         {
-            DebugAssert("Attempt to use a null framebuffer.", *this);
+            ASSERT(*this, "Attempt to use a null framebuffer.");
             if (!*this)
                 return;
             BindHandle(data.handle);
@@ -133,7 +133,7 @@ namespace Graphics
 
         FrameBuffer &&Attach(Attachment att) // Old non-depth attachments are discarded.
         {
-            DebugAssert("Attempt to use a null framebuffer.", *this);
+            ASSERT(*this, "Attempt to use a null framebuffer.");
             if (!*this)
                 return std::move(*this);
 
@@ -152,7 +152,7 @@ namespace Graphics
         #ifdef glDrawBuffers
         FrameBuffer &&Attach(const std::vector<Attachment> &att) // Old non-depth attachments are discarded.
         {
-            DebugAssert("Attempt to use a null framebuffer.", *this);
+            ASSERT(*this, "Attempt to use a null framebuffer.");
             if (!*this)
                 return std::move(*this);
 
@@ -173,7 +173,7 @@ namespace Graphics
 
         FrameBuffer &&AttachDepth(Attachment att)
         {
-            DebugAssert("Attempt to use a null framebuffer.", *this);
+            ASSERT(*this, "Attempt to use a null framebuffer.");
             if (!*this)
                 return std::move(*this);
 
@@ -188,7 +188,7 @@ namespace Graphics
 
         FrameBuffer &&CheckStatus() // Throws if the framebuffer is incomplete.
         {
-            DebugAssert("Attempt to use a null framebuffer.", *this);
+            ASSERT(*this, "Attempt to use a null framebuffer.");
             if (!*this)
                 return std::move(*this);
 

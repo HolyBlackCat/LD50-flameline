@@ -99,7 +99,7 @@ namespace Graphics
 
         void Bind() const
         {
-            DebugAssert("Attempt to use a null index buffer.", *this);
+            ASSERT(*this, "Attempt to use a null index buffer.");
             if (!*this)
                 return;
             IndexBuffers::Bind(data.handle);
@@ -120,7 +120,7 @@ namespace Graphics
 
         void SetData(int count, const T *source = 0, Usage usage = static_draw) // Binds the buffer.
         {
-            DebugAssert("Attempt to use a null index buffer.", *this);
+            ASSERT(*this, "Attempt to use a null index buffer.");
             if (!*this)
                 return;
             Bind();
@@ -133,7 +133,7 @@ namespace Graphics
         }
         void SetDataPartBytes(int offset, int bytes, const uint8_t *source) // Binds the buffer.
         {
-            DebugAssert("Attempt to use a null index buffer.", *this);
+            ASSERT(*this, "Attempt to use a null index buffer.");
             if (!*this)
                 return;
             Bind();
@@ -154,7 +154,7 @@ namespace Graphics
 
         void DrawFromBoundBuffer(DrawMode m, int offset, int count) const // Binds the buffer.
         {
-            DebugAssert("Attempt to use a null index buffer.", *this);
+            ASSERT(*this, "Attempt to use a null index buffer.");
             if (!*this)
                 return;
             Bind();

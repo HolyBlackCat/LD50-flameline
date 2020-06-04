@@ -204,7 +204,7 @@ namespace Graphics
 
         void BindStorage() const
         {
-            DebugAssert("Attempt to use a null vertex buffer.", *this);
+            ASSERT(*this, "Attempt to use a null vertex buffer.");
             if (!*this)
                 return;
             VertexBuffers::BindStorage(data.handle);
@@ -220,7 +220,7 @@ namespace Graphics
 
         void BindDraw(const T &attributes = {}) const // If element type is not reflected, disables all attributes. `attributes` is effectively unused. We need it to compute attribute offsets.
         {
-            DebugAssert("Attempt to use a null vertex buffer.", *this);
+            ASSERT(*this, "Attempt to use a null vertex buffer.");
             if (!*this)
                 return;
             VertexBuffers::BindDraw(data.handle, attributes);
@@ -241,7 +241,7 @@ namespace Graphics
 
         void SetData(int count, const T *source = 0, Usage usage = static_draw) // Binds storage.
         {
-            DebugAssert("Attempt to use a null vertex buffer.", *this);
+            ASSERT(*this, "Attempt to use a null vertex buffer.");
             if (!*this)
                 return;
             BindStorage();
@@ -255,7 +255,7 @@ namespace Graphics
         }
         void SetDataPartBytes(int offset, int bytes, const uint8_t *source) // Binds storage.
         {
-            DebugAssert("Attempt to use a null vertex buffer.", *this);
+            ASSERT(*this, "Attempt to use a null vertex buffer.");
             if (!*this)
                 return;
             BindStorage();
@@ -265,7 +265,7 @@ namespace Graphics
         void Draw(DrawMode m, int offset, int count) const // Binds for drawing.
         {
             static_assert(is_reflected, "Element type of this buffer is not reflected, unable to draw.");
-            DebugAssert("Attempt to use a null vertex buffer.", *this);
+            ASSERT(*this, "Attempt to use a null vertex buffer.");
             if (!*this)
                 return;
             BindDraw();

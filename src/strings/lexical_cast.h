@@ -17,6 +17,7 @@
 #include "meta/misc.h"
 #include "meta/type_info.h"
 #include "program/errors.h"
+#include "strings/common.h"
 #include "strings/escape.h"
 #include "strings/format.h"
 #include "utils/robust_math.h"
@@ -211,7 +212,7 @@ namespace Strings
             }
             else
             {
-                DebugAssert("ToString attempted to represent a long double as a pair of regular doubles, but the number didn't survive a round-trip conversion.", (long double)major + minor == number);
+                ASSERT((long double)major + minor == number, "ToString attempted to represent a long double as a pair of regular doubles, but the number didn't survive a round-trip conversion.");
 
                 if (str.position() + 1 >= str.size()) // We use +1 because we want space for both the delimiter and the null-terminator.
                 {
@@ -239,7 +240,7 @@ namespace Strings
     {
         char buf[ToStringMaxBufferLen()];
         [[maybe_unused]] bool ok = ToString(buf, sizeof buf, number);
-        DebugAssert("The internal buffer allocated by `ToString` ended up being too small, huh.", ok);
+        ASSERT(ok, "The internal buffer allocated by `ToString` ended up being too small, huh.");
         return buf;
     }
 

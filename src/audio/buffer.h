@@ -61,7 +61,7 @@ namespace Audio
 
         void SetData(Bits bits_per_sample, Channels channel_count, int sampling_rate, int byte_count, const std::uint8_t *source = 0)
         {
-            DebugAssert("Attempt to use a null audio buffer.", *this);
+            ASSERT(*this, "Attempt to use a null audio buffer.");
             if (!*this)
                 return;
 
@@ -79,7 +79,7 @@ namespace Audio
         }
         void SetData(const Sound &sound)
         {
-            DebugAssert("Attempt to use a null sound.", sound);
+            ASSERT(sound, "Attempt to use a null sound.");
             SetData(sound.BitsPerSample(), sound.ChannelCount(), sound.SamplingRate(), sound.ByteCount(), sound.Data());
         }
     };

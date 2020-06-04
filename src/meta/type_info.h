@@ -126,7 +126,7 @@ namespace Meta
                 #ifndef _MSC_VER
                 int status = -4;
                 const char *ret = abi::__cxa_demangle(name, buf_ptr, &buf_size, &status);
-                DebugAssert("Unable to demangle a name.", status != -2);
+                ASSERT(status != -2, "Unable to demangle a name.");
                 if (status != 0) // -1 = out of memory, -2 = invalid string, -3 = invalid usage
                     return name;
                 return ret;

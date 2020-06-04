@@ -105,7 +105,7 @@ namespace Graphics::Renderers
 
         void SetMatrix(fmat4 new_matrix)
         {
-            DebugAssert("Attempt to use a null renderer.", *this);
+            ASSERT(*this, "Attempt to use a null renderer.");
             uniforms.matrix = new_matrix;
         }
         void ResetMatrix()
@@ -130,7 +130,7 @@ namespace Graphics::Renderers
 
         Flat &operator<<(Geom::View<Vertex, Index> view)
         {
-            DebugAssert("Attempt to use a null renderer.", *this);
+            ASSERT(*this, "Attempt to use a null renderer.");
             if (!*this)
                 return *this;
 

@@ -31,7 +31,7 @@ class MultiArray
   public:
     MultiArray(index_vec_t size_vec = index_vec_t(0)) : size_vec(size_vec), storage(size_vec.prod())
     {
-        DebugAssert("Invalid multiarray size.", size_vec.min() >= 0);
+        ASSERT(size_vec.min() >= 0, "Invalid multiarray size.");
     }
     template <typename A, A ...I> MultiArray(Meta::value_list<I...>, std::array<type, index_vec_t(I...).prod()> data) : size_vec(I...), storage(data.begin(), data.end())
     {
@@ -51,7 +51,7 @@ class MultiArray
 
     [[nodiscard]] type &unsafe_at(index_vec_t pos)
     {
-        DebugAssert(STR("Multiarray indices out of range. Indices are ", (pos), " but the array size is ", (size_vec), "."), pos_in_range(pos));
+        ASSERT(pos_in_range(pos), STR("Multiarray indices out of range. Indices are ", (pos), " but the array size is ", (size_vec), "."));
 
         index_t index = 0;
         index_t factor = 1;

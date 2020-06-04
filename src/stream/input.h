@@ -289,7 +289,7 @@ namespace Stream
         // Returns the reference to that buffer.
         Buffer &LoadSegmentToBuffer(bool use_buffer_b, std::size_t segment_offset)
         {
-            DebugAssert("Invalid segment offset.", PositionToSegmentOffset(segment_offset) == segment_offset);
+            ASSERT(PositionToSegmentOffset(segment_offset) == segment_offset, "Invalid segment offset.");
 
             Buffer &buffer = use_buffer_b ? data.buffer_b : data.buffer_a;
 
