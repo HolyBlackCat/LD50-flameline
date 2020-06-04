@@ -7,7 +7,7 @@
 #include <sstream>
 #include <type_traits>
 
-#define VERSION "3.1.16"
+#define VERSION "3.1.17"
 
 #pragma GCC diagnostic ignored "-Wpragmas" // Silence GCC warning about the next line disabling a warning that GCC doesn't have.
 #pragma GCC diagnostic ignored "-Wstring-plus-int" // Silence clang warning about `1+R"()"` pattern.
@@ -280,8 +280,10 @@ int main(int argc, char **argv)
                 template <typename T> inline constexpr bool is_matrix_v = is_matrix_impl<T>::value;
 
                 // Check if `T` is an 'other type' (possbily const), i.e. not a suitable vector/matrix element.
-                // Effectively checks for a member `disable_vec_mat_operators` typedef.
+                // Returns false for IO streams.
+                // Also returns false for classes with a member type alias `disable_vec_mat_operators`.
                 template <typename T, typename = void> struct is_other_impl : std::false_type {};
+                template <typename T> struct is_other_impl<T, std::enable_if_t<std::is_base_of_v<std::ios_base, T>>> : std::true_type {};
                 template <typename T> struct is_other_impl<T, decltype(std::enable_if<1, typename T::disable_vec_mat_operators>{}, void())> : std::true_type {}; // Note the use of `enable_if` without `_t`. We just need an arbitrary template type here.
                 template <typename T> inline constexpr bool is_other_v = is_other_impl<T>::value;
 
