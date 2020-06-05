@@ -359,6 +359,10 @@ USED_PACKAGES :=
 # Used pkg-config packages from the library pack.
 USED_EXTERNAL_PACKAGES :=
 # Used external pkg-config packages.
+ALWAYS_COPIED_SHARED_LIB_PATTERS :=
+# A list of patterns. If a shared library name matches this pattern (contains any word from this list as a substring),
+# it will be copied from the dependency pack to the location of the binary unconditionally.
+# Otherwise a library is only copied if the linker flags obtained from pkg-config (`-l...`) mention a similar name.
 # ]
 
 
@@ -371,6 +375,7 @@ override lib_pack_info_file := $(OBJECT_DIR)/library_pack_info.mk
 override deps_library_pack_name :=
 override deps_packages :=
 override deps_external_packages :=
+override deps_always_copied_shared_lib_patterns :=
 override deps_compiler_flags :=
 override deps_linker_flags :=
 -include $(lib_pack_info_file)
@@ -713,6 +718,9 @@ endif
 ifneq ($(strip $(USED_EXTERNAL_PACKAGES)),$(strip $(deps_external_packages)))
 $(lib_pack_info_file): __force_this_target
 endif
+ifneq ($(strip $(ALWAYS_COPIED_SHARED_LIB_PATTERS)),$(strip $(deps_always_copied_shared_lib_patterns)))
+$(lib_pack_info_file): __force_this_target
+endif
 
 # Make sure everything is rebuilt if dependency information is updated.
 $(OUTPUT_FILE_EXT) $(objects) $(compiled_headers): | $(lib_pack_info_file)
@@ -732,10 +740,11 @@ $(lib_pack_info_file):
     			$(lf)I can install them for you; I need `$(library_pack_archive_pattern_display)` in the current directory)))
 	$(erase_shared_libraries)
 	$(call safe_shell_exec,$(call echo,override deps_library_pack_name := $(LIBRARY_PACK_NAME)) >$@)
-	$(call safe_shell_exec,$(call echo,override deps_compiler_flags := $(subst $$,$$$$,$(call run_pkgconfig,--cflags) $(extra_pkgconfig_compiler_flags))) >>$@)
-	$(call safe_shell_exec,$(call echo,override deps_linker_flags := $(subst $$,$$$$,$(call run_pkgconfig,--libs) $(extra_pkgconfig_linker_flags))) >>$@)
 	$(call safe_shell_exec,$(call echo,override deps_packages := $(USED_PACKAGES)) >>$@)
 	$(call safe_shell_exec,$(call echo,override deps_external_packages := $(USED_EXTERNAL_PACKAGES)) >>$@)
+	$(call safe_shell_exec,$(call echo,override deps_always_copied_shared_lib_patterns := $(ALWAYS_COPIED_SHARED_LIB_PATTERS)) >>$@)
+	$(call safe_shell_exec,$(call echo,override deps_compiler_flags := $(subst $$,$$$$,$(call run_pkgconfig,--cflags) $(extra_pkgconfig_compiler_flags))) >>$@)
+	$(call safe_shell_exec,$(call echo,override deps_linker_flags := $(subst $$,$$$$,$(call run_pkgconfig,--libs) $(extra_pkgconfig_linker_flags))) >>$@)
 	$(eval include $(lib_pack_info_file))
 	$(info [Deps] Packages used:)
 	$(info [Deps]   $(deps_packages))
@@ -757,6 +766,17 @@ override deps_entry_summary = $(call deps_entry_dir,$1) >> $(call deps_entry_nam
 
 # A list of shared libraries found in the library pack.
 override available_libs = $(strip $(foreach x,$(notdir $(wildcard $(library_pack_path)/$(directory_dll)/*$(pattern_dll))),$(if $(call is_canonical_dll_name,$x),$x)))
+# A list of patterns for dynamic libraries that we might need, guessed based on the linker flags.
+ifeq ($(TARGET_OS),windows)
+# `[lib]$name[-???].dll`.
+override needed_lib_patterns = $(foreach x,$(patsubst -l%,%,$(filter -l%,$(deps_linker_flags))),$x.dll lib$x.dll $x-%.dll lib$x-%.dll)
+else
+# `lib$name[-???].so[???]`. The `-???` part is rare, but apparently SDL2 uses it.
+override needed_lib_patterns = $(foreach x,$(patsubst -l%,%,$(filter -l%,$(deps_linker_flags))),lib$x.so% lib$x-%)
+endif
+# A list of libraries from the pack that the program needs, guessed based on the linker flags.
+# Equal to `available_libs`, with libs not mentioned in the linker flags (or `$(deps_always_copied_shared_lib_patterns)`) removed.
+override needed_available_libs = $(strip $(foreach x,$(available_libs),$(if $(filter $(needed_lib_patterns),$x)$(call find_any_as_substr,$(deps_always_copied_shared_lib_patterns),$x),$x)))
 
 ifeq ($(TARGET_OS),linux)
 override ldd_with_path = $(call set_env,LD_LIBRARY_PATH,$(library_pack_path)/$(directory_dll):$$LD_LIBRARY_PATH) && $(LDD)
@@ -786,8 +806,8 @@ endif
 __generic_build: | __shared_libs
 __shared_libs: | $(OUTPUT_FILE_EXT)
 	$(info [Deps] Following prebuilt libraries will be copied to `$(dir $(OUTPUT_FILE_EXT))`:)
-	$(foreach x,$(available_libs),$(info [Deps] - $(library_pack_path)/$(directory_dll)/$x))
-	$(foreach x,$(available_libs),$(call safe_shell_exec,$(call copy,$(library_pack_path)/$(directory_dll)/$x,$(dir $(OUTPUT_FILE_EXT))))\
+	$(foreach x,$(needed_available_libs),$(info [Deps] - $(library_pack_path)/$(directory_dll)/$x))
+	$(foreach x,$(needed_available_libs),$(call safe_shell_exec,$(call copy,$(library_pack_path)/$(directory_dll)/$x,$(dir $(OUTPUT_FILE_EXT))))\
 		$(call adjust_rpath,$(dir $(OUTPUT_FILE_EXT))$x))
 	$(info [Deps] Copying completed)
 	$(info [Deps] Determining all dependencies for `$(OUTPUT_FILE_EXT)`...)
@@ -802,7 +822,7 @@ __shared_libs: | $(OUTPUT_FILE_EXT)
 		$(error Didn't expect to find `$(call deps_entry_name,$x)` in `$(call deps_entry_dir,$x)`)))
 	$(info [Deps] Out of those, following libraries will be copied to `$(dir $(OUTPUT_FILE_EXT))`:)
 	$(foreach x,$(_local_libs),$(info [Deps] - $(call deps_entry_summary,$x)))
-	$(eval override _local_libs := $(foreach x,$(_local_libs),$(if $(call find_elem_in,$(call deps_entry_name,$x),$(available_libs)),\
+	$(eval override _local_libs := $(foreach x,$(_local_libs),$(if $(call find_elem_in,$(call deps_entry_name,$x),$(needed_available_libs)),\
 		$(info [Deps] Skipping prebuilt library: $(call deps_entry_name,$x)),$x)))
 	$(foreach x,$(_local_libs),$(call safe_shell_exec,$(call copy,$(call deps_entry_dir,$x)$(call deps_entry_name,$x),$(dir $(OUTPUT_FILE_EXT))))\
 		$(call adjust_rpath,$(dir $(OUTPUT_FILE_EXT))$(call deps_entry_name,$x)))

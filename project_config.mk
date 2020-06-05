@@ -10,7 +10,7 @@ LINKER_MODE := CXX
 
 # Dependency set name
 LIBRARY_PACK_NAME := imp-re_deps_2020-05-10
-USED_PACKAGES := openal freetype2 ogg vorbis vorbisenc vorbisfile zlib fmt double-conversion
+USED_PACKAGES := openal freetype2 ogg vorbis vorbisfile zlib fmt double-conversion
 USED_EXTERNAL_PACKAGES :=
 ifeq ($(TARGET_OS),windows)
 USED_PACKAGES += sdl2
