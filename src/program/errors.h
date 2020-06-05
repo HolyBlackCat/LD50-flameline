@@ -45,7 +45,7 @@ namespace Program
     {
         // An assertion function.
         // Triggers an error if `enable && !condition`.
-        inline bool Assert(bool enable, bool condition, std::string_view message_or_expr, const char *expr_or_nothing = nullptr)
+        inline bool Assert(bool enable, const char *context, const char *function, bool condition, std::string_view message_or_expr, const char *expr_or_nothing = nullptr)
         {
             if (!enable || condition)
                 return true;
@@ -53,12 +53,12 @@ namespace Program
             if (expr_or_nothing)
             {
                 // User specified a custom message.
-                HardError("Assertion failed:\n", message_or_expr);
+                HardError(STR("Assertion failed!\n   at   ", (context), "\n   in   ", (function), "\nMessage:\n   ", (message_or_expr)));
             }
             else
             {
                 // User didn't specify a message.
-                HardError("Assertion failed for expression:\n", message_or_expr);
+                HardError(STR("Assertion failed!\n   at   ", (context), "\n   in   ", (function), "\nExpression:\n   ", (message_or_expr)));
             }
 
             return condition;
@@ -66,9 +66,9 @@ namespace Program
 
         // A template overload that allows using explicitly-but-not-implicitly-convertible-to-bool expressions as conditions.
         template <typename T>
-        bool Assert(bool enable, const T &condition, std::string_view message_or_expr, const char *expr_or_nothing = nullptr)
+        bool Assert(bool enable, const char *context, const char *function, const T &condition, std::string_view message_or_expr, const char *expr_or_nothing = nullptr)
         {
-            return Assert(enable, bool(condition), message_or_expr, expr_or_nothing);
+            return Assert(enable, context, function, bool(condition), message_or_expr, expr_or_nothing);
         }
     }
 }
@@ -77,8 +77,9 @@ namespace Program
 // A debug assertion.
 // Can be called either as `ASSERT(bool)` or `ASSERT(bool, std::string_view)`.
 // In the first case, the expression is printed in the message, otherwise the custom message is printed.
-#define ASSERT(...) ASSERT_impl(__VA_ARGS__)
-#define ASSERT_impl(...) ::Program::impl::Assert(IMP_RE_ENABLE_ASSERTIONS, __VA_ARGS__, #__VA_ARGS__)
+#define ASSERT(...) ASSERT_impl(__LINE__, __VA_ARGS__)
+#define ASSERT_impl(line, ...) ASSERT_impl_low(line, __VA_ARGS__)
+#define ASSERT_impl_low(line, ...) ::Program::impl::Assert(IMP_RE_ENABLE_ASSERTIONS, __FILE__ ":" #line, __PRETTY_FUNCTION__, __VA_ARGS__, #__VA_ARGS__)
 
 // A macro controlling the assertions.
 // You can redefine it at any time to change the behavior or ASSERT.

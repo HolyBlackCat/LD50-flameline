@@ -24,7 +24,6 @@
 #include "strings/symbol_position.h"
 #include "utils/bit_manip.h"
 #include "utils/byte_order.h"
-#include "utils/memory_access.h"
 #include "utils/robust_math.h"
 #include "utils/unicode.h"
 
@@ -484,7 +483,7 @@ namespace Stream
               default:
                 return "";
               case byte_offset:
-                return STR("offset ", (data.position)"#X");
+                return STR("offset 0x", (data.position)"X"); // Writing `0x` manually instead of with `#` because I want a lowercase `x`.
               case text_position:
               case text_byte_position:
                 {
