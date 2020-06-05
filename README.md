@@ -1,21 +1,25 @@
-### imp-re engine
+### imp-re
 
-A relatively simple game engine written for personal purposes.
+A collection of various small libraries, made for personal use. Some of them are intended for game development, some are general-purpose.
 
-Libraries used:
+Features:
 
-* SDL2 for window management,
+* Convenient wrappers for SDL2, OpenGL, OpenAL.
+* A simple 2D renderer.
+* A macro-based reflection system for performing automatic [de]serialization, built on top of custom IO streams.
+* Some fancy macros that improve the C++ syntax.
 
-* OpenGL for graphics,
+* Various bits and pieces:
 
-* OpenAL for audio.
+  * A math library.
+  * Metaprogramming utilities.
+  * Scope guards.
+  * A Boost.Preprocess ripoff.
+  * A tiny JSON parser.
+  * . . .
 
-* FMT for text formatting.
-
-The engine comes comes with custom macro-based relfection, custom JSON parser and several other features.
-
-It's licensed under **ZLIB license**. Feel free to use it.
+Licensed under [ZLIB LICENSE](LICENSE.md).
 
 ---
 
-Currently I'm targeting Clang 10.0.0 (with GCC 10's libstdc++). GCC 10 may or may not work with minor adjustments. MSVC .
+Currently I'm targeting Clang 10.0.0 (with GCC 10's libstdc++; Windows and Linux). GCC 10 should work with minor adjustments. MSVC support would require significant changes, and a new built system.
