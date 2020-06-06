@@ -8,6 +8,15 @@ namespace Stream
 {
     enum class capacity_t : std::size_t {};
 
+    enum ExceptionPrefixStyle : std::uint8_t
+    {
+        minimal          = 0,
+        with_target_name = 1 << 0,
+    };
+    [[nodiscard]] inline ExceptionPrefixStyle operator&(ExceptionPrefixStyle a, ExceptionPrefixStyle b) {return ExceptionPrefixStyle(std::uint8_t(a) & std::uint8_t(b));}
+    [[nodiscard]] inline ExceptionPrefixStyle operator|(ExceptionPrefixStyle a, ExceptionPrefixStyle b) {return ExceptionPrefixStyle(std::uint8_t(a) | std::uint8_t(b));}
+
+
     namespace impl
     {
         // Checks if `T` is a container consisting of single-byte arithmetic objects.

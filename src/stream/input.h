@@ -153,14 +153,14 @@ namespace Stream
         inline constexpr bool is_appendable_byte_seq_ptr_or_null_v = std::is_null_pointer_v<T> || (std::is_pointer_v<T> && is_appendable_byte_seq_v<std::remove_pointer_t<T>>);
     }
 
-    enum PositionCategory
+    enum SeekMode
     {
         absolute,
         relative,
         end,
     };
 
-    enum LocationStyle
+    enum LocationStyle : std::uint8_t
     {
         none,
         byte_offset,
@@ -215,6 +215,7 @@ namespace Stream
             std::size_t size = 0; // This value must be representable as `ptrdiff_t`.
 
             std::optional<LocationStyle> location_style;
+            std::optional<ExceptionPrefixStyle> exception_prefix_style;
 
             std::string name;
 
@@ -456,10 +457,10 @@ namespace Stream
             return data.name;
         }
 
-        // Does nothing if a style is already selected.
-        Input &WantLocationStyle(LocationStyle style)
+        // Does nothing if a style is already selected, unless `force` is true.
+        Input &WantLocationStyle(LocationStyle style, bool force = false)
         {
-            if (!data.location_style)
+            if (!data.location_style || force)
                 data.location_style = style;
 
             return *this;
@@ -480,7 +481,6 @@ namespace Stream
             switch (style)
             {
               case none:
-              default:
                 return "";
               case byte_offset:
                 return STR("offset 0x", (data.position)"X"); // Writing `0x` manually instead of with `#` because I want a lowercase `x`.
@@ -508,15 +508,47 @@ namespace Stream
                     return pos.ToString();
                 }
             }
+            return "";
+        }
+
+        // Does nothing if a style is already selected, unless `force` is true.
+        Input &WantExceptionPrefixStyle(ExceptionPrefixStyle style, bool force = false)
+        {
+            if (!data.exception_prefix_style || force)
+                data.exception_prefix_style = style;
+
+            return *this;
+        }
+
+        // Returns `with_target_name` by default.
+        [[nodiscard]] ExceptionPrefixStyle GetExceptionPrefixStyle() const
+        {
+            return data.exception_prefix_style.value_or(with_target_name);
         }
 
         // Uses `GetLocationString` to construct a prefix for exception messages.
+        // Prefix format depends on the values of `GetLocationStyle()` and `GetExceptionPrefixStyle()`.
         [[nodiscard]] std::string GetExceptionPrefix()
         {
-            std::string ret = "In an input stream bound to `" + GetTarget() + "`";
+            auto style = GetExceptionPrefixStyle();
+
+            std::string ret;
+            if (style & with_target_name)
+            {
+                if (*this)
+                    ret = FMT("In an input stream bound to `{}`", GetTarget());
+                else
+                    ret = "In a null input stream";
+            }
 
             if (std::string loc = GetLocation(); loc.size() > 0)
-                ret += ", at " + loc;
+            {
+                ret += (ret.empty() ? "At " : ", at ");
+                ret += loc;
+            }
+
+            if (ret.empty())
+                return "";
 
             ret += ":\n";
             return ret;
@@ -568,11 +600,11 @@ namespace Stream
 
         // Moves the cursor.
         // Throws if it ends up out of bounds.
-        void Seek(std::ptrdiff_t offset, PositionCategory category)
+        void Seek(std::ptrdiff_t offset, SeekMode mode)
         {
             std::size_t base_pos =
-                category == relative ? data.position :
-                category == end      ? data.size     : 0;
+                mode == relative ? data.position :
+                mode == end      ? data.size     : 0;
 
             std::size_t new_pos = base_pos + offset;
 

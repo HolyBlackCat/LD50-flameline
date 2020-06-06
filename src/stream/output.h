@@ -8,6 +8,7 @@
 #include <functional>
 #include <iterator>
 #include <memory>
+#include <optional>
 #include <string>
 #include <type_traits>
 #include <vector>
@@ -43,6 +44,8 @@ namespace Stream
             std::size_t buffer_pos = 0;
             std::size_t buffer_capacity = 0;
             flush_func_t flush;
+
+            std::optional<ExceptionPrefixStyle> exception_prefix_style;
 
             std::string name;
         };
@@ -152,10 +155,34 @@ namespace Stream
             return data.name;
         }
 
+        // Does nothing if a style is already selected, unless `force` is true.
+        Output &WantExceptionPrefixStyle(ExceptionPrefixStyle style, bool force = false)
+        {
+            if (!data.exception_prefix_style || force)
+                data.exception_prefix_style = style;
+
+            return *this;
+        }
+
+        // Returns `with_target_name` by default.
+        [[nodiscard]] ExceptionPrefixStyle GetExceptionPrefixStyle() const
+        {
+            return data.exception_prefix_style.value_or(with_target_name);
+        }
+
         // Uses `GetLocationString` to construct a prefix for exception messages.
         [[nodiscard]] std::string GetExceptionPrefix() const
         {
-            return "In an output stream bound to `" + GetTarget() + "`: ";
+            auto style = GetExceptionPrefixStyle();
+            if (style & with_target_name)
+            {
+                if (*this)
+                    return FMT("In an output stream bound to `{}`:\n", GetTarget());
+                else
+                    return "In a null output stream:\n";
+            }
+
+            return "";
         }
 
         // Flushes the stream.
@@ -170,6 +197,10 @@ namespace Stream
             {
                 data.flush(*this, data.buffer.get(), data.buffer_pos);
                 data.buffer_pos = 0;
+            }
+            else if (!*this)
+            {
+                Program::Error(GetExceptionPrefix() + "Attempt to flush a null stream.");
             }
         }
 
