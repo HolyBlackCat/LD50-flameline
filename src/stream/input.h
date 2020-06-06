@@ -520,14 +520,14 @@ namespace Stream
             return *this;
         }
 
-        // Returns `with_target_name` by default.
+        // Returns `with_target_name | with_location` by default.
         [[nodiscard]] ExceptionPrefixStyle GetExceptionPrefixStyle() const
         {
-            return data.exception_prefix_style.value_or(with_target_name);
+            return data.exception_prefix_style.value_or(with_target_name | with_location);
         }
 
         // Uses `GetLocationString` to construct a prefix for exception messages.
-        // Prefix format depends on the values of `GetLocationStyle()` and `GetExceptionPrefixStyle()`.
+        // Prefix format can be changed using `WantExceptionPrefixStyle`.
         [[nodiscard]] std::string GetExceptionPrefix()
         {
             auto style = GetExceptionPrefixStyle();
@@ -541,10 +541,13 @@ namespace Stream
                     ret = "In a null input stream";
             }
 
-            if (std::string loc = GetLocation(); loc.size() > 0)
+            if (style & with_location)
             {
-                ret += (ret.empty() ? "At " : ", at ");
-                ret += loc;
+                if (std::string loc = GetLocation(); loc.size() > 0)
+                {
+                    ret += (ret.empty() ? "At " : ", at ");
+                    ret += loc;
+                }
             }
 
             if (ret.empty())

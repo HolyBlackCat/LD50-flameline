@@ -171,6 +171,7 @@ namespace Stream
         }
 
         // Uses `GetLocationString` to construct a prefix for exception messages.
+        // Prefix format can be changed using `WantExceptionPrefixStyle`.
         [[nodiscard]] std::string GetExceptionPrefix() const
         {
             auto style = GetExceptionPrefixStyle();
