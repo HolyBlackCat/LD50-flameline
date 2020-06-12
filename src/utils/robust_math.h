@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cmath>
+#include <concepts>
 #include <limits>
 #include <stdexcept>
 #include <type_traits>
@@ -50,6 +51,8 @@ namespace Robust
         // Compares an integral and a floating-point value.
         // Despite the parameter names, it doesn't matter which one is which.
         // Follows a so-called 'partial ordering': for some pairs of values you get a special 'undefined' result (i.e. for NaNs compared with any number).
+        // See following thread for the explanation of the algorithm and for alternative implementations:
+        //   https://stackoverflow.com/questions/58734034/how-to-properly-compare-an-integer-and-a-floating-point-value
         template <typename I, typename F>
         [[nodiscard]] Ordering compare_int_float_three_way(I i, F f)
         {
@@ -265,6 +268,196 @@ namespace Robust
     {
         static_assert(std::is_arithmetic_v<A> && std::is_arithmetic_v<B>, "Parameters must be arithmetic.");
         dst = src;
-        return not_equal(src, dst);
+        if constexpr (std::is_same_v<A, B>)
+            return false;
+        else
+            return not_equal(src, dst);
     }
+
+
+    // Arithmetic operations for integral types with overflow checks and divide-by-zero checks.
+    // All three arguments must have the same type; the third one is a reference, that's where the result is stored.
+    // Return false on success, and true if the operation fails.
+    // If the operation overflows, the returned result should be gracefully wrapped around.
+    // If division-by-zero happens, the result is as if the divisor was 1 instead of 0.
+
+    // Concept: an integral type that's not a bool, not cv-qualified.
+    // We don't want bools because the overflow-checking builtins don't work on them
+    // (actually they do work in Clang, but the GCC manual says they shouldn't, and GCC rejects them),
+    // and working around that isn't really worth the effort.
+    template <typename T>
+    concept integral_non_bool = std::integral<T> && !std::is_same_v<T, bool> && !std::is_const_v<T> && !std::is_volatile_v<T>;
+
+    // Addition.
+    template <integral_non_bool C, std::same_as<C> A, std::same_as<C> B>
+    constexpr bool addition_fails(A a, B b, C &c)
+    {
+        return __builtin_add_overflow(a, b, &c);
+    }
+
+    // Subtraction.
+    template <integral_non_bool C, std::same_as<C> A, std::same_as<C> B>
+    constexpr bool subtraction_fails(A a, B b, C &c)
+    {
+        return __builtin_sub_overflow(a, b, &c);
+    }
+
+    // Multiplication.
+    template <integral_non_bool C, std::same_as<C> A, std::same_as<C> B>
+    constexpr bool multiplication_fails(A a, B b, C &c)
+    {
+        return __builtin_mul_overflow(a, b, &c);
+    }
+
+    // Division.
+    template <integral_non_bool C, std::same_as<C> A, std::same_as<C> B>
+    constexpr bool division_fails(A a, B b, C &c)
+    {
+        if (b == B{})
+        {
+            c = a;
+            return true;
+        }
+        c = a / b;
+        return false;
+    }
+
+    // Remainder.
+    template <integral_non_bool C, std::same_as<C> A, std::same_as<C> B>
+    constexpr bool remainder_fails(A a, B b, C &c)
+    {
+        if (b == B{})
+        {
+            c = C{};
+            return true;
+        }
+        c = a % b;
+        return false;
+    }
+
+
+    // Integer wrapper, with safe overloaded operators.
+    // Example minimal usage:
+    //   int a = 10, b = 20, result;
+    //   if (Robust::value(a) + Robust::value(b) >>= result)
+    //       throw "overflow";
+    //   std::cout << result << '\n';
+    // The overloaded operators only accept operands of the same type. Use `.cast_to<T>()` to safely cast them if necessary.
+    // If the type of the rhs of `>>=` differs from the stored type, a `cast_to` is performed automatically.
+    // You don't have to use `>>=`; see the definition of `class value` for other ways to access the result.
+
+    namespace impl
+    {
+        class [[nodiscard("Check the return value to see if the result is valid.")]]
+            boolean
+        {
+            bool value = false;
+
+          public:
+            constexpr boolean(bool value) : value(value) {}
+
+            boolean(const boolean &) = delete;
+            boolean &operator=(const boolean &) = delete;
+
+            [[nodiscard]] explicit constexpr operator bool() const
+            {
+                return value;
+            }
+        };
+    }
+
+    template <integral_non_bool T>
+    class [[nodiscard]] value
+    {
+        T val{};
+        bool invalid = false;
+
+        template <integral_non_bool> friend class value;
+
+      public:
+        constexpr value() {}
+
+        explicit constexpr value(T val) : val(val) {}
+        explicit constexpr value(auto) = delete; // Prevent implicit conversions when constructing.
+
+        [[nodiscard]] constexpr bool is_invalid() const
+        {
+            return invalid;
+        }
+        [[nodiscard]] constexpr T get_value_or_throw() const
+        {
+            if (invalid)
+                throw std::runtime_error("An invalid `Robust::value`.");
+            return val;
+        }
+        [[nodiscard]] constexpr T get_value_even_if_invalid() const
+        {
+            return val;
+        }
+        [[nodiscard]] constexpr T get_value_or(T alternative) const
+        {
+            if (invalid)
+                return alternative;
+            return val;
+        }
+        [[nodiscard]] constexpr T get_value_or(auto) const = delete; // Prevent implicit conversions when constructing.
+
+        // Writes the value of `val` into the `result`.
+        // Returns true if the value is invalid, or would be invalid after the cast to `U`.
+        template <integral_non_bool U>
+        constexpr impl::boolean operator>>=(U &result)
+        {
+            if constexpr (std::is_same_v<T, U>)
+            {
+                result = val;
+                return invalid;
+            }
+            else
+            {
+                return cast_to<U>() >>= result;
+            }
+        }
+
+        // A safe cast.
+        template <integral_non_bool U>
+        constexpr value<U> cast_to() const
+        {
+            value<U> ret;
+            ret.invalid = conversion_fails(val, ret.val) || invalid;
+            return ret;
+        }
+
+        // Arithmetic operations.
+        // For extra clarity, the operands are required to have the same type.
+        constexpr value<T> operator+(value other) const
+        {
+            value ret;
+            ret.invalid = addition_fails(val, other.val, ret.val) || invalid || other.invalid;
+            return ret;
+        }
+        constexpr value<T> operator-(value other) const
+        {
+            value ret;
+            ret.invalid = subtraction_fails(val, other.val, ret.val) || invalid || other.invalid;
+            return ret;
+        }
+        constexpr value<T> operator*(value other) const
+        {
+            value ret;
+            ret.invalid = multiplication_fails(val, other.val, ret.val) || invalid || other.invalid;
+            return ret;
+        }
+        constexpr value<T> operator/(value other) const
+        {
+            value ret;
+            ret.invalid = division_fails(val, other.val, ret.val) || invalid || other.invalid;
+            return ret;
+        }
+        constexpr value<T> operator%(value other) const
+        {
+            value ret;
+            ret.invalid = remainder_fails(val, other.val, ret.val) || invalid || other.invalid;
+            return ret;
+        }
+    };
 }
