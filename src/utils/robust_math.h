@@ -337,14 +337,21 @@ namespace Robust
 
 
     // Integer wrapper, with safe overloaded operators.
+    //
     // Example minimal usage:
     //   int a = 10, b = 20, result;
     //   if (Robust::value(a) + Robust::value(b) >>= result)
     //       throw "overflow";
     //   std::cout << result << '\n';
+    //
     // The overloaded operators only accept operands of the same type. Use `.cast_to<T>()` to safely cast them if necessary.
+    // Alternatively, call `.weakly_typed()` on one of the operands to convert it automatically.
+    //
     // If the type of the rhs of `>>=` differs from the stored type, a `cast_to` is performed automatically.
-    // You don't have to use `>>=`; see the definition of `class value` for other ways to access the result.
+    // Instead of using `>>=` to access the result, you can compare it for [in]equality with an other `Robust::value` (invalid values always compare inequal),
+    // There are other ways of accessing the result, see the definition of `class value`.
+    //
+    // For literals, instead of writing `Robust::value(42).weakly_typed()` you can use `Robust::constant<42>` as a shorthand.
 
     namespace impl
     {
@@ -369,10 +376,28 @@ namespace Robust
     template <integral_non_bool T>
     class [[nodiscard]] value
     {
+        template <integral_non_bool> friend class value;
         T val{};
         bool invalid = false;
 
-        template <integral_non_bool> friend class value;
+        [[nodiscard]] constexpr bool is_zero() const
+        {
+            return !invalid && val == T{};
+        }
+
+        class [[nodiscard]] weakly_typed_wrapper
+        {
+            value obj;
+
+          public:
+            constexpr weakly_typed_wrapper(value obj) : obj(obj) {}
+
+            template <typename U>
+            constexpr operator value<U>() const
+            {
+                return obj.cast_to<U>();
+            }
+        };
 
       public:
         constexpr value() {}
@@ -427,37 +452,87 @@ namespace Robust
             return ret;
         }
 
+        // Returns the same object, wrapped in a class that makes it implicitly convertible to `value<U>` for any `U`.
+        constexpr weakly_typed_wrapper weakly_typed() const
+        {
+            return *this;
+        }
+
         // Arithmetic operations.
         // For extra clarity, the operands are required to have the same type.
-        constexpr value<T> operator+(value other) const
+        // Note that those are not defined as regular member functions to allow lhs to be of a different type, convertible to `value`.
+        friend constexpr value<T> operator+(value a, value b)
         {
             value ret;
-            ret.invalid = addition_fails(val, other.val, ret.val) || invalid || other.invalid;
+            ret.invalid = addition_fails(a.val, b.val, ret.val) || a.invalid || b.invalid;
             return ret;
         }
-        constexpr value<T> operator-(value other) const
+        friend constexpr value<T> operator-(value a, value b)
         {
             value ret;
-            ret.invalid = subtraction_fails(val, other.val, ret.val) || invalid || other.invalid;
+            ret.invalid = subtraction_fails(a.val, b.val, ret.val) || a.invalid || b.invalid;
             return ret;
         }
-        constexpr value<T> operator*(value other) const
+        friend constexpr value<T> operator*(value a, value b)
         {
+            // Note that multiplying by a valid 0 ignores the validity of the other operand.
             value ret;
-            ret.invalid = multiplication_fails(val, other.val, ret.val) || invalid || other.invalid;
+            ret.invalid = multiplication_fails(a.val, b.val, ret.val) || (a.invalid && !b.is_zero()) || (b.invalid && !a.is_zero());
             return ret;
         }
-        constexpr value<T> operator/(value other) const
+        friend constexpr value<T> operator/(value a, value b)
         {
+            // Note that we can't ignore the validity of `b` even if `a` is zero, because `0 / 0` is undefined.
             value ret;
-            ret.invalid = division_fails(val, other.val, ret.val) || invalid || other.invalid;
+            ret.invalid = division_fails(a.val, b.val, ret.val) || a.invalid || b.invalid;
             return ret;
         }
-        constexpr value<T> operator%(value other) const
+        friend constexpr value<T> operator%(value a, value b)
         {
+            // Note that we can't ignore the validity of `b` even if `a` is zero, because `0 % 0` is undefined.
+            // We could in theory ignore the validity of `a` if `abs(b) == 1`, but this is a rather rare case.
             value ret;
-            ret.invalid = remainder_fails(val, other.val, ret.val) || invalid || other.invalid;
+            ret.invalid = remainder_fails(a.val, b.val, ret.val) || a.invalid || b.invalid;
             return ret;
+        }
+
+
+        // Equality comparsion.
+        // In C++20, `a != b` can get automatically rewritten as `!(a == b)`, so we don't overload `!=` manually.
+        // We don't provide relational comparsions (less-than, etc) because invalid values would have to
+        // be treated as incomparable (like nans when comparing floats), which would make things rather obscure.
+        //
+        // The non-template friend overload is necessary to support comparsion with `Robust::constant`.
+        // The template overload is needed for heterogenous comparsion. I considered making it friend
+        // for consistency, but then it would have to be defined outside of the class.
+        [[nodiscard]] friend constexpr bool operator==(value a, value b)
+        {
+            return !a.invalid && !b.invalid && a.val == b.val;
+        }
+        template <integral_non_bool U>
+        [[nodiscard]] constexpr bool operator==(value<U> other) const
+        {
+            return !invalid && !other.invalid && equal(val, other.val);
         }
     };
+
+    namespace impl
+    {
+        template <integral_non_bool auto V>
+        class [[nodiscard]] constant
+        {
+          public:
+            constexpr constant() {}
+
+            template <typename T>
+            constexpr operator value<T>() const
+            {
+                // Not sure why it doesn't work without specifying the template parameter. A Clang bug?
+                return value<decltype(V)>(V).template cast_to<T>();
+            }
+        };
+    }
+
+    template <integral_non_bool auto V>
+    inline constexpr impl::constant<V> constant;
 }
