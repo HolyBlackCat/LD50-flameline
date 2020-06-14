@@ -1,290 +1,330 @@
 #include "sound.h"
 
-#include <exception>
-#include <limits>
+#include <string_view>
 
 #include <vorbis/vorbisfile.h>
 
+#include "macros/finally.h"
+#include "strings/format.h"
+#include "utils/robust_math.h"
+
 namespace Audio
 {
-    Sound::Sound(Format format, Stream::ReadOnlyData file, Bits preferred_bits_per_sample)
+    Sound::Sound(Format format, std::optional<Channels> expected_channel_count, Stream::Input input, BitResolution preferred_resolution)
     {
-        try
+        auto CheckChannelCount = [&]
         {
-            switch (format)
+            if (expected_channel_count && *expected_channel_count != channel_count)
             {
-              case wav:
+                Program::Error(FMT("{}Expected a {} sound, but got {}.", input.GetExceptionPrefix(),
+                    (*expected_channel_count == mono ? "mono" : "stereo"), (channel_count == mono ? "mono" : "stereo")));
+            }
+        };
+
+        switch (format)
+        {
+          case wav:
+            try
+            {
+                input.WantExceptionPrefixStyle(Stream::with_location);
+                input.WantLocationStyle(Stream::byte_offset);
+
+                input.DiscardChars("RIFF");
+
+                if (auto val = input.ReadLittle<std::uint32_t>(); val + val % 2 != input.RemainingBytes())
+                    Program::Error(input.GetExceptionPrefix() + "Incorrect size specified in the RIFF header.");
+
+                input.DiscardChars("WAVE");
+
+                bool got_format_chunk = false;
+                bool got_data_chunk = false; // If this is true, then `got_format_chunk` must be true.
+
+                // Loop over all chunks in the file.
+                while (input.RemainingBytes())
                 {
-                    // Stop if the file is too small.
-                    if (file.size() < 44) // 44 is the size of WAV header.
-                        Program::Error("The file is too small to be valid.");
+                    char chunk_name_buf[4];
+                    input.Read(chunk_name_buf, sizeof chunk_name_buf);
+                    std::string_view chunk_name(chunk_name_buf, chunk_name_buf + sizeof chunk_name_buf);
 
-                    const std::uint8_t *ptr = file.data();
+                    auto chunk_size = input.ReadLittle<std::uint32_t>();
+                    if (chunk_size > input.RemainingBytes())
+                        Program::Error(input.GetExceptionPrefix() + "Chunk size is too large.");
 
-                    // Stop if no `RIFF` label.
-                    if (std::memcmp(ptr, "RIFF", 4))
-                        Program::Error("No \"RIFF\" label.");
-                    ptr += 4;
+                    if (chunk_name == "fmt ") // Note the space.
+                    {
+                        if (got_format_chunk)
+                            Program::Error(input.GetExceptionPrefix() + "A repeated format chunk.");
+                        // `got_data_chunk` will be false here, no need to check.
+                        got_format_chunk = true;
 
-                    // Read the remaining file length.
-                    std::uint32_t expected_file_data_length = Memory::ReadLittle<std::uint32_t>(ptr);
-                    ptr += 4;
+                        if (input.ReadLittle<std::uint16_t>() != 1)
+                            Program::Error(input.GetExceptionPrefix() + "Compressed files are not supported.");
 
-                    // Stop if the remaining length is too small.
-                    if (expected_file_data_length < 36)
-                        Program::Error("Invalid file length specified in the header.");
-                    expected_file_data_length -= 36;
+                        // We check chunk size after checking the data format, to give user a prettier error message.
+                        if (chunk_size != 16 && chunk_size != 18)
+                            Program::Error(input.GetExceptionPrefix() + "Invalid format chunk size.");
 
-                    // Stop if no `WAVE` label.
-                    if (std::memcmp(ptr, "WAVE", 4))
-                        Program::Error("No \"WAVE\" label.");
-                    ptr += 4;
+                        auto channels = input.ReadLittle<std::uint16_t>();
+                        if (channels != 1 && channels != 2)
+                            Program::Error(input.GetExceptionPrefix() + "Only mono and stereo sound is supported.");
+                        channel_count = Channels(channels);
+                        CheckChannelCount();
 
-                    // Stop if no `fmt ` label.
-                    if (std::memcmp(ptr, "fmt ", 4))
-                        Program::Error("No \"fmt \" label.");
-                    ptr += 4;
+                        sampling_rate = input.ReadLittle<std::uint32_t>();
+                        if (sampling_rate <= 0)
+                            Program::Error(input.GetExceptionPrefix() + "Invalid sample rate.");
 
-                    // Stop if the remining size of `fmt ` section doesn't match the supported format.
-                    if (Memory::ReadLittle<std::uint32_t>(ptr) != 16)
-                        Program::Error("This format of WAV files is not supported.");
-                    ptr += 4;
+                        input.Skip(4); // Bytes per second (possibly average). We don't care about that.
+                        input.Skip(2); // Bytes per sample for all channels combined. We don't need this value.
 
-                    // Stop if the file is compressed or has floating-point samples.
-                    if (Memory::ReadLittle<std::uint16_t>(ptr) != 1)
-                        Program::Error("File is compresssed or uses floating-point samples. This is not supported.");
-                    ptr += 2;
+                        auto bits_per_sample_per_channel = input.ReadLittle<std::uint16_t>();
+                        if (bits_per_sample_per_channel != 8 && bits_per_sample_per_channel != 16)
+                            Program::Error(input.GetExceptionPrefix() + "Unsupported resolution, expected 8 or 16 bits per sample.");
+                        resolution = BitResolution(bits_per_sample_per_channel);
 
-                    // Get channel count, stop if the file is neither mono nor stereo.
-                    std::uint16_t file_channels = Memory::ReadLittle<std::uint16_t>(ptr);
-                    if (file_channels != 1 && file_channels != 2)
-                        Program::Error("The file must be mono or stereo.");
-                    ptr += 2;
-                    channel_count = Channels(file_channels);
+                        if (chunk_size == 18)
+                            input.DiscardBytes({0,0});
+                    }
+                    else if (chunk_name == "data")
+                    {
+                        if (!got_format_chunk)
+                            Program::Error(input.GetExceptionPrefix() + "No format chunk found before a data chunk.");
+                        if (got_data_chunk)
+                            Program::Error(input.GetExceptionPrefix() + "A repeated data chunk.");
+                        got_data_chunk = true;
 
-                    // Get sampling rate, stop if it's too large.
-                    std::uint32_t file_sampling_rate = Memory::ReadLittle<std::uint32_t>(ptr);
-                    if (file_sampling_rate > std::numeric_limits<int>::max())
-                        Program::Error("Invalid sampling rate specified.");
-                    ptr += 4;
-                    sampling_rate = file_sampling_rate;
+                        if (chunk_size % BytesPerBlock() != 0)
+                            Program::Error(input.GetExceptionPrefix() + "Data size is not a multiple of block size.");
 
-                    // Skip useless data:
-                    // 4 bytes: The amount of bytes per second.
-                    // 2 bytes: Bytes per sample for all channels combined.
-                    ptr += 6;
+                        data.resize(chunk_size);
+                        switch (resolution)
+                        {
+                          case bits_8:
+                            input.Read(Data<std::uint8_t>(), chunk_size);
+                            break;
+                          case bits_16:
+                            input.ReadLittle(Data<std::int16_t>(), chunk_size / BytesPerSample());
+                        }
+                    }
+                    else
+                    {
+                        // Skip any unknown chunks.
+                        input.Skip(chunk_size);
+                    }
 
-                    // Get the amount of bits per single channel sample, stop if it's neither 8 nor 16.
-                    std::uint16_t file_bits = Memory::ReadLittle<std::uint16_t>(ptr);
-                    if (file_bits != 8 && file_bits != 16)
-                        Program::Error("The file must use 8 or 16 bits per sample.");
-                    ptr += 2;
-                    bits_per_sample = Bits(file_bits);
-
-                    // Stop if no `data` label.
-                    if (std::memcmp(ptr, "data", 4))
-                        Program::Error("No \"data\" label.");
-                    ptr += 4;
-
-                    // Read the remaining file length.
-                    std::uint32_t file_data_length = Memory::ReadLittle<std::uint32_t>(ptr);
-                    // Stop if it doesn't match the length stored at the beginning of the file.
-                    if (file_data_length != expected_file_data_length)
-                        Program::Error("The file contains additional unsupported sectons or is corrupted.");
-                    // Stop if we have 16 bits per sample and data length is not divisible by two.
-                    if (file_bits == 16 && file_data_length % 2 != 0)
-                        Program::Error("The file uses 16 bits per sample, but data size is not a multiple of two.");
-                    // Stop if the file is too short.
-                    if (file.size() < file_data_length + 44)
-                        Program::Error("Unexpected end of file.");
-                    ptr += 4;
-
-                    // Copy data.
-                    data = std::vector<std::uint8_t>(ptr, ptr + file_data_length);
-
-                    // Fix byte order if necessary.
-                    if (bits_per_sample == bits_16)
-                        for (std::size_t i = 0; i < data.size(); i += 2)
-                            ByteOrder::ConvertBytes(&data[i], 2, ByteOrder::little);
+                    // Skip padding.
+                    // It normally should be 0, but I'm not going to validate it.
+                    // It's a bad idea according to https://github.com/taglib/taglib/issues/882
+                    if (chunk_size % 2 == 1)
+                        input.SkipOne();
                 }
-                break;
-              case ogg:
+
+                // Check if got the necessary chunks.
+                // We don't need to check `got_format_chunk` because it's implied by `got_data_chunk`.
+                if (!got_data_chunk)
+                    Program::Error("The data chunk is missing.");
+            }
+            catch (std::exception &e)
+            {
+                Program::Error(FMT("While reading a wav sound from `{}`:\n{}", input.GetTarget(), e.what()));
+            }
+            break;
+          case ogg:
+            try
+            {
+                // Stream exceptions aren't supposed to escape the callbacks anyway,
+                // might as well make constructing them as cheap as possible.
+                input.WantExceptionPrefixStyle(Stream::no_prefix);
+
+                // Construct callbacks.
+                ov_callbacks callbacks;
+                callbacks.close_func = nullptr;
+                callbacks.tell_func = [](void *stream_ptr) -> long
                 {
-                    (void)OV_CALLBACKS_DEFAULT;
-                    (void)OV_CALLBACKS_NOCLOSE;
-                    (void)OV_CALLBACKS_STREAMONLY;
-                    (void)OV_CALLBACKS_STREAMONLY_NOCLOSE;
-
-                    // Construct callbacks for reading from memory buffer.
-                    struct Descriptor
+                    try
                     {
-                        const std::uint8_t *start, *cur, *end;
-                    };
-                    Descriptor desc{file.begin(), file.begin(), file.end()};
-
-                    ov_callbacks callbacks;
-                    callbacks.tell_func = [](void *desc_ptr) -> long
+                        long ret;
+                        if (Robust::conversion_fails(static_cast<Stream::Input *>(stream_ptr)->Position(), ret))
+                            return -1;
+                        return ret;
+                    }
+                    catch (...)
                     {
-                        Descriptor &desc = *static_cast<Descriptor *>(desc_ptr);
-                        return desc.cur - desc.start;
-                    };
-                    callbacks.seek_func = [](void *desc_ptr, std::int64_t offset, int mode) -> int
+                        return -1;
+                    }
+                };
+                callbacks.seek_func = [](void *stream_ptr, std::int64_t offset, int mode) -> int
+                {
+                    try
                     {
-                        Descriptor &desc = *static_cast<Descriptor *>(desc_ptr);
+                        std::ptrdiff_t converted_offset;
+                        if (Robust::conversion_fails(offset, converted_offset))
+                            return -1;
 
+                        Stream::SeekMode converted_mode;
                         switch (mode)
                         {
                           case SEEK_SET:
-                            desc.cur = desc.start + offset;
+                            converted_mode = Stream::absolute;
                             break;
                           case SEEK_CUR:
-                            desc.cur += offset;
+                            converted_mode = Stream::relative;
                             break;
                           case SEEK_END:
-                            desc.cur = desc.end + offset;
+                            converted_mode = Stream::end;
                             break;
                           default:
-                            return 1;
+                            return -1;
                         }
 
-                        if (desc.cur < desc.start || desc.cur > desc.end)
-                            return 1;
-
+                        static_cast<Stream::Input *>(stream_ptr)->Seek(converted_offset, converted_mode);
                         return 0;
-                    };
-                    callbacks.read_func = [](void *dst, std::size_t elem_size, std::size_t elem_count, void *desc_ptr) -> std::size_t
+                    }
+                    catch (...)
                     {
-                        Descriptor &desc = *static_cast<Descriptor *>(desc_ptr);
-                        if (desc.cur + elem_count * elem_size > desc.end)
-                            elem_count = (desc.end - desc.cur) / elem_size;
-                        std::copy(desc.cur, desc.cur + elem_count * elem_size, static_cast<std::uint8_t *>(dst));
-                        desc.cur += elem_count * elem_size;
-                        return elem_count;
-                    };
-                    callbacks.close_func = 0;
+                        return -1;
+                    }
+                };
+                callbacks.read_func = [](void *buffer, std::size_t elem_size, std::size_t elem_count, void *stream_ptr) -> std::size_t
+                {
+                    try
+                    {
+                        if (elem_size == 0 || elem_count == 0)
+                            return 0;
 
-                    // Open file.
-                    OggVorbis_File ogg_file;
-                    switch (ov_open_callbacks(&desc, &ogg_file, 0, 0, callbacks))
+                        auto &stream = *static_cast<Stream::Input *>(stream_ptr);
+
+                        std::size_t total_size;
+                        bool enough_data = true;
+
+                        // If the read size is larger than the remaining amount of bytes
+                        // OR if the calculation of `total_size` overflowed, clamp the read size.
+                        if ((Robust::value(elem_size) * Robust::value(elem_count) >>= total_size) || total_size > stream.RemainingBytes())
+                        {
+                            total_size = stream.RemainingBytes();
+                            enough_data = false;
+                        }
+
+                        stream.Read(static_cast<char *>(buffer), total_size);
+
+                        if (enough_data)
+                            return elem_count;
+                        else
+                            return total_size / elem_size;
+                    }
+                    catch (...)
+                    {
+                        return -1;
+                    }
+                };
+
+                // Open a file with those callbacks.
+                OggVorbis_File ogg_file_handle;
+                switch (ov_open_callbacks(&input, &ogg_file_handle, nullptr, 0, callbacks))
+                {
+                  case 0:
+                    break;
+                  case OV_EREAD:
+                    Program::Error("Unable to read data from the stream.");
+                    break;
+                  case OV_ENOTVORBIS:
+                    Program::Error("This is not a vorbis sound.");
+                    break;
+                  case OV_EVERSION:
+                    Program::Error("Vorbis version mismatch.");
+                    break;
+                  case OV_EBADHEADER:
+                    Program::Error("Invalid header.");
+                    break;
+                  case OV_EFAULT:
+                    Program::Error("Internal vorbis error.");
+                    break;
+                  default:
+                    Program::Error("Unknown vorbis error.");
+                    break;
+                }
+                FINALLY( ov_clear(&ogg_file_handle); )
+
+
+                // Get some info about the file. No cleanup appears to be necessary.
+                vorbis_info *info = ov_info(&ogg_file_handle, -1);
+                if (!info)
+                    Program::Error("Unable to get information about the file.");
+
+                // Get channel count.
+                if (info->channels != 1 && info->channels != 2)
+                    Program::Error("The file has too many channels. Only mono and stereo are supported.");
+                channel_count = Channels(info->channels);
+                CheckChannelCount();
+
+                // Get frequency.
+                if (Robust::conversion_fails(info->rate, sampling_rate))
+                    Program::Error("The sample rate is too high.");
+
+                // Get the block count.
+                auto total_block_count = ov_pcm_total(&ogg_file_handle, -1);
+                if (total_block_count == OV_EINVAL)
+                    Program::Error("Unable to determine the file length.");
+
+                // Copy bit resolution from the parameter.
+                resolution = preferred_resolution;
+
+                // Compute the necessary storage size.
+                std::size_t storage_size;
+                if (Robust::value(total_block_count).cast_to<std::size_t>() * Robust::value(BytesPerBlock()).weakly_typed() >>= storage_size)
+                    Program::Error("The file is too long.");
+
+                data.resize(storage_size);
+
+                std::size_t current_offset = 0;
+
+                // An index of the current bitstream (basically a section) of the file.
+                // When it changes, the amount of channels and/or sample rate can also change; if it happens, we throw an exception.
+                int old_bitstream_index = -1;
+
+                while (current_offset < storage_size)
+                {
+                    int bitstream_index;
+                    auto segment_size = ov_read(&ogg_file_handle, reinterpret_cast<char *>(data.data() + current_offset), storage_size - current_offset, 0/*little endian*/,
+                        BytesPerSample(), resolution == bits_16/*true means numbers are signed*/, &bitstream_index);
+
+                    switch (segment_size)
                     {
                       case 0:
+                        Program::Error("Unexpected end of file.");
                         break;
-                      case OV_EREAD:
-                        Program::Error("Unable to read data from the stream.");
+                      case OV_HOLE:
+                        Program::Error("The file is corrupted.");
                         break;
-                      case OV_ENOTVORBIS:
-                        Program::Error("This is not a vorbis sound.");
+                      case OV_EBADLINK:
+                        Program::Error("Bad link.");
                         break;
-                      case OV_EVERSION:
-                        Program::Error("Vorbis version mismatch.");
-                        break;
-                      case OV_EBADHEADER:
+                      case OV_EINVAL:
                         Program::Error("Invalid header.");
                         break;
-                      case OV_EFAULT:
-                        Program::Error("Internal vorbis error.");
-                        break;
-                      default:
-                        Program::Error("Unknown vorbis error.");
-                        break;
                     }
-                    FINALLY( ov_clear(&ogg_file); )
+                    current_offset += segment_size;
 
-                    // Get file info.
-                    vorbis_info *info = ov_info(&ogg_file, -1);
-
-                    // Stop if the file is too big.
-                    uint64_t samples = ov_pcm_total(&ogg_file, -1);
-                    if (samples > std::numeric_limits<std::size_t>::max())
-                        Program::Error("The file is too big.");
-
-                    // Get channel count.
-                    if (info->channels != 1 && info->channels != 2)
-                        Program::Error("The file has too many channels. Only mono and stereo are supported.");
-                    channel_count = Channels(info->channels);
-
-                    // Get frequency.
-                    sampling_rate = info->rate;
-
-                    // Save the preferred amount of bits per sample.
-                    bits_per_sample = preferred_bits_per_sample;
-
-                    // Reserve the necessary amount of memory.
-                    std::size_t remaining_bytes = samples * BytesPerSample();
-                    data.resize(remaining_bytes);
-                    char *target = reinterpret_cast<char *>(data.data());
-
-                    // Figure out reading options.
-                    int bytes_per_sample = bits_per_sample == bits_16 ? 2 : 1;
-                    bool signed_samples = bits_per_sample == bits_16;
-
-                    // Read the file.
-                    int current_bitstream = -1;
-                    while (remaining_bytes > 0)
+                    if (bitstream_index != old_bitstream_index)
                     {
-                        // Try reading some bytes.
-                        int bitstream;
-                        long section_size = ov_read(&ogg_file, target, remaining_bytes, ByteOrder::native == ByteOrder::big, bytes_per_sample, signed_samples, &bitstream);
+                        old_bitstream_index = bitstream_index;
 
-                        // Check for errors.
-                        switch (section_size)
-                        {
-                          case 0:
-                            Program::Error("Unexpected end of stream.");
-                            break;
-                          case OV_HOLE:
-                            Program::Error("The file is corrupted.");
-                            break;
-                          case OV_EBADLINK:
-                            Program::Error("Bad link.");
-                            break;
-                          case OV_EINVAL:
-                            Program::Error("Invalid header.");
-                            break;
-                          default:
-                            break;
-                        }
-
-                        // Check if the bitstream has changed.
-                        if (bitstream != current_bitstream)
-                        {
-                            current_bitstream = bitstream;
-
-                            // Get new information.
-                            vorbis_info *local_info = ov_info(&ogg_file, bitstream);
-
-                            // Stop if the amount of channels has changed.
-                            if (local_info->channels != info->channels)
-                                Program::Error("Different sections of the file contain different number of channels. This is not supported.");
-
-                            // Stop if the frequency has changed.
-                            if (local_info->rate != info->rate)
-                                Program::Error("Different sections of the file use different sampling rates. This is not supported.");
-                        }
-
-                        // Adjust data pointer and the remaining byte count.
-                        target += section_size;
-                        remaining_bytes -= section_size;
+                        info = ov_info(&ogg_file_handle, -1); // `-1` means the current bitstream, we could also use `bitstream_index` here.
+                        if (!info)
+                            Program::Error("Unable to get information about a section of the file.");
+                        if (Robust::not_equal(info->channels, int(channel_count)))
+                            Program::Error("Channel count has changed in the middle of the file.");
+                        if (Robust::not_equal(info->rate, sampling_rate))
+                            Program::Error("Sampling rate has changed in the middle of the file.");
                     }
                 }
-                break;
-            }
-        }
-        catch (std::exception &e)
-        {
-            std::string format_name;
-            switch (format)
-            {
-              case wav:
-                format_name = "WAV";
-                break;
-              case ogg:
-                format_name = "OGG";
-                break;
-            }
 
-            Program::Error("Unable to parse `", file.name(), "` as ", format_name, ":\n", e.what());
+            }
+            catch (std::exception &e)
+            {
+                Program::Error(FMT("While reading a vorbis sound from `{}`:\n{}", input.GetTarget(), e.what()));
+            }
+            break;
         }
     }
-
 }
