@@ -9,7 +9,7 @@
 
 #include "graphics/image.h"
 #include "program/errors.h"
-#include "reflection/full.h"
+#include "reflection/structs.h"
 #include "strings/format.h"
 #include "utils/filesystem.h"
 #include "utils/mat.h"

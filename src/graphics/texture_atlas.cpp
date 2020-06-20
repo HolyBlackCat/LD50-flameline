@@ -2,6 +2,7 @@
 
 #include <memory>
 
+#include "reflection/full.h"
 #include "stream/readonly_data.h"
 #include "stream/save_to_file.h"
 #include "utils/packing.h"

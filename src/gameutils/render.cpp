@@ -3,7 +3,7 @@
 #include <algorithm>
 
 #include "graphics/complete.h"
-#include "reflection/full.h"
+#include "reflection/structs.h"
 
 struct Render::Data
 {

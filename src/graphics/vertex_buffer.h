@@ -9,7 +9,7 @@
 #include "macros/finally.h"
 #include "meta/misc.h"
 #include "program/errors.h"
-#include "reflection/full.h"
+#include "reflection/structs.h"
 #include "utils/mat.h"
 
 namespace Graphics

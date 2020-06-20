@@ -11,7 +11,7 @@
 #include "macros/finally.h"
 #include "meta/misc.h"
 #include "program/errors.h"
-#include "reflection/full.h"
+#include "reflection/structs.h"
 #include "strings/format.h"
 #include "strings/common.h"
 

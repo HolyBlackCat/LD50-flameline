@@ -338,6 +338,7 @@ namespace Refl
         // This is the higher-level interface.
 
         // Returns the type of a member variable.
+        // If `T` is const, the returned type will always be const.
         template <typename T, std::size_t I> using member_type = std::remove_reference_t<decltype(Class::Member<I>(std::declval<T &>()))>; // Using a qualified call to protect against accidental ADL.
 
         namespace impl

@@ -7,7 +7,7 @@
 #include "graphics/vertex_buffer.h"
 #include "graphics/viewport.h"
 #include "interface/window.h"
-#include "reflection/full.h"
+#include "reflection/structs.h"
 
 #ifdef IMP_RE_HAVE_FRAMEBUFFERS
 
