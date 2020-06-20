@@ -4,73 +4,49 @@
 #include <memory>
 #include <unordered_set>
 
-#include <al.h>
-
 #include "audio/buffer.h"
+#include "audio/openal.h"
+#include "program/errors.h"
 #include "utils/mat.h"
 
 namespace Audio
 {
+    enum SourceState {playing, paused, stopped};
+
     class Source
     {
         inline static float
-            default_ref_dist    = 1,
             default_rolloff_fac = 1,
+            default_ref_dist    = 1,
             default_max_dist    = std::numeric_limits<float>::infinity();
-
-        struct Object
-        {
-            ALuint handle = 0;
-
-            Object()
-            {
-                // We don't throw the handle is null. Instead, we make sure that any operation on a null handle has no effect.
-                alGenSources(1, &handle);
-
-                if (handle)
-                {
-                    alSourcef(handle, AL_REFERENCE_DISTANCE, default_ref_dist);
-                    alSourcef(handle, AL_ROLLOFF_FACTOR,     default_rolloff_fac);
-                    alSourcef(handle, AL_MAX_DISTANCE,       default_max_dist);
-                }
-            }
-
-            Object(const Object &) = delete;
-            Object &operator=(const Object &) = delete;
-
-            ~Object()
-            {
-                if (handle)
-                    alDeleteSources(1, &handle);
-            }
-        };
-
-        inline static std::unordered_set<std::shared_ptr<Object>> destroyed_temporary_sources;
 
         struct Data
         {
-            std::shared_ptr<Object> object;
-            bool is_temporary = 0;
+            ALuint handle = 0;
         };
         Data data;
 
-        using ref = Source &&;
+        using ref = Source &;
 
       public:
+        // Create a null source.
         Source() {}
 
         Source(const Audio::Buffer &buffer)
         {
             ASSERT(buffer, "Attempt to use a null audio buffer.");
 
-            // Create the source.
-            data.object = std::make_shared<Object>();
-            if (data.object->handle)
-                alSourcei(data.object->handle, AL_BUFFER, buffer.Handle());
-            else
-                data.object = {};
+            // We don't throw the handle is null. Instead, we make sure that any operation on a null handle has no effect.
+            alGenSources(1, &data.handle);
 
-            data.is_temporary = 0;
+            if (data.handle)
+            {
+                alSourcei(data.handle, AL_BUFFER, buffer.Handle());
+
+                alSourcef(data.handle, AL_REFERENCE_DISTANCE, default_ref_dist);
+                alSourcef(data.handle, AL_ROLLOFF_FACTOR,     default_rolloff_fac);
+                alSourcef(data.handle, AL_MAX_DISTANCE,       default_max_dist);
+            }
         }
 
         Source(Source &&other) noexcept : data(std::exchange(other.data, {})) {}
@@ -82,160 +58,165 @@ namespace Audio
 
         ~Source()
         {
-            if (bool(data.object) && data.is_temporary)
+            if (data.handle)
+                alDeleteSources(1, &data.handle);
+        }
+
+        // Returns true if the source is not null.
+        // Note that if a non-null source can't be constructed, you'll silently get a null source instead.
+        // All operations on a null source should be no-ops.
+        [[nodiscard]] explicit operator bool() const
+        {
+            return bool(data.handle);
+        }
+
+        // Returns the source handle.
+        [[nodiscard]] ALuint Handle() const
+        {
+            return data.handle;
+        }
+
+        [[nodiscard]] SourceState GetState() const
+        {
+            if (!data.handle)
+                return stopped;
+            int state;
+            alGetSourcei(data.handle, AL_SOURCE_STATE, &state);
+            switch (state)
             {
-                int is_looping;
-                alGetSourcei(data.object->handle, AL_LOOPING, &is_looping);
-                if (is_looping)
-                    return;
-                play();
-                destroyed_temporary_sources.insert(data.object);
+              case AL_INITIAL:
+              case AL_STOPPED:
+                return stopped;
+                break;
+              case AL_PLAYING:
+                return playing;
+                break;
+              case AL_PAUSED:
+                return paused;
+                break;
             }
+            return stopped;
         }
 
-        explicit operator bool() const
+        [[nodiscard]] bool IsLooping() const
         {
-            return bool(data.object);
+            if (!data.handle)
+                return false;
+            int ret;
+            alGetSourcei(data.handle, AL_LOOPING, &ret);
+            return bool(ret);
         }
 
-        // Cleans up destroyed temporary sources that finished playing.
-        // Normally you don't need to call it manually, since it's called from `Context::Tick()`.
-        // If it is not called, you'll gradually leak memory as the sources finish playing.
-        static void Cleanup()
-        {
-            auto it = destroyed_temporary_sources.begin();
 
-            while (it != destroyed_temporary_sources.end())
-            {
-                int state;
-                alGetSourcei((*it)->handle, AL_SOURCE_STATE, &state);
-                if (state != AL_PLAYING)
-                    it = destroyed_temporary_sources.erase(it);
-                else
-                    it++;
-            }
-        }
+        // Sound model parameters.
+        // See comments for `Audio::Parameters::Model` in `parameters.h` for the meaning of those settings.
 
-        /* The volume curve is a hyperbola, clamped at 1 (if `distance` < `ref`).
-         *             /                   1                \
-         * volume = min| 1 , ------------------------------ |
-         *             \     1 + fac * (distance * ref - 1) /
-         * `distance` is clamped at `max`.
-         */
-        static void DefaultMaxDistance(float d)
+        // Defaults to 1. Increase to make the sound lose volume with distance faster.
+        static void DefaultRolloffFactor(float f)
         {
-            default_max_dist = d;
+            default_rolloff_fac = f;
         }
         static void DefaultRefDistance(float d)
         {
             default_ref_dist = d;
         }
-        static void DefaultRolloffFactor(float f)
+        static void DefaultMaxDistance(float d)
         {
-            default_rolloff_fac = f;
+            default_max_dist = d;
+        }
+
+        Source &rolloff_factor(float f)
+        {
+            if (data.handle)
+                alSourcef(data.handle, AL_ROLLOFF_FACTOR, f);
+            return *this;
+        }
+        Source &max_distance(float d)
+        {
+            if (data.handle)
+                alSourcef(data.handle, AL_MAX_DISTANCE, d);
+            return *this;
+        }
+        Source &ref_distance(float d)
+        {
+            if (data.handle)
+                alSourcef(data.handle, AL_REFERENCE_DISTANCE, d);
+            return *this;
         }
 
 
-        ref max_distance(float d)
+        // Common parameters.
+
+        Source &volume(float v)
         {
-            if (data.object)
-                alSourcef(data.object->handle, AL_MAX_DISTANCE, d);
-            return (ref)*this;
+            if (data.handle)
+                alSourcef(data.handle, AL_GAIN, v);
+            return *this;
         }
-        ref ref_distance(float d)
+        Source &pitch(float p)
         {
-            if (data.object)
-                alSourcef(data.object->handle, AL_REFERENCE_DISTANCE, d);
-            return (ref)*this;
+            if (data.handle)
+                alSourcef(data.handle, AL_PITCH, p);
+            return *this;
         }
-        ref rolloff_factor(float f)
+        Source &loop(bool l = true)
         {
-            if (data.object)
-                alSourcef(data.object->handle, AL_ROLLOFF_FACTOR, f);
-            return (ref)*this;
+            if (data.handle)
+                alSourcei(data.handle, AL_LOOPING, l);
+            return *this;
         }
 
-        ref temporary() // Doesn't work for looped sounds. Plays the sound after the data.object is destroyed.
+
+        // State control.
+
+        Source &play()
         {
-            if (data.object)
-                data.is_temporary = 1;
-            return (ref)*this;
+            if (data.handle)
+                alSourcePlay(data.handle);
+            return *this;
+        }
+        Source &pause()
+        {
+            if (data.handle)
+                alSourcePause(data.handle);
+            return *this;
+        }
+        Source &stop()
+        {
+            if (data.handle)
+                alSourceStop(data.handle);
+            return *this;
+        }
+        Source &rewind()
+        {
+            if (data.handle)
+                alSourceRewind(data.handle);
+            return *this;
         }
 
-        ref volume(float v)
+
+        // 3D audio support (makes sense for mono sources only).
+
+        Source &pos(fvec3 p)
         {
-            if (data.object)
-                alSourcef(data.object->handle, AL_GAIN, v);
-            return (ref)*this;
+            if (data.handle)
+                alSourcefv(data.handle, AL_POSITION, p.as_array());
+            return *this;
         }
-        ref pitch(float p)
+        Source &vel(fvec3 v)
         {
-            if (data.object)
-                alSourcef(data.object->handle, AL_PITCH, p);
-            return (ref)*this;
+            if (data.handle)
+                alSourcefv(data.handle, AL_VELOCITY, v.as_array());
+            return *this;
         }
-        ref loop(bool l)
+        Source &relative(bool r = 1)
         {
-            if (data.object)
-                alSourcei(data.object->handle, AL_LOOPING, l);
-            return (ref)*this;
+            if (data.handle)
+                alSourcei(data.handle, AL_SOURCE_RELATIVE, r);
+            return *this;
         }
 
-        ref play()
-        {
-            if (data.object)
-                alSourcePlay(data.object->handle);
-            return (ref)*this;
-        }
-        ref pause()
-        {
-            if (data.object)
-                alSourcePause(data.object->handle);
-            return (ref)*this;
-        }
-        ref stop()
-        {
-            if (data.object)
-                alSourceStop(data.object->handle);
-            return (ref)*this;
-        }
-        ref rewind()
-        {
-            if (data.object)
-                alSourceRewind(data.object->handle);
-            return (ref)*this;
-        }
-
-        // All functions below do not work for stereo sources.
-
-        ref pos(fvec3 p)
-        {
-            if (data.object)
-                alSourcefv(data.object->handle, AL_POSITION, p.as_array());
-            return (ref)*this;
-        }
-        ref vel(fvec3 v)
-        {
-            if (data.object)
-                alSourcefv(data.object->handle, AL_VELOCITY, v.as_array());
-            return (ref)*this;
-        }
-        ref relative(bool r = 1)
-        {
-            if (data.object)
-                alSourcei(data.object->handle, AL_SOURCE_RELATIVE, r);
-            return (ref)*this;
-        }
-
-        ref pos(fvec2 p)
-        {
-            pos(p.to_vec3());
-            return (ref)*this;
-        }
-        ref vel(fvec2 p)
-        {
-            vel(p.to_vec3());
-            return (ref)*this;
-        }
+        Source &pos(fvec2 p) {return pos(p.to_vec3());}
+        Source &vel(fvec2 p) {return vel(p.to_vec3());}
     };
 }

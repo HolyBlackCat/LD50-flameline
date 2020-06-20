@@ -1,14 +1,16 @@
 #pragma once
 
-#include <alc.h>
-
 #include "audio/context.h"
+#include "audio/openal.h"
 #include "program/errors.h"
 
 namespace Audio
 {
     inline void CheckErrors()
     {
+        if (!Context::Exists())
+            return;
+
         switch (alcGetError(Context::Get().DeviceHandle()))
         {
             case 0:                   return;

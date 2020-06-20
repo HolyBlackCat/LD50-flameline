@@ -3,11 +3,10 @@
 #include <cstdint>
 #include <utility>
 
-#include <al.h>
-
+#include "audio/openal.h"
 #include "audio/sound.h"
-#include "program/errors.h"
 #include "macros/finally.h"
+#include "program/errors.h"
 
 namespace Audio
 {
@@ -49,38 +48,59 @@ namespace Audio
                 alDeleteBuffers(1, &data.handle);
         }
 
-        explicit operator bool() const
+        [[nodiscard]] explicit operator bool() const
         {
             return bool(data.handle);
         }
 
-        ALuint Handle() const
+        [[nodiscard]] ALuint Handle() const
         {
             return data.handle;
         }
 
-        void SetData(Bits bits_per_sample, Channels channel_count, int sampling_rate, int byte_count, const std::uint8_t *source = 0)
+        // Sets the data from memory, with the format specified at runtime.
+        // Note that the length of the data is measured in blocks. Each block consists of `channel_count` samples, each sample having `resolution` bits in it.
+        void SetData(int sampling_rate, Channels channel_count, BitResolution resolution, std::size_t block_count, const std::uint8_t *source = nullptr)
         {
             ASSERT(*this, "Attempt to use a null audio buffer.");
             if (!*this)
                 return;
 
             ALenum format;
-            if (bits_per_sample == bits_8 && channel_count == mono)
-                format = AL_FORMAT_MONO8;
-            else if (bits_per_sample == bits_16 && channel_count == mono)
-                format = AL_FORMAT_MONO16;
-            else if (bits_per_sample == bits_8 && channel_count == stereo)
-                format = AL_FORMAT_STEREO8;
-            else /* bits_per_sample == bits_16 && channel_count == stereo */
-                format = AL_FORMAT_STEREO16;
+            if (channel_count == mono)
+            {
+                if (resolution == bits_8)
+                    format = AL_FORMAT_MONO8;
+                else // bits_16
+                    format = AL_FORMAT_MONO16;
+            }
+            else // stereo
+            {
+                if (resolution == bits_8)
+                    format = AL_FORMAT_STEREO8;
+                else // bits_16
+                    format = AL_FORMAT_STEREO16;
+            }
 
-            alBufferData(data.handle, format, source, byte_count, sampling_rate);
+            alBufferData(data.handle, format, source, GetBytesPerBlock(resolution, channel_count) * block_count, sampling_rate);
         }
+        // Sets the data from memory, in the 8-bit format.
+        // Note that the length of the data is measured in blocks. Each block consists of `channel_count` samples, each sample having 8 bits in it.
+        void SetData(int sampling_rate, Channels channel_count, std::size_t block_count, const std::uint8_t *source = nullptr)
+        {
+            SetData(sampling_rate, channel_count, bits_8, block_count, source);
+        }
+        // Sets the data from memory, in the 16-bit format.
+        // Note that the length of the data is measured in blocks. Each block consists of `channel_count` samples, each sample having 16 bits in it.
+        void SetData(int sampling_rate, Channels channel_count, std::size_t block_count, const std::int16_t *source = nullptr)
+        {
+            SetData(sampling_rate, channel_count, bits_16, block_count, reinterpret_cast<const std::uint8_t *>(source));
+        }
+
+        // Copies the data from the `sound` into the buffer.
         void SetData(const Sound &sound)
         {
-            ASSERT(sound, "Attempt to use a null sound.");
-            SetData(sound.BitsPerSample(), sound.ChannelCount(), sound.SamplingRate(), sound.ByteCount(), sound.Data());
+            SetData(sound.SamplingRate(), sound.ChannelCount(), sound.Resolution(), sound.BlockCount(), sound.RawUntypedData());
         }
     };
 }
