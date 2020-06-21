@@ -10,6 +10,7 @@
 #include "graphics/types.h"
 #include "macros/finally.h"
 #include "meta/misc.h"
+#include "meta/tags.h"
 #include "program/errors.h"
 #include "reflection/structs.h"
 #include "strings/format.h"

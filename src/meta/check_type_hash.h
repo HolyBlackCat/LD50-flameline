@@ -13,6 +13,9 @@
 
 namespace Meta
 {
+    // Lets you augument classes with a hidden "type hash" field.
+    // You can check it at runtime to make sure a pointer/reference you have really points to a valid instance.
+
     namespace impl
     {
         // A class wrapper to make friend declarations easier.

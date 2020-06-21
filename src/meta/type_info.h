@@ -7,6 +7,8 @@
 
 namespace Meta
 {
+    // Constexpr functions to get type names, and hashes for them.
+
     namespace impl
     {
         template <typename T>
