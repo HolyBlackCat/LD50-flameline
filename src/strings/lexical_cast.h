@@ -14,7 +14,7 @@
 #include <double-conversion/double-conversion.h>
 
 #include "macros/check.h"
-#include "meta/misc.h"
+#include "meta/basic.h"
 #include "meta/type_info.h"
 #include "program/errors.h"
 #include "strings/common.h"

@@ -10,13 +10,13 @@
 #include "macros/check.h"
 #include "macros/finally.h"
 #include "meta/assignable_wrapper.h"
+#include "meta/basic.h"
 #include "meta/lists.h"
 #include "meta/misc.h"
-#include "meta/tags.h"
 #include "program/errors.h"
-#include "signals/connection.h"
 #include "signals/connection_list.h"
 #include "signals/connection_state.h"
+#include "signals/connection.h"
 
 /*   Signals and slots
  * Signals and slots is a convenient way to send messages between objects.

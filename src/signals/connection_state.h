@@ -3,8 +3,8 @@
 #include <cstddef>
 #include <type_traits>
 
+#include "meta/basic.h"
 #include "meta/check_type_hash.h"
-#include "meta/misc.h"
 #include "signals/connection.h"
 
 namespace Sig

@@ -1,7 +1,6 @@
 #pragma once
 
-#include "meta/misc.h" // For `Meta::value`.
-#include "meta/tags.h"
+#include "meta/basic.h" // For `Meta::value`.
 
 namespace Meta
 {
