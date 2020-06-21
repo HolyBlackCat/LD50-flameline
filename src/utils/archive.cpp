@@ -53,7 +53,7 @@ namespace Archive
         static_assert(sizeof(std::size_t) <= sizeof(size_type), "Read comments here.");
         /*
          * If the static_assert above fires, you need to uncomment following code.
-         * We can't leave it uncommented now, because clang complains about comparsion being always false.
+         * We can't leave it uncommented now, because clang complains about comparison being always false.
          *
          *     if (size > std::numeric_limits<size_type>::max())
          *         Program::Error("Compression failure.");

@@ -8,12 +8,12 @@
 
 #include "meta/misc.h"
 
-/* The functions in this file can be used for ROBUST comparsions between integral and/or floating-point types.
+/* The functions in this file can be used for ROBUST comparisons between integral and/or floating-point types.
  *
  * About reliability:
- * The `float x float` comparsions should be completely reliable, as we simply use the builtin comparsion operators.
- * The `int x int` comparsions should also be reliable, as the comparsion algorithm is simple.
- * The `int x float` comparsions, on the other hand, rely on a complicated algorithm. Even though they were tested,
+ * The `float x float` comparisons should be completely reliable, as we simply use the builtin comparison operators.
+ * The `int x int` comparisons should also be reliable, as the comparison algorithm is simple.
+ * The `int x float` comparisons, on the other hand, rely on a complicated algorithm. Even though they were tested,
  *     it's hard to guarantee complete robustness here. Also they might be slow.
  */
 
@@ -23,7 +23,7 @@ namespace Robust
     // "Partial" means that some values are not comparable (i.e. NaNs, that's what `unordered` is for).
     enum class Ordering {less, equal, greater, unordered};
 
-    // This set of operators allows comparsions between an `Ordering` and 0.
+    // This set of operators allows comparisons between an `Ordering` and 0.
     // `ordering < 0` -> less
     // `ordering > 0` -> greater
     // `ordering <= 0` -> less or equal
@@ -505,13 +505,13 @@ namespace Robust
         }
 
 
-        // Equality comparsion.
+        // Equality comparison.
         // In C++20, `a != b` can get automatically rewritten as `!(a == b)`, so we don't overload `!=` manually.
-        // We don't provide relational comparsions (less-than, etc) because invalid values would have to
+        // We don't provide relational comparisons (less-than, etc) because invalid values would have to
         // be treated as incomparable (like nans when comparing floats), which would make things rather obscure.
         //
-        // The non-template friend overload is necessary to support comparsion with `Robust::constant`.
-        // The template overload is needed for heterogenous comparsion. I considered making it friend
+        // The non-template friend overload is necessary to support comparison with `Robust::constant`.
+        // The template overload is needed for heterogenous comparison. I considered making it friend
         // for consistency, but then it would have to be defined outside of the class.
         [[nodiscard]] friend constexpr bool operator==(value a, value b)
         {
