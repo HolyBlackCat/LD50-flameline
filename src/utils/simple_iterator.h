@@ -136,12 +136,12 @@ namespace SimpleIterator
         return Input(std::forward<F>(func));
     }
 
-    // Constructs a forward iterator with the value type matching the type of first parameter (`remove_cvref_t<S>`).
-    // `func` is `void func(remove_cvref_t<S> &)`, it's used to modify the value when the iterator is incremented.
+    // Constructs a forward iterator with the value type matching the type of first parameter (`remove_cvref_t<V>`).
+    // `func` is `void func(remove_cvref_t<V> &)`, it's used to modify the value when the iterator is incremented.
     // Types of both `state` and `func` don't have to be default-constructible (default-constructed iterators are
     // non-dereferencable and non-incrementable).
     // `==` is overloaded for the resulting iterator to compare the stored values (and default-constructed iterators
-    // compare equal to each other, and inequal to everything else).
+    // compare equal to each other, and unequal to everything else).
     template <typename V, typename F>
     [[nodiscard]] auto Make(V &&value, F &&func)
     {
