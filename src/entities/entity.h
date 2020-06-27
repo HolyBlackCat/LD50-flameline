@@ -31,14 +31,12 @@ namespace Ent
 
     // A concept for components.
     // A component is a class inheriting from `Component`.
-    // It must be default-constructible (not sure how the entities could be constructed otherwise).
     // It can't be overaligned, and can't have cv-qualifiers.
     // The `Component` base must be unambiguous (because if it is, then EBO probably doesn't apply, and you waste some storage).
     // Note that `std::derived` automatically makes sure the base is unambiguous.
     template <typename T>
     concept ValidComponent =
         std::derived_from<T, Component> && !std::is_same_v<T, Component> &&
-        std::default_initializable<T> &&
         !std::is_const_v<T> && !std::is_volatile_v<T> && alignof(T) <= component_alignment;
 
 
@@ -172,6 +170,29 @@ namespace Ent
         // Implementation of an entity class inheriting from `Entity` and providing storage for components.
 
 
+        // The element-wise constructor of `SpecificEntity` uses this
+        // to initialize components that didn't get an initializer.
+        struct DefaultComponentInitializer
+        {
+            template <typename T>
+            operator T() const
+            {
+                return T{}; // If you get an error here, you tried to default-construct a non-default-constructible component.
+            }
+        };
+
+        // Returns the index of `T` in `P...`, or -1 if not found, or -2 if found more than once.
+        // Ignores cvref when comparing types.
+        template <typename T, typename ...P>
+        inline constexpr std::size_t find_type_index_ignoring_cvref = []{
+            std::size_t index = 0, ret = -1;
+            int matches = 0;
+            ((std::is_same_v<std::remove_cvref_t<T>, std::remove_cvref_t<P>> ? void((ret = index, matches++)) : void(), index++), ...);
+            if (matches > 1)
+                ret = -2;
+            return ret;
+        }();
+
         // Inherits from `Entity` and stores components `C...`.
         // Don't use this class directly, because it doesn't remove duplicates from `C...` and doesn't enforce component dependencies.
         template <ValidComponent ...C>
@@ -183,6 +204,52 @@ namespace Ent
             const void *GetComponentPtr(std::type_index index) const noexcept override final
             {
                 return GetTupleElemByTypeIndex(components, index);
+            }
+
+          public:
+            // Value-initializes all components. (The tuple constructor does that by default.)
+            // Note the `requires`. It's not necessary per se, because the tuple won't have a default constructor
+            // if some of the components are not default-constructible. However, it gives us a nicer error message
+            // when user tries to default-construct a component, instead of a cryptic "a tuple doesn't have a default constructor".
+            // The other (fancy) constructor is selected, and the error message for it should indireclty point the user
+            // to a specific component that lacks the default constructor.
+            SpecificEntity()
+            requires(std::default_initializable<C> && ...)
+            {}
+
+            // Initializes each component separately.
+            // If there's a parameter with the same type as the component (ignoring cv-qualifiers and value category),
+            //   the corresponding component is initialized with it. Otherwise it's initialized
+            //   with `DefaultComponentInitializer{}`, which should default-construct it.
+            template <typename ...P>
+            requires(ValidComponent<std::remove_cvref_t<P>> && ...)
+            SpecificEntity(P &&... params) : components(
+                // Make a list of initializers for the tuple.
+                []<typename T>(Meta::tag<T>, P &&... params) -> decltype(auto)
+                {
+                    // Here `T` is one of `C...`.
+                    constexpr std::size_t index = find_type_index_ignoring_cvref<C, P...>;
+
+                    // Make sure we didn't get more than one initializer.
+                    // Note that the condition is separated into a variable, to prevent it from cluttering the error message.
+                    constexpr bool x = index != std::size_t(-2);
+                    static_assert(("More than one initializer was provided for component", Meta::tag<C>{}, x));
+
+                    if constexpr (index == std::size_t(-1))
+                        return DefaultComponentInitializer{};
+                    else
+                        return std::get<index>(std::forward_as_tuple(std::forward<P>(params)...));
+                }(Meta::tag<C>{}, std::forward<P>(params)...)...)
+            {
+                // Make sure we don't have any extra unused initializers.
+                ([]<typename T>(Meta::tag<T>)
+                {
+                    // Here `T` is one of `P...`.
+                    // Check if the entity actually has a component `std::remove_cvref<T>`.
+                    // Note that the condition is separated into a variable, to prevent it from cluttering the error message.
+                    constexpr bool x = Meta::list_contains_type<Meta::type_list<C...>, std::remove_cvref_t<T>>;
+                    static_assert(("This entity doesn't contain component", Meta::tag<T>{}, "but an initializer for it was provided.", x));
+                }(Meta::tag<P>{}), ...);
             }
         };
 
@@ -407,11 +474,12 @@ namespace Ent
             // The required size of storage can be obtained from `RequiredStorageSize()`.
             // Constructs all the nodes using placement-new, in memory immediately following this instance.
             // `func` is `ListNode &func(int i)`, where `i = 0..node_count-1. It must return a reference to
-            // the head node of i-th list to which this entity should be appended.
-            template <typename F>
-            explicit SpecificEntityWithNodes(have_enough_storage, int node_count, F &&func)
+            //   the head node of i-th list to which this entity should be appended.
+            // The `params...` are forwarded to the constructor of `SpecificEntity`, see it for details.
+            template <typename F, typename ...P>
+            explicit SpecificEntityWithNodes(have_enough_storage, int node_count, F &&func, P &&... params)
                 requires(noexcept(func(int{})))
-                : node_count(node_count)
+                : SpecificEntityWithNodes::SpecificEntity(std::forward<P>(params)...), node_count(node_count)
             {
                 for (int i = 0; i < node_count; i++)
                     ::new(GetNodeStoragePtr(i)) ListNode(ListNode::insert_before{}, func(i), this);
@@ -600,6 +668,8 @@ namespace Ent
 
     // Stores all information necessary to create an entity, for a specific `Controller` configuration.
     // You're supposed to cache those, either manually or using `EntityTemplateCache` (see below).
+    // Entity templates can be reused for different controllers with the same configuration and same
+    //   default components.
     template <ValidComponent ...C>
     class EntityTemplate : public UntypedEntityTemplate
     {
@@ -748,7 +818,35 @@ namespace Ent
                 Program::Error("Attempt to use a null entity list handle.");
             return entity_lists.at(list_handle.GetIndex()).list;
         }
-
+        // Same as `operator()`, but throws if the list has more than one entity.
+        [[nodiscard]] const List &GetAtMostOne(ListHandle list_handle) const
+        {
+            const List &list = operator()(list_handle);
+            List::iterator_t it = list.begin();
+            if (it != list.end() && ++it != list.end())
+                Program::Error("Expected at most one entity in the specified list.");
+            return list;
+        }
+        // Same as `operator()`, but throws if the list has less than one entity.
+        [[nodiscard]] const List &GetAtLeastOne(ListHandle list_handle) const
+        {
+            const List &list = operator()(list_handle);
+            if (list.begin() == list.end())
+                Program::Error("Expected at least one entity in the specified list.");
+            return list;
+        }
+        // If the list contains a single entity, returns it, otherwise throws.
+        [[nodiscard]] Entity &GetOne(ListHandle list_handle) const
+        {
+            const List &list = operator()(list_handle);
+            List::iterator_t it = list.begin();
+            if (it == list.end())
+                Program::Error("Expected exactly one entity in the specified list, but got none.");
+            Entity &ret = *it;
+            if (++it != list.end())
+                Program::Error("Expected exactly one entity in the specified list, but got more.");
+            return ret;
+        }
 
         // Destroys a single entity.
         // WARNING: This invalidates any list iterators pointing to that entity.
@@ -777,19 +875,27 @@ namespace Ent
                 DestroyListed(ListHandle::ConstructFromIndex(i));
         }
 
-        // Create an entity using a template
-        template <ValidComponent ...C>
-        Entity &Create(const EntityTemplate<C...> &entity_template)
+        // Create an entity using a template.
+        // The `params` is a list of components, a subset of `C...`.
+        // The matching components from `C...` are initialized from those, and other components are value-initialized.
+        template <ValidComponent ...C, typename ...P>
+        Entity &Create(const EntityTemplate<C...> &entity_template, P &&... params)
         {
-            return CreateFromUntypedTemplate<C...>(entity_template);
+            return CreateFromUntypedTemplate<C...>(entity_template, std::forward<P>(params)...);
         }
-        template <ValidComponent ...C>
-        Entity &Create(ValidEntityTemplateCache auto &template_cache)
+        // Create an entity by grabbing a template for it from a cache.
+        // If there's no matching template in the cache, it will be added automatically.
+        // The `params` is a list of components, a subset of `C...`.
+        // The matching components from `C...` are initialized from those, and other components are value-initialized.
+        template <ValidComponent ...C, typename ...P>
+        Entity &Create(ValidEntityTemplateCache auto &template_cache, P &&... params)
         {
-            return CreateFromUntypedTemplate<C...>(template_cache.template GetTemplate<Meta::type_list<C...>>([this]
+            auto lambda = [this]
             {
                 return MakeEntityTemplate<C...>();
-            }));
+            };
+
+            return CreateFromUntypedTemplate<C...>(template_cache.template GetTemplate<Meta::type_list<C...>>(lambda), std::forward<P>(params)...);
         }
 
         // Makes an "entity template".
@@ -823,8 +929,8 @@ namespace Ent
         }
 
       private:
-        template <ValidComponent ...C>
-        Entity &CreateFromUntypedTemplate(const UntypedEntityTemplate &entity_template)
+        template <ValidComponent ...C, typename ...P>
+        Entity &CreateFromUntypedTemplate(const UntypedEntityTemplate &entity_template, P &&... params)
         {
             const auto &list_handles = entity_template.GetListHandles();
 
@@ -849,7 +955,7 @@ namespace Ent
             {
                 return const_cast<List &>(operator()(list_handles[i]));
             };
-            entity_type *entity = new(storage) entity_type(typename entity_type::have_enough_storage{}, list_handles.size(), ith_list_head);
+            entity_type *entity = new(storage) entity_type(typename entity_type::have_enough_storage{}, list_handles.size(), ith_list_head, std::forward<P>(params)...);
 
             return *entity;
         }
