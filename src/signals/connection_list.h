@@ -21,7 +21,7 @@ namespace Sig
     template <typename OriginalConnection, typename State = EmptyState>
     class ConnectionList
     {
-        static_assert(Meta::is_specialization_of<OriginalConnection, Connection>, "The template parameter must be a specialization of `Sig::Connection`.");
+        static_assert(Meta::specialization_of<OriginalConnection, Connection>, "The template parameter must be a specialization of `Sig::Connection`.");
 
       public:
         using original_connection_t = OriginalConnection;

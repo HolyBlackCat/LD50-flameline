@@ -249,14 +249,16 @@ namespace Sig
       public:
         using BasicConnection<A, B>::BasicConnection;
 
-        Connection(Connection &&other)
+        Connection(Connection &&other) noexcept
         {
             // Every non-abstract class that inherits from `BasicConnection` has to do this.
+            // The callbacks are noexcept, so we can safely add noexcept here.
             this->MoveFrom(other);
         }
-        Connection &operator=(Connection &&other)
+        Connection &operator=(Connection &&other) noexcept
         {
             // Every non-abstract class that inherits from `BasicConnection` has to do this.
+            // The callbacks are noexcept, so we can safely add noexcept here.
             this->MoveFrom(other);
             return *this;
         }

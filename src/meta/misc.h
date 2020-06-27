@@ -9,6 +9,12 @@
 
 namespace Meta
 {
+    // Lambda overloader.
+
+    template <typename ...P> struct overload : P... { using P::operator()...; };
+    template <typename ...P> overload(P...) -> overload<P...>;
+
+
     // Copy cv-qualifiers from one type to another.
 
     namespace impl
@@ -34,19 +40,19 @@ namespace Meta
 
 
     // Checks if a type is a specialization of a template.
-    // `is_specialization_of<A, B>` is true if `A` is `B<P...>`, where `P...` are some types.
+    // `specialization_of<A, B>` is true if `A` is `B<P...>`, where `P...` are some types.
 
     namespace impl
     {
         template <typename A, template <typename...> typename B>
-        struct is_specialization_of : std::false_type {};
+        struct specialization_of : std::false_type {};
 
         template <template <typename...> typename T, typename ...P>
-        struct is_specialization_of<T<P...>, T> : std::true_type {};
+        struct specialization_of<T<P...>, T> : std::true_type {};
     }
 
     template <typename A, template <typename...> typename B>
-    inline constexpr bool is_specialization_of = impl::is_specialization_of<A, B>::value;
+    concept specialization_of = impl::specialization_of<A, B>::value;
 
 
     // An object wrapper that moves the underlying object even when copied.

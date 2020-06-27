@@ -399,7 +399,7 @@ namespace Sig
 
         // Check if `T` is a specialization of `MonoSignal` (strictly non-const) or `Signal` (possibly const).
         // We require `MonoSignal`s to be non-const because connecting to them can be destructive (removes previous connection).
-        template <typename T> inline constexpr bool is_connectable_signal_v = Meta::is_specialization_of<T, MonoSignal> || Meta::is_specialization_of<std::remove_const_t<T>, Signal>;
+        template <typename T> inline constexpr bool is_connectable_signal_v = Meta::specialization_of<T, MonoSignal> || Meta::specialization_of<std::remove_const_t<T>, Signal>;
 
         // Check if `T` is `MonoSlot` or `Slot`.
         template <typename T> inline constexpr bool is_slot_v = std::is_same_v<T, MonoSlot> || std::is_same_v<T, Slot>;
