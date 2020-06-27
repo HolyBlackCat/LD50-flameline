@@ -811,6 +811,10 @@ namespace Ent
             return !entity_lists.empty();
         }
 
+        // Returns the allocator.
+        [[nodiscard]]       Allocator &GetAllocator()       {return allocator;}
+        [[nodiscard]] const Allocator &GetAllocator() const {return allocator;}
+
         // Returns the entity list with the specified handle. Throws if the handle is invalid.
         [[nodiscard]] const List &operator()(ListHandle list_handle) const
         {
