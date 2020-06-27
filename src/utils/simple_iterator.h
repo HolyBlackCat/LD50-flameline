@@ -8,6 +8,7 @@
 
 #include "macros/check.h"
 #include "meta/assignable_wrapper.h"
+#include "meta/basic.h"
 
 namespace SimpleIterator
 {
@@ -130,7 +131,7 @@ namespace SimpleIterator
 
     // Equivalent to `Input(func)`.
     // This function is there so that you don't have to think about which iterator type to pick.
-    template <typename F>
+    template <Meta::deduce..., typename F>
     [[nodiscard]] auto Make(F &&func)
     {
         return Input(std::forward<F>(func));
@@ -142,7 +143,7 @@ namespace SimpleIterator
     // non-dereferencable and non-incrementable).
     // `==` is overloaded for the resulting iterator to compare the stored values (and default-constructed iterators
     // compare equal to each other, and unequal to everything else).
-    template <typename V, typename F>
+    template <Meta::deduce..., typename V, typename F>
     [[nodiscard]] auto Make(V &&value, F &&func)
     {
         struct State
@@ -167,6 +168,7 @@ namespace SimpleIterator
             }
             void operator()(std::true_type)
             {
+                static_assert(std::is_void_v<decltype(data->func(data->value))>, "The callback shouldn't return anything.");
                 data->func(data->value);
             }
 
@@ -175,6 +177,6 @@ namespace SimpleIterator
                 return data == other.data;
             }
         };
-        return Forward<State>(State{typename State::Data(std::forward<V>(value), std::forward<F>(func))});
+        return Forward<State>(typename State::Data(std::forward<V>(value), std::forward<F>(func)));
     }
 }
