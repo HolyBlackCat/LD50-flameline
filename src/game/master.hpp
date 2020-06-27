@@ -33,6 +33,7 @@
 #include "strings/format.h"
 #include "strings/lexical_cast.h"
 #include "utils/clock.h"
+#include "utils/entities.h"
 #include "utils/mat.h"
 #include "utils/metronome.h"
 #include "utils/multiarray.h"
