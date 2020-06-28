@@ -10,6 +10,7 @@
 #include <vector>
 
 #include "audio/complete.h"
+#include "entities/base.h"
 #include "gameutils/adaptive_viewport.h"
 #include "gameutils/render.h"
 #include "graphics/complete.h"
@@ -33,7 +34,6 @@
 #include "strings/format.h"
 #include "strings/lexical_cast.h"
 #include "utils/clock.h"
-#include "utils/entities.h"
 #include "utils/mat.h"
 #include "utils/metronome.h"
 #include "utils/multiarray.h"
