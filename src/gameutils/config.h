@@ -176,7 +176,7 @@ template <typename T> class Config
         try
         {
             std::string obj_string = Refl::ToString(object);
-            Stream::SaveFile(file_name, obj_string);
+            Stream::SaveFile(file_name, obj_string, Stream::text);
         }
         catch (...) {}
     }

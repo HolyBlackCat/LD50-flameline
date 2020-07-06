@@ -100,12 +100,21 @@ namespace Strings
         return Escape({&ch, 1});
     }
 
+
+    enum class UnescapeFlags
+    {
+        no_flags = 0,
+        strip_cr_bytes = 1 << 2, // Remove `\r` bytes from the input. Escape sequences `\r` are not affected, only the raw bytes are.
+    };
+    [[nodiscard]] inline UnescapeFlags operator&(UnescapeFlags a, UnescapeFlags b) {return UnescapeFlags(int(a) & int(b));}
+    [[nodiscard]] inline UnescapeFlags operator|(UnescapeFlags a, UnescapeFlags b) {return UnescapeFlags(int(a) | int(b));}
+
     // Unescapes a string. Throws on failure.
     // Supports following escape sequences: \', \", \\, \a, \b, \f, \n, \r, \t, \v.
     // Doesn't support \?, because it's stupid.
     // Additionally supports octal \[0-7]{1,3}, hex \x[a-zA-Z0-9]{1,2}, and unicode \u[a-zA-Z0-9]{4}, \U[a-zA-Z0-9]{8} escapes.
     template <typename Iter, CHECK_EXPR(*std::declval<Iter &>()++ = char())>
-    void Unescape(std::string_view str, Iter output_iter)
+    void Unescape(std::string_view str, Iter output_iter, UnescapeFlags flags = UnescapeFlags::no_flags)
     {
         auto cur = str.begin();
         const auto end = str.end();
@@ -133,7 +142,9 @@ namespace Strings
         {
             if (*cur != '\\')
             {
-                *output_iter++ = *cur++;
+                if (!bool(flags & UnescapeFlags::strip_cr_bytes) || *cur != '\r')
+                    *output_iter++ = *cur;
+                cur++;
             }
             else
             {
@@ -219,10 +230,10 @@ namespace Strings
             }
         }
     }
-    [[nodiscard]] inline std::string Unescape(std::string_view str)
+    [[nodiscard]] inline std::string Unescape(std::string_view str, UnescapeFlags flags = UnescapeFlags::no_flags)
     {
         std::string ret;
-        Unescape(str, std::back_inserter(ret));
+        Unescape(str, std::back_inserter(ret), flags);
         return ret;
     }
 }

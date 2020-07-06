@@ -89,7 +89,7 @@ namespace Stream
         }
 
         // Constructs a stream bound to a file.
-        Output(std::string file_name, SaveMode mode = overwrite, capacity_t capacity = default_capacity)
+        Output(std::string file_name, SaveMode mode = binary, capacity_t capacity = default_capacity)
         {
             auto deleter = [](FILE *file)
             {

@@ -18,24 +18,28 @@ namespace Stream
 {
     enum SaveMode
     {
-        overwrite,
-        append,
+        binary,
+        append_binary,
+        text,
+        append_text,
     };
 
     [[nodiscard]] inline const char *SaveModeStringRepresentation(SaveMode mode)
     {
         switch (mode)
         {
-            case overwrite: return "wb";
-            case append:    return "ab";
+            case binary:        return "wb";
+            case append_binary: return "ab";
+            case text:          return "w";
+            case append_text:   return "a";
         }
 
-        return "wb";
+        return SaveModeStringRepresentation(binary);
     }
 
 
     // Saves a block of memory to a file. Throws on failure.
-    inline void SaveFile(std::string file_name, const std::uint8_t *begin, const std::uint8_t *end, SaveMode mode = overwrite)
+    inline void SaveFile(std::string file_name, const std::uint8_t *begin, const std::uint8_t *end, SaveMode mode = binary)
     {
         FILE *file = better_fopen(file_name.c_str(), SaveModeStringRepresentation(mode));
         if (!file)
@@ -46,14 +50,14 @@ namespace Stream
     }
 
     // Saves a block of memory to a file. Throws on failure.
-    inline void SaveFile(std::string file_name, const char *begin, const char *end, SaveMode mode = overwrite)
+    inline void SaveFile(std::string file_name, const char *begin, const char *end, SaveMode mode = binary)
     {
         SaveFile(std::move(file_name), reinterpret_cast<const std::uint8_t *>(begin), reinterpret_cast<const std::uint8_t *>(end), mode);
     }
 
     // Saves a container to a file. Throws on failure.
     template <typename T, CHECK_TYPE(impl::detect_flat_byte_container<T>)>
-    void SaveFile(std::string file_name, const T &container, SaveMode mode = overwrite)
+    void SaveFile(std::string file_name, const T &container, SaveMode mode = binary)
     {
         const std::uint8_t *ptr = reinterpret_cast<const std::uint8_t *>(std::data(container));
         SaveFile(std::move(file_name), ptr, ptr + std::size(container), mode);

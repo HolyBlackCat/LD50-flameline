@@ -158,7 +158,7 @@ namespace Graphics
         try
         {
             std::string desc_string = Refl::ToString(desc, Refl::ToStringOptions::Pretty());
-            Stream::SaveFile(out_desc_file, desc_string);
+            Stream::SaveFile(out_desc_file, desc_string, Stream::text);
         }
         catch (...) {}
     }

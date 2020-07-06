@@ -50,7 +50,7 @@ namespace Refl
 
             try
             {
-                object = Strings::Unescape(temp_str);
+                object = Strings::Unescape(temp_str, Strings::UnescapeFlags::strip_cr_bytes);
             }
             catch (std::exception &e)
             {
