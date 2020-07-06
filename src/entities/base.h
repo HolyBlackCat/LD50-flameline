@@ -634,7 +634,7 @@ namespace Ent
             return index != std::size_t(-1);
         }
 
-        // For internal use. Constructs a new handle given a list index.
+        // Mostly for internal use. Constructs a new handle given a list index.
         [[nodiscard]] static ListHandle ConstructFromIndex(std::size_t index)
         {
             ListHandle ret;
