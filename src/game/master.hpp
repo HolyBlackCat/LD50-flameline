@@ -13,6 +13,7 @@
 #include "entities/base.h"
 #include "gameutils/adaptive_viewport.h"
 #include "gameutils/render.h"
+#include "gameutils/state.h"
 #include "graphics/complete.h"
 #include "input/complete.h"
 #include "interface/gui.h"

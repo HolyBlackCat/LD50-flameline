@@ -1,20 +1,56 @@
-const ivec2 screen_size(480, 270);
+#include "main.h"
+
 Interface::Window window("Iota", screen_size * 2, Interface::windowed, adjust_(Interface::WindowSettings{}, min_size = screen_size));
-Graphics::DummyVertexArray dummy_vao = nullptr;
+static Graphics::DummyVertexArray dummy_vao = nullptr;
 
 const Graphics::ShaderConfig shader_config = Graphics::ShaderConfig::Core();
 Interface::ImGuiController gui_controller(Poly::derived<Interface::ImGuiController::GraphicsBackend_Modern>, adjust_(Interface::ImGuiController::Config{}, shader_header = shader_config.common_header));
 
-Graphics::TextureAtlas texture_atlas(ivec2(2048), "assets/_images", "assets/atlas.png", "assets/atlas.refl");
-Graphics::Texture texture_main = Graphics::Texture(nullptr).Wrap(Graphics::clamp).Interpolation(Graphics::nearest).SetData(texture_atlas.GetImage());
+namespace Fonts
+{
+    namespace Files
+    {
+        Graphics::FontFile &Main()
+        {
+            static Graphics::FontFile ret("assets/Monocat_6x12.ttf", 12);
+            return ret;
+        }
+    }
+
+    Graphics::Font &Main()
+    {
+        static Graphics::Font ret;
+        return ret;
+    }
+}
+
+Graphics::TextureAtlas &TextureAtlas()
+{
+    static Graphics::TextureAtlas ret = []{
+        Graphics::TextureAtlas ret(ivec2(2048), "assets/_images", "assets/atlas.png", "assets/atlas.refl");
+        auto font_region = ret.Get("font_storage.png");
+
+        Unicode::CharSet glyph_ranges;
+        glyph_ranges.Add(Unicode::Ranges::Basic_Latin);
+
+        Graphics::MakeFontAtlas(ret.GetImage(), font_region.pos, font_region.size, {
+            {Fonts::Main(), Fonts::Files::Main(), glyph_ranges, Graphics::FontFile::monochrome_with_hinting},
+        });
+        return ret;
+    }();
+    return ret;
+}
+Graphics::Texture texture_main = Graphics::Texture(nullptr).Wrap(Graphics::clamp).Interpolation(Graphics::nearest).SetData(TextureAtlas().GetImage());
 
 AdaptiveViewport adaptive_viewport(shader_config, screen_size);
 Render r = adjust_(Render(0x2000, shader_config), SetTexture(texture_main), SetMatrix(adaptive_viewport.GetDetails().MatrixCentered()));
 
 Input::Mouse mouse;
 
-struct State : Program::DefaultBasicState
+struct ProgramState : Program::DefaultBasicState
 {
+    State::StateManager state_manager;
+
     void Resize()
     {
         adaptive_viewport.Update();
@@ -64,7 +100,7 @@ struct State : Program::DefaultBasicState
             Program::Exit();
 
         gui_controller.PreTick();
-        HighLevelTick();
+        state_manager.Tick();
     }
 
     void Render() override
@@ -73,7 +109,7 @@ struct State : Program::DefaultBasicState
 
         gui_controller.PreRender();
         adaptive_viewport.BeginFrame();
-        HighLevelRender();
+        state_manager.Render();
         adaptive_viewport.FinishFrame();
         Graphics::CheckErrors();
         gui_controller.PostRender();
@@ -89,40 +125,22 @@ struct State : Program::DefaultBasicState
         // Load various small fonts
         auto monochrome_font_flags = ImGuiFreeType::Monochrome | ImGuiFreeType::MonoHinting;
 
-        gui_controller.LoadFont("assets/Monokat_6x12.ttf", 12.0f, adjust(ImFontConfig{}, RasterizerFlags = monochrome_font_flags));
+        gui_controller.LoadFont("assets/Monocat_6x12.ttf", 12.0f, adjust(ImFontConfig{}, RasterizerFlags = monochrome_font_flags));
         gui_controller.LoadDefaultFont();
         gui_controller.RenderFontsWithFreetype();
 
         Graphics::Blending::Enable();
         Graphics::Blending::FuncNormalPre();
-    }
 
-    float angle = 0;
-
-    void HighLevelTick()
-    {
-        angle += 0.01;
-        ImGui::ShowDemoWindow();
-    }
-
-    void HighLevelRender()
-    {
-        Graphics::SetClearColor(fvec3(0));
-        Graphics::Clear();
-
-        r.BindShader();
-
-        r.iquad(mouse.pos(), ivec2(32)).center().rotate(angle).color(mouse.left.down() ? fvec3(1,0.5,0) : fvec3(0,0.5,1));
-
-        r.Finish();
+        state_manager.NextState().Set("Initial");
     }
 };
 
 int _main_(int, char **)
 {
-    State loop_state;
-    loop_state.Init();
-    loop_state.Resize();
-    loop_state.RunMainLoop();
+    ProgramState program_state;
+    program_state.Init();
+    program_state.Resize();
+    program_state.RunMainLoop();
     return 0;
 }

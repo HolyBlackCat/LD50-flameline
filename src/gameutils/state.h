@@ -9,7 +9,7 @@
 
 namespace State
 {
-    class NextState;
+    class NextStateSelector;
 
     REFL_STRUCT( BasicState REFL_POLYMORPHIC )
     {
@@ -17,7 +17,11 @@ namespace State
         BasicState(BasicState &&) = default;
         BasicState &operator=(BasicState &&) = default;
 
-        virtual void Tick(const NextState &next_state) = 0;
+        // This should called once when the state is constructed.
+        // `params` is a user-provided string, or an empty one if it wasn't provided.
+        virtual void Init(const std::string &params) {(void)params;}
+
+        virtual void Tick(const NextStateSelector &next_state) = 0;
         virtual void Render() const = 0;
     };
     using Storage = Refl::PolyStorage<BasicState>;
@@ -30,7 +34,7 @@ namespace State
         Tag() {}
 
         // Throws on failure.
-        // WARNING: Do not invoke this before `main`. At that point states might not be registered yet.
+        // WARNING: Do not invoke this before `main`. At that point states might not have been registered yet.
         Tag(const char *name) : index(Refl::Polymorphic::NameToIndex<BasicState>(name)) {}
         Tag(const std::string &name) : index(Refl::Polymorphic::NameToIndex<BasicState>(name)) {}
 
@@ -40,31 +44,31 @@ namespace State
         [[nodiscard]] std::size_t Index() const {return index;}
     };
 
-    [[nodiscard]] inline Storage Construct(Tag tag)
+    [[nodiscard]] inline Storage Construct(Tag tag, const std::string &params = {})
     {
-        return Refl::Polymorphic::ConstructFromIndex<BasicState>(tag.Index());
+        Storage ret = Refl::Polymorphic::ConstructFromIndex<BasicState>(tag.Index());
+        ret->Init(params);
+        return ret;
     }
 
 
-    class NextState
+    class NextStateSelector
     {
         mutable bool is_set = false;
         mutable Tag tag;
-
-        using func_t = std::function<void(Storage &storage)>;
-        mutable func_t func;
+        mutable std::string params;
 
       public:
-        NextState() {}
+        NextStateSelector() {}
 
         // Sets the next state.
-        // `new_func` is saved, and is later called on the new state after it's constructed.
-        // It's `const` because we pass `NextState` to `Tick()` by a const reference.
-        void Set(Tag new_tag, func_t new_func = nullptr) const
+        // If you pass a null tag, the next state will be null.
+        // Note that this function is `const` because we pass `NextStateSelector` to `Tick()` by a const reference.
+        void Set(Tag new_tag, std::string new_params = std::string{}) const
         {
             is_set = true;
             tag = new_tag;
-            func = std::move(new_func);
+            params = std::move(new_params);
         }
 
         // Non-const because we don't want `Tick()` to call it.
@@ -77,7 +81,7 @@ namespace State
         {
             is_set = false;
             tag = Tag{};
-            func = nullptr;
+            params = std::string{};
         }
 
         // Non-const because we don't want `Tick()` to call it.
@@ -88,12 +92,9 @@ namespace State
 
             Storage ret;
 
+            // If `tag` is null, `ret` remains null.
             if (tag)
-            {
-                ret = Construct(tag);
-                if (func)
-                    func(ret);
-            }
+                ret = Construct(tag, params);
 
             Reset();
             return ret;
@@ -104,7 +105,7 @@ namespace State
     class StateManager
     {
         Storage state;
-        NextState next_state;
+        NextStateSelector next_state;
 
       public:
         StateManager() {}
@@ -114,15 +115,9 @@ namespace State
             return bool(state);
         }
 
-        template <typename T, typename ...P> T &SetState(P &&... params)
+        [[nodiscard]] const NextStateSelector &NextState()
         {
-            next_state.Reset();
-            return state.make<T>(std::forward<P>(params)...);
-        }
-
-        void SetState(Tag tag)
-        {
-            next_state.Set(tag);
+            return next_state;
         }
 
         void Tick()
