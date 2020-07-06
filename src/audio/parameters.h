@@ -87,7 +87,7 @@ namespace Audio
 
         // If clamping is enabled, the distance is clamped between `ref_dist` and `max_dist`. Disabling clamping is not recommended.
         // In any case, according to the spec, if the parameters make gain calculations impossible, the gain falls back to 1.
-        void DistanceModel(Model model, bool clamped = true)
+        inline void DistanceModel(Model model, bool clamped = true)
         {
             ALenum model_enum = AL_NONE;
             switch (model)
