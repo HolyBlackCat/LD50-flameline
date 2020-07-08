@@ -1,6 +1,7 @@
 #pragma once
 
 #include <algorithm>
+#include <cstring>
 #include <vector>
 
 #include "program/errors.h"
@@ -24,7 +25,7 @@ class ActionSequence
 
             // Make sure the list is sorted alphabetically (by class names).
             // Reflection is supposed to do that automatically, but we add an assertion to be sure.
-            auto compare = [](const storage_t &a, const storage_t &b){return Refl::Polymorphic::Name(a) < Refl::Polymorphic::Name(b);};
+            auto compare = [](const storage_t &a, const storage_t &b){return std::strcmp(Refl::Polymorphic::Name(a), Refl::Polymorphic::Name(b)) < 0;};
             ASSERT(std::is_sorted(ret.begin(), ret.end(), compare));
             return ret;
         }();
