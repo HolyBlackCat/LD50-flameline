@@ -27,7 +27,7 @@ namespace Input
                 return;
 
             // Remember old cur_pos
-            ivec2 prev_pos_f = cur_pos_f;
+            fvec2 prev_pos_f = cur_pos_f;
             ivec2 prev_pos = cur_pos;
 
             // Get cur_pos and transform it
