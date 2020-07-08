@@ -15,6 +15,37 @@ namespace Meta
     template <typename ...P> overload(P...) -> overload<P...>;
 
 
+    // A wrapper that resets the underlying object to the default-constructed value.
+    // The wrapper is copyable, and the value is not changed on copy.
+
+    template <typename T>
+    struct ResetIfMovedFrom
+    {
+        T value{};
+
+        constexpr ResetIfMovedFrom() {}
+        constexpr ResetIfMovedFrom(const T &value) : value(value) {}
+        constexpr ResetIfMovedFrom(T &&value) : value(std::move(value)) {}
+
+        constexpr ResetIfMovedFrom(const ResetIfMovedFrom &) = default;
+        constexpr ResetIfMovedFrom &operator=(const ResetIfMovedFrom &) = default;
+
+        constexpr ResetIfMovedFrom(ResetIfMovedFrom &&other) noexcept
+            : value(std::move(other.value))
+        {
+            other.value = T{};
+        }
+        constexpr ResetIfMovedFrom &operator=(ResetIfMovedFrom &&other) noexcept
+        {
+            if (&other == this)
+                return *this;
+            value = std::move(other.value);
+            other.value = T{};
+            return *this;
+        }
+    };
+
+
     // Copy cv-qualifiers from one type to another.
 
     namespace impl
