@@ -777,6 +777,10 @@ namespace Ent
         };
         std::vector<ListWithPred> entity_lists;
 
+        // Entity count, for debugging purposes. Can be removed without affecting anything.
+        // A temporary measure, until we figure out a decent customization point to plug this in.
+        Meta::ResetIfMovedFrom<std::size_t> entity_count;
+
       public:
         // Default-constructible (assuming the allocator is default-constructible),
         // but needs to be configured with `ControllerConfig` before use.
@@ -814,6 +818,9 @@ namespace Ent
         // Returns the allocator.
         [[nodiscard]]       Allocator &GetAllocator()       {return allocator;}
         [[nodiscard]] const Allocator &GetAllocator() const {return allocator;}
+
+        // Returns the current entity count.
+        [[nodiscard]] std::size_t GetEntityCount() const {return entity_count.value;}
 
         // Returns the entity list with the specified handle. Throws if the handle is invalid.
         [[nodiscard]] const List &operator()(ListHandle list_handle) const
@@ -858,6 +865,7 @@ namespace Ent
         {
             entity.~Entity();
             allocator.Deallocate(reinterpret_cast<char *>(&entity));
+            entity_count.value--;
         }
         // Destroys all entities in the specified list.
         void DestroyListed(ListHandle list_handle)
@@ -960,6 +968,8 @@ namespace Ent
                 return const_cast<List &>(operator()(list_handles[i]));
             };
             entity_type *entity = new(storage) entity_type(typename entity_type::have_enough_storage{}, list_handles.size(), ith_list_head, std::forward<P>(params)...);
+
+            entity_count.value++;
 
             return *entity;
         }
