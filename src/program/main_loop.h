@@ -45,24 +45,27 @@ namespace Program
 
     class DefaultBasicState : public BasicState
     {
-      protected:
-        bool stop = false;
         bool executing_frame = false;
         std::uint64_t frame_start = -1;
 
+      protected:
+        bool stop = false;
+
       public:
-        // Returns the metronome, or `nullptr` if want to run one tick per frame.
+        // Returns the tick metronome, or `nullptr` if want to run one tick per frame.
+        // The intended way of overriding is to add a metronome as a class member, and return a pointer to it.
         virtual Metronome *GetTickMetronome() {return nullptr;}
 
+        // Returns true if it's advisable to have a FPS cap. That is, when vsync is disabled.
+        // See comment on `GetFpsCap` for the intended use of this function.
         [[nodiscard]] static bool NeedFpsCap()
         {
-            if (Interface::Window::IsOpen() && Interface::Window::Get().VSyncMode() == Interface::VSync::disabled)
-                return 60;
-            else
-                return 0;
+            return Interface::Window::IsOpen() && Interface::Window::Get().VSyncMode() == Interface::VSync::disabled;
         }
 
         // Returns target FPS. `<= 0` if not limited.
+        // When overriding this function, it's recommended to multiply the return value by `NeedFpsCap()`,
+        // which enables the cap only when vsync is disabled.
         virtual int GetFpsCap() {return 0;}
 
         // Ignored if FPS cap is disabled.
