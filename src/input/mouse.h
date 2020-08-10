@@ -19,7 +19,7 @@ namespace Input
         void Update() const
         {
             // Get window
-            auto &window = Interface::Window::Get();
+            auto window = Interface::Window::Get();
 
             // Stop if the mouse was already updated this tick.
             uint64_t tick = window.Ticks();

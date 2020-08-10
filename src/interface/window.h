@@ -20,20 +20,19 @@ namespace Interface
     enum class Profile {core, compat, es, any};
     enum YesOrNo {yes, no, dont_care};
 
-    inline ivec2 PosUndefined()
-    {
-        return ivec2(SDL_WINDOWPOS_UNDEFINED);
-    }
-    inline ivec2 PosCentered()
-    {
-        return ivec2(SDL_WINDOWPOS_CENTERED);
-    }
+    [[nodiscard]] inline ivec2 PosUndefined() {return ivec2(SDL_WINDOWPOS_UNDEFINED);}
+    [[nodiscard]] inline ivec2 PosCentered() {return ivec2(SDL_WINDOWPOS_CENTERED);}
 
     struct WindowSettings
     {
+        WindowSettings() {}
+
+        // Returns a short readable summary of window settings. Some less important settings are not included.
+        [[nodiscard]] std::string Summary() const;
+
         ivec2 pos = PosCentered();
         ivec2 min_size = ivec2(0);
-        bool fixed_size = 0;
+        bool fixed_size = false;
         int display = 0;
 
         int gl_major = CGLFL_GL_MAJOR, gl_minor = CGLFL_GL_MINOR; // 0,0 = don't care.
@@ -49,115 +48,114 @@ namespace Interface
             Profile::any;
         #endif
 
-        bool gl_debug = 0;
+        bool gl_debug = false;
         VSync vsync = VSync::adaptive;
         YesOrNo hw_accelerated = dont_care;
-        bool fwd_compat = 0;
-        int msaa = 0;
-        ivec4 color_bits = ivec4(0);
-        int depth_bits = 0, stencil_bits = 0;
-
-        WindowSettings() {}
-
-        std::string Summary() const; // Returns a short readable summary of window settings. Settings that can't cause a window creation error aren't included.
+        bool fwd_compat = false;
+        int msaa = 0; // 0 and 1 mean the same thing, no antialiasing.
+        ivec4 color_bits = ivec4(0); // 0 mean "unspecified".
+        int depth_bits = 0, stencil_bits = 0; // Same.
     };
 
+    // A window class.
+    // It's reference-counted, but only one actual window can exist at a time.
     class Window
     {
-        // Only one instance can exist at a time.
+        struct Data;
+
+        // Once we decide to support several windows, this should be replaced by something else.
+        inline static std::weak_ptr<Data> global_data;
+
+        std::shared_ptr<Data> data;
+
       public:
+        Window() {}
+        Window(const Window &) = default;
+        Window(Window &&) = default;
+        Window &operator=(const Window &) = default;
+        Window &operator=(Window &&) = default;
+        ~Window();
+
+        [[nodiscard]] explicit operator bool() const {return bool(data);}
+
+        Window(std::string title, ivec2 size, FullscreenMode mode = windowed, const WindowSettings &settings = {});
+
+        // Unlike `Get()`, this doesn't throw if there is no window.
+        [[nodiscard]] static SDL_Window *GetHandleOrNull();
+
+        [[nodiscard]] static bool IsOpen();
+
+        // Will throw if the window doesn't exist.
+        [[nodiscard]] static Window Get();
+
+        [[nodiscard]] SDL_Window *Handle() const;
+        [[nodiscard]] SDL_GLContext Context() const;
+
+        void SetTitle(std::string new_title);
+        [[nodiscard]] const std::string &Title() const;
+
+        [[nodiscard]] ivec2 Size() const;
+        [[nodiscard]] bool Resizable() const;
+
+        // Sets VSync mode, automatically falling back to different modes on failure.
+        // If it fails to set even a fallback mode, does nothing and reports `unspecified` mode.
+        // Passing `unspecified` to this function makes the window forget the actual mode and
+        // report `unspecified`, but is otherwise a no-op.
+        void SetVSyncMode(VSync new_vsync);
+        [[nodiscard]] VSync VSyncMode() const;
+
+        // If the window is not resizable, then `borderless_fullscreen` (which would require a window resize) acts as `fullscreen`.
+        void SetMode(FullscreenMode new_mode);
+        [[nodiscard]] FullscreenMode Mode() const;
+
+        // Processes events, increments the tick counter.
+        // If hooks are specified, applies them in order to each event. If a hook returns false, the current event is discarded.
+        void ProcessEvents(const std::vector<std::function<bool(SDL_Event &)>> &hooks = {});
+
+        // Updates the picture on the screen, increments the frame counter.
+        void SwapBuffers();
+
+        // Those counters initially return 1.
+        // This lets us use 0 for events that never happened.
+        [[nodiscard]] uint64_t Ticks() const;
+        [[nodiscard]] uint64_t Frames() const;
+
+        // Those return true for one tick after the corresponding event happend.
+        // We make sure that a resize is always reported after `Tick()` is called for the first time.
+        [[nodiscard]] bool Resized() const;
+        [[nodiscard]] bool ExitRequested() const;
+
+        // Returns true if the window is focused.
+        [[nodiscard]] bool HasKeyboardFocus() const;
+        // Returns true if the window is hovered.
+        [[nodiscard]] bool HasMouseFocus() const; // Returns 1 if the window is hovered.
+
+        // Returns text that was entered during the last tick, in UTF-8.
+        [[nodiscard]] const std::string &TextInput() const;
 
         struct InputTimes
         {
             uint64_t press = 0, release = 0, repeat = 0;
         };
+        // Returns the information about a specific button.
+        // The values represent the last time points when a specific action happened to the button.
+        // They are taken from the `Ticks()` counter.
+        [[nodiscard]] InputTimes GetInputTimes(Input::Enum index) const;
 
-      private:
-        inline static Window *instance = 0;
+        // Returns mouse position.
+        [[nodiscard]] ivec2 MousePos() const;
+        // Returns the change in mouse position since the last tick.
+        // Works even when the mouse is in the relative mode.
+        [[nodiscard]] ivec2 MouseMovement() const;
 
-        struct Data
-        {
-            SDL_Window *handle = 0;
-            SDL_GLContext context = 0;
+        // Hides the mouse cursor while it hovers the window.
+        void HideCursor(bool hide = true);
+        // Hides the cursor and prevents the mouse from leaving the window.
+        // `MousePos()` won't work properly in this mode.
+        void RelativeMouseMode(bool relative = true);
 
-            std::string title;
-
-            ivec2 size = ivec2(0);
-            VSync vsync = VSync::unspecified;
-            bool resizable = 0;
-            FullscreenMode mode = FullscreenMode::windowed;
-
-            uint64_t tick_counter = 1, frame_counter = 1;
-
-            uint64_t resize_time = 0;
-            uint64_t exit_request_time = 0;
-
-            std::string text_input;
-
-            ivec2 mouse_pos = ivec2(0);
-            ivec2 mouse_movement = ivec2(0);
-
-            bool keyboard_focus = 0, mouse_focus = 0;
-
-            std::vector<InputTimes> input_times;
-
-            std::vector<std::string> dropped_files, dropped_strings;
-        };
-
-        Data data;
-
-      public:
-        Window();
-        Window(Window &&other) noexcept;
-        Window &operator=(Window other) noexcept;
-        ~Window();
-
-        Window(std::string title, ivec2 size, FullscreenMode mode = windowed, const WindowSettings &settings = {});
-
-        static SDL_Window *GetHandleOrNull(); // Unlike `Get()`, this doesn't throw if there is no window.
-
-        static bool IsOpen();
-        static Window &Get(); // This will throw if there is no window.
-
-        SDL_Window *Handle() const;
-        SDL_GLContext Context() const;
-
-        void SetTitle(std::string new_title);
-        std::string Title() const;
-
-        ivec2 Size() const;
-
-        VSync VSyncMode() const;
-        bool Resizable() const;
-
-        void SetMode(FullscreenMode new_mode); // If the window is not resizable, then `borderless_fullscreen` (which requires a window resize) acts as `fullscreen`.
-        FullscreenMode Mode() const;
-
-        void ProcessEvents(std::vector<std::function<bool(SDL_Event &)>> hooks = {}); // If a hook returns `false`, the current event is discarded.
-        void SwapBuffers();
-
-        // Those counters start from 1.
-        uint64_t Ticks() const;
-        uint64_t Frames() const;
-
-        // Those return 1 for one tick after the corresponding event happend.
-        bool Resized() const;
-        bool ExitRequested() const;
-
-        bool HasKeyboardFocus() const; // Returns 1 if the window is active.
-        bool HasMouseFocus() const; // Returns 1 if the window is hovered.
-
-        std::string TextInput() const;
-
-        InputTimes GetInputTimes(Input::Enum index) const;
-
-        ivec2 MousePos() const;
-        ivec2 MouseMovement() const;
-
-        void HideCursor(bool hide = 1);
-        void RelativeMouseMode(bool relative = 1);
-
-        const std::vector<std::string> &DroppedFiles(); // Files dragged onto the window at the last tick.
-        const std::vector<std::string> &DroppedStrings(); // Text dragged onto the window at the last tick.
+        // Files dragged onto the window at the last tick.
+        [[nodiscard]] const std::vector<std::string> &DroppedFiles();
+        [[nodiscard]] const std::vector<std::string> &DroppedStrings(); // Text dragged onto the window at the last tick.
     };
 }

@@ -16,7 +16,7 @@ namespace Input
 
         void Update() const
         {
-            auto &window = Interface::Window::Get();
+            auto window = Interface::Window::Get();
 
             uint64_t tick = window.Ticks();
             if (update_time == tick)
@@ -33,7 +33,7 @@ namespace Input
 
         bool Assign(Enum begin, Enum end)
         {
-            auto &window = Interface::Window::Get();
+            auto window = Interface::Window::Get();
             uint64_t tick = window.Ticks();
 
             for (auto i = begin; i < end; i = Enum(i+1))
