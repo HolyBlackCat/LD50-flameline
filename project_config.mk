@@ -9,8 +9,8 @@ OUTPUT_FILE := bin/imp-re
 LINKER_MODE := CXX
 
 # Dependency set name
-LIBRARY_PACK_NAME := imp-re_deps_2020-07-06
-USED_PACKAGES := openal freetype2 ogg vorbis vorbisfile zlib fmt double-conversion
+LIBRARY_PACK_NAME := imp-re_deps_2020-08-02
+USED_PACKAGES := openal freetype2 ogg vorbis vorbisfile zlib fmt double-conversion bullet
 USED_EXTERNAL_PACKAGES :=
 ifeq ($(TARGET_OS),windows)
 USED_PACKAGES += sdl2
