@@ -11,26 +11,6 @@ namespace Input
     {
         Enum index = None;
 
-        mutable uint64_t update_time = 0;
-        mutable bool is_pressed = 0, is_released = 0, is_down = 0, is_repeated = 0;
-
-        void Update() const
-        {
-            auto window = Interface::Window::Get();
-
-            uint64_t tick = window.Ticks();
-            if (update_time == tick)
-                return;
-
-            auto times = window.GetInputTimes(index);
-            is_pressed = times.press == tick;
-            is_released = times.release == tick;
-            is_down = times.press > times.release;
-            is_repeated = times.repeat == tick;
-
-            update_time = tick;
-        }
-
         bool Assign(Enum begin, Enum end)
         {
             auto window = Interface::Window::Get();
@@ -41,22 +21,22 @@ namespace Input
                 if (window.GetInputTimes(i).press == tick)
                 {
                     index = i;
-                    return 1;
+                    return true;
                 }
             }
 
-            return 0;
+            return false;
         }
 
       public:
         Button() {}
         Button(Enum index) : index(index) {}
 
-        [[nodiscard]] bool pressed () const {Update(); return is_pressed;}
-        [[nodiscard]] bool released() const {Update(); return is_released;}
-        [[nodiscard]] bool repeated() const {Update(); return is_repeated;}
-        [[nodiscard]] bool down    () const {Update(); return is_down;}
-        [[nodiscard]] bool up      () const {Update(); return !is_down;}
+        [[nodiscard]] bool pressed () const {auto window = Interface::Window::Get(); return window.GetInputTimes(index).press   == window.Ticks();}
+        [[nodiscard]] bool released() const {auto window = Interface::Window::Get(); return window.GetInputTimes(index).release == window.Ticks();}
+        [[nodiscard]] bool repeated() const {auto window = Interface::Window::Get(); return window.GetInputTimes(index).repeat  == window.Ticks();}
+        [[nodiscard]] bool down    () const {auto times = Interface::Window::Get().GetInputTimes(index); return times.press > times.release;}
+        [[nodiscard]] bool up      () const {return !down();}
 
         [[nodiscard]] explicit operator bool() const {return index != None;}
 
@@ -65,22 +45,25 @@ namespace Input
             return index;
         }
 
-        [[nodiscard]] std::string Name() const // Returns a layout-dependent name, which
+        // Returns a button name which should hopefully be layout-dependent, but not input-language-dependent.
+        [[nodiscard]] std::string Name() const
         {
             if (index == None)
             {
                 return "None";
             }
-            else if (index >= BeginKeys && index < EndKeys)
+            else if (index >= BeginKeys && index < EndKeys) // Note that `BeginKeys == None`, so we check for `None` before this.
             {
                 const char *ret;
 
+                // From looking at the code, `SDL_GetKeyFromScancode` returns 0 on failure.
                 if (SDL_Keycode keycode = SDL_GetKeyFromScancode(SDL_Scancode(index)))
                     ret = SDL_GetKeyName(keycode);
                 else
                     ret = SDL_GetScancodeName(SDL_Scancode(index));
 
-                if (*ret) // We don't need to check for null pointers, since above functions never return those.
+                // It looks like the functions we call return an empty string rather than null on failure, but it's better to be safe.
+                if (ret && *ret)
                     return ret;
                 else
                     return "Unknown " + std::to_string(index);
@@ -121,14 +104,18 @@ namespace Input
             }
         }
 
+        // If a key is currently pressed (not down), assigns its index to this button.
+        // Returns false if nothing is pressed.
         bool AssignKey()
         {
             return Assign(BeginKeys, EndKeys);
         }
+        // Same but for the mouse buttons.
         bool AssignMouseButton()
         {
             return Assign(BeginMouseButtons, EndMouseButtons);
         }
+        // Same but for the mouse wheel.
         bool AssignMouseWheel()
         {
             return Assign(BeginMouseWheel, EndMouseWheel);
