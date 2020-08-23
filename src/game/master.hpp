@@ -11,8 +11,8 @@
 
 #include "audio/complete.h"
 #include "entities/base.h"
-#include "gameutils/action_sequence.h"
 #include "gameutils/adaptive_viewport.h"
+#include "gameutils/class_sequence.h"
 #include "gameutils/render.h"
 #include "gameutils/state.h"
 #include "graphics/complete.h"

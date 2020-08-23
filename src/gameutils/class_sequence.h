@@ -10,7 +10,7 @@
 
 template <typename Base>
 requires Refl::Class::explicitly_polymorphic<Base>
-class ActionSequence
+class ClassSequence
 {
     using storage_t = Refl::PolyStorage<Base>;
 
@@ -33,7 +33,7 @@ class ActionSequence
     }
 
   public:
-    constexpr ActionSequence() {}
+    constexpr ClassSequence() {}
 
     // Returns the amount of stored actions.
     [[nodiscard]] std::size_t size() const
@@ -43,7 +43,7 @@ class ActionSequence
 
     // Those iterators dereference to `const Refl::PolyStorage<Base> &`.
     // The list of objects is stored in a global variable, and is constructed on the first use.
-    // The `ActionSequence` object itself is empty, and can be constructed as needed.
+    // The `ClassSequence` object itself is empty, and can be constructed as needed.
     [[nodiscard]] auto begin() const
     {
         return GetList().begin();
