@@ -36,7 +36,7 @@ namespace Audio
         {
             ASSERT(buffer, "Attempt to use a null audio buffer.");
 
-            // We don't throw the handle is null. Instead, we make sure that any operation on a null handle has no effect.
+            // We don't throw if the handle is null. Instead, we make sure that any operation on a null handle has no effect.
             alGenSources(1, &data.handle);
 
             if (data.handle)
@@ -209,7 +209,7 @@ namespace Audio
                 alSourcefv(data.handle, AL_VELOCITY, v.as_array());
             return *this;
         }
-        Source &relative(bool r = 1)
+        Source &relative(bool r = true)
         {
             if (data.handle)
                 alSourcei(data.handle, AL_SOURCE_RELATIVE, r);
