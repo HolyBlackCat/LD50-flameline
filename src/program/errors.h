@@ -44,11 +44,10 @@ namespace Program
     namespace impl
     {
         // An assertion function.
-        // Triggers an error if `enable && !condition`.
-        inline bool Assert(bool enable, const char *context, const char *function, bool condition, std::string_view message_or_expr, const char *expr_or_nothing = nullptr)
+        inline void Assert(const char *context, const char *function, bool condition, std::string_view message_or_expr, const char *expr_or_nothing = nullptr)
         {
-            if (!enable || condition)
-                return true;
+            if (condition)
+                return;
 
             if (expr_or_nothing)
             {
@@ -61,35 +60,29 @@ namespace Program
                 HardError(STR("Assertion failed!\n   at   ", (context), "\n   in   ", (function), "\nExpression:\n   ", (message_or_expr)));
             }
 
-            return condition;
+            return;
         }
 
         // A template overload that allows using explicitly-but-not-implicitly-convertible-to-bool expressions as conditions.
         template <typename T>
-        bool Assert(bool enable, const char *context, const char *function, const T &condition, std::string_view message_or_expr, const char *expr_or_nothing = nullptr)
+        void Assert(const char *context, const char *function, const T &condition, std::string_view message_or_expr, const char *expr_or_nothing = nullptr)
         {
-            return Assert(enable, context, function, bool(condition), message_or_expr, expr_or_nothing);
+            return Assert(context, function, bool(condition), message_or_expr, expr_or_nothing);
         }
     }
 }
 
 
-// A debug assertion.
-// Can be called either as `ASSERT(bool)` or `ASSERT(bool, std::string_view)`.
+// An assertion macro that always works, even in release builds.
+// Can be called either as `ASSERT_ALWAYS(bool)` or `ASSERT_ALWAYS(bool, std::string_view)`.
 // In the first case, the expression is printed in the message, otherwise the custom message is printed.
-#define ASSERT(...) ASSERT_impl(__LINE__, __VA_ARGS__)
-#define ASSERT_impl(line, ...) ASSERT_impl_low(line, __VA_ARGS__)
-#define ASSERT_impl_low(line, ...) ::Program::impl::Assert(IMP_RE_ENABLE_ASSERTIONS, __FILE__ ":" #line, __PRETTY_FUNCTION__, __VA_ARGS__, #__VA_ARGS__)
+#define ASSERT_ALWAYS(...) ASSERT_ALWAYS_impl(__LINE__, __VA_ARGS__)
+#define ASSERT_ALWAYS_impl(line, ...) ASSERT_ALWAYS_impl_low(line, __VA_ARGS__)
+#define ASSERT_ALWAYS_impl_low(line, ...) ::Program::impl::Assert(__FILE__ ":" #line, __PRETTY_FUNCTION__, __VA_ARGS__, #__VA_ARGS__)
 
-// A macro controlling the assertions.
-// You can redefine it at any time to change the behavior or ASSERT.
-#ifndef IMP_RE_ENABLE_ASSERTIONS
-#  define IMP_RE_ENABLE_ASSERTIONS IMP_RE_ENABLE_ASSERTIONS_DEFAULT
-#endif
-
-// The default value of `IMP_RE_ENABLE_ASSERTIONS`.
+// An assertion macro that only works in debug builds. (But you can redefine it if necessary.)
 #ifdef NDEBUG
-#  define IMP_RE_ENABLE_ASSERTIONS_DEFAULT 0
+#  define ASSERT(...) void(0)
 #else
-#  define IMP_RE_ENABLE_ASSERTIONS_DEFAULT 1
+#  define ASSERT(...) ASSERT_ALWAYS(__VA_ARGS__)
 #endif
