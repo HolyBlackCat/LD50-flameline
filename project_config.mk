@@ -9,18 +9,12 @@ OUTPUT_FILE := bin/imp-re
 LINKER_MODE := CXX
 
 # Dependency set name
-LIBRARY_PACK_NAME := imp-re_deps_2020-08-02
-USED_PACKAGES := openal freetype2 ogg vorbis vorbisfile zlib fmt double-conversion bullet
-USED_EXTERNAL_PACKAGES :=
-ifeq ($(TARGET_OS),windows)
-USED_PACKAGES += sdl2
-else
-USED_EXTERNAL_PACKAGES += sdl2
-endif
+LIBRARY_PACK_NAME := imp-re_deps_2020-10-25
+USED_PACKAGES := sdl2 openal freetype2 ogg vorbis vorbisfile zlib fmt double-conversion bullet
 
 
 # Flags
-CXXFLAGS := -std=c++2a -pedantic-errors -Wall -Wextra -Wdeprecated -Wextra-semi
+CXXFLAGS := -std=c++20 -pedantic-errors -Wall -Wextra -Wdeprecated -Wextra-semi
 LDFLAGS :=
 # Important flags
 override CXXFLAGS += -include src/program/common_macros.h -include src/program/parachute.h -Isrc -Ilib/include $(subst -Dmain,-DENTRY_POINT_OVERRIDE,$(sort $(deps_compiler_flags)))

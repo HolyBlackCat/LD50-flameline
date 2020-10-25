@@ -6,8 +6,8 @@ CXX_COMPILER = clang++ --target=x86_64-w64-windows-gnu -femulated-tls
 C_LINKER     = clang --target=x86_64-w64-windows-gnu -femulated-tls -fuse-ld=lld
 CXX_LINKER   = clang++ --target=x86_64-w64-windows-gnu -femulated-tls -fuse-ld=lld
 else
-C_COMPILER   = clang-10
-CXX_COMPILER = clang++-10
-C_LINKER     = clang-10 -fuse-ld=lld
-CXX_LINKER   = clang++-10 -fuse-ld=lld
+C_COMPILER   = clang-11
+CXX_COMPILER = clang++-11
+C_LINKER     = clang-11 -fuse-ld=lld-11
+CXX_LINKER   = clang++-11 -fuse-ld=lld-11
 endif
