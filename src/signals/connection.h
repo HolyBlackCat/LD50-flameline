@@ -33,6 +33,28 @@ namespace Sig
 
     namespace impl
     {
+        /* Class hierarchy:
+         *
+         *           impl::ConnectionAliases
+         *                  /          \
+         *                 /            \__________________________________
+         *    impl::BasicConnection                                        \
+         *       /  |       \                                               \
+         *      /   |  (connection list element)  <--contains--  impl::BasicConnectionList
+         *     /    |                                                       /  \
+         * ___/_____|______________________________________________________/____\__________
+         *    |     |               Exposed classes:                      /      \
+         *    |     |                                                    /      FixedOwner::ConnectionList
+         *    |    FixedOwner::Connection                               /
+         *    |                                                       ConnectionList
+         *  Connection
+         *
+         *
+         * `FixedOwner::Connection[List]` clases don't change their owner unless they're told to.
+         * `Connection[List]` clases change their owner automatically when moved,
+         *   while assuming that the owner is at a fixed offset relative to themselves.
+         */
+
         template <ConnectionOwner LocalOwnerT, ConnectionOwner RemoteOwnerT, ConnectionState LocalStateT, ConnectionState RemoteStateT>
         class BasicConnection;
 
@@ -67,8 +89,8 @@ namespace Sig
                 }
 
                 // This is called when the owner of a connection (or a connection list) is moved.
-                // In practice, this is called when the connection or list itself is moved. The new owner address is calculated under
-                //   the assumption that the connection is stored at a fixed offset relative to the owner.
+                // This can happen when the owner is changed manually, or when the connection or list itself is moved. In the latter case,
+                //   the new owner address is calculated under the assumption that the connection is stored at a fixed offset relative to the owner.
                 // This callback is not emitted when a connection list moves its elements around in the vector, because it doesn't change their owner.
                 virtual void OnRemoteOwnerMoved(const base_t &local_con, LocalOwner &local_owner, RemoteOwner &old_remote_owner, RemoteOwner &new_remote_owner) noexcept
                 {
@@ -128,10 +150,23 @@ namespace Sig
             using remote_basic_callbacks_t = typename ConnectionCallbacks<RemoteOwner, LocalOwner, RemoteState, LocalState>::Base;
         };
 
+        // A helper class that invokes the `Bind` member function of the object that you give it (which can be a connection or a list).
+        // A class is necessary because we need to be`friend` it, which is necessary because the functions it will be calling should be non-public.
+        // We keep the `Bind` member functions non-public because they can be asymmetrical, e.g. a connection list knows how to bind to a connection,
+        //   but not vice versa, and we don't want to expose this assymetry to the user.
+        // See comment on `Sig::Bind` for why this is not `noexcept`.
+        struct BindInvoker
+        {
+            template <auto LocalGetter, auto RemoteGetter, typename LocalCallbacks, typename RemoteCallbacks>
+            static void Bind(auto &con_a, auto &owner_a, auto &con_b, auto &owner_b) requires
+                requires{ { con_a.template Bind<LocalGetter, RemoteGetter, LocalCallbacks, RemoteCallbacks>(owner_a, con_b, owner_b) } -> std::same_as<void>; }
+            {
+                con_a.template Bind<LocalGetter, RemoteGetter, LocalCallbacks, RemoteCallbacks>(owner_a, con_b, owner_b);
+            }
+        };
+
         // An incomplete 'connection' class.
-        // Is non-movable and has no public 'bind' function, but has some
-        //   protected functions to help implement this functionality in derived classes.
-        // See derived classes `Connection` and `ConnectionList` below for a description of what it does.
+        // Is non-movable, but has some protected functions to help make derived classes movable.
         template <ConnectionOwner LocalOwnerT, ConnectionOwner RemoteOwnerT, ConnectionState LocalStateT, ConnectionState RemoteStateT>
         class BasicConnection : public ConnectionAliases<LocalOwnerT, RemoteOwnerT, LocalStateT, RemoteStateT>
         {
@@ -152,6 +187,7 @@ namespace Sig
 
           private:
             friend remote_base_t;
+            friend BindInvoker;
 
             using callbacks_helper_t        = ConnectionCallbacks<LocalOwnerT, RemoteOwnerT, LocalStateT, RemoteStateT>;
             using remote_callbacks_helper_t = ConnectionCallbacks<RemoteOwnerT, LocalOwnerT, RemoteStateT, LocalStateT>;
@@ -321,13 +357,20 @@ namespace Sig
                 AssertConsistency();
             }
 
+            // Wraps `LowBind` with an interface understood by `BindInvoker`.
+            // This can bind to anything derived from `BasicConnection`.
+            template <auto LocalGetter, auto RemoteGetter, typename LocalCallbacks, typename RemoteCallbacks>
+            void Bind(LocalOwnerT &owner, remote_base_t &remote, RemoteOwnerT &remote_owner) noexcept
+            {
+                LowBind<LocalCallbacks, RemoteCallbacks>(owner, remote, remote_owner);
+            }
+
             // Move `other` into this object.
-            // Asserts `this != &other` (in release builds does nothing otherwise).
+            // If `this == &other`, does nothing.
             // The binding on the current object is lost, if any. The unbind callback is called in that case.
             // The "remote owner moved" callback is not invoked, and the owner pointer is not changed.
             void MoveFrom(BasicConnection &other) noexcept
             {
-                ASSERT(this != &other);
                 if (this == &other)
                     return;
 
@@ -356,15 +399,14 @@ namespace Sig
 
             // Change the owner of this object to `new_owner`.
             // Since it requires modifying remote state, does nothing if this connection is not bound.
+            // Does nothing if the already have this owner.
             // Invokes the "remote owner moved" callback on the remote.
             // If this is called together with `MoveFrom`, I think `MoveFrom` should be called first.
-            // The new owner must be different from the old one, otherwise you'll get an assertion (or no-op in a release build).
             void OwnerWasMovedTo(owner_t &new_owner) noexcept
             {
                 if (!*this)
                     return; // Stop if not bound.
 
-                ASSERT(data.remote_con->data.remote_owner != &new_owner); // `&new_owner` must be different from the old one.
                 if (data.remote_con->data.remote_owner == &new_owner)
                     return; // If the owner didn't change, stop early to avoid invoking the callback.
 
@@ -378,23 +420,201 @@ namespace Sig
                 if (data.remote_combined_callback)
                     data.remote_combined_callback(data.remote_con, data.remote_owner, &old_owner, &new_owner);
             }
+
+            // Moves this object from `other`, and automatically updates the owner assuming it's at a fixed offset relative to this object.
+            // Does nothing if `this == &other`.
+            void MoveFromAndUpdateOwner(BasicConnection &other) noexcept
+            {
+                // None of this needs a self-assignment check.
+                MoveFrom(other);
+                if (*this)
+                {
+                    // Calculate new owner address, assuming it's at a fixed offset relative to the connection.
+                    char *new_owner = reinterpret_cast<char *>(this) + (reinterpret_cast<char *>(Owner()) - reinterpret_cast<char *>(&other));
+                    OwnerWasMovedTo(*reinterpret_cast<LocalOwnerT *>(new_owner));
+                }
+            }
         };
 
-        // A helper class that invokes the `Bind` member function of the object that you give it (which can be a connection or a list).
-        // A class is necessary because we need to be`friend` it, which is necessary because the functions it will be calling should be private.
-        // We keep the `Bind` member functions private because they can be asymmetrical, e.g. a connection list knows how to bind to a connection,
-        //   but not vice versa, and we don't want to expose this assymetry to the user.
-        // See comment on `Sig::Bind` for why this is not `noexcept`.
-        struct BindInvoker
+        // An incomplete 'connection list' class.
+        // Is non-movable, but has some protected functions to help make derived classes movable.
+        template <
+            ConnectionOwner LocalOwnerT, ConnectionOwner RemoteOwnerT,
+            ConnectionState LocalStateT = EmptyState, ConnectionState RemoteStateT = EmptyState
+        >
+        class BasicConnectionList : public ConnectionAliases<LocalOwnerT, RemoteOwnerT, LocalStateT, RemoteStateT>
         {
-            template <auto LocalGetter, auto RemoteGetter, typename LocalCallbacks, typename RemoteCallbacks>
-            static void Bind(auto &con_a, auto &owner_a, auto &con_b, auto &owner_b) requires
-                requires{ { con_a.template Bind<LocalGetter, RemoteGetter, LocalCallbacks, RemoteCallbacks>(owner_a, con_b, owner_b) } -> std::same_as<void>; }
+            friend BindInvoker;
+
+            // A type of the symmetric list.
+            using remote_list_t = BasicConnectionList<RemoteOwnerT, LocalOwnerT, RemoteStateT, LocalStateT>;
+            friend remote_list_t;
+
+            using aliases = ConnectionAliases<LocalOwnerT, RemoteOwnerT, LocalStateT, RemoteStateT>;
+
+            // Wraps existing callbacks, adding code to `OnUnbindAlive` to erase the unbound connection from the list.
+            template <typename Orig/*Original callbacks*/, auto GetLocalListFromOwner>
+            struct ExtraCallbacks : Orig
             {
-                con_a.template Bind<LocalGetter, RemoteGetter, LocalCallbacks, RemoteCallbacks>(owner_a, con_b, owner_b);
+                void OnUnbindAlive(const typename Orig::base_t &local_con, typename Orig::owner_t &old_local_owner, typename Orig::remote_owner_t &old_remote_owner) noexcept override
+                {
+                    // Invoke the callback first, while `local_con` is still alive.
+                    Orig::OnUnbindAlive(local_con, old_local_owner, old_remote_owner);
+
+                    // Erase `local_con` from `.elements`.
+                    auto &local_list_elems = std::invoke(GetLocalListFromOwner, old_local_owner).elements;
+                    using elem_t = typename std::remove_cvref_t<decltype(local_list_elems)>::value_type;
+                    std::size_t index = &static_cast<const elem_t &>(local_con) - local_list_elems.data();
+                    ASSERT( index < local_list_elems.size() );
+                    local_list_elems.erase(local_list_elems.begin() + index);
+                }
+            };
+
+            // This is what is actually stored in the connection list.
+            // Similar to `Connection`, but has custom bind funcitons and can't be bound with `Sig::Bind`.
+            // Unlike `Connection`, doesn't recalculate the owner address if moved.
+            struct Elem : public BasicConnection<LocalOwnerT, RemoteOwnerT, LocalStateT, RemoteStateT>
+            {
+                friend BasicConnectionList;
+                using base = BasicConnection<LocalOwnerT, RemoteOwnerT, LocalStateT, RemoteStateT>;
+
+                constexpr Elem() noexcept {}
+
+                Elem(Elem &&other) noexcept
+                {
+                    base::MoveFrom(other);
+                }
+                Elem &operator=(Elem &&other) noexcept
+                {
+                    base::MoveFrom(other);
+                    return *this;
+                }
+
+                // Binds this object to something derived from `BasicConnection`, adding `ExtraCallbacks` to the local callbacks.
+                template <auto GetLocalListFromOwner, typename LocalCallbacks, typename RemoteCallbacks>
+                void BindThisElem(LocalOwnerT &owner, typename base::remote_base_t &remote, RemoteOwnerT &remote_owner) noexcept
+                {
+                    using ExtraLocalCallbacks = ExtraCallbacks<LocalCallbacks, GetLocalListFromOwner>;
+                    base::template LowBind<ExtraLocalCallbacks, RemoteCallbacks>(owner, remote, remote_owner);
+                }
+                // Binds this object to a `BasicConnectionList`, adding `ExtraCallbacks` to both callbacks.
+                template <auto GetLocalListFromOwner, auto GetRemoteListFromOwner, typename LocalCallbacks, typename RemoteCallbacks>
+                void BindThisElemToOtherListElem(LocalOwnerT &owner, typename base::remote_base_t &remote, RemoteOwnerT &remote_owner) noexcept
+                {
+                    using ExtraLocalCallbacks = ExtraCallbacks<LocalCallbacks, GetLocalListFromOwner>;
+                    using ExtraRemoteCallbacks = ExtraCallbacks<RemoteCallbacks, GetRemoteListFromOwner>;
+                    base::template LowBind<ExtraLocalCallbacks, ExtraRemoteCallbacks>(owner, remote, remote_owner);
+                }
+            };
+            // The list of connections.
+            std::vector<Elem> elements;
+
+            // This can bind to anything derived from `BasicConnection`.
+            template <auto LocalGetter, auto RemoteGetter, typename LocalCallbacks, typename RemoteCallbacks>
+            void Bind(LocalOwnerT &owner, typename Elem::remote_base_t &remote, RemoteOwnerT &remote_owner) noexcept
+            {
+                // First, explicitly unbind the remote!
+                // We have to do this in case it's already bound to our list, because in that case the next line would probably malfunction.
+                remote.Unbind();
+                elements.emplace_back().template BindThisElem<LocalGetter, LocalCallbacks, RemoteCallbacks>(owner, remote, remote_owner);
+            }
+
+            // This can bind to a `BasicConnectionList`.
+            // This is not noexcept on purpose, because the element allocation can throw.
+            template <auto LocalGetter, auto RemoteGetter, typename LocalCallbacks, typename RemoteCallbacks>
+            void Bind(LocalOwnerT &owner, remote_list_t &remote, RemoteOwnerT &remote_owner)
+            {
+                // We don't check if the second list is already bound to ours, add unconditionally add a new connection.
+                // This could've been avoided only in linear time, which is not good enough.
+                Elem &local_elem = elements.emplace_back();
+                FINALLY_ON_THROW( elements.pop_back(); ) // The next `emplace_back` is the only thing that can throw here.
+                typename remote_list_t::Elem &remote_elem = remote.elements.emplace_back(); // Nothing throws below this point, so no scope guard.
+                local_elem.template BindThisElemToOtherListElem<LocalGetter, RemoteGetter, LocalCallbacks, RemoteCallbacks>(owner, remote_elem, remote_owner);
+            }
+
+          protected:
+            constexpr BasicConnectionList() noexcept {}
+
+            // Updates the owner for all elements.
+            // Does nothing if already using that owner.
+            void OwnerWasMovedTo(LocalOwnerT &new_owner) noexcept
+            {
+                // We don't have to manually check if the owner didn't change.
+                for (Elem &elem : elements)
+                    elem.OwnerWasMovedTo(new_owner);
+            }
+
+            // Moves this object from `other`.
+            // Does nothing if `this == &other`.
+            void MoveFrom(BasicConnectionList &other) noexcept
+            {
+                if (this == &other)
+                    return;
+
+                // Clear the list first.
+                // Note that we can't just overwrite it, because it wouldn't call the user callbacks.
+                UnbindAll();
+                // Move the elements.
+                elements = std::move(other.elements);
+            }
+
+            // Moves this object from `other`, and automatically updates the owner assuming it's at a fixed offset relative to this object.
+            // Does nothing if `this == &other`.
+            void MoveFromAndUpdateElemOwners(BasicConnectionList &other) noexcept
+            {
+                // None of this needs a self-assignment check.
+
+                // Move the state.
+                MoveFrom(other);
+
+                if (elements.empty())
+                    return; // Stop if no elements, because we need at least one to do calculations.
+
+                // Calculate new owner address, assuming it's at a fixed offset relative to the connection.
+                // This assumes that all elements have the same owner.
+                char *new_owner = reinterpret_cast<char *>(this) + (reinterpret_cast<char *>(elements.front().Owner()) - reinterpret_cast<char *>(&other));
+                OwnerWasMovedTo(*reinterpret_cast<LocalOwnerT *>(new_owner));
+            }
+
+          public:
+            // Returns a const reference to one of the sub-connections (`const BasicConnection<...> &`).
+            // The reference is const because rebinding a sub-connection would break things (the connection
+            //   would be destroyed as soon as the old binding is lost, in the middle of the rebinding process).
+            [[nodiscard]] const typename aliases::base_t &operator[](std::size_t index) const noexcept
+            {
+                ASSERT(index < elements.size());
+                const typename aliases::base_t &ret = elements[index];
+                ASSERT(ret);
+                return ret;
+            }
+
+            // Returns the amount of the sub-connections.
+            [[nodiscard]] std::size_t Size() const noexcept
+            {
+                return elements.size();
+            }
+
+            // Removes a specific connection from the list.
+            void Unbind(std::size_t index) noexcept
+            {
+                ASSERT(index < elements.size());
+                // The unbound connection is removed from the list automatically by its callback.
+                // Note that erasing the element and relying on its destructor would be wrong, since it wouldn't call the user callback.
+                elements[index].Unbind();
+            }
+
+            // Removes all connections from the list.
+            void UnbindAll() noexcept
+            {
+                // Note that we can't just do `elements.clear()`, since it wouldn't call the user callback.
+                std::size_t i = elements.size();
+                // Loop from the back to avoid pointlessly moving the elements around.
+                while (i-- > 0)
+                    Unbind(i);
             }
         };
     }
+
 
     // Binds two connections to each other.
     // Example usage: `Sig::Bind<&A::con_a, &B::con_b>(a, b);`,
@@ -440,12 +660,52 @@ namespace Sig
         }
     }
 
+
+    // Those connections and connection lists are immovable for safety, but can be moved manually with a special member function.
+    // The owner can be updated manually with a member function.
+    namespace FixedOwner
+    {
+        // Makes some low-level functions of `BasicConnection` public, and has a public construtor.
+        // See `Sig::Connection` for more details on connections in general.
+        template <
+            ConnectionOwner LocalOwnerT, ConnectionOwner RemoteOwnerT,
+            ConnectionState LocalStateT = EmptyState, ConnectionState RemoteStateT = EmptyState
+        >
+        class Connection : public impl::BasicConnection<LocalOwnerT, RemoteOwnerT, LocalStateT, RemoteStateT>
+        {
+            using base = impl::BasicConnection<LocalOwnerT, RemoteOwnerT, LocalStateT, RemoteStateT>;
+
+          public:
+            constexpr Connection() noexcept {}
+
+            using base::MoveFrom;
+            using base::OwnerWasMovedTo;
+        };
+
+        // Makes some low-level functions of `impl::BasicConnection` public, and has a public construtor.
+        // See `Sig::ConnectionList` for more details on connections in general.
+        template <
+            ConnectionOwner LocalOwnerT, ConnectionOwner RemoteOwnerT,
+            ConnectionState LocalStateT = EmptyState, ConnectionState RemoteStateT = EmptyState
+        >
+        class ConnectionList : public impl::BasicConnectionList<LocalOwnerT, RemoteOwnerT, LocalStateT, RemoteStateT>
+        {
+            using base = impl::BasicConnectionList<LocalOwnerT, RemoteOwnerT, LocalStateT, RemoteStateT>;
+
+          public:
+            constexpr ConnectionList() noexcept {}
+
+            using base::MoveFrom;
+            using base::OwnerWasMovedTo;
+        };
+    }
+
     // A connection.
     // Can be bound to a single `Connection` or `ConnectionList` (the type of which has to be symmetric to this one, see the comment on `Bind`).
     // When bound, stores a pointer to the remote connection and to its owner (the enclosing class, possibly indirectly enclosing),
     //   and some type-erased callbacks that are called automatically in certain situations.
     // If `LocalStateT` is specified, also stores a value of that type, which can be freely accessed.
-    // When const, it can't be bound/unbound, the user state becomes const, and the remote connection will be exposed only as const. Everything else shouldn't change./
+    // When const, it can't be bound/unbound, the user state becomes const, and the remote connection will be exposed only as const. Everything else shouldn't change.
     // NOTE: This class can be moved, but if it's connected, it will look for a new owner at the same offset relative to itself, be careful.
     template <
         ConnectionOwner LocalOwnerT, ConnectionOwner RemoteOwnerT,
@@ -453,207 +713,44 @@ namespace Sig
     >
     class Connection : public impl::BasicConnection<LocalOwnerT, RemoteOwnerT, LocalStateT, RemoteStateT>
     {
-        friend impl::BindInvoker;
         using base = impl::BasicConnection<LocalOwnerT, RemoteOwnerT, LocalStateT, RemoteStateT>;
-
-        // This can bind to anything derived from `BasicConnection`.
-        template <auto LocalGetter, auto RemoteGetter, typename LocalCallbacks, typename RemoteCallbacks>
-        void Bind(LocalOwnerT &owner, typename base::remote_base_t &remote, RemoteOwnerT &remote_owner) noexcept
-        {
-            base::template LowBind<LocalCallbacks, RemoteCallbacks>(owner, remote, remote_owner);
-        }
-
-        void MoveFromAndUpdateOwner(Connection &other) noexcept
-        {
-            base::MoveFrom(other);
-            if (*this)
-            {
-                // Calculate new owner address, assuming it's at a fixed offset relative to the connection.
-                char *new_owner = reinterpret_cast<char *>(this) + (reinterpret_cast<char *>(base::Owner()) - reinterpret_cast<char *>(&other));
-                base::OwnerWasMovedTo(*reinterpret_cast<LocalOwnerT *>(new_owner));
-            }
-        }
 
       public:
         constexpr Connection() noexcept {}
 
         Connection(Connection &&other) noexcept
         {
-            MoveFromAndUpdateOwner(other);
+            base::MoveFromAndUpdateOwner(other);
         }
 
         Connection &operator=(Connection &&other) noexcept
         {
-            if (this != &other)
-                MoveFromAndUpdateOwner(other);
+            base::MoveFromAndUpdateOwner(other); // This automatically does a self-assignment check.
             return *this;
         }
     };
 
-    // Same as `Connection`, but can be connected to more than one `Connection` and/or `ConnectionList`.
+    // Same as `Connection`, but can bind to more than one connection or connection list.
     template <
         ConnectionOwner LocalOwnerT, ConnectionOwner RemoteOwnerT,
         ConnectionState LocalStateT = EmptyState, ConnectionState RemoteStateT = EmptyState
     >
-    class ConnectionList : public impl::ConnectionAliases<LocalOwnerT, RemoteOwnerT, LocalStateT, RemoteStateT>
+    class ConnectionList : public impl::BasicConnectionList<LocalOwnerT, RemoteOwnerT, LocalStateT, RemoteStateT>
     {
-        friend impl::BindInvoker;
-
-        // A type of the symmetric list.
-        using remote_list_t = ConnectionList<RemoteOwnerT, LocalOwnerT, RemoteStateT, LocalStateT>;
-        friend remote_list_t;
-
-        using aliases = impl::ConnectionAliases<LocalOwnerT, RemoteOwnerT, LocalStateT, RemoteStateT>;
-
-        // Wraps existing callbacks, adding code to `OnUnbindAlive` to erase the unbound connection from the list.
-        template <typename Orig/*Original callbacks*/, auto GetLocalListFromOwner>
-        struct ExtraCallbacks : Orig
-        {
-            void OnUnbindAlive(const typename Orig::base_t &local_con, typename Orig::owner_t &old_local_owner, typename Orig::remote_owner_t &old_remote_owner) noexcept override
-            {
-                // Invoke the callback first, while `local_con` is still alive.
-                Orig::OnUnbindAlive(local_con, old_local_owner, old_remote_owner);
-
-                // Erase `local_con` from `.elements`.
-                auto &local_list_elems = std::invoke(GetLocalListFromOwner, old_local_owner).elements;
-                using elem_t = typename std::remove_cvref_t<decltype(local_list_elems)>::value_type;
-                std::size_t index = &static_cast<const elem_t &>(local_con) - local_list_elems.data();
-                ASSERT( index < local_list_elems.size() );
-                local_list_elems.erase(local_list_elems.begin() + index);
-            }
-        };
-
-        // This is what is actually stored in the connection list.
-        // Similar to `Connection`, but has custom bind funcitons and can't be bound with `Sig::Bind`.
-        // Unlike `Connection`, doesn't recalculate the owner address if moved.
-        struct Elem : public impl::BasicConnection<LocalOwnerT, RemoteOwnerT, LocalStateT, RemoteStateT>
-        {
-            friend ConnectionList;
-            using base = impl::BasicConnection<LocalOwnerT, RemoteOwnerT, LocalStateT, RemoteStateT>;
-
-            constexpr Elem() noexcept {}
-
-            Elem(Elem &&other) noexcept
-            {
-                base::MoveFrom(other);
-            }
-            Elem &operator=(Elem &&other) noexcept
-            {
-                if (this != &other)
-                    base::MoveFrom(other);
-                return *this;
-            }
-
-            // Binds this object to something derived from `BasicConnection`, adding `ExtraCallbacks` to the local callbacks.
-            template <auto GetLocalListFromOwner, typename LocalCallbacks, typename RemoteCallbacks>
-            void BindThisElem(LocalOwnerT &owner, typename base::remote_base_t &remote, RemoteOwnerT &remote_owner) noexcept
-            {
-                using ExtraLocalCallbacks = ExtraCallbacks<LocalCallbacks, GetLocalListFromOwner>;
-                base::template LowBind<ExtraLocalCallbacks, RemoteCallbacks>(owner, remote, remote_owner);
-            }
-            // Binds this object to a `ConnectionList`, adding `ExtraCallbacks` to both callbacks.
-            template <auto GetLocalListFromOwner, auto GetRemoteListFromOwner, typename LocalCallbacks, typename RemoteCallbacks>
-            void BindThisElemToOtherListElem(LocalOwnerT &owner, typename base::remote_base_t &remote, RemoteOwnerT &remote_owner) noexcept
-            {
-                using ExtraLocalCallbacks = ExtraCallbacks<LocalCallbacks, GetLocalListFromOwner>;
-                using ExtraRemoteCallbacks = ExtraCallbacks<RemoteCallbacks, GetRemoteListFromOwner>;
-                base::template LowBind<ExtraLocalCallbacks, ExtraRemoteCallbacks>(owner, remote, remote_owner);
-            }
-        };
-        // The list of connections.
-        std::vector<Elem> elements;
-
-        // Moves this object from `other`.
-        // Asserts `this != &other` (otherwise, in release builds this will be a no-op).
-        void MoveFromAndUpdateElemOwners(ConnectionList &other) noexcept
-        {
-            // Clear the list first.
-            // Note that we can't just overwrite it, because it wouldn't call the user callbacks.
-            UnbindAll();
-            // Move the elements.
-            elements = std::move(other.elements);
-
-            for (Elem &elem : elements)
-            {
-                // Calculate new owner address, assuming it's at a fixed offset relative to the connection.
-                // The elements will normally have the same owner, but to be safe we repeat the calculation for each one of them.
-                char *new_owner = reinterpret_cast<char *>(this) + (reinterpret_cast<char *>(elem.Owner()) - reinterpret_cast<char *>(&other));
-                elem.OwnerWasMovedTo(*reinterpret_cast<LocalOwnerT *>(new_owner));
-            }
-        }
-
-        // This can bind to anything derived from `BasicConnection`.
-        template <auto LocalGetter, auto RemoteGetter, typename LocalCallbacks, typename RemoteCallbacks>
-        void Bind(LocalOwnerT &owner, typename Elem::remote_base_t &remote, RemoteOwnerT &remote_owner) noexcept
-        {
-            // First, explicitly unbind the remote!
-            // We have to do this in case it's already bound to our list, because in that case the next line would probably malfunction.
-            remote.Unbind();
-            elements.emplace_back().template BindThisElem<LocalGetter, LocalCallbacks, RemoteCallbacks>(owner, remote, remote_owner);
-        }
-
-        // This can bind to a `ConnectionList`.
-        // This is not noexcept on purpose, because the element allocation can throw.
-        template <auto LocalGetter, auto RemoteGetter, typename LocalCallbacks, typename RemoteCallbacks>
-        void Bind(LocalOwnerT &owner, remote_list_t &remote, RemoteOwnerT &remote_owner)
-        {
-            // We don't check if the second list is already bound to ours, add unconditionally add a new connection.
-            // This could've been avoided only in linear time, which is not good enough.
-            Elem &local_elem = elements.emplace_back();
-            FINALLY_ON_THROW( elements.pop_back(); ) // The next `emplace_back` is the only thing that can throw here.
-            typename remote_list_t::Elem &remote_elem = remote.elements.emplace_back(); // Nothing throws below this point, so no scope guard.
-            local_elem.template BindThisElemToOtherListElem<LocalGetter, RemoteGetter, LocalCallbacks, RemoteCallbacks>(owner, remote_elem, remote_owner);
-        }
+        using base = impl::BasicConnectionList<LocalOwnerT, RemoteOwnerT, LocalStateT, RemoteStateT>;
 
       public:
         constexpr ConnectionList() noexcept {}
 
         ConnectionList(ConnectionList &&other) noexcept
         {
-            MoveFromAndUpdateElemOwners(other);
+            base::MoveFromAndUpdateElemOwners(other);
         }
 
         ConnectionList &operator=(ConnectionList &&other) noexcept
         {
-            if (this != &other)
-                MoveFromAndUpdateElemOwners(other);
+            base::MoveFromAndUpdateElemOwners(other); // This automatically does a self-assignment check.
             return *this;
-        }
-
-        // Returns a const reference to one of the sub-connections (`const BasicConnection<...> &`).
-        // The reference is const because rebinding a sub-connection would break things (the connection
-        //   would be destroyed as soon as the old binding is lost, in the middle of the rebinding process).
-        [[nodiscard]] const typename aliases::base_t &operator[](std::size_t index) const noexcept
-        {
-            ASSERT(index < elements.size());
-            const typename aliases::base_t &ret = elements[index];
-            ASSERT(ret);
-            return ret;
-        }
-
-        // Returns the amount of the sub-connections.
-        [[nodiscard]] std::size_t Size() const noexcept
-        {
-            return elements.size();
-        }
-
-        // Removes a specific connection from the list.
-        void Unbind(std::size_t index) noexcept
-        {
-            ASSERT(index < elements.size());
-            // The unbound connection is removed from the list automatically by its callback.
-            // Note that erasing the element and relying on its destructor would be wrong, since it wouldn't call the user callback.
-            elements[index].Unbind();
-        }
-
-        // Removes all connections from the list.
-        void UnbindAll() noexcept
-        {
-            // Note that we can't just do `elements.clear()`, since it wouldn't call the user callback.
-            std::size_t i = elements.size();
-            // Loop from the back to avoid pointlessly moving the elements around.
-            while (i-- > 0)
-                Unbind(i);
         }
     };
 }
