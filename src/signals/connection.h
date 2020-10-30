@@ -621,7 +621,8 @@ namespace Sig
     //   where `a`,`b` are instances of classes `A`,`B`, having member variables `con_a`,`con_b`, which are `Sig::Connection`s or `Sig::ConnectionList`s.
     // Connections returned by the getters must be symmetrical, i.e. `Sig::Connection[List]<A,B,X,Y>` can only bind to `Sig::Connection[List]<B,A,Y,X>` (lists can bind to non-lists).
     // The getters don't have to be member pointers; they are used as `std::invoke(getter, connection)`,
-    //   but NOTE that the connections returned by the getters have to be located AT A FIXED OFFSET relative to their owners. If moved, they'll look for a new owner at that offset.
+    //   but NOTE that unless you're using `FixedOwner::...` connections, the connections returned by the getters
+    //   have to be located AT A FIXED OFFSET relative to their owners. If moved, they'll look for a new owner at that offset.
     // You can optionally provide callbacks a the 3rd and 4th parameters, for the first and the second connections respectively. Those callbacks
     //   must inherit from `::basic_callbacks_t` (a member type of the respective connection), which is an alias for `Sig::impl::ConnectionCallbacks<...>::Base`.
     // Note that this is not `noexcept`, it can throw only if a connection list runs out of memory.
@@ -662,7 +663,7 @@ namespace Sig
 
 
     // Those connections and connection lists are immovable for safety, but can be moved manually with a special member function.
-    // The owner can be updated manually with a member function.
+    // The owner address can only be updated manually.
     namespace FixedOwner
     {
         // Makes some low-level functions of `BasicConnection` public, and has a public construtor.
