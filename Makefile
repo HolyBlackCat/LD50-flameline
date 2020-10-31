@@ -627,16 +627,18 @@ override EXCLUDE_FILES += $(foreach d,$(EXCLUDE_DIRS),$(call rwildcard,$d,*.c *.
 override include_files = $(filter-out $(EXCLUDE_FILES),$(SOURCES) $(foreach d,$(SOURCE_DIRS),$(call rwildcard,$d,*.h *.hpp)))
 override get_file_headers = $(foreach x,$(pch_all_entries),$(if $(filter $(call pch_entry_file_patterns,$x),$1),-include $(call pch_entry_header,$x)))
 override get_file_local_flags = $(foreach x,$(subst |, ,$(subst $(space),<,$(FILE_SPECIFIC_FLAGS))),$(if $(filter $(subst *,%,$(subst <, ,$(word 1,$(subst >, ,$x)))),$1),$(subst <, ,$(word 2,$(subst >, ,$x)))))
-override file_command = && $(call echo,{"directory": "$(current_dir)"$(comma) "file": "$(current_dir)/$3"$(comma) "command": "$(strip $1 $2 $(call get_file_headers,$3) $3)"}$(comma)) >>compile_commands.json
-override all_commands = $(foreach f,$(filter %.c $(if $(assume_h_files_are_cpp),,%.h),$(include_files)),$(call file_command,$(C_COMPILER),$(CFLAGS) $(call get_file_local_flags,$3),$f)) \
-						$(foreach f,$(filter %.cpp %.hpp $(if $(assume_h_files_are_cpp),%.h),$(include_files)),$(call file_command,$(CXX_COMPILER),$(CXXFLAGS) $(call get_file_local_flags,$3),$f))
+override file_command = $(file >>compile_commands.json,{"directory": "$(current_dir)", "file": "$(current_dir)/$3", "command": "$(strip $1 $2 $(call get_file_headers,$3) $3)"},)
+override all_commands = $(foreach f,$(filter %.c $(if $(assume_h_files_are_cpp),,%.h),$(include_files)),$(call file_command,$(C_COMPILER),$(CFLAGS) $(call get_file_local_flags,$f),$f)) \
+						$(foreach f,$(filter %.cpp %.hpp $(if $(assume_h_files_are_cpp),%.h),$(include_files)),$(call file_command,$(CXX_COMPILER),$(CXXFLAGS) $(call get_file_local_flags,$f),$f))
 
 # Public: generate `compile_commands.json`.
 # Any target-specific flags are ignored.
 .PHONY: commands
 commands: __no_mode_needed
 	@$(call echo,[Generating] compile_commands.json)
-	@$(call echo,[) >compile_commands.json $(all_commands) && $(call echo,]) >>compile_commands.json
+	$(file >compile_commands.json,[)
+	$(all_commands)
+	$(file >>compile_commands.json,])
 	@$(call echo,[Done])
 
 # Public: remove compile_commands.json.
