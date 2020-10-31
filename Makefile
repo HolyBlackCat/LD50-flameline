@@ -786,7 +786,7 @@ else
 ifeq ($(HOST_SHELL),windows)
 override ldd_with_path = $(call set_env,PATH,$(call native_path,$(library_pack_path)/$(directory_dll));%PATH%) && $(LDD)
 else
-override ldd_with_path = $(call set_env,PATH,$(call native_path,$(library_pack_path)/$(directory_dll));$$PATH) && $(LDD)
+override ldd_with_path = $(call set_env,PATH,$(call native_path,$(library_pack_path)/$(directory_dll)):$$PATH) && $(LDD)
 endif
 endif
 
