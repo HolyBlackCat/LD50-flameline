@@ -143,34 +143,29 @@ override find_elem_in = $(if $(filter 1,$(words $1)),$(word 1,$(foreach x,$2,$(i
 
 # --- DETECT ENVIRONMENT ---
 
-# Host OS.
+# Host OS and target OS.Z
 ifeq ($(OS),Windows_NT)
 HOST_OS ?= windows
+TARGET_OS ?= windows
 else
 HOST_OS ?= linux
+TARGET_OS ?= linux
 endif
 
 ifeq ($(HOST_OS),windows)
-override host_win_linux = $1
 override host_extension_exe := .exe
 override host_native_path = $(subst /,\,$1)
 else
-override host_win_linux = $2
 override host_extension_exe :=
 override host_native_path = $1
 endif
 
-# Target OS.
-TARGET_OS ?= $(HOST_OS)
-
 ifeq ($(TARGET_OS),windows)
-override target_win_linux = $1
 override extension_exe := .exe
 override pattern_dll := *.dll
 override directory_dll := bin
 override is_canonical_dll_name = y
 else
-override target_win_linux = $2
 override extension_exe :=
 override pattern_dll := *.so*
 override directory_dll := lib
@@ -183,12 +178,6 @@ ifeq ($(shell echo "foo"),"foo")
 HOST_SHELL ?= windows
 else
 HOST_SHELL ?= linux
-endif
-
-ifeq ($(HOST_SHELL),windows)
-override shell_win_linux = $1
-else
-override shell_win_linux = $2
 endif
 
 # Shell-specific functions.
