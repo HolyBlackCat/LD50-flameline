@@ -11,4 +11,4 @@ obj/**
 *.zip
 gmon.out
 compile_commands.json
-.clangd/**
+.cache/**
