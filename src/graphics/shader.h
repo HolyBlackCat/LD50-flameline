@@ -94,10 +94,10 @@ namespace Graphics
         std::string uniform_prefix;
 
         ShaderPreferences() : ShaderPreferences("a_", "u_") {}
-        ShaderPreferences(std::string a, std::string u) : attribute_prefix(a), uniform_prefix(u) {}
+        ShaderPreferences(std::string a, std::string u) : attribute_prefix(std::move(a)), uniform_prefix(std::move(u)) {}
     };
 
-    static constexpr struct None_t {} None; // Means no attributes or no uniforms.
+    static constexpr struct none_t {} none; // Means no attributes or no uniforms.
 
     template <typename T> class Uniform;
 
@@ -132,7 +132,7 @@ namespace Graphics
 
         template <typename T> static std::string AppendAttributesToSource(const std::string &source, const ShaderConfig &cfg, const ShaderPreferences &pref)
         {
-            if constexpr (std::is_same_v<std::remove_cv_t<T>, None_t>)
+            if constexpr (std::is_same_v<std::remove_cv_t<T>, none_t>)
             {
                 return source;
             }
@@ -161,7 +161,7 @@ namespace Graphics
 
         template <typename T> static std::string AppendUniformsToSource(const std::string &source, const ShaderConfig &cfg, const ShaderPreferences &pref, bool is_vertex)
         {
-            if constexpr (std::is_same_v<std::remove_cv_t<T>, None_t>)
+            if constexpr (std::is_same_v<std::remove_cv_t<T>, none_t>)
             {
                 return source;
             }
@@ -201,9 +201,13 @@ namespace Graphics
             }
         }
 
-        template <typename T> static std::vector<std::string> MakeAttributeList(const ShaderPreferences &pref)
+        // If `T` is `none_t`, returns an empty vector.
+        // Otherwise it must be a reflected structure, and the function returns the list of member names,
+        // with a prefix (`pref.attribute_prefix`) added to them.
+        template <typename T>
+        static std::vector<std::string> MakeAttributeList(const ShaderPreferences &pref)
         {
-            if constexpr (std::is_same_v<std::remove_cv_t<T>, None_t>)
+            if constexpr (std::is_same_v<std::remove_cv_t<T>, none_t>)
             {
                 return {};
             }
@@ -225,6 +229,10 @@ namespace Graphics
 
         Shader() {}
 
+        // A basic constructor.
+        // `name` is not saved, and is used only in exception messages if this constructor throws.
+        // `attributes` is a list of attributes for which you want to force specific locations (index of the name becomes the location), can be empty.
+        // Strings from `cfg` are appended to the shader sources.
         Shader(std::string name, const ShaderConfig &cfg, std::string vert_source, std::string frag_source, const std::vector<std::string> &attributes = {})
         {
             data.handle = glCreateProgram();
@@ -249,7 +257,7 @@ namespace Graphics
                 FINALLY( glDeleteShader(object); ) // Note that we unconditionally delete the shader. GL keeps it alive as long as it's attached to a program.
 
                 const char *source_bytes = source.c_str();
-                glShaderSource(object, 1, &source_bytes, 0);
+                glShaderSource(object, 1, &source_bytes, nullptr);
 
                 glCompileShader(object);
 
@@ -262,14 +270,14 @@ namespace Graphics
                     glGetShaderiv(object, GL_INFO_LOG_LENGTH, &log_len);
 
                     std::string log;
-                    if (log_len == 0) // No log
+                    if (log_len <= 0) // No log
                     {
                         log = "N/A";
                     }
                     else
                     {
                         log.resize(log_len - 1); // `log_len` includes null terminator.
-                        glGetShaderInfoLog(object, log_len, 0, log.data());
+                        glGetShaderInfoLog(object, log_len, nullptr, log.data());
                     }
 
                     Program::Error("Unable to compile ", is_vertex ? "vertex" : "fragment", " shader: `", name, "`.\nLog:\n", Strings::Trim(log));
@@ -293,26 +301,38 @@ namespace Graphics
                 glGetProgramiv(data.handle, GL_INFO_LOG_LENGTH, &log_len);
 
                 std::string log;
-                if (log_len == 0) // No log
+                if (log_len <= 0) // No log
                 {
                     log = "N/A";
                 }
                 else
                 {
                     log.resize(log_len - 1); // `log_len` includes null terminator.
-                    glGetProgramInfoLog(data.handle, log_len, 0, log.data());
+                    glGetProgramInfoLog(data.handle, log_len, nullptr, log.data());
                 }
 
                 Program::Error("Unable to link shader program: `", name, "`.\nLog:\n", Strings::Trim(log));
             }
         }
 
+        // Advanced constructor.
+        // `name` is not saved, and is used only in exception messages if this constructor throws.
+        // Strings from `cfg` are appended to the shader sources.
+        // If `AttributesT` is not `none_t`, it must be a reflected sturcture. Attribute declarations with
+        //   the names and types taken from this structure will be appended to the vertex source.
+        // If `uniforms` is not `none`, it must be a reflected structure with members of type `Uniform<...>`.
+        //   It will be initialized with the uniform locations. Declarations of those uniforms will be automatically
+        //   appended to the shaders (both shaders by default, add reflection attribute `Vert` or `Frag` for a single shader).
         template <typename AttributesT, typename UniformsT>
         Shader(std::string name, const ShaderConfig &cfg, const ShaderPreferences &pref, Meta::tag<AttributesT>, UniformsT &uniforms, const std::string &vert_source, const std::string &frag_source)
-            : Shader(name, cfg, AppendUniformsToSource<UniformsT>(AppendAttributesToSource<AttributesT>(vert_source, cfg, pref), cfg, pref, 1),
-                      AppendUniformsToSource<UniformsT>(frag_source, cfg, pref, 0), MakeAttributeList<AttributesT>(pref))
+            : Shader(
+                name, cfg,
+                AppendUniformsToSource<UniformsT>(AppendAttributesToSource<AttributesT>(vert_source, cfg, pref), cfg, pref, true),
+                AppendUniformsToSource<UniformsT>(frag_source, cfg, pref, false),
+                MakeAttributeList<AttributesT>(pref)
+            )
         {
-            if constexpr (std::is_same_v<std::remove_cv_t<UniformsT>, None_t>)
+            if constexpr (std::is_same_v<std::remove_cv_t<UniformsT>, none_t>)
             {
                 (void)uniforms;
             }
@@ -372,7 +392,8 @@ namespace Graphics
         }
     };
 
-    template <typename T> class Uniform
+    template <typename T>
+    class Uniform
     {
         GLuint handle = 0;
         int location = -1;
@@ -398,7 +419,7 @@ namespace Graphics
 
         inline static constexpr int array_elements = std::extent_v<std::conditional_t<is_array, type_with_extent, type_with_extent[1]>>;
 
-        using effective_type = std::conditional_t<is_texture || is_bool, int, type>; // Textures and bools become ints here
+        using effective_type = std::conditional_t<is_texture || is_bool, Math::change_vec_base_t<type, int>, type>; // Textures and bools become ints here
 
         using base_type = typename std::conditional_t<Math::is_scalar_v<effective_type>, std::enable_if<1, effective_type>, effective_type>::type; // Vectors and matrices become scalars here.
 
@@ -416,7 +437,7 @@ namespace Graphics
 
             Shader::BindHandle(handle);
 
-                 if constexpr (is_texture) glUniform1i(location, object.Index());
+            if      constexpr (is_texture) glUniform1i(location, object.Index());
             else if constexpr (std::is_same_v<effective_type, float       >) glUniform1f (location, object);
             else if constexpr (std::is_same_v<effective_type, fvec2       >) glUniform2f (location, object.x, object.y);
             else if constexpr (std::is_same_v<effective_type, fvec3       >) glUniform3f (location, object.x, object.y, object.z);
@@ -445,13 +466,14 @@ namespace Graphics
 
             set_no_bind(ptr, count, offset);
         }
+
       private:
         void set_no_bind(const effective_type *ptr, int count, int offset = 0) const
         {
             if (count < 0 || offset < 0 || offset + count > array_elements)
                 Program::Error("Invalid shader uniform array range.");
             int l = location + offset;
-                 if constexpr (std::is_same_v<effective_type, float       >) glUniform1fv (l, count, reinterpret_cast<const base_type *>(ptr));
+            if      constexpr (std::is_same_v<effective_type, float       >) glUniform1fv (l, count, reinterpret_cast<const base_type *>(ptr));
             else if constexpr (std::is_same_v<effective_type, fvec2       >) glUniform2fv (l, count, reinterpret_cast<const base_type *>(ptr));
             else if constexpr (std::is_same_v<effective_type, fvec3       >) glUniform3fv (l, count, reinterpret_cast<const base_type *>(ptr));
             else if constexpr (std::is_same_v<effective_type, fvec4       >) glUniform4fv (l, count, reinterpret_cast<const base_type *>(ptr));
@@ -480,7 +502,8 @@ namespace Graphics
         }
     };
 
-    template <typename T> inline void Shader::AssignUniformLocation(Uniform<T> &uniform, int loc)
+    template <typename T>
+    void Shader::AssignUniformLocation(Uniform<T> &uniform, int loc)
     {
         uniform.modify(data.handle, loc);
     }
