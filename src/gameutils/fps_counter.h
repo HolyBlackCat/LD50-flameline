@@ -23,8 +23,8 @@ namespace GameUtils
                 return;
             last_second = this_second;
             Interface::Window window = Interface::Window::Get();
-            tps = window.Ticks() - last_ticks;
-            fps = window.Frames() - last_frames;
+            tps = window.Ticks() - std::exchange(last_ticks, window.Ticks());
+            fps = window.Frames() - std::exchange(last_frames, window.Frames());
         }
 
         [[nodiscard]] int Tps() const

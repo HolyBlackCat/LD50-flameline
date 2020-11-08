@@ -52,6 +52,7 @@ Input::Mouse mouse;
 struct ProgramState : Program::DefaultBasicState
 {
     State::StateManager state_manager;
+    GameUtils::FpsCounter fps_counter;
 
     void Resize()
     {
@@ -59,8 +60,6 @@ struct ProgramState : Program::DefaultBasicState
         mouse.SetMatrix(adaptive_viewport.GetDetails().MouseMatrixCentered());
     }
 
-    int last_second = -1;
-    int tick_counter = 0, frame_counter = 0;
     Metronome metronome = Metronome(60);
 
     Metronome *GetTickMetronome() override
@@ -75,20 +74,12 @@ struct ProgramState : Program::DefaultBasicState
 
     void EndFrame() override
     {
-        int cur_second = SDL_GetTicks() / 1000;
-        if (cur_second == last_second)
-            return;
-
-        last_second = cur_second;
-        window.SetTitle(STR((window_name), " TPS:", (tick_counter), " FPS:", (frame_counter)));
-        tick_counter = 0;
-        frame_counter = 0;
+        fps_counter.Update();
+        window.SetTitle(STR((window_name), " TPS:", (fps_counter.Tps()), " FPS:", (fps_counter.Fps())));
     }
 
     void Tick() override
     {
-        tick_counter++;
-
         // window.ProcessEvents();
         window.ProcessEvents({gui_controller.EventHook()});
 
@@ -106,8 +97,6 @@ struct ProgramState : Program::DefaultBasicState
 
     void Render() override
     {
-        frame_counter++;
-
         gui_controller.PreRender();
         adaptive_viewport.BeginFrame();
         state_manager.Render();
