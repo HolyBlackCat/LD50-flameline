@@ -1,6 +1,8 @@
 #include "main.h"
 
-Interface::Window window("Iota", screen_size * 2, Interface::windowed, adjust_(Interface::WindowSettings{}, min_size = screen_size));
+static constexpr std::string_view window_name = "Iota";
+
+Interface::Window window(std::string(window_name), screen_size * 2, Interface::windowed, adjust_(Interface::WindowSettings{}, min_size = screen_size));
 static Graphics::DummyVertexArray dummy_vao = nullptr;
 
 const Graphics::ShaderConfig shader_config = Graphics::ShaderConfig::Core();
@@ -78,8 +80,7 @@ struct ProgramState : Program::DefaultBasicState
             return;
 
         last_second = cur_second;
-        std::cout << "TPS: " << tick_counter << "\n";
-        std::cout << "FPS: " << frame_counter << "\n\n";
+        window.SetTitle(STR((window_name), " TPS:", (tick_counter), " FPS:", (frame_counter)));
         tick_counter = 0;
         frame_counter = 0;
     }
