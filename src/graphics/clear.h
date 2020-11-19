@@ -6,7 +6,7 @@
 
 namespace Graphics
 {
-    inline void Clear(bool color = 1, bool depth = 0, bool stencil = 0)
+    inline void Clear(bool color = true, bool depth = false, bool stencil = false)
     {
         glClear(color * GL_COLOR_BUFFER_BIT | depth * GL_DEPTH_BUFFER_BIT | stencil * GL_STENCIL_BUFFER_BIT);
     }
