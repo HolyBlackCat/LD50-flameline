@@ -8,15 +8,15 @@
         {
             "label": "Build",
             "type": "shell",
-            "command": "make -j4",
+            "command": "make -j12",
             "presentation": {"echo": true, "reveal": "always", "focus": false, "panel": "shared", "showReuseMessage": false, "clear": true},
             "group": {"kind": "build", "isDefault": true},
         },
         {
             "label": "Build & Run",
             "type": "shell",
-            "windows": {"command": "make -j4 && cd bin && PATH= ./imp-re"},
-            "linux": {"command": "make -j4 && cd bin && ./imp-re"},
+            "windows": {"command": "make -j12 && cd bin && PATH= ./imp-re"},
+            "linux": {"command": "make -j12 && cd bin && ./imp-re"},
             "presentation": {"echo": true, "reveal": "always", "focus": false, "panel": "shared", "showReuseMessage": false, "clear": true},
         },
         {
@@ -65,7 +65,7 @@
         {
             "label": "⦻ Rebuild",
             "type": "shell",
-            "command": "make clean_mode && make -j4",
+            "command": "make clean_mode && make -j12",
             "presentation": {"echo": true, "reveal": "always", "focus": false, "panel": "shared", "showReuseMessage": false, "clear": true},
         },
         {
