@@ -524,12 +524,6 @@ namespace Ent
                 return *std::launder(reinterpret_cast<ListNode *>(GetNodeStoragePtr(index)));
             }
         };
-
-        // template <ValidComponent ...C>
-        // [[nodiscard]] std::size_t GetStorageSizeForSpecificEntityWithNodes()
-        // {
-        //     return Storage::Align<alignof(ListNode)>(sizeof(SpecificEntityWithNodes<C...>));
-        // }
     }
 
     // Describes a linked list of entities.
