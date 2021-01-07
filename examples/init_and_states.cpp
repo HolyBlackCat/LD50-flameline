@@ -52,7 +52,7 @@ Input::Mouse mouse;
 
 struct ProgramState : Program::DefaultBasicState
 {
-    State::StateManager state_manager;
+    GameUtils::State::StateManager state_manager;
     GameUtils::FpsCounter fps_counter;
 
     void Resize()
@@ -129,13 +129,13 @@ struct ProgramState : Program::DefaultBasicState
 
 namespace States
 {
-    STRUCT( Initial EXTENDS State::BasicState )
+    STRUCT( Initial EXTENDS GameUtils::State::BasicState )
     {
         UNNAMED_MEMBERS()
 
         float angle = 0;
 
-        void Tick(const State::NextStateSelector &next_state) override
+        void Tick(const GameUtils::State::NextStateSelector &next_state) override
         {
             (void)next_state;
 

@@ -7,7 +7,7 @@
 
 #include "reflection/full_with_poly.h"
 
-namespace State
+namespace GameUtils::State
 {
     class NextStateSelector;
 
