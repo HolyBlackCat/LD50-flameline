@@ -160,6 +160,7 @@ namespace Strings
 // See the comments on `STR(...)` for the syntax.
 #define FORMAT_ARGS(...) FORMAT_ARGS_(, __VA_ARGS__)
 // Similar to `FORMAT_ARGS`, but additionally lets you specify the string literal prefix, such as `L`. The prefix can be empty.
+// Prevent Clang-Tidy from complaining: NOLINTNEXTLINE(bugprone-suspicious-missing-comma)
 #define FORMAT_ARGS_(prefix, ...) FORMAT_impl_inline_str( MA_VA_FOR_EACH(prefix, FORMAT_impl_inline_format, MA_TR_C(__VA_ARGS__)) ) MA_VA_FOR_EACH(, FORMAT_impl_inline_param, MA_TR_C(__VA_ARGS__))
 
 // Internal. Loop body for creating a format string. `elem` is either a string literal or a field (a parenthesized expression, possibly followed by a format specification); see comments on `STR(...)` for details.
