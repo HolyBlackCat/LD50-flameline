@@ -16,15 +16,17 @@ namespace GameUtils
         constexpr FpsCounter() {}
 
         // Prefer to call this once per frame.
-        void Update()
+        // Returns true if the values were updated, false otherwise.
+        bool Update()
         {
             int this_second = SDL_GetTicks() / 1000;
             if (this_second == last_second)
-                return;
+                return false;
             last_second = this_second;
             Interface::Window window = Interface::Window::Get();
             tps = window.Ticks() - std::exchange(last_ticks, window.Ticks());
             fps = window.Frames() - std::exchange(last_frames, window.Frames());
+            return true;
         }
 
         [[nodiscard]] int Tps() const
