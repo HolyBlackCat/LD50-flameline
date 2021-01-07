@@ -46,7 +46,7 @@ endif
 FILE_SPECIFIC_FLAGS := lib/implementation.cpp lib/cglfl.cpp > -g0 -O3
 
 # Precompiled headers
-PRECOMPILED_HEADERS := src/game/*.cpp > src/game/master.hpp
+PRECOMPILED_HEADERS := src/game/*.cpp src/game/*.h > src/game/master.hpp
 
 # Code generation
 GEN_CXXFLAGS := -std=c++2a -Wall -Wextra -pedantic-errors
