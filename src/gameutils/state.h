@@ -11,6 +11,7 @@ namespace GameUtils::State
 {
     class NextStateSelector;
 
+    // Inherit your custom states from this class.
     REFL_STRUCT( BasicState REFL_POLYMORPHIC )
     {
         BasicState() = default;
@@ -26,6 +27,7 @@ namespace GameUtils::State
     };
     using Storage = Refl::PolyStorage<BasicState>;
 
+    // Represents a state class, inherited from `BasicState`.
     class Tag
     {
         std::size_t index = -1;
@@ -44,6 +46,7 @@ namespace GameUtils::State
         [[nodiscard]] std::size_t Index() const {return index;}
     };
 
+    // Constructs a state from a tag.
     [[nodiscard]] inline Storage Construct(Tag tag, const std::string &params = {})
     {
         Storage ret = Refl::Polymorphic::ConstructFromIndex<BasicState>(tag.Index());
@@ -51,7 +54,7 @@ namespace GameUtils::State
         return ret;
     }
 
-
+    // This class is passed to the `Tick()` function of custom states, and lets them switch to different states.
     class NextStateSelector
     {
         mutable bool is_set = false;
@@ -101,7 +104,8 @@ namespace GameUtils::State
         }
     };
 
-
+    // Manages a state.
+    // To set the state manually (including the initial state), do `foo.NextState().Set(...)`.
     class StateManager
     {
         Storage state;
