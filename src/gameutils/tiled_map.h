@@ -36,7 +36,7 @@ namespace Tiled
         template <typename F> void ForEachPointWithNamePrefix(std::string prefix, F &&func) const // `func` is `void func(std::string name, fvec2 pos)`.
         {
             auto begin = points.lower_bound(prefix);
-            while (begin != points.end() && Strings::StartsWith(begin->first, prefix))
+            while (begin != points.end() && begin->first.starts_with(prefix))
             {
                 func(begin->first, begin->second);
                 begin++;
