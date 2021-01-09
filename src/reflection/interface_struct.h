@@ -140,7 +140,7 @@ namespace Refl
 
                     // We use a pointer cast instead of a reference one to catch cases where the derived class doesn't actually inherit from this base, but merely overloads the conversion operator.
                     const base_type &base_ref = *static_cast<const base_type *>(&object);
-                    Refl::Interface(base_ref).ToString(base_ref, output, options, next_base_state); // A qualified call prevents unwanted ADL.
+                    InterfaceFor(base_ref).ToString(base_ref, output, options, next_base_state); // A qualified call prevents unwanted ADL.
                 }
             };
 
@@ -183,7 +183,7 @@ namespace Refl
                             output.WriteChar('=');
                     }
 
-                    Refl::Interface(ref).ToString(ref, output, options, next_member_state); // A qualified call prevents unwanted ADL.
+                    InterfaceFor(ref).ToString(ref, output, options, next_member_state); // A qualified call prevents unwanted ADL.
                 }
             });
 
@@ -287,7 +287,7 @@ namespace Refl
                             else
                             {
                                 auto &member_ref = Class::Member<i>(object);
-                                Refl::Interface(member_ref).FromString(member_ref, input, options, next_member_state); // A qualified call prevents unwanted ADL.
+                                InterfaceFor(member_ref).FromString(member_ref, input, options, next_member_state); // A qualified call prevents unwanted ADL.
 
                                 obtained_members[i] = true;
                             }
@@ -356,7 +356,7 @@ namespace Refl
                         Utils::SkipWhitespaceAndComments(input);
                     }
 
-                    Refl::Interface(ref).FromString(ref, input, options, next_state); // A qualified call prevents unwanted ADL.
+                    InterfaceFor(ref).FromString(ref, input, options, next_state); // A qualified call prevents unwanted ADL.
                 };
 
                 // Read virtual bases.
@@ -405,7 +405,7 @@ namespace Refl
 
             auto WriteEntry = [&](auto &ref, decltype(next_member_state) next_state)
             {
-                Refl::Interface(ref).ToBinary(ref, output, options, next_state); // A qualified call prevents unwanted ADL.
+                InterfaceFor(ref).ToBinary(ref, output, options, next_state); // A qualified call prevents unwanted ADL.
             };
 
             // Write virtual bases.
@@ -448,7 +448,7 @@ namespace Refl
 
             auto ReadEntry = [&](auto &ref, decltype(next_member_state) next_state)
             {
-                Refl::Interface(ref).FromBinary(ref, input, options, next_state); // A qualified call prevents unwanted ADL.
+                InterfaceFor(ref).FromBinary(ref, input, options, next_state); // A qualified call prevents unwanted ADL.
             };
 
             // Write virtual bases.
