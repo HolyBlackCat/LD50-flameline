@@ -46,17 +46,23 @@ namespace Meta
     };
 
 
-    // Copy cv-qualifiers from one type to another.
+    // Copy qualifiers from one type to another. Original qualifiers are stripped.
+    // Can copy either cv-qualifiers or cvref-qualifiers. In the former case, ref-qualifiers are not stripped from the destination.
 
     namespace impl
     {
-        template <typename A, typename B> struct copy_qualifiers {using type = B;};
-        template <typename A, typename B> struct copy_qualifiers<const          A, B> {using type = const          B;};
-        template <typename A, typename B> struct copy_qualifiers<      volatile A, B> {using type =       volatile B;};
-        template <typename A, typename B> struct copy_qualifiers<const volatile A, B> {using type = const volatile B;};
+        template <typename A, typename B> struct copy_cv_qualifiers                      {using type =                std::remove_cv_t<B>;};
+        template <typename A, typename B> struct copy_cv_qualifiers<const          A, B> {using type = const          std::remove_cv_t<B>;};
+        template <typename A, typename B> struct copy_cv_qualifiers<      volatile A, B> {using type =       volatile std::remove_cv_t<B>;};
+        template <typename A, typename B> struct copy_cv_qualifiers<const volatile A, B> {using type = const volatile std::remove_cv_t<B>;};
+
+        template <typename A, typename B> struct copy_cvref_qualifiers          {using type = typename copy_cv_qualifiers<A, std::remove_reference_t<B>>::type;};
+        template <typename A, typename B> struct copy_cvref_qualifiers<A & , B> {using type = typename copy_cv_qualifiers<A, std::remove_reference_t<B>>::type &;};
+        template <typename A, typename B> struct copy_cvref_qualifiers<A &&, B> {using type = typename copy_cv_qualifiers<A, std::remove_reference_t<B>>::type &&;};
     }
 
-    template <typename A, typename B> using copy_qualifiers = typename impl::copy_qualifiers<A, B>::type;
+    template <typename A, typename B> using copy_cv_qualifiers = typename impl::copy_cv_qualifiers<A, B>::type;
+    template <typename A, typename B> using copy_cvref_qualifiers = typename impl::copy_cvref_qualifiers<A, B>::type;
 
 
     // A replacement for `std::experimental::is_detected`.

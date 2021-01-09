@@ -43,8 +43,8 @@ namespace Macro::MemberDowncast
         static_assert(std::is_class_v<OuterT> && !std::is_const_v<OuterT> && !std::is_volatile_v<OuterT>, "Resulting type must be a cv-unqualified class.");
         static_assert(std::is_same_v<std::remove_cvref_t<InnerT>, std::remove_cvref_t<ParamT>>, "Argument type doesn't match the type of the specified member.");
 
-        using outer_type_cv_t = Meta::copy_qualifiers<ParamT, OuterT>;
-        using char_cv_t = Meta::copy_qualifiers<ParamT, char>;
+        using outer_type_cv_t = Meta::copy_cv_qualifiers<ParamT, OuterT>;
+        using char_cv_t = Meta::copy_cv_qualifiers<ParamT, char>;
 
         auto *ret = reinterpret_cast<outer_type_cv_t *>(reinterpret_cast<char_cv_t *>(ptr) - MemberOffset);
         Meta::AssertTypeHash(*ret);
