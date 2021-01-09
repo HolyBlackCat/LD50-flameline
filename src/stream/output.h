@@ -155,10 +155,10 @@ namespace Stream
             return data.name;
         }
 
-        // Does nothing if a style is already selected, unless `force` is true.
-        Output &WantExceptionPrefixStyle(ExceptionPrefixStyle style, bool force = false)
+        // Does nothing if a style is already selected of if the parameter is null. Unless `force` is true.
+        Output &WantExceptionPrefixStyle(std::optional<ExceptionPrefixStyle> style, bool force = false)
         {
-            if (!data.exception_prefix_style || force)
+            if ((!data.exception_prefix_style && style) || force)
                 data.exception_prefix_style = style;
 
             return *this;

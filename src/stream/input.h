@@ -457,10 +457,10 @@ namespace Stream
             return data.name;
         }
 
-        // Does nothing if a style is already selected, unless `force` is true.
-        Input &WantLocationStyle(LocationStyle style, bool force = false)
+        // Does nothing if a style is already selected or if the parameter is null. Unless `force` is true.
+        Input &WantLocationStyle(std::optional<LocationStyle> style, bool force = false)
         {
-            if (!data.location_style || force)
+            if ((!data.location_style && style) || force)
                 data.location_style = style;
 
             return *this;
@@ -516,10 +516,10 @@ namespace Stream
             return "";
         }
 
-        // Does nothing if a style is already selected, unless `force` is true.
-        Input &WantExceptionPrefixStyle(ExceptionPrefixStyle style, bool force = false)
+        // Does nothing if a style is already selected or if the parameter is null. Unless `force` is true.
+        Input &WantExceptionPrefixStyle(std::optional<ExceptionPrefixStyle> style, bool force = false)
         {
-            if (!data.exception_prefix_style || force)
+            if ((!data.exception_prefix_style && style) || force)
                 data.exception_prefix_style = style;
 
             return *this;
