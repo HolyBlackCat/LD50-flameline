@@ -471,6 +471,11 @@ namespace Stream
         {
             return data.location_style.value_or(none);
         }
+        // Returns null by default.
+        [[nodiscard]] std::optional<LocationStyle> GetLocationStyleOpt() const
+        {
+            return data.location_style;
+        }
 
         // Returns a string describing current location in the stream.
         // This function can be costly for some location flavors, use it wisely.
@@ -524,6 +529,11 @@ namespace Stream
         [[nodiscard]] ExceptionPrefixStyle GetExceptionPrefixStyle() const
         {
             return data.exception_prefix_style.value_or(with_target_name | with_location);
+        }
+        // Returns null by default.
+        [[nodiscard]] std::optional<ExceptionPrefixStyle> GetExceptionPrefixStyleOpt() const
+        {
+            return data.exception_prefix_style;
         }
 
         // Uses `GetLocationString` to construct a prefix for exception messages.

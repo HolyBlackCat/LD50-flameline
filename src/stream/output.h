@@ -169,6 +169,11 @@ namespace Stream
         {
             return data.exception_prefix_style.value_or(with_target_name);
         }
+        // Returns null by default.
+        [[nodiscard]] std::optional<ExceptionPrefixStyle> GetExceptionPrefixStyleOpt() const
+        {
+            return data.exception_prefix_style.value_or(with_target_name);
+        }
 
         // Uses `GetLocationString` to construct a prefix for exception messages.
         // Prefix format can be changed using `WantExceptionPrefixStyle`.
