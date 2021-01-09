@@ -993,6 +993,7 @@ namespace Ent
         // any `Controller` configured using this instance.
         [[nodiscard]] ListHandle AddList(std::function<list_predicate_t> predicate)
         {
+            ThrowIfFinalized();
             auto ret = ListHandle::ConstructFromIndex(entity_lists.size());
             entity_lists.push_back({std::move(predicate)});
             return ret;
