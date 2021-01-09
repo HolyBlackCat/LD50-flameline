@@ -39,7 +39,7 @@ namespace Stream
         };
 
         // A category matching a single character.
-        class EqualTo final : public Category
+        class EqualTo : public Category
         {
             char saved_char = 0;
 
@@ -59,7 +59,7 @@ namespace Stream
         // A generic character category.
         // Usage: `Is("fancy character", [](char ch){return condition;})`
         template <typename F, CHECK(std::is_convertible_v<decltype(std::declval<F>()(char())), bool>)>
-        class Is final : public Category
+        class Is : public Category
         {
             F &&func;
             const char *name_str;
@@ -78,10 +78,44 @@ namespace Stream
         };
 
 
+        namespace impl
+        {
+            template <typename T, CHECK(std::is_base_of_v<Category, T>)>
+            class Negation : public T
+            {
+              public:
+                using base = T;
+
+                Negation(const T &other) : T(other) {}
+                Negation(T &&other) : T(std::move(other)) {}
+
+                [[nodiscard]] bool operator()(char ch) const override
+                {
+                    return !base::operator()(ch);
+                }
+                [[nodiscard]] std::string name() const override
+                {
+                    return "not " + T::name();
+                }
+            };
+        }
+        // Returns an inverted category.
+        // We use a wrapper instead of exposing the category directly (using CTAD), because with CTAD `Not(Not(...))` negates only once. Lame.
+        template <typename T>
+        [[nodiscard]] auto Not(T category)
+        {
+            // Could perfect-forard the category, but meh.
+            if constexpr (requires{requires std::same_as<impl::Negation<typename T::base>, T>;})
+                return static_cast<typename T::base &&>(category); // If this is a double negation, return the original category.
+            else
+                return impl::Negation<T>(std::move(category));
+        }
+
+
         // Some character categories.
 
         #define CHAR_CATEGORY(class_name_, string_, expr_) \
-            struct class_name_ final : Category \
+            struct class_name_ : Category \
             { \
                 [[nodiscard]] bool operator()(char ch) const override {return expr_;} \
                 [[nodiscard]] std::string name() const override {return string_;} \
@@ -122,7 +156,7 @@ namespace Stream
         // Fancy stateful character categories.
 
         // Matches a c-style identifier.
-        class SeqIdentifier final : public Category
+        class SeqIdentifier : public Category
         {
             mutable bool first_char = true;
 
