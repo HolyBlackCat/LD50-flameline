@@ -236,16 +236,16 @@ CXX_COMPILER = $(error No C++ compiler specified.\
 	$(lf)Define `CXX_COMPILER` in `local_config.mk` or directly when invoking `make`)
 
 C_LINKER = $(error No C linker specified.\
-    $(lf)Define `C_LINKER` in `local_config.mk` or directly when invoking `make`.\
-    $(lf)Normally it should be equal to `C_COMPILER`.\
-    $(lf)\
-    $(lf)If you're using Clang, consider using LLD linker to improve linking times. See comments in the makefile for details)
+	$(lf)Define `C_LINKER` in `local_config.mk` or directly when invoking `make`.\
+	$(lf)Normally it should be equal to `C_COMPILER`.\
+	$(lf)\
+	$(lf)If you're using Clang, consider using LLD linker to improve linking times. See comments in the makefile for details)
 
 CXX_LINKER = $(error No C++ linker specified.\
-    $(lf)Define `CXX_LINKER` in `local_config.mk` or directly when invoking `make`.\
-    $(lf)Normally it should be equal to `CXX_COMPILER`.\
-    $(lf)\
-    $(lf)If you're using Clang, consider using LLD linker to improve linking times. See comments in the makefile for details)
+	$(lf)Define `CXX_LINKER` in `local_config.mk` or directly when invoking `make`.\
+	$(lf)Normally it should be equal to `CXX_COMPILER`.\
+	$(lf)\
+	$(lf)If you're using Clang, consider using LLD linker to improve linking times. See comments in the makefile for details)
 
 # Using LLD linker with Clang
 #
@@ -271,15 +271,17 @@ endif
 
 # Following variables have no effect if dependency management is disabled:
 # [
-LIBRARY_PACK_DIR := ../_dependencies
 # Will look for dependencies in this directory.
-STD_LIB_NAME_PATTERNS := libgcc libstdc++ libc++ winpthread
-# If one of those strings is present in a shared library name, that library is considered to be a part of the standard library.
-BANNED_LIBRARY_PATH_PATTERNS :=
+LIBRARY_PACK_DIR := ../_dependencies
 ifeq ($(TARGET_OS),windows)
-BANNED_LIBRARY_PATH_PATTERNS += :/Windows
-endif
+# If one of those strings is present in a shared library name, that library is considered to be a part of the standard library.
+STD_LIB_NAME_PATTERNS := libgcc libstdc++ libc++ winpthread
 # If one of those strings is present in a path to a library that matches `STD_LIB_NAME_PATTERNS`, a error will be emitted.
+BANNED_LIBRARY_PATH_PATTERNS := :/Windows
+else
+STD_LIB_NAME_PATTERNS := *
+BANNED_LIBRARY_PATH_PATTERNS :=
+endif
 # ]
 
 
@@ -728,7 +730,7 @@ $(lib_pack_info_file):
 				$(call safe_shell_exec,$(call mkdir,$(library_pack_path)) && tar -C $(LIBRARY_PACK_DIR) -xf $(_local_archive_path))\
 				$(info [Deps] Done. This file is no longer needed, you can remove it.),\
 			$(error Prebuilt dependencies not found in `$(library_pack_path)`.\
-    			$(lf)I can install them for you; I need `$(library_pack_archive_pattern_display)` in the current directory)))
+				$(lf)I can install them for you; I need `$(library_pack_archive_pattern_display)` in the current directory)))
 	$(erase_shared_libraries)
 	$(call safe_shell_exec,$(call echo,override deps_library_pack_name := $(LIBRARY_PACK_NAME)) >$@)
 	$(call safe_shell_exec,$(call echo,override deps_packages := $(USED_PACKAGES)) >>$@)
@@ -779,10 +781,11 @@ override ldd_with_path = $(call set_env,PATH,$(call native_path,$(library_pack_p
 endif
 endif
 
-# On Windows does nothing. On Linux, uses `patchelf` to add `$ORIGIN` to RPATH of library $1.
+# On Windows does nothing. On Linux, uses `patchelf` to add `$ORIGIN` to RPATH of library $1, and also calls `chmod -x` on it.
 ifeq ($(TARGET_OS),linux)
-override adjust_rpath = \
-	$(call safe_shell_exec,$(PATCHELF) --set-rpath '$$ORIGIN' '$1')
+override finalize = \
+	$(call safe_shell_exec,$(PATCHELF) --set-rpath '$$ORIGIN' '$1')\
+	$(call safe_shell_exec,chmod -x '$1')
 # Alternative implementation, which appends `$ORIGIN` to rpath without removing existing entries.
 #	$(call safe_shell_exec,$(PATCHELF) --set-rpath \
 #		'$(subst <, ,$(subst $(space),:,$(strip $$ORIGIN \
@@ -790,7 +793,7 @@ override adjust_rpath = \
 #		)))' '$1'\
 #	)
 else
-override adjust_rpath =
+override finalize =
 endif
 
 .PHONY: __shared_libs
@@ -799,7 +802,7 @@ __shared_libs: | $(OUTPUT_FILE_EXT)
 	$(info [Deps] Following prebuilt libraries will be copied to `$(dir $(OUTPUT_FILE_EXT))`:)
 	$(foreach x,$(needed_available_libs),$(info [Deps] - $(library_pack_path)/$(directory_dll)/$x))
 	$(foreach x,$(needed_available_libs),$(call safe_shell_exec,$(call copy,$(library_pack_path)/$(directory_dll)/$x,$(dir $(OUTPUT_FILE_EXT))))\
-		$(call adjust_rpath,$(dir $(OUTPUT_FILE_EXT))$x))
+		$(call finalize,$(dir $(OUTPUT_FILE_EXT))$x))
 	$(info [Deps] Copying completed)
 	$(info [Deps] Determining all dependencies for `$(OUTPUT_FILE_EXT)`...)
 	$(eval override _local_dep_list := $(call safe_shell,$(ldd_with_path) -- $(OUTPUT_FILE_EXT)))
@@ -808,7 +811,16 @@ __shared_libs: | $(OUTPUT_FILE_EXT)
 	$(eval override _local_dep_list := $(subst |, ,$(subst $(space),>,$(subst | ,|,$(foreach x,$(_local_dep_list),$(call trim_left,$x))))))
 	$(eval override _local_dep_list := $(sort $(foreach x,$(_local_dep_list),$(if $(filter 2,$(words $(subst <, ,$x))),./,$(subst \,/,$(dir $(word 2,$(subst <, ,$x)))))<$(word 1,$(subst <, ,$x)))))
 	$(foreach x,$(_local_dep_list),$(info [Deps] - $(call deps_entry_summary,$x)))
-	$(eval override _local_libs := $(strip $(foreach x,$(_local_dep_list),$(if $(call find_any_as_substr,$(STD_LIB_NAME_PATTERNS),$(call deps_entry_name,$x)),$x))))
+	$(eval override _local_libs := $(strip $(foreach x,$(_local_dep_list),\
+		$(if \
+			$(and \
+				$(filter $(subst *,%,$(STD_LIB_NAME_PATTERNS)),$(call deps_entry_name,$x)),\
+				$(filter-out ./,$(call deps_entry_dir,$x))\
+			)\
+		,\
+			$x\
+		)\
+	)))
 	$(foreach x,$(_local_libs),$(if $(call find_any_as_substr,$(BANNED_LIBRARY_PATH_PATTERNS),$(call deps_entry_dir,$x)),\
 		$(error Didn't expect to find `$(call deps_entry_name,$x)` in `$(call deps_entry_dir,$x)`)))
 	$(info [Deps] Out of those, following libraries will be copied to `$(dir $(OUTPUT_FILE_EXT))`:)
@@ -816,8 +828,9 @@ __shared_libs: | $(OUTPUT_FILE_EXT)
 	$(eval override _local_libs := $(foreach x,$(_local_libs),$(if $(call find_elem_in,$(call deps_entry_name,$x),$(needed_available_libs)),\
 		$(info [Deps] Skipping prebuilt library: $(call deps_entry_name,$x)),$x)))
 	$(foreach x,$(_local_libs),$(call safe_shell_exec,$(call copy,$(call deps_entry_dir,$x)$(call deps_entry_name,$x),$(dir $(OUTPUT_FILE_EXT))))\
-		$(call adjust_rpath,$(dir $(OUTPUT_FILE_EXT))$(call deps_entry_name,$x)))
+		$(call finalize,$(dir $(OUTPUT_FILE_EXT))$(call deps_entry_name,$x)))
 	$(info [Deps] Copying completed)
+	@true
 endif
 
 endif
