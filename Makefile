@@ -87,9 +87,11 @@ build:
 
 
 # --- CHECK IF MAKE WAS RESTARTED ---
-$(if $(MAKE_RESTARTS),$(eval override make_was_restarted := yes))
-ifneq ($(make_was_restarted),)
+ifneq ($(MAKE_RESTARTS),)
+override make_was_restarted := yes
 $(info --------)
+else
+override make_was_restarted :=
 endif
 
 
@@ -110,6 +112,9 @@ endef
 .PHONY: __force_this_target
 __force_this_target:
 
+# Used to create local variables in a safer way. E.g. `$(call var,x := 42)`.
+override var = $(eval override $(subst $,$$$$,$1))
+
 # A recursive wildcard function.
 # Source: https://stackoverflow.com/a/18258352/2752075
 # Recursively searches a directory for all files matching a pattern.
@@ -129,7 +134,7 @@ endif
 override safe_shell_exec = $(call space,$(call safe_shell,$1))
 
 # Trim space on the left of $1.
-override trim_left = $(eval override __trim_left_var := $1)$(__trim_left_var)$(eval override undefine __trim_left_var)
+override trim_left = $(call var,__trim_left_var := $1)$(__trim_left_var)$(eval override undefine __trim_left_var)
 
 # Checks if $2 contains any word from list $1 as a substring.
 override find_any_as_substr = $(word 1,$(foreach x,$1,$(findstring $x,$2)))
@@ -724,7 +729,7 @@ $(OUTPUT_FILE_EXT) $(objects) $(compiled_headers): | $(lib_pack_info_file)
 $(lib_pack_info_file):
 	$(info [Deps] Updating dependency information...)
 	$(if $(wildcard $(library_pack_path)),,\
-		$(eval override _local_archive_path := $(wildcard $(library_pack_archive_pattern)))\
+		$(call var,_local_archive_path := $(wildcard $(library_pack_archive_pattern)))\
 		$(if $(filter 1,$(words $(_local_archive_path))),\
 			$(info [Deps] Unpacking `$(_local_archive_path)`...)\
 				$(call safe_shell_exec,$(call mkdir,$(library_pack_path)) && tar -C $(LIBRARY_PACK_DIR) -xf $(_local_archive_path))\
@@ -805,13 +810,13 @@ __shared_libs: | $(OUTPUT_FILE_EXT)
 		$(call finalize,$(dir $(OUTPUT_FILE_EXT))$x))
 	$(info [Deps] Copying completed)
 	$(info [Deps] Determining all dependencies for `$(OUTPUT_FILE_EXT)`...)
-	$(eval override _local_dep_list := $(call safe_shell,$(ldd_with_path) -- $(OUTPUT_FILE_EXT)))
+	$(call var,_local_dep_list := $(call safe_shell,$(ldd_with_path) -- $(OUTPUT_FILE_EXT)))
 	$(if $(strip $(_local_dep_list)),,$(error Got empty output from LDD))
-	$(eval override _local_dep_list := $(subst $(space)=>$(space),<,$(subst $(space)$(open_par),<,$(subst $(close_par) ,|,$(_local_dep_list)))))
-	$(eval override _local_dep_list := $(subst |, ,$(subst $(space),>,$(subst | ,|,$(foreach x,$(_local_dep_list),$(call trim_left,$x))))))
-	$(eval override _local_dep_list := $(sort $(foreach x,$(_local_dep_list),$(if $(filter 2,$(words $(subst <, ,$x))),./,$(subst \,/,$(dir $(word 2,$(subst <, ,$x)))))<$(word 1,$(subst <, ,$x)))))
+	$(call var,_local_dep_list := $(subst $(space)=>$(space),<,$(subst $(space)$(open_par),<,$(subst $(close_par) ,|,$(_local_dep_list)))))
+	$(call var,_local_dep_list := $(subst |, ,$(subst $(space),>,$(subst | ,|,$(foreach x,$(_local_dep_list),$(call trim_left,$x))))))
+	$(call var,_local_dep_list := $(sort $(foreach x,$(_local_dep_list),$(if $(filter 2,$(words $(subst <, ,$x))),./,$(subst \,/,$(dir $(word 2,$(subst <, ,$x)))))<$(word 1,$(subst <, ,$x)))))
 	$(foreach x,$(_local_dep_list),$(info [Deps] - $(call deps_entry_summary,$x)))
-	$(eval override _local_libs := $(strip $(foreach x,$(_local_dep_list),\
+	$(call var,_local_libs := $(strip $(foreach x,$(_local_dep_list),\
 		$(if \
 			$(and \
 				$(filter $(subst *,%,$(STD_LIB_NAME_PATTERNS)),$(call deps_entry_name,$x)),\
@@ -825,7 +830,7 @@ __shared_libs: | $(OUTPUT_FILE_EXT)
 		$(error Didn't expect to find `$(call deps_entry_name,$x)` in `$(call deps_entry_dir,$x)`)))
 	$(info [Deps] Out of those, following libraries will be copied to `$(dir $(OUTPUT_FILE_EXT))`:)
 	$(foreach x,$(_local_libs),$(info [Deps] - $(call deps_entry_summary,$x)))
-	$(eval override _local_libs := $(foreach x,$(_local_libs),$(if $(call find_elem_in,$(call deps_entry_name,$x),$(needed_available_libs)),\
+	$(call var,_local_libs := $(foreach x,$(_local_libs),$(if $(call find_elem_in,$(call deps_entry_name,$x),$(needed_available_libs)),\
 		$(info [Deps] Skipping prebuilt library: $(call deps_entry_name,$x)),$x)))
 	$(foreach x,$(_local_libs),$(call safe_shell_exec,$(call copy,$(call deps_entry_dir,$x)$(call deps_entry_name,$x),$(dir $(OUTPUT_FILE_EXT))))\
 		$(call finalize,$(dir $(OUTPUT_FILE_EXT))$(call deps_entry_name,$x)))
