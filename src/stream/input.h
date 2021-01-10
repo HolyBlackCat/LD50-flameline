@@ -100,9 +100,10 @@ namespace Stream
             };
         }
         // Returns an inverted category.
-        // We use a wrapper instead of exposing the category directly (using CTAD), because with CTAD `Not(Not(...))` negates only once. Lame.
-        template <typename T>
-        [[nodiscard]] auto Not(T category)
+        // We use a function instead of exposing the category directly (using CTAD), because with CTAD `Not(Not(...))` negates only once. Lame.
+        // But also the operator notation shorter.
+        template <typename T, CHECK(std::is_base_of_v<Category, T>)>
+        [[nodiscard]] auto operator!(T category)
         {
             // Could perfect-forard the category, but meh.
             if constexpr (requires{requires std::same_as<impl::Negation<typename T::base>, T>;})
