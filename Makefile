@@ -178,53 +178,14 @@ override directory_dll := lib
 override is_canonical_dll_name = $(filter 2,$(words $(subst ., ,$(word 2,$(subst .so, so,$(subst $(space),<,$1))))))
 endif
 
-# Host shell.
+# Make sure we're not using a Windows shell.
 ifeq ($(shell echo "foo"),"foo")
-HOST_SHELL ?= windows
-else
-HOST_SHELL ?= linux
+$(error `mingw32-make` is not supported! Use MSYS2 and its `make` instead.)
 endif
 
-# Shell-specific functions.
-# Example usage: $(call rmfile,bin/out.exe)
-override silence = >$(dev_null) 2>$(dev_null) || $(success)
-ifeq ($(HOST_SHELL),windows)
-# - Utilities
-override dev_null := NUL
-override success := (echo. >$(dev_null))
-# - Shell commands
-override rmfile = (del /F /Q "$1" $(silence))
-override rmdir = (rd /S /Q "$1" $(silence))
-override mkdir = (mkdir "$1" $(silence))
-override move = move /Y "$1" "$2"
-override copy = copy /Y "$1" "$2"
-override touch = type nul >>"$1"
-override echo = echo $(subst <,^<,$(subst >,^>,$1))
-override echo_lf := echo.
-override pause := pause
-override set_env = set "$1=$2"
-# - Functions
-override native_path = $(subst /,\,$1)
-override dir_target_name = $(patsubst %\,%,$(subst /,\,$1))
-else
-# - Utilities
-override dev_null := /dev/null
-override success := true
-# - Shell commands
-override rmfile = rm -f '$1'
-override rmdir = rm -rf '$1'
-override mkdir = mkdir -p '$1'
-override move = mv -f '$1' '$2'
-override copy = cp -f '$1' '$2'
-override touch = touch '$1'
+# Shell functions.
 override echo = echo '$(subst ','"'"',$1)'
-override echo_lf := echo
 override pause := read -s -n 1 -p 'Press any key to continue . . .' && echo
-override set_env = export "$1=$2"
-# - Functions
-override native_path = $1
-override dir_target_name = $1
-endif
 
 
 # --- IMPORT LOCAL CONFIG ---
@@ -255,10 +216,11 @@ CXX_LINKER = $(error No C++ linker specified.\
 # Using LLD linker with Clang
 #
 # To use LLD linker, append `-fuse-ld=lld` to `*_LINKER` variables.
-# If you're using LLD on Windows, LLD will generate `<exec_name>.lib` file alongside the resulting binary. Add following to `local_config.mk` to automatically delete it:
+# On windows, some old LLD versions used to generate `<exec_name>.lib` file alongside the resulting binary.
+# If that happens to you, add following to `local_config.mk` to automatically delete that file:
 #
 #     ifeq ($(TARGET_OS),windows)
-#     POST_BUILD_COMMANDS = @$(call rmfile,$(OUTPUT_FILE).lib)
+#     POST_BUILD_COMMANDS = @rm -f '$(OUTPUT_FILE).lib' || true
 #     endif
 #
 
@@ -405,30 +367,19 @@ __check_mode:
 		$(lf)Add `mode=...` to the flags. Selected mode will be remembered and used by default until changed.\
 		$(lf)You can also do `make use mode=...` to change mode without doing anything else.\
 		$(lf)Supported modes are: $(mode_list))
-override __else := 0
-else
-override __else := 1
-endif
-
+else ifeq ($(mode),)
 # If using a saved mode.
-ifeq ($(__else),1)
-ifeq ($(mode),)
 __check_mode:
 	$(info [Mode] $(current_mode))
-override __else := 0
 else
-override __else := 1
-endif
-endif
-
 # If mode was specified with a flag.
-ifeq ($(__else),1)
 __check_mode:
 	$(if $(call mode_exists,$(mode)),,$(error Invalid build mode specified.\
 		$(lf)Expected one of: $(mode_list)))
 	$(info [Mode] $(strip $(old_mode) -> $(mode)))
 ifneq ($(mode),$(current_mode)) # Specified mode differs from the saved one, file update is necessary.
-	@$(call echo,override current_mode := $(mode))>$(current_mode_file)
+	$(file >$(current_mode_file),override current_mode := $(mode))
+	@true
 endif
 
 ifneq ($(mode),$(current_mode)) # Specified mode differs from the saved one.
@@ -506,8 +457,8 @@ $(foreach x,$(subst |, ,$(subst $(space),<,$(FILE_SPECIFIC_FLAGS))),$(foreach y,
 
 # --- RULES FOR CREATING FOLDERS ---
 override files_requiring_folders := $(OUTPUT_FILE_EXT) $(objects) $(compiled_headers) $(current_mode_file) $(lib_pack_info_file)
-$(foreach x,$(files_requiring_folders),$(eval $x: | $(call dir_target_name,$(dir $x))))
-$(foreach x,$(sort $(dir $(files_requiring_folders))),$(eval $(call dir_target_name,$x): ; @$(call mkdir,$x)))
+$(foreach x,$(files_requiring_folders),$(eval $x: | $(dir $x)))
+$(foreach x,$(sort $(dir $(files_requiring_folders))),$(eval $x: ; @mkdir -p '$x'))
 
 
 # --- TARGETS ---
@@ -526,28 +477,28 @@ build: __check_mode __mode_$(current_mode)
 .PHONY: clean
 clean: __no_mode_needed
 	@$(call echo,[Cleaning] All build artifacts)
-	@$(success) $(foreach x,$(mode_list),&& $(call rmdir,$(common_object_dir)/$x))
-	@$(call rmfile,$(OUTPUT_FILE_EXT))
-	@$(call rmfile,$(current_mode_file))
+	@true $(foreach x,$(mode_list),; rm -rf '$(common_object_dir)/$x')
+	@rm -f '$(OUTPUT_FILE_EXT)'
+	@rm -f '$(current_mode_file)'
 	@$(call echo,[Done])
 
 # Public: erase files for the current build mode, including precompiled headers but not including the executable.
 .PHONY: clean_mode
 clean_mode: __check_mode
 	@$(call echo,[Cleaning] Mode '$(current_mode)')
-	@$(call rmdir,$(OBJECT_DIR))
+	@rm -rf '$(OBJECT_DIR)'
 	@$(call echo,[Done])
 
 # Public: clean precompiled headers for the current build mode.
 .PHONY: clean_pch
 clean_pch: __check_mode
-	@$(call echo,[Cleaning] PCH for mode '$(current_mode)') $(foreach x,$(compiled_headers),&& $(call rmfile,$x))
+	@$(call echo,[Cleaning] PCH for mode '$(current_mode)') $(foreach x,$(compiled_headers),; rm -f '$x')
 	@$(call echo,[Done])
 
 # Public: clean absolutely everything.
 .PHONY: clean_everything
 clean_everything: clean clean_commands
-	@$(call rmdir,$(common_object_dir))
+	@rm -rf '$(common_object_dir)'
 
 ifneq ($(dependency_management_enabled),)
 clean_everything: clean_deps
@@ -596,10 +547,10 @@ $(OBJECT_DIR)/%.hpp.gch: %.hpp
 else
 # * C precompiled headers (skip)
 $(OBJECT_DIR)/%.h.gch: %.h
-	@$(call touch,$@)
+	@touch '$@'
 # * C++ precompiled headers (skip)
 $(OBJECT_DIR)/%.hpp.gch: %.hpp
-	@$(call touch,$@)
+	@touch '$@'
 endif
 # * Windows resources
 $(OBJECT_DIR)/%.rc.o: %.rc
@@ -613,7 +564,7 @@ EXCLUDE_DIRS  :=# ^
 
 override assume_h_files_are_cpp := $(filter CXX,$(LINKER_MODE))
 
-ifneq ($(and $(filter windows,$(HOST_OS)),$(filter linux,$(HOST_SHELL))),)
+ifneq ($(filter windows,$(HOST_OS)),)
 # If we're on windows and use linux-style shell, we need to fix the path. `/c/foo/bar` -> `c:/foo/bar`
 override current_dir = $(subst <, ,$(subst $(space),/,$(strip $(join $(subst /, ,$(subst $(space),<,$(CURDIR))),:))))
 else
@@ -641,7 +592,7 @@ commands: __no_mode_needed
 .PHONY: clean_commands
 clean_commands: __no_mode_needed
 	@$(call echo,[Cleaning] Commands)
-	@$(call rmfile,compile_commands.json)
+	@rm -f 'compile_commands.json'
 	@$(call echo,[Done])
 
 
@@ -650,7 +601,7 @@ clean_commands: __no_mode_needed
 # A list of shared libraries currently sitting in the build directory.
 override shared_libraries := $(wildcard $(dir $(OUTPUT_FILE_EXT))*$(pattern_dll))
 # A command to erase all `shared_libraries`.
-override erase_shared_libraries = $(if $(shared_libraries),@$(success) $(foreach x,$(shared_libraries),&& $(call rmfile,$x)))
+override erase_shared_libraries = $(if $(shared_libraries),@true $(foreach x,$(shared_libraries),; rm -f '$x'))
 
 # Public: erase shared libraries that were copied into the build directory.
 .PHONY: clean_shared_libs
@@ -664,7 +615,7 @@ clean_shared_libs: __no_mode_needed
 clean_deps: __no_mode_needed
 	@$(call echo,[Cleaning] Dependencies)
 	$(erase_shared_libraries)
-	@$(call rmfile,$(lib_pack_info_file))
+	@rm -f '$(lib_pack_info_file)'
 	@$(call echo,[Done])
 
 # Public: update dependency information.
@@ -691,7 +642,7 @@ override library_pack_archive_pattern_display = $(subst *,<platform>,$(library_p
 
 # Same as $(PKGCONFIG), but with some commands to set proper library paths.
 # Using `=` here instead of `:=`, because this variable isn't required very often.
-override pkgconfig_with_path = $(call set_env,PKG_CONFIG_PATH,) && $(call set_env,PKG_CONFIG_LIBDIR,$(library_pack_path)/lib/pkgconfig) && $(PKGCONFIG)
+override pkgconfig_with_path = env 'PKG_CONFIG_PATH=' 'PKG_CONFIG_LIBDIR=$(library_pack_path)/lib/pkgconfig' $(PKGCONFIG)
 
 # `run_pkgconfig` - runs pkg-config with $1 (--cflags or --libs) as flags, and sanitizes the results.
 override banned_pkgconfig_flag_patterns := -rpath --enable-new-dtags
@@ -732,7 +683,7 @@ $(lib_pack_info_file):
 		$(call var,_local_archive_path := $(wildcard $(library_pack_archive_pattern)))\
 		$(if $(filter 1,$(words $(_local_archive_path))),\
 			$(info [Deps] Unpacking `$(_local_archive_path)`...)\
-				$(call safe_shell_exec,$(call mkdir,$(library_pack_path)) && tar -C $(LIBRARY_PACK_DIR) -xf $(_local_archive_path))\
+				$(call safe_shell_exec,mkdir -p '$(library_pack_path)' && tar -C $(LIBRARY_PACK_DIR) -xf $(_local_archive_path))\
 				$(info [Deps] Done. This file is no longer needed, you can remove it.),\
 			$(error Prebuilt dependencies not found in `$(library_pack_path)`.\
 				$(lf)I can install them for you; I need `$(library_pack_archive_pattern_display)` in the current directory)))
@@ -777,13 +728,9 @@ endif
 override needed_available_libs = $(strip $(foreach x,$(available_libs),$(if $(filter $(needed_lib_patterns),$x)$(call find_any_as_substr,$(deps_always_copied_shared_lib_patterns),$x),$x)))
 
 ifeq ($(TARGET_OS),linux)
-override ldd_with_path = $(call set_env,LD_LIBRARY_PATH,$(library_pack_path)/$(directory_dll):$$LD_LIBRARY_PATH) && $(LDD)
+override ldd_with_path = env 'LD_LIBRARY_PATH=$(library_pack_path)/$(directory_dll):$$LD_LIBRARY_PATH' $(LDD)
 else
-ifeq ($(HOST_SHELL),windows)
-override ldd_with_path = $(call set_env,PATH,$(call native_path,$(library_pack_path)/$(directory_dll));%PATH%) && $(LDD)
-else
-override ldd_with_path = $(call set_env,PATH,$(call native_path,$(library_pack_path)/$(directory_dll)):$$PATH) && $(LDD)
-endif
+override ldd_with_path = env 'PATH=$(library_pack_path)/$(directory_dll):$$PATH' $(LDD)
 endif
 
 # On Windows does nothing. On Linux, uses `patchelf` to add `$ORIGIN` to RPATH of library $1, and also calls `chmod -x` on it.
@@ -806,7 +753,7 @@ __generic_build: | __shared_libs
 __shared_libs: | $(OUTPUT_FILE_EXT)
 	$(info [Deps] Following prebuilt libraries will be copied to `$(dir $(OUTPUT_FILE_EXT))`:)
 	$(foreach x,$(needed_available_libs),$(info [Deps] - $(library_pack_path)/$(directory_dll)/$x))
-	$(foreach x,$(needed_available_libs),$(call safe_shell_exec,$(call copy,$(library_pack_path)/$(directory_dll)/$x,$(dir $(OUTPUT_FILE_EXT))))\
+	$(foreach x,$(needed_available_libs),$(call safe_shell_exec,cp -f '$(library_pack_path)/$(directory_dll)/$x' '$(dir $(OUTPUT_FILE_EXT))')\
 		$(call finalize,$(dir $(OUTPUT_FILE_EXT))$x))
 	$(info [Deps] Copying completed)
 	$(info [Deps] Determining all dependencies for `$(OUTPUT_FILE_EXT)`...)
@@ -832,7 +779,7 @@ __shared_libs: | $(OUTPUT_FILE_EXT)
 	$(foreach x,$(_local_libs),$(info [Deps] - $(call deps_entry_summary,$x)))
 	$(call var,_local_libs := $(foreach x,$(_local_libs),$(if $(call find_elem_in,$(call deps_entry_name,$x),$(needed_available_libs)),\
 		$(info [Deps] Skipping prebuilt library: $(call deps_entry_name,$x)),$x)))
-	$(foreach x,$(_local_libs),$(call safe_shell_exec,$(call copy,$(call deps_entry_dir,$x)$(call deps_entry_name,$x),$(dir $(OUTPUT_FILE_EXT))))\
+	$(foreach x,$(_local_libs),$(call safe_shell_exec,cp -f '$(call deps_entry_dir,$x)$(call deps_entry_name,$x)' '$(dir $(OUTPUT_FILE_EXT))')\
 		$(call finalize,$(dir $(OUTPUT_FILE_EXT))$(call deps_entry_name,$x)))
 	$(info [Deps] Copying completed)
 	@true
