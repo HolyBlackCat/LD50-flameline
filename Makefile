@@ -184,7 +184,8 @@ $(error `mingw32-make` is not supported! Use MSYS2 and its `make` instead.)
 endif
 
 # Shell functions.
-override echo = echo '$(subst ','"'"',$1)'
+override quote = '$(subst ','"'"',$1)'
+override echo = echo $(call quote,$1)
 override pause := read -s -n 1 -p 'Press any key to continue . . .' && echo
 
 
@@ -458,7 +459,7 @@ $(foreach x,$(subst |, ,$(subst $(space),<,$(FILE_SPECIFIC_FLAGS))),$(foreach y,
 # --- RULES FOR CREATING FOLDERS ---
 override files_requiring_folders := $(OUTPUT_FILE_EXT) $(objects) $(compiled_headers) $(current_mode_file) $(lib_pack_info_file)
 $(foreach x,$(files_requiring_folders),$(eval $x: | $(dir $x)))
-$(foreach x,$(sort $(dir $(files_requiring_folders))),$(eval $x: ; @mkdir -p '$x'))
+$(foreach x,$(sort $(dir $(files_requiring_folders))),$(eval $x: ; @mkdir -p $(call quote,$x)))
 
 
 # --- TARGETS ---
@@ -477,29 +478,29 @@ build: __check_mode __mode_$(current_mode)
 .PHONY: clean
 clean: __no_mode_needed
 	@$(call echo,[Cleaning] All build artifacts)
-	@true $(foreach x,$(mode_list),; rm -rf '$(common_object_dir)/$x')
-	@rm -f '$(OUTPUT_FILE_EXT)'
+	@true $(foreach x,$(mode_list),; rm -rf $(call quote,$(common_object_dir)/$x))
+	@rm -f $(call quote,$(OUTPUT_FILE_EXT))
 	@$(call echo,[Done])
 
 # Public: erase files for the current build mode, including precompiled headers but not including the executable.
 .PHONY: clean_mode
 clean_mode: __check_mode
 	@$(call echo,[Cleaning] Mode '$(current_mode)')
-	@rm -rf '$(OBJECT_DIR)'
+	@rm -rf $(call quote,$(OBJECT_DIR))
 	@$(call echo,[Done])
 
 # Public: clean precompiled headers for the current build mode.
 .PHONY: clean_pch
 clean_pch: __check_mode
-	@$(call echo,[Cleaning] PCH for mode '$(current_mode)') $(foreach x,$(compiled_headers),; rm -f '$x')
+	@$(call echo,[Cleaning] PCH for mode '$(current_mode)') $(foreach x,$(compiled_headers),; rm -f $(call quote,$x))
 	@$(call echo,[Done])
 
 # Public: clean absolutely everything.
 .PHONY: clean_everything
 clean_everything: clean_commands
 	@$(call echo,[Cleaning] All build artifacts)
-	@rm -rf '$(common_object_dir)'
-	@rm -f '$(OUTPUT_FILE_EXT)'
+	@rm -rf $(call quote,$(common_object_dir))
+	@rm -f $(call quote,$(OUTPUT_FILE_EXT))
 	@$(call echo,[Done])
 
 ifneq ($(dependency_management_enabled),)
@@ -549,10 +550,10 @@ $(OBJECT_DIR)/%.hpp.gch: %.hpp
 else
 # * C precompiled headers (skip)
 $(OBJECT_DIR)/%.h.gch: %.h
-	@touch '$@'
+	@touch $(call quote,$@)
 # * C++ precompiled headers (skip)
 $(OBJECT_DIR)/%.hpp.gch: %.hpp
-	@touch '$@'
+	@touch $(call quote,$@)
 endif
 # * Windows resources
 $(OBJECT_DIR)/%.rc.o: %.rc
@@ -603,7 +604,7 @@ clean_commands: __no_mode_needed
 # A list of shared libraries currently sitting in the build directory.
 override shared_libraries := $(wildcard $(dir $(OUTPUT_FILE_EXT))*$(pattern_dll))
 # A command to erase all `shared_libraries`.
-override erase_shared_libraries = $(if $(shared_libraries),@true $(foreach x,$(shared_libraries),; rm -f '$x'))
+override erase_shared_libraries = $(if $(shared_libraries),@true $(foreach x,$(shared_libraries),; rm -f $(call quote,$x)))
 
 # Public: erase shared libraries that were copied into the build directory.
 .PHONY: clean_shared_libs
@@ -617,7 +618,7 @@ clean_shared_libs: __no_mode_needed
 clean_deps: __no_mode_needed
 	@$(call echo,[Cleaning] Dependencies)
 	$(erase_shared_libraries)
-	@rm -f '$(lib_pack_info_file)'
+	@rm -f $(call quote,$(lib_pack_info_file))
 	@$(call echo,[Done])
 
 # Public: update dependency information.
@@ -644,7 +645,7 @@ override library_pack_archive_pattern_display = $(subst *,<platform>,$(library_p
 
 # Same as $(PKGCONFIG), but with some commands to set proper library paths.
 # Using `=` here instead of `:=`, because this variable isn't required very often.
-override pkgconfig_with_path = env 'PKG_CONFIG_PATH=' 'PKG_CONFIG_LIBDIR=$(library_pack_path)/lib/pkgconfig' $(PKGCONFIG)
+override pkgconfig_with_path = env $(call quote,PKG_CONFIG_PATH=) $(call quote,PKG_CONFIG_LIBDIR=$(library_pack_path)/lib/pkgconfig) $(PKGCONFIG)
 
 # `run_pkgconfig` - runs pkg-config with $1 (--cflags or --libs) as flags, and sanitizes the results.
 override banned_pkgconfig_flag_patterns := -rpath --enable-new-dtags
@@ -685,7 +686,7 @@ $(lib_pack_info_file):
 		$(call var,_local_archive_path := $(wildcard $(library_pack_archive_pattern)))\
 		$(if $(filter 1,$(words $(_local_archive_path))),\
 			$(info [Deps] Unpacking `$(_local_archive_path)`...)\
-				$(call safe_shell_exec,mkdir -p '$(library_pack_path)' && tar -C $(LIBRARY_PACK_DIR) -xf $(_local_archive_path))\
+				$(call safe_shell_exec,mkdir -p $(call quote,$(library_pack_path)) && tar -C $(LIBRARY_PACK_DIR) -xf $(_local_archive_path))\
 				$(info [Deps] Done. This file is no longer needed, you can remove it.),\
 			$(error Prebuilt dependencies not found in `$(library_pack_path)`.\
 				$(lf)I can install them for you; I need `$(library_pack_archive_pattern_display)` in the current directory)))
@@ -730,21 +731,21 @@ endif
 override needed_available_libs = $(strip $(foreach x,$(available_libs),$(if $(filter $(needed_lib_patterns),$x)$(call find_any_as_substr,$(deps_always_copied_shared_lib_patterns),$x),$x)))
 
 ifeq ($(TARGET_OS),linux)
-override ldd_with_path = env 'LD_LIBRARY_PATH=$(library_pack_path)/$(directory_dll):$$LD_LIBRARY_PATH' $(LDD)
+override ldd_with_path = env $(call quote,LD_LIBRARY_PATH=$(library_pack_path)/$(directory_dll):$$LD_LIBRARY_PATH) $(LDD)
 else
-override ldd_with_path = env 'PATH=$(library_pack_path)/$(directory_dll):$$PATH' $(LDD)
+override ldd_with_path = env $(call quote,PATH=$(library_pack_path)/$(directory_dll):$$PATH) $(LDD)
 endif
 
 # On Windows does nothing. On Linux, uses `patchelf` to add `$ORIGIN` to RPATH of library $1, and also calls `chmod -x` on it.
 ifeq ($(TARGET_OS),linux)
 override finalize = \
-	$(call safe_shell_exec,$(PATCHELF) --set-rpath '$$ORIGIN' '$1')\
-	$(call safe_shell_exec,chmod -x '$1')
+	$(call safe_shell_exec,$(PATCHELF) --set-rpath '$$ORIGIN' $(call quote,$1))\
+	$(call safe_shell_exec,chmod -x $(call quote,$1))
 # Alternative implementation, which appends `$ORIGIN` to rpath without removing existing entries.
 #	$(call safe_shell_exec,$(PATCHELF) --set-rpath \
-#		'$(subst <, ,$(subst $(space),:,$(strip $$ORIGIN \
-#			$(foreach y,$(subst :, ,$(subst $(space),<,$(call safe_shell,$(PATCHELF) --print-rpath '$1'))),$(if $(call find_any_as_substr,$(dollar)ORIGIN $(dollar)(ORIGIN),$y),,$y))\
-#		)))' '$1'\
+#		$(call quote,$(subst <, ,$(subst $(space),:,$(strip $$ORIGIN \
+#			$(foreach y,$(subst :, ,$(subst $(space),<,$(call safe_shell,$(PATCHELF) --print-rpath $(call quote,$1)))),$(if $(call find_any_as_substr,$(dollar)ORIGIN $(dollar)(ORIGIN),$y),,$y))\
+#		)))) $(call quote,$1)\
 #	)
 else
 override finalize =
@@ -755,7 +756,7 @@ __generic_build: | __shared_libs
 __shared_libs: | $(OUTPUT_FILE_EXT)
 	$(info [Deps] Following prebuilt libraries will be copied to `$(dir $(OUTPUT_FILE_EXT))`:)
 	$(foreach x,$(needed_available_libs),$(info [Deps] - $(library_pack_path)/$(directory_dll)/$x))
-	$(foreach x,$(needed_available_libs),$(call safe_shell_exec,cp -f '$(library_pack_path)/$(directory_dll)/$x' '$(dir $(OUTPUT_FILE_EXT))')\
+	$(foreach x,$(needed_available_libs),$(call safe_shell_exec,cp -f $(call quote,$(library_pack_path)/$(directory_dll)/$x) $(call quote,$(dir $(OUTPUT_FILE_EXT))))\
 		$(call finalize,$(dir $(OUTPUT_FILE_EXT))$x))
 	$(info [Deps] Copying completed)
 	$(info [Deps] Determining all dependencies for `$(OUTPUT_FILE_EXT)`...)
@@ -781,7 +782,7 @@ __shared_libs: | $(OUTPUT_FILE_EXT)
 	$(foreach x,$(_local_libs),$(info [Deps] - $(call deps_entry_summary,$x)))
 	$(call var,_local_libs := $(foreach x,$(_local_libs),$(if $(call find_elem_in,$(call deps_entry_name,$x),$(needed_available_libs)),\
 		$(info [Deps] Skipping prebuilt library: $(call deps_entry_name,$x)),$x)))
-	$(foreach x,$(_local_libs),$(call safe_shell_exec,cp -f '$(call deps_entry_dir,$x)$(call deps_entry_name,$x)' '$(dir $(OUTPUT_FILE_EXT))')\
+	$(foreach x,$(_local_libs),$(call safe_shell_exec,cp -f $(call quote,$(call deps_entry_dir,$x)$(call deps_entry_name,$x)) $(call quote,$(dir $(OUTPUT_FILE_EXT))))\
 		$(call finalize,$(dir $(OUTPUT_FILE_EXT))$(call deps_entry_name,$x)))
 	$(info [Deps] Copying completed)
 	@true
