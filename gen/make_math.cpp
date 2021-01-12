@@ -7,7 +7,7 @@
 #include <sstream>
 #include <type_traits>
 
-#define VERSION "3.1.17"
+#define VERSION "3.1.18"
 
 #pragma GCC diagnostic ignored "-Wpragmas" // Silence GCC warning about the next line disabling a warning that GCC doesn't have.
 #pragma GCC diagnostic ignored "-Wstring-plus-int" // Silence clang warning about `1+R"()"` pattern.
@@ -1549,7 +1549,7 @@ int main(int argc, char **argv)
 
                     if constexpr (no_vectors_v<A,B>)
                     {
-                        if (var < min)
+                        if (!(var >= min)) // The condition is written like this to catch NaNs, they always compare to false.
                         $   var = min;
                     }
                     else
@@ -1566,7 +1566,7 @@ int main(int argc, char **argv)
 
                     if constexpr (no_vectors_v<A,B>)
                     {
-                        if (var > max)
+                        if (!(var <= max)) // The condition is written like this to catch NaNs, they always compare to false.
                         $   var = max;
                     }
                     else
