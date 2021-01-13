@@ -213,7 +213,7 @@ namespace Refl
     }
     // A convenience replacement for `Interface` that deduces T.
     // Note that this being a lambda prevents unwanted ADL.
-    constexpr auto InterfaceFor = []<typename T>(const T &) -> typename impl::SelectInterface<std::remove_cv_t<T>>::type
+    constexpr auto InterfaceFor = []<typename T>(T &&) -> typename impl::SelectInterface<std::remove_cvref_t<T>>::type
     {
         return {};
     };
