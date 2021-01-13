@@ -26,7 +26,7 @@ generate: $(tmp_file)
 
 $(tmp_file): $(generator_binary)
 	@$(call echo,[Generating] $(target) [Running] $<)
-	@$(call native_path,./$<) $@
+	@./$< $@
 	@$(call rmfile,$<)
 
 $(generator_binary): $(generator_source)
