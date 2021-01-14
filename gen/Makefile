@@ -21,13 +21,13 @@ override tmp_file := $(common_object_dir)/$(basename $(notdir $(target))).tmp$(s
 generate: $(tmp_file)
 	@$(call echo,[Generating] $(target) [Validating] $<)
 	@$(CXX_COMPILER) $(CXXFLAGS) -fsyntax-only -x c++-header $<
-	@$(call move,$<,$(target))
+	@mv $(call quote,$<) $(call quote,$(target))
 	@$(call echo,[Generating] $(target) [Done])
 
 $(tmp_file): $(generator_binary)
 	@$(call echo,[Generating] $(target) [Running] $<)
 	@./$< $@
-	@$(call rmfile,$<)
+	@rm -f $(call quote,$<)
 
 $(generator_binary): $(generator_source)
 	@$(call echo,[Generating] $(target) [C++] $<)
