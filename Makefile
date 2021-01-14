@@ -640,8 +640,8 @@ ifneq ($(strip $(if $(MAKECMDGOALS),$(filter $(targets_requiring_deps_info),$(MA
 override library_pack_path = $(LIBRARY_PACK_DIR)/$(LIBRARY_PACK_NAME)
 
 # A pattern for a dependency archive.
-override library_pack_archive_pattern = ./$(LIBRARY_PACK_NAME)_prebuilt_*.tar.gz
-override library_pack_archive_pattern_display = $(subst *,<platform>,$(library_pack_archive_pattern))
+override library_pack_archive_pattern = ./$(LIBRARY_PACK_NAME)_prebuilt_$(TARGET_OS)*.tar.gz
+override library_pack_archive_pattern_display = $(library_pack_archive_pattern)
 
 # Same as $(PKGCONFIG), but with some commands to set proper library paths.
 # Using `=` here instead of `:=`, because this variable isn't required very often.
