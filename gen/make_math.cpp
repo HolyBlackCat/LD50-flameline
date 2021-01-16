@@ -207,6 +207,8 @@ int main(int argc, char **argv)
             }
         });
 
+        next_line();
+
         section("inline namespace Alias // Short type aliases", []
         {
             { // Type-generic
@@ -538,6 +540,11 @@ int main(int argc, char **argv)
 
                             // Normalize
                             output("[[nodiscard]] constexpr auto norm() const -> vec",w,"<decltype(type{}/len())> {if (auto l = len()) return *this / l; else return vec(0);}\n");
+
+                            // Approximate length and normalization.
+                            output("[[nodiscard]] constexpr auto approx_len() const {return floating_point_t<type>(len_sqr() + 1) / 2;} // Accurate only around `len()==1`.\n");
+                            output("[[nodiscard]] constexpr auto approx_inv_len() const {return 2 / floating_point_t<type>(len_sqr() + 1);}\n");
+                            output("[[nodiscard]] constexpr auto approx_norm() const {return *this * approx_inv_len();} // Guaranteed to converge to `len()==1` eventually, when starting from any finite `len_sqr()`.\n");
                         }
 
                         { // Angles and directions
@@ -547,7 +554,7 @@ int main(int argc, char **argv)
                                 output("[[nodiscard]] static constexpr vec dir(type angle, type len = 1) {return vec(std::cos(angle) * len, std::sin(angle) * len); static_assert(is_floating_point, \"The vector must be floating-point.\");}\n");
 
                                 // Get angle
-                                output("template <typename TT = double> [[nodiscard]] constexpr TT angle() const {return std::atan2(TT(y), TT(x));}\n"); // Note that atan2 is well-defined even when applied to (0,0).
+                                output("template <typename TT = floating_point_t<type>> [[nodiscard]] constexpr TT angle() const {return std::atan2(TT(y), TT(x));}\n"); // Note that atan2 is well-defined even when applied to (0,0).
 
                                 // Rotate by 90 degree increments
                                 output("[[nodiscard]] constexpr vec rot90(int steps = 1) const {switch (steps & 3) {default: return *this; case 1: return {-y,x}; case 2: return -*this; case 3: return {y,-x};}}\n");

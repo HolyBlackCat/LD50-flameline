@@ -1,6 +1,6 @@
 // mat.h
 // Vector and matrix math
-// Version 3.1.17
+// Version 3.1.18
 // Generated, don't touch.
 
 #pragma once
@@ -22,6 +22,7 @@ namespace Math
         template <int D, typename T> struct vec;
         template <int W, int H, typename T> struct mat;
     }
+    
     inline namespace Alias // Short type aliases
     {
         template <typename T> using vec2 = vec<2,T>; template <typename T> using vec3 = vec<3,T>; template <typename T> using vec4 = vec<4,T>;
@@ -363,8 +364,11 @@ namespace Math
             [[nodiscard]] constexpr auto len_sqr() const {return x*x + y*y;}
             [[nodiscard]] constexpr auto len() const {return std::sqrt(len_sqr());}
             [[nodiscard]] constexpr auto norm() const -> vec2<decltype(type{}/len())> {if (auto l = len()) return *this / l; else return vec(0);}
+            [[nodiscard]] constexpr auto approx_len() const {return floating_point_t<type>(len_sqr() + 1) / 2;} // Accurate only around `len()==1`.
+            [[nodiscard]] constexpr auto approx_inv_len() const {return 2 / floating_point_t<type>(len_sqr() + 1);}
+            [[nodiscard]] constexpr auto approx_norm() const {return *this * approx_inv_len();} // Guaranteed to converge to `len()==1` eventually, when starting from any finite `len_sqr()`.
             [[nodiscard]] static constexpr vec dir(type angle, type len = 1) {return vec(std::cos(angle) * len, std::sin(angle) * len); static_assert(is_floating_point, "The vector must be floating-point.");}
-            template <typename TT = double> [[nodiscard]] constexpr TT angle() const {return std::atan2(TT(y), TT(x));}
+            template <typename TT = floating_point_t<type>> [[nodiscard]] constexpr TT angle() const {return std::atan2(TT(y), TT(x));}
             [[nodiscard]] constexpr vec rot90(int steps = 1) const {switch (steps & 3) {default: return *this; case 1: return {-y,x}; case 2: return -*this; case 3: return {y,-x};}}
             [[nodiscard]] static constexpr vec dir4(int index) {return vec(1,0).rot90(index);}
             [[nodiscard]] static constexpr vec dir8(int index) {vec array[8]{vec(1,0),vec(1,1),vec(0,1),vec(-1,1),vec(-1,0),vec(-1,-1),vec(0,-1),vec(1,-1)}; return array[index & 7];}
@@ -411,6 +415,9 @@ namespace Math
             [[nodiscard]] constexpr auto len_sqr() const {return x*x + y*y + z*z;}
             [[nodiscard]] constexpr auto len() const {return std::sqrt(len_sqr());}
             [[nodiscard]] constexpr auto norm() const -> vec3<decltype(type{}/len())> {if (auto l = len()) return *this / l; else return vec(0);}
+            [[nodiscard]] constexpr auto approx_len() const {return floating_point_t<type>(len_sqr() + 1) / 2;} // Accurate only around `len()==1`.
+            [[nodiscard]] constexpr auto approx_inv_len() const {return 2 / floating_point_t<type>(len_sqr() + 1);}
+            [[nodiscard]] constexpr auto approx_norm() const {return *this * approx_inv_len();} // Guaranteed to converge to `len()==1` eventually, when starting from any finite `len_sqr()`.
             template <typename TT> [[nodiscard]] constexpr auto dot(const vec3<TT> &o) const {return x * o.x + y * o.y + z * o.z;}
             template <typename TT> [[nodiscard]] constexpr auto cross(const vec3<TT> &o) const -> vec3<decltype(x * o.x - x * o.x)> {return {y * o.z - z * o.y, z * o.x - x * o.z, x * o.y - y * o.x};}
             template <typename TT> [[nodiscard]] constexpr auto delta_to(vec3<TT> v) const {return v - *this;}
@@ -454,6 +461,9 @@ namespace Math
             [[nodiscard]] constexpr auto len_sqr() const {return x*x + y*y + z*z + w*w;}
             [[nodiscard]] constexpr auto len() const {return std::sqrt(len_sqr());}
             [[nodiscard]] constexpr auto norm() const -> vec4<decltype(type{}/len())> {if (auto l = len()) return *this / l; else return vec(0);}
+            [[nodiscard]] constexpr auto approx_len() const {return floating_point_t<type>(len_sqr() + 1) / 2;} // Accurate only around `len()==1`.
+            [[nodiscard]] constexpr auto approx_inv_len() const {return 2 / floating_point_t<type>(len_sqr() + 1);}
+            [[nodiscard]] constexpr auto approx_norm() const {return *this * approx_inv_len();} // Guaranteed to converge to `len()==1` eventually, when starting from any finite `len_sqr()`.
             template <typename TT> [[nodiscard]] constexpr auto dot(const vec4<TT> &o) const {return x * o.x + y * o.y + z * o.z + w * o.w;}
             template <typename TT> [[nodiscard]] constexpr auto delta_to(vec4<TT> v) const {return v - *this;}
             [[nodiscard]] constexpr auto tie() {return std::tie(x,y,z,w);}
@@ -1614,7 +1624,7 @@ namespace Math
             
             if constexpr (no_vectors_v<A,B>)
             {
-                if (var < min)
+                if (!(var >= min)) // The condition is written like this to catch NaNs, they always compare to false.
                     var = min;
             }
             else
@@ -1631,7 +1641,7 @@ namespace Math
             
             if constexpr (no_vectors_v<A,B>)
             {
-                if (var > max)
+                if (!(var <= max)) // The condition is written like this to catch NaNs, they always compare to false.
                     var = max;
             }
             else
