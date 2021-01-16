@@ -7,7 +7,7 @@
 #include <sstream>
 #include <type_traits>
 
-#define VERSION "3.1.18"
+#define VERSION "3.1.19"
 
 #pragma GCC diagnostic ignored "-Wpragmas" // Silence GCC warning about the next line disabling a warning that GCC doesn't have.
 #pragma GCC diagnostic ignored "-Wstring-plus-int" // Silence clang warning about `1+R"()"` pattern.
@@ -1016,9 +1016,9 @@ int main(int argc, char **argv)
                 next_line();
 
                 // Deduction guides
-                output("template <typename ...P, std::enable_if_t<sizeof...(P) == 4, bool> = true> mat(P...) -> mat<2, 2, larger_t<P...>>;\n");
-                output("template <typename ...P, std::enable_if_t<sizeof...(P) == 9, bool> = true> mat(P...) -> mat<3, 3, larger_t<P...>>;\n");
-                output("template <typename ...P, std::enable_if_t<sizeof...(P) == 16, bool> = true> mat(P...) -> mat<4, 4, larger_t<P...>>;\n");
+                output("template <typename ...P, typename = std::enable_if_t<sizeof...(P) == 4>> mat(P...) -> mat<2, 2, larger_t<P...>>;\n");
+                output("template <typename ...P, typename = std::enable_if_t<sizeof...(P) == 9>> mat(P...) -> mat<3, 3, larger_t<P...>>;\n");
+                output("template <typename ...P, typename = std::enable_if_t<sizeof...(P) == 16>> mat(P...) -> mat<4, 4, larger_t<P...>>;\n");
             });
 
             next_line();
@@ -1651,14 +1651,14 @@ int main(int argc, char **argv)
                 // Some of them are imported from `std` and extended to operate on vectors. Some are custom.
 
                 using std::abs;
-                template <typename T, std::nullptr_t = std::enable_if_t<!no_vectors_v<T>, std::nullptr_t>{}>
+                template <typename T, std::enable_if_t<!no_vectors_v<T>, std::nullptr_t> = nullptr>
                 [[nodiscard]] T abs(T x)
                 {
                     return apply_elementwise([](auto val){return std::abs(val);}, x);
                 }
 
                 using std::round;
-                template <typename T, std::nullptr_t = std::enable_if_t<!no_vectors_v<T>, std::nullptr_t>{}>
+                template <typename T, std::enable_if_t<!no_vectors_v<T>, std::nullptr_t> = nullptr>
                 [[nodiscard]] T round(T x)
                 {
                     static_assert(std::is_floating_point_v<vec_base_t<T>>, "Argument must be floating-point.");
@@ -1666,7 +1666,7 @@ int main(int argc, char **argv)
                 }
 
                 using std::floor;
-                template <typename T, std::nullptr_t = std::enable_if_t<!no_vectors_v<T>, std::nullptr_t>{}>
+                template <typename T, std::enable_if_t<!no_vectors_v<T>, std::nullptr_t> = nullptr>
                 [[nodiscard]] T floor(T x)
                 {
                     static_assert(std::is_floating_point_v<vec_base_t<T>>, "Argument must be floating-point.");
@@ -1674,7 +1674,7 @@ int main(int argc, char **argv)
                 }
 
                 using std::ceil;
-                template <typename T, std::nullptr_t = std::enable_if_t<!no_vectors_v<T>, std::nullptr_t>{}>
+                template <typename T, std::enable_if_t<!no_vectors_v<T>, std::nullptr_t> = nullptr>
                 [[nodiscard]] T ceil(T x)
                 {
                     static_assert(std::is_floating_point_v<vec_base_t<T>>, "Argument must be floating-point.");
@@ -1682,7 +1682,7 @@ int main(int argc, char **argv)
                 }
 
                 using std::trunc;
-                template <typename T, std::nullptr_t = std::enable_if_t<!no_vectors_v<T>, std::nullptr_t>{}>
+                template <typename T, std::enable_if_t<!no_vectors_v<T>, std::nullptr_t> = nullptr>
                 [[nodiscard]] T trunc(T x)
                 {
                     static_assert(std::is_floating_point_v<vec_base_t<T>>, "Argument must be floating-point.");
@@ -1700,7 +1700,7 @@ int main(int argc, char **argv)
                 }
 
                 using std::nexttoward;
-                template <typename A, typename B, std::nullptr_t = std::enable_if_t<!no_vectors_v<A, B>, std::nullptr_t>{}>
+                template <typename A, typename B, std::enable_if_t<!no_vectors_v<A, B>, std::nullptr_t> = nullptr>
                 [[nodiscard]] A nexttoward(A value, B target)
                 {
                     static_assert(std::is_floating_point_v<vec_base_t<A>>, "The first argument must be floating-point.");
@@ -1760,7 +1760,7 @@ int main(int argc, char **argv)
                 }
 
                 using std::pow;
-                template <typename A, typename B, std::nullptr_t = std::enable_if_t<!no_vectors_v<A, B>, std::nullptr_t>{}>
+                template <typename A, typename B, std::enable_if_t<!no_vectors_v<A, B>, std::nullptr_t> = nullptr>
                 [[nodiscard]] auto pow(A a, B b)
                 {
                     return apply_elementwise([](auto val_a, auto val_b){return std::pow(val_a, val_b);}, a, b);
