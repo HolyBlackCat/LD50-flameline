@@ -287,8 +287,8 @@ SOURCE_DIRS := .
 OUTPUT_FILE := program
 OUTPUT_FILE_EXT = $(OUTPUT_FILE)$(extension_exe)# Output filename with extension. Normally you don't need to touch this, override `OUTPUT_FILE` instead. Note that we can't use `:=` here.
 OBJECT_DIR := obj
-CFLAGS := -std=c11 -Wall -Wextra -pedantic-errors -g
-CXXFLAGS := -std=c++17 -Wall -Wextra -pedantic-errors -g
+CFLAGS := -std=c17 -Wall -Wextra -pedantic-errors -g
+CXXFLAGS := -std=c++20 -Wall -Wextra -pedantic-errors -g
 WINDRES_FLAGS := -O res
 LDFLAGS :=
 LINKER_MODE := CXX# C or CXX
