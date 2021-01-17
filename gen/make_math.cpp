@@ -7,7 +7,7 @@
 #include <sstream>
 #include <type_traits>
 
-#define VERSION "3.2.0"
+#define VERSION "3.2.1"
 
 #pragma GCC diagnostic ignored "-Wpragmas" // Silence GCC warning about the next line disabling a warning that GCC doesn't have.
 #pragma GCC diagnostic ignored "-Wstring-plus-int" // Silence clang warning about `1+R"()"` pattern.
@@ -2001,17 +2001,19 @@ int main(int argc, char **argv)
                     [[nodiscard]] constexpr vec3_t axis_norm() const { return xyz().norm(); }
                     [[nodiscard]] constexpr float angle() const { return 2 * std::atan2(xyz().len(), w); }
 
+                    // Negates the rotation. Not strictly an inversion in the mathematical sense, since the length stays unchanged (while it's supposed to become `1 / old_length`).
                     [[nodiscard]] constexpr quat inverse() const {return quat(xyz().to_vec4(-w));}
+                    // Negates the three imaginary parts of the quaternion, `xyz`. Effectively inverts the rotation, but works slower than `inverse()`. Useful only for low-level quaternion things.
                     [[nodiscard]] constexpr quat conjugate() const {return quat((-xyz()).to_vec4(w));}
 
                     // Uses iterative normalization to keep denormalization from accumulating due to lack of precision.
-                    [[nodiscard]] constexpr quat operator*(quat other) const {return mult_without_norm(other).approx_norm();}
+                    template <typename TT> [[nodiscard]] constexpr quat<larger_t<T,TT>> operator*(quat<TT> other) const {return mult_without_norm(other).approx_norm();}
                     constexpr quat &operator*=(quat other) {return *this = *this * other;}
 
                     // Simple quaternion multiplication, without any normalization.
-                    [[nodiscard]] constexpr quat mult_without_norm(quat other) const
+                    template <typename TT> [[nodiscard]] constexpr quat<larger_t<T,TT>> mult_without_norm(quat<TT> other) const
                     {
-                        return quat(vec4_t(
+                        return quat<larger_t<T,TT>>(vec4<larger_t<T,TT>>(
                         $   x * other.w + w * other.x - z * other.y + y * other.z,
                         $   y * other.w + z * other.x + w * other.y - x * other.z,
                         $   z * other.w - y * other.x + x * other.y + w * other.z,
@@ -2020,11 +2022,11 @@ int main(int argc, char **argv)
                     }
 
                     // Transforms a vector by this quaternion. Only makes sense if the quaternion is normalized.
-                    [[nodiscard]] constexpr vec3_t operator*(vec3_t other) const
+                    template <typename TT> [[nodiscard]] constexpr vec3<larger_t<T,TT>> operator*(vec3<TT> other) const
                     {
                         // This is called the "Euler-Rodrigues formula".
                         // We could also use `*this * other * this->conjugate()`, but that looks less optimized.
-                        vec3_t tmp = xyz().cross(other);
+                        vec3<larger_t<T,TT>> tmp = xyz().cross(other);
                         return other + 2 * w * tmp + 2 * xyz().cross(tmp);
                     }
 
