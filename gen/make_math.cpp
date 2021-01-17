@@ -7,7 +7,7 @@
 #include <sstream>
 #include <type_traits>
 
-#define VERSION "3.1.19"
+#define VERSION "3.2.0"
 
 #pragma GCC diagnostic ignored "-Wpragmas" // Silence GCC warning about the next line disabling a warning that GCC doesn't have.
 #pragma GCC diagnostic ignored "-Wstring-plus-int" // Silence clang warning about `1+R"()"` pattern.
@@ -194,6 +194,9 @@ int main(int argc, char **argv)
         )");
         next_line();
     }
+
+    output("// Vectors and matrices\n");
+    next_line();
 
     section("namespace Math", []
     {
@@ -1954,6 +1957,149 @@ int main(int argc, char **argv)
                     for (int i = 1; i < D; i++)
                     $   ret ^= std::hash<decltype(v.x)>{}(v[i]) + 0x9e3779b9 + (ret << 6) + (ret >> 2); // From Boost.
                     return ret;
+                }
+            };
+        )");
+    });
+
+    next_line();
+    output("// Quaternions\n");
+    next_line();
+
+    section("namespace Math", []
+    {
+        output(1+R"#(
+            inline namespace Quat // Quaternions.
+            {
+                template <typename T> struct quat
+                {
+                    static_assert(std::is_floating_point_v<T>, "The base type must be floating-point.");
+                    using disable_vec_mat_operators = void; // Otherwise vec/mat operators sometimes conflict with our ones.
+                    using type = T;
+                    using vec3_t = vec3<T>;
+                    using vec4_t = vec4<T>;
+                    using mat3_t = mat3<T>;
+                    type x = 0, y = 0, z = 0, w = 1; // This represents zero rotation.
+
+                    constexpr quat() {}
+                    constexpr quat(type x, type y, type z, type w) : x(x), y(y), z(z), w(w) {}
+                    explicit constexpr quat(vec4_t vec) : x(vec.x), y(vec.y), z(vec.z), w(vec.w) {}
+
+                    // Normalizes the axis. If it's already normalized, use `with_normalized_axis()` instead.
+                    constexpr quat(vec3_t axis, type angle) {*this = with_normalized_axis(axis.norm(), angle);}
+                    [[nodiscard]] static constexpr quat with_normalized_axis(vec3_t axis, type angle) {angle *= type(0.5); return quat((axis * std::sin(angle)).to_vec4(std::cos(angle)));}
+
+                    [[nodiscard]] constexpr vec4_t as_vec() const {return {x, y, z, w};}
+                    [[nodiscard]] constexpr vec3_t xyz() const {return {x, y, z};}
+                    [[nodiscard]] type *as_array() {return &x;}
+                    [[nodiscard]] const type *as_array() const {return &x;}
+
+                    [[nodiscard]] constexpr quat norm() const {return quat(as_vec().norm());}
+                    [[nodiscard]] constexpr quat approx_norm() const {return quat(as_vec().approx_norm());}
+
+                    [[nodiscard]] constexpr vec3_t axis_denorm() const { return xyz(); }
+                    [[nodiscard]] constexpr vec3_t axis_norm() const { return xyz().norm(); }
+                    [[nodiscard]] constexpr float angle() const { return 2 * std::atan2(xyz().len(), w); }
+
+                    [[nodiscard]] constexpr quat inverse() const {return quat(xyz().to_vec4(-w));}
+                    [[nodiscard]] constexpr quat conjugate() const {return quat((-xyz()).to_vec4(w));}
+
+                    // Uses iterative normalization to keep denormalization from accumulating due to lack of precision.
+                    [[nodiscard]] constexpr quat operator*(quat other) const {return mult_without_norm(other).approx_norm();}
+                    constexpr quat &operator*=(quat other) {return *this = *this * other;}
+
+                    // Simple quaternion multiplication, without any normalization.
+                    [[nodiscard]] constexpr quat mult_without_norm(quat other) const
+                    {
+                        return quat(vec4_t(
+                        $   x * other.w + w * other.x - z * other.y + y * other.z,
+                        $   y * other.w + z * other.x + w * other.y - x * other.z,
+                        $   z * other.w - y * other.x + x * other.y + w * other.z,
+                        $   w * other.w - x * other.x - y * other.y - z * other.z
+                        ));
+                    }
+
+                    // Transforms a vector by this quaternion. Only makes sense if the quaternion is normalized.
+                    [[nodiscard]] constexpr vec3_t operator*(vec3_t other) const
+                    {
+                        // This is called the "Euler-Rodrigues formula".
+                        // We could also use `*this * other * this->conjugate()`, but that looks less optimized.
+                        vec3_t tmp = xyz().cross(other);
+                        return other + 2 * w * tmp + 2 * xyz().cross(tmp);
+                    }
+
+                    // Returns a rotation matrix for this quaternion. Only makes sense if the quaternion is normalized.
+                    [[nodiscard]] constexpr mat3_t matrix() const
+                    {
+                        return mat3_t(
+                        $   1 - (2*y*y + 2*z*z), 2*x*y - 2*z*w, 2*x*z + 2*y*w,
+                        $   2*x*y + 2*z*w, 1 - (2*x*x + 2*z*z), 2*y*z - 2*x*w,
+                        $   2*x*z - 2*y*w, 2*y*z + 2*x*w, 1 - (2*x*x + 2*y*y)
+                        );
+                    }
+
+                    // Returns a rotation matrix for this quaternion. Works even if the quaternion is not normalized.
+                    [[nodiscard]] constexpr mat3_t matrix_from_denorm() const
+                    {
+                        type f = 1 / as_vec().len_sqr();
+                        mat3_t m = matrix();
+                        return mat3_t(m.x * f, m.y * f, m.z * f);
+                    }
+                };
+
+                using fquat = quat<float>;
+                using dquat = quat<double>;
+                using ldquat = quat<long double>;
+
+                template <typename A, typename B, typename T> std::basic_ostream<A,B> &operator<<(std::basic_ostream<A,B> &s, const quat<T> &q)
+                {
+                    s.width(0);
+                    if (q.axis_denorm() == vec3<T>(0))
+                    $   s << "[angle=0";
+                    else
+                    $   s << "[axis=" << q.axis_denorm()/q.axis_denorm().max() << " angle=" << to_deg(q.angle()) << "(deg)";
+                    return s << " len=" << q.as_vec().len() << ']';
+                }
+
+                template <typename A, typename B, typename T> std::basic_istream<A,B> &operator>>(std::basic_istream<A,B> &s, quat<T> &q)
+                {
+                    vec4<T> vec;
+                    s >> vec;
+                    q = quat(vec);
+                    return s;
+                }
+            }
+
+            namespace Export
+            {
+                using namespace Quat;
+            }
+        )#");
+    });
+
+    next_line();
+
+    section("namespace std", []
+    {
+        output(1+R"(
+            template <typename T> struct less<Math::quat<T>>
+            {
+                using result_type = bool;
+                using first_argument_type = Math::quat<T>;
+                using second_argument_type = Math::quat<T>;
+                constexpr bool operator()(const Math::quat<T> &a, const Math::quat<T> &b) const
+                {
+                    return a.as_vec().tie() < b.as_vec().tie();
+                }
+            };
+
+            template <typename T> struct hash<Math::quat<T>>
+            {
+                using result_type = std::size_t;
+                using argument_type = Math::quat<T>;
+                std::size_t operator()(const Math::quat<T> &q) const
+                {
+                    return std::hash<Math::vec4<T>>{}(q.as_vec());
                 }
             };
         )");
