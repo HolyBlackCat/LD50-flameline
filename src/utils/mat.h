@@ -1,6 +1,6 @@
 // mat.h
 // Vector and matrix math
-// Version 3.2.1
+// Version 3.2.2
 // Generated, don't touch.
 
 #pragma once
@@ -976,9 +976,12 @@ namespace Math
             }
         };
         
-        template <typename ...P, typename = std::enable_if_t<sizeof...(P) == 4>> mat(P...) -> mat<2, 2, larger_t<P...>>;
-        template <typename ...P, typename = std::enable_if_t<sizeof...(P) == 9>> mat(P...) -> mat<3, 3, larger_t<P...>>;
-        template <typename ...P, typename = std::enable_if_t<sizeof...(P) == 16>> mat(P...) -> mat<4, 4, larger_t<P...>>;
+        template <typename ...P, typename = std::enable_if_t<sizeof...(P) == 4 && (is_scalar_v<P> && ...)>> mat(P...) -> mat<2, 2, larger_t<P...>>;
+        template <typename ...P, typename = std::enable_if_t<sizeof...(P) == 9 && (is_scalar_v<P> && ...)>> mat(P...) -> mat<3, 3, larger_t<P...>>;
+        template <typename ...P, typename = std::enable_if_t<sizeof...(P) == 16 && (is_scalar_v<P> && ...)>> mat(P...) -> mat<4, 4, larger_t<P...>>;
+        template <typename ...P, typename = std::enable_if_t<sizeof...(P) >= 2 && sizeof...(P) <= 4 && ((vec_size_v<P> == 2) && ...)>> mat(P...) -> mat<sizeof...(P), 2, larger_t<typename P::type...>>;
+        template <typename ...P, typename = std::enable_if_t<sizeof...(P) >= 2 && sizeof...(P) <= 4 && ((vec_size_v<P> == 3) && ...)>> mat(P...) -> mat<sizeof...(P), 3, larger_t<typename P::type...>>;
+        template <typename ...P, typename = std::enable_if_t<sizeof...(P) >= 2 && sizeof...(P) <= 4 && ((vec_size_v<P> == 4) && ...)>> mat(P...) -> mat<sizeof...(P), 4, larger_t<typename P::type...>>;
         //} Matrices
         
         //{ Operators

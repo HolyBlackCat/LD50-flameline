@@ -7,7 +7,7 @@
 #include <sstream>
 #include <type_traits>
 
-#define VERSION "3.2.1"
+#define VERSION "3.2.2"
 
 #pragma GCC diagnostic ignored "-Wpragmas" // Silence GCC warning about the next line disabling a warning that GCC doesn't have.
 #pragma GCC diagnostic ignored "-Wstring-plus-int" // Silence clang warning about `1+R"()"` pattern.
@@ -1018,10 +1018,15 @@ int main(int argc, char **argv)
 
                 next_line();
 
-                // Deduction guides
-                output("template <typename ...P, typename = std::enable_if_t<sizeof...(P) == 4>> mat(P...) -> mat<2, 2, larger_t<P...>>;\n");
-                output("template <typename ...P, typename = std::enable_if_t<sizeof...(P) == 9>> mat(P...) -> mat<3, 3, larger_t<P...>>;\n");
-                output("template <typename ...P, typename = std::enable_if_t<sizeof...(P) == 16>> mat(P...) -> mat<4, 4, larger_t<P...>>;\n");
+                { // Deduction guides
+                    // From scalars
+                    for (int w = 2; w <= 4; w++)
+                        output("template <typename ...P, typename = std::enable_if_t<sizeof...(P) == ",w*w," && (is_scalar_v<P> && ...)>> mat(P...) -> mat<",w,", ",w,", larger_t<P...>>;\n");
+
+                    // From vectors
+                    for (int h = 2; h <= 4; h++)
+                        output("template <typename ...P, typename = std::enable_if_t<sizeof...(P) >= 2 && sizeof...(P) <= 4 && ((vec_size_v<P> == ",h,") && ...)>> mat(P...) -> mat<sizeof...(P), ",h,", larger_t<typename P::type...>>;\n");
+                }
             });
 
             next_line();
