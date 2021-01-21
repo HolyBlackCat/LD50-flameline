@@ -1,6 +1,6 @@
 // mat.h
 // Vector and matrix math
-// Version 3.2.3
+// Version 3.2.4
 // Generated, don't touch.
 
 #pragma once
@@ -251,16 +251,8 @@ namespace Math
         template <int W, int H, typename T> struct is_matrix_impl<const mat<W,H,T>> : std::true_type {};
         template <typename T> inline constexpr bool is_matrix_v = is_matrix_impl<T>::value;
         
-        // Check if `T` is an 'other type' (possbily const), i.e. not a suitable vector/matrix element.
-        // Returns false for IO streams.
-        // Also returns false for classes with a member type alias `disable_vec_mat_operators`.
-        template <typename T, typename = void> struct is_other_impl : std::false_type {};
-        template <typename T> struct is_other_impl<T, std::enable_if_t<std::is_base_of_v<std::ios_base, T>>> : std::true_type {};
-        template <typename T> struct is_other_impl<T, decltype(std::enable_if<1, typename T::disable_vec_mat_operators>{}, void())> : std::true_type {}; // Note the use of `enable_if` without `_t`. We just need an arbitrary template type here.
-        template <typename T> inline constexpr bool is_other_v = is_other_impl<T>::value;
-        
-        // Check if a type is a scalar type (i.e. not vector nor matrix nor 'other').
-        template <typename T> inline constexpr bool is_scalar_v = !is_vector_v<T> && !is_matrix_v<T> && !is_other_v<T>;
+        // Check if a type is a scalar type.
+        template <typename T> inline constexpr bool is_scalar_v = std::is_arithmetic_v<T>; // Not `std::is_scalar`, because that includes pointers.
         
         template <typename A, typename B = void> using enable_if_scalar_t = std::enable_if_t<is_scalar_v<A>, B>;
         
@@ -1369,19 +1361,17 @@ namespace Math
         //} Member access
         
         //{ Custom operators
-        struct op_type_dot {using disable_vec_mat_operators = void;};
-        struct op_type_cross {using disable_vec_mat_operators = void;};
+        struct op_type_dot {};
+        struct op_type_cross {};
         
         template <typename A> struct op_expr_type_dot
         {
-            using disable_vec_mat_operators = void;
             A &&a;
             template <typename B> [[nodiscard]] constexpr decltype(auto) operator/(B &&b) {return std::forward<A>(a).dot(std::forward<B>(b));}
             template <typename B> constexpr decltype(auto) operator/=(B &&b) {a = std::forward<A>(a).dot(std::forward<B>(b)); return std::forward<A>(a);}
         };
         template <typename A> struct op_expr_type_cross
         {
-            using disable_vec_mat_operators = void;
             A &&a;
             template <typename B> [[nodiscard]] constexpr decltype(auto) operator/(B &&b) {return std::forward<A>(a).cross(std::forward<B>(b));}
             template <typename B> constexpr decltype(auto) operator/=(B &&b) {a = std::forward<A>(a).cross(std::forward<B>(b)); return std::forward<A>(a);}
@@ -1400,8 +1390,6 @@ namespace Math
             T vec_end = T(0);
             
           public:
-            using disable_vec_mat_operators = void;
-            
             class iterator
             {
                 friend class vector_range<T>;
@@ -1510,8 +1498,6 @@ namespace Math
             T vec_begin = T(0);
             
           public:
-            using disable_vec_mat_operators = void;
-            
             vector_range_halfbound(T vec_begin) : vec_begin(vec_begin) {}
             
             template <int A, typename B> friend vector_range<T> operator<(const vector_range_halfbound &range, vec<A,B> point)
@@ -1527,8 +1513,6 @@ namespace Math
         
         struct vector_range_factory
         {
-            using disable_vec_mat_operators = void;
-            
             template <int A, typename B> vector_range<vec<A,B>> operator()(vec<A,B> size) const
             {
                 return vector_range<vec<A,B>>(vec<A,B>(0), size);
@@ -2028,7 +2012,6 @@ namespace Math
         template <typename T> struct quat
         {
             static_assert(std::is_floating_point_v<T>, "The base type must be floating-point.");
-            using disable_vec_mat_operators = void; // Otherwise vec/mat operators sometimes conflict with our ones.
             using type = T;
             using vec3_t = vec3<T>;
             using vec4_t = vec4<T>;
