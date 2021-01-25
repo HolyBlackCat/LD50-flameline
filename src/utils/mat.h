@@ -1,6 +1,6 @@
 // mat.h
 // Vector and matrix math
-// Version 3.2.4
+// Version 3.2.5
 // Generated, don't touch.
 
 #pragma once
@@ -2113,6 +2113,15 @@ namespace Math
             q = quat(vec);
             return s;
         }
+    }
+    
+    inline namespace Utility
+    {
+        // Check if `T` is a quaternion type (possibly const).
+        template <typename T> struct is_quat_impl : std::false_type {};
+        template <typename T> struct is_quat_impl<      quat<T>> : std::true_type {};
+        template <typename T> struct is_quat_impl<const quat<T>> : std::true_type {};
+        template <typename T> inline constexpr bool is_quat_v = is_quat_impl<T>::value;
     }
     
     namespace Export

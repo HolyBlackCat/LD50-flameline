@@ -7,7 +7,7 @@
 #include <sstream>
 #include <type_traits>
 
-#define VERSION "3.2.4"
+#define VERSION "3.2.5"
 
 #pragma GCC diagnostic ignored "-Wpragmas" // Silence GCC warning about the next line disabling a warning that GCC doesn't have.
 #pragma GCC diagnostic ignored "-Wstring-plus-int" // Silence clang warning about `1+R"()"` pattern.
@@ -2065,6 +2065,15 @@ int main(int argc, char **argv)
                     q = quat(vec);
                     return s;
                 }
+            }
+
+            inline namespace Utility
+            {
+                // Check if `T` is a quaternion type (possibly const).
+                template <typename T> struct is_quat_impl : std::false_type {};
+                template <typename T> struct is_quat_impl<      quat<T>> : std::true_type {};
+                template <typename T> struct is_quat_impl<const quat<T>> : std::true_type {};
+                template <typename T> inline constexpr bool is_quat_v = is_quat_impl<T>::value;
             }
 
             namespace Export
