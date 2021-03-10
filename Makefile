@@ -247,7 +247,7 @@ STD_LIB_NAME_PATTERNS := libgcc libstdc++ libc++ winpthread
 # If one of those strings is present in a path to a library that matches `STD_LIB_NAME_PATTERNS`, a error will be emitted.
 BANNED_LIBRARY_PATH_PATTERNS := :/Windows
 else
-STD_LIB_NAME_PATTERNS := *
+STD_LIB_NAME_PATTERNS := .
 BANNED_LIBRARY_PATH_PATTERNS :=
 endif
 # ]
@@ -731,9 +731,9 @@ endif
 override needed_available_libs = $(strip $(foreach x,$(available_libs),$(if $(filter $(needed_lib_patterns),$x)$(call find_any_as_substr,$(deps_always_copied_shared_lib_patterns),$x),$x)))
 
 ifeq ($(TARGET_OS),linux)
-override ldd_with_path = env $(call quote,LD_LIBRARY_PATH=$(library_pack_path)/$(directory_dll):$$LD_LIBRARY_PATH) $(LDD)
+override ldd_with_path = export LD_LIBRARY_PATH=$(call quote,$(library_pack_path)/$(directory_dll):)"$$LD_LIBRARY_PATH" && $(LDD)
 else
-override ldd_with_path = env $(call quote,PATH=$(library_pack_path)/$(directory_dll):$$PATH) $(LDD)
+override ldd_with_path = export PATH=$(call quote,$(library_pack_path)/$(directory_dll):)"$$PATH" && $(LDD)
 endif
 
 # On Windows does nothing. On Linux, uses `patchelf` to add `$ORIGIN` to RPATH of library $1, and also calls `chmod -x` on it.
@@ -769,7 +769,7 @@ __shared_libs: | $(OUTPUT_FILE_EXT)
 	$(call var,_local_libs := $(strip $(foreach x,$(_local_dep_list),\
 		$(if \
 			$(and \
-				$(filter $(subst *,%,$(STD_LIB_NAME_PATTERNS)),$(call deps_entry_name,$x)),\
+				$(strip $(foreach y,$(STD_LIB_NAME_PATTERNS),$(findstring $y,$(call deps_entry_name,$x)))),\
 				$(filter-out ./,$(call deps_entry_dir,$x))\
 			)\
 		,\
