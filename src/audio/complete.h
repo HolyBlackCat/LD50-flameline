@@ -6,4 +6,5 @@
 #include "audio/openal.h"
 #include "audio/parameters.h"
 #include "audio/sound.h"
+#include "audio/source_manager.h"
 #include "audio/source.h"
