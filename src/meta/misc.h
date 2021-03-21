@@ -1,6 +1,7 @@
 #pragma once
 
 #include <array>
+#include <concepts>
 #include <type_traits>
 #include <utility>
 
@@ -125,9 +126,9 @@ namespace Meta
     template <typename T> fake_copyable(T) -> fake_copyable<T>;
 
 
-    // Checks if A is the same type as B, or if A is `void`.
+    // Checks if `T` is the same type as any of the `P...`.
 
-    template <typename A, typename B> inline constexpr bool is_same_or_void_v = std::is_void_v<A> || std::is_same_v<A, B>;
+    template <typename T, typename ...P> concept same_as_any_of = (std::same_as<T, P> || ...);
 
 
     // A helper function that invokes a callback.
@@ -139,7 +140,7 @@ namespace Meta
     R invoke_and_get_return_value_or(const R &default_val, F &&func, P &&... params)
     {
         using ret_t = decltype(std::forward<F>(func)(std::forward<P>(params)...));
-        static_assert(is_same_or_void_v<ret_t, R>, "The return type of the callback must either be void or match the type of the first parameter.");
+        static_assert(same_as_any_of<ret_t, R, void>, "The return type of the callback must either be void or match the type of the first parameter.");
         if constexpr (std::is_void_v<ret_t>)
         {
             std::forward<F>(func)(std::forward<P>(params)...);
