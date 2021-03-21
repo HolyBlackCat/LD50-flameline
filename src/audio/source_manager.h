@@ -4,6 +4,7 @@
 #include <memory>
 #include <vector>
 
+#include "audio/buffer.h"
 #include "audio/source.h"
 #include "program/errors.h"
 
@@ -18,10 +19,16 @@ namespace Audio
       public:
         SourceManager() {}
 
-        void AddSource(std::shared_ptr<Source> source)
+        // Adds a new source to the manager.
+        // It should be `play()`ed immediately, otherwise it will be removed at the next `Tick()`.
+        void Add(std::shared_ptr<Source> source)
         {
             ASSERT(std::find(sources.begin(), sources.end(), source) == sources.end(), "Adding a duplicate source to `Audio::SourceManager`.");
             sources.push_back(std::move(source));
+        }
+        [[nodiscard]] std::shared_ptr<Source> Add(const Buffer &buffer)
+        {
+            return sources.emplace_back(std::make_shared<Source>(buffer));
         }
 
         // Releases sources that aren't playing.
