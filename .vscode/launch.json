@@ -14,7 +14,8 @@
             "linux": {"target": "./imp-re"},
             "cwd": "${workspaceRoot}/bin",
             "valuesFormatting": "prettyPrinters",
-            "internalConsoleOptions": "openOnSessionStart"
+            "internalConsoleOptions": "openOnSessionStart",
+            "preLaunchTask": "Build"
         },
     ]
 }
