@@ -902,7 +902,7 @@ That's all.
 
 // Internal. Helper for `REFL_STRUCT_impl_low`. Generates a class registration helper. It's generated here only if both `REFL_METADATA_ONLY` and `REFL_TERSE` are used.
 // `name_` is the struct name. Note that at this point it can't be a template.
-#define REFL_STRUCT_impl_low_registration_helper(name_) REFL_MEMBERS_impl_metadata_registration_helper(name_, inline static)
+#define REFL_STRUCT_impl_low_registration_helper(name_) REFL_MEMBERS_impl_metadata_registration_helper(name_, inline static, name_)
 
 // Internal. Helper for `REFL_STRUCT_impl_low`. Generates a full list of template parameters (`template<...>`) that includes the default values.
 // `seq` is `(type,name[,init])...`. If `seq` is empty, expands to nothing.
@@ -1047,7 +1047,7 @@ That's all.
     /* unconditionally polymorphic, so it's not acceptable.                  */\
     void zrefl_RegistrationHelper() \
     { \
-        REFL_MEMBERS_impl_metadata_registration_helper(::std::remove_reference_t<decltype(*this)>,) \
+        REFL_MEMBERS_impl_metadata_registration_helper(::std::remove_reference_t<decltype(*this)>,,) \
     }
 
 // Internal. Helper for `REFL_MEMBERS`. Declares variables themselves, without metadata.
@@ -1184,9 +1184,10 @@ That's all.
 // Internal. Causes a template instantiation that registers the struct as polymorphic. (Not included in the common metadata).
 // `this_type_` is either the struct name itself, or something involving `decltype(*this)`.
 // `prefix_` is added to the decl-specifier-seq of the variable.
+// `helper_suffix_` is added to the name of the helper variable, and can be empty in the variable is defined inside of a class where it can't conflict with anything else.
 // Note that this variable has to instantiate after all other metadata has been defined. Otherwise it's not going to work.
-#define REFL_MEMBERS_impl_metadata_registration_helper(this_type_, prefix_) \
-    [[maybe_unused]] prefix_ ::Refl::Polymorphic::impl::RegisterType<this_type_> zrefl_RegistrationHelperVar;
+#define REFL_MEMBERS_impl_metadata_registration_helper(this_type_, prefix_, helper_suffix_) \
+    [[maybe_unused]] prefix_ ::Refl::Polymorphic::impl::RegisterType<this_type_> MA_CAT(zrefl_RegistrationHelperVar_, helper_suffix_);
 
 
 #if 0 // Tests
