@@ -912,6 +912,25 @@ namespace Stream
             return Extract<mode, C>(Char::EqualTo(byte));
         }
 
+        template <ExtractMode mode> requires (mode == one)
+        [[nodiscard]] char Extract(const Char::Category &category)
+        {
+            char ch = ReadChar();
+            if (!category(ch))
+                Program::Error(GetExceptionPrefix() + "Expected " + category.name() + ".");
+            return ch;
+        }
+        template <ExtractMode mode> requires (mode == if_present)
+        [[nodiscard]] std::optional<char> Extract(const Char::Category &category)
+        {
+            if (!MoreData())
+                return {};
+            if (char ch = ReadChar(); category(ch))
+                return ch;
+            else
+                return {};
+        }
+
         // Discards matching characters from the input.
         // `mode` affects how many characters are read, and whether or not reading 0 characters causes an exception.
         // Returns the amount of characters processed.
