@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <array>
 #include <deque>
+#include <functional>
 #include <iostream>
 #include <map>
 #include <type_traits>
