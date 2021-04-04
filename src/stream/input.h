@@ -1,6 +1,7 @@
 #pragma once
 
 #include <algorithm>
+#include <concepts>
 #include <cstddef>
 #include <cstdint>
 #include <cstdio>
@@ -12,7 +13,6 @@
 #include <type_traits>
 #include <utility>
 
-#include "macros/check.h"
 #include "meta/misc.h"
 #include "program/errors.h"
 #include "stream/better_fopen.h"
@@ -58,7 +58,8 @@ namespace Stream
 
         // A generic character category.
         // Usage: `Is("fancy character", [](char ch){return condition;})`
-        template <typename F, CHECK(std::is_convertible_v<decltype(std::declval<F>()(char())), bool>)>
+        template <typename F>
+        requires std::is_convertible_v<decltype(std::declval<F>()(char())), bool>
         class Is : public Category
         {
             F &&func;
@@ -80,7 +81,7 @@ namespace Stream
 
         namespace impl
         {
-            template <typename T, CHECK(std::is_base_of_v<Category, T>)>
+            template <std::derived_from<Category> T>
             class Negation : public T
             {
               public:
@@ -102,7 +103,7 @@ namespace Stream
         // Returns an inverted category.
         // We use a function instead of exposing the category directly (using CTAD), because with CTAD `Not(Not(...))` negates only once. Lame.
         // But also the operator notation shorter.
-        template <typename T, CHECK(std::is_base_of_v<Category, T>)>
+        template <std::derived_from<Category> T>
         [[nodiscard]] auto operator!(T category)
         {
             // Could perfect-forard the category, but meh.
@@ -857,7 +858,8 @@ namespace Stream
         // `mode` affects how many characters are read, and whether or not reading 0 characters causes an exception.
         // `append_to` can either be `nullptr` or a pointer to a container to which the matching characters are appended.
         // Returns the amount of characters processed.
-        template <ExtractMode mode = at_least_one, typename T, CHECK(impl::is_appendable_byte_seq_ptr_or_null_v<T>)>
+        template <ExtractMode mode = at_least_one, typename T>
+        requires impl::is_appendable_byte_seq_ptr_or_null_v<T>
         std::size_t Extract(const Char::Category &category, T append_to)
         {
             constexpr bool several = mode == at_least_one || mode == any;
@@ -885,7 +887,8 @@ namespace Stream
 
             return count;
         }
-        template <ExtractMode mode = at_least_one, typename T, CHECK(impl::is_appendable_byte_seq_ptr_or_null_v<T>)>
+        template <ExtractMode mode = at_least_one, typename T>
+        requires impl::is_appendable_byte_seq_ptr_or_null_v<T>
         std::size_t Extract(std::uint8_t byte, T append_to)
         {
             return Extract<mode>(Char::EqualTo(byte), append_to);
@@ -894,15 +897,16 @@ namespace Stream
         // Reads matching characters from the input.
         // `mode` affects whether or not reading 0 characters causes an exception.
         // Returns the matching characters in a container of type `C`.
-        template <ExtractMode mode = at_least_one, typename C = std::string, CHECK(impl::is_appendable_byte_seq_v<C>)>
+        template <ExtractMode mode = at_least_one, typename C = std::string>
+        requires (mode == at_least_one || mode == any) && impl::is_appendable_byte_seq_v<C>
         [[nodiscard]] C Extract(const Char::Category &category)
         {
-            static_assert(mode == at_least_one || mode == any, "Mode has to be `at_least_one` or `any`.");
             C ret;
             Extract<mode>(category, &ret);
             return ret;
         }
-        template <ExtractMode mode = at_least_one, typename C = std::string, CHECK(impl::is_appendable_byte_seq_v<C>)>
+        template <ExtractMode mode = at_least_one, typename C = std::string>
+        requires (mode == at_least_one || mode == any) && impl::is_appendable_byte_seq_v<C>
         [[nodiscard]] C Extract(std::uint8_t byte)
         {
             return Extract<mode, C>(Char::EqualTo(byte));
@@ -925,9 +929,9 @@ namespace Stream
         // Discards a sequence of bytes from the input.
         // `mode` affects whether it returns `false` on failure or throws.
         template <ExtractMode mode = one>
+        requires (mode == one) || (mode == if_present)
         bool DiscardBytes(const std::uint8_t *bytes, std::size_t count)
         {
-            static_assert(mode == one || mode == if_present, "Mode has to be `one` or `if_present`.");
             auto pos = Position();
             for (std::size_t i = 0; i < count; i++)
             {
