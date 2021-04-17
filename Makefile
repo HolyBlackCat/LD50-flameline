@@ -247,7 +247,9 @@ STD_LIB_NAME_PATTERNS := libgcc libstdc++ libc++ winpthread
 # If one of those strings is present in a path to a library that matches `STD_LIB_NAME_PATTERNS`, a error will be emitted.
 BANNED_LIBRARY_PATH_PATTERNS := :/Windows
 else
-STD_LIB_NAME_PATTERNS := .
+# Some testing was performed (building on Ubuntu 18.04, running on 20.04), and it was determined that copying any other libraries crashes the application.
+# Except `libatomic`, but I don't think we care about it.
+STD_LIB_NAME_PATTERNS := libgcc libstdc++
 BANNED_LIBRARY_PATH_PATTERNS :=
 endif
 # ]
