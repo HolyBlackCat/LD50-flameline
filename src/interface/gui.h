@@ -374,7 +374,7 @@ namespace Interface
         //     controller.LoadFont("assets/SourceSansPro-Regular.ttf", font_size, adjust(ImFontConfig{}, RasterizerFlags = freetype_flags));
         //     controller.LoadDefaultFont();
         //     controller.RenderFontsWithFreetype();
-        ImGuiFreetypeFontConfigurator(Interface::ImGuiController &controller_ref, int font_size, ImGuiFreeType::RasterizerFlags default_flags, load_fonts_func_t new_func)
+        ImGuiFreetypeFontConfigurator(Interface::ImGuiController &controller_ref, int font_size, ImGuiFreeTypeBuilderFlags default_flags, load_fonts_func_t new_func)
             : controller(&controller_ref), font_size(font_size), freetype_flags(default_flags), load_fonts_func(std::move(new_func))
         {
             load_fonts_func(*controller, font_size, freetype_flags);
