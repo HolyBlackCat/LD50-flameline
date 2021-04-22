@@ -1,5 +1,3 @@
-#include "reflection/short_macros.h"
-
 constexpr ivec2 screen_size = ivec2(480, 270);
 constexpr std::string_view window_name = "Iota";
 
@@ -13,37 +11,25 @@ namespace Fonts
 {
     namespace Files
     {
-        Graphics::FontFile &Main()
-        {
-            static Graphics::FontFile ret("assets/Monocat_6x12.ttf", 12);
-            return ret;
-        }
+        Graphics::FontFile main("assets/Monocat_6x12.ttf", 12);
     }
 
-    Graphics::Font &Main()
-    {
-        static Graphics::Font ret;
-        return ret;
-    }
+    Graphics::Font main;
 }
 
-Graphics::TextureAtlas &TextureAtlas()
-{
-    static Graphics::TextureAtlas ret = []{
-        Graphics::TextureAtlas ret(ivec2(2048), "assets/_images", "assets/atlas.png", "assets/atlas.refl");
-        auto font_region = ret.Get("font_storage.png");
+Graphics::TextureAtlas texture_atlas = []{
+    Graphics::TextureAtlas ret(ivec2(2048), "assets/_images", "assets/atlas.png", "assets/atlas.refl");
+    auto font_region = ret.Get("font_storage.png");
 
-        Unicode::CharSet glyph_ranges;
-        glyph_ranges.Add(Unicode::Ranges::Basic_Latin);
+    Unicode::CharSet glyph_ranges;
+    glyph_ranges.Add(Unicode::Ranges::Basic_Latin);
 
-        Graphics::MakeFontAtlas(ret.GetImage(), font_region.pos, font_region.size, {
-            {Fonts::Main(), Fonts::Files::Main(), glyph_ranges, Graphics::FontFile::monochrome_with_hinting},
-        });
-        return ret;
-    }();
+    Graphics::MakeFontAtlas(ret.GetImage(), font_region.pos, font_region.size, {
+        {Fonts::main, Fonts::Files::main, glyph_ranges, Graphics::FontFile::monochrome_with_hinting},
+    });
     return ret;
-}
-Graphics::Texture texture_main = Graphics::Texture(nullptr).Wrap(Graphics::clamp).Interpolation(Graphics::nearest).SetData(TextureAtlas().GetImage());
+}();
+Graphics::Texture texture_main = Graphics::Texture(nullptr).Wrap(Graphics::clamp).Interpolation(Graphics::nearest).SetData(texture_atlas.GetImage());
 
 AdaptiveViewport adaptive_viewport(shader_config, screen_size);
 Render r = adjust_(Render(0x2000, shader_config), SetTexture(texture_main), SetMatrix(adaptive_viewport.GetDetails().MatrixCentered()));
