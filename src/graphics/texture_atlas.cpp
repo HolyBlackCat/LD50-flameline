@@ -15,7 +15,7 @@ namespace Graphics
         constexpr int max_nesting_level = 32;
 
         // Decide if regenrating the atlas should be allowed.
-        bool allow_regeneration = source_dir.size() > 0;
+        bool allow_regeneration = !source_dir.empty();
 
         Filesystem::TreeNode source_tree;
 

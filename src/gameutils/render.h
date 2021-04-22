@@ -93,7 +93,7 @@ class Render
         }
       public:
         Quad_t(Quad_t &&other) noexcept : queue(std::exchange(other.queue, {})), data(std::move(other.data)) {}
-        Quad_t &operator=(Quad_t other)
+        Quad_t &operator=(Quad_t other) noexcept
         {
             std::swap(queue, other.queue);
             std::swap(data, other.data);

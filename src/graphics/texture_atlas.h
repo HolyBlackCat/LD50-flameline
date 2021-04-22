@@ -38,7 +38,7 @@ namespace Graphics
 
             Region() {}
 
-            Region region(ivec2 sub_pos, ivec2 sub_size) const
+            [[nodiscard]] Region region(ivec2 sub_pos, ivec2 sub_size) const
             {
                 Region ret;
                 ret.pos = pos + sub_pos;
@@ -46,7 +46,7 @@ namespace Graphics
                 return ret;
             }
 
-            Region margin(int m) const
+            [[nodiscard]] Region margin(int m) const
             {
                 Region ret;
                 ret.pos = pos + m;
@@ -65,11 +65,11 @@ namespace Graphics
             RegionList() {}
 
             // [] wraps around for easier animation.
-            Region &operator[](int index)
+            [[nodiscard]] Region &operator[](int index)
             {
                 return const_cast<Region &>(std::as_const(*this)[index]);
             }
-            const Region &operator[](int index) const
+            [[nodiscard]] const Region &operator[](int index) const
             {
                 return list[mod_ex(index, int(list.size()))];
             }
@@ -80,21 +80,21 @@ namespace Graphics
         // Pass empty string as `source_dir` to disallow regeneration.
         TextureAtlas(ivec2 target_size, const std::string &source_dir, const std::string &out_image_file, const std::string &out_desc_file, bool add_gaps = 1);
 
-        const std::string &SourceDirectory() const
+        [[nodiscard]] const std::string &SourceDirectory() const
         {
             return source_dir;
         }
 
-        Image &GetImage()
+        [[nodiscard]] Image &GetImage()
         {
             return image;
         }
-        const Image &GetImage() const
+        [[nodiscard]] const Image &GetImage() const
         {
             return image;
         }
 
-        bool GetOpt(const std::string &name, Region &target) const // Returns false if no such image.
+        [[nodiscard]] bool GetOpt(const std::string &name, Region &target) const // Returns false if no such image.
         {
             auto it = desc.images.find(name);
             if (it == desc.images.end())
@@ -105,14 +105,14 @@ namespace Graphics
             return true;
         }
 
-        Region Get(const std::string &name) const
+        [[nodiscard]] Region Get(const std::string &name) const
         {
             Region ret;
             if (!GetOpt(name, ret))
                 Program::Error("No image `", name, "` in texture atlas for `", source_dir, "`.");
             return ret;
         }
-        RegionList GetList(const std::string &prefix, int first_index, const std::string &suffix, int count = -1) const
+        [[nodiscard]] RegionList GetList(const std::string &prefix, int first_index, const std::string &suffix, int count = -1) const
         {
             RegionList ret;
 
@@ -140,7 +140,8 @@ namespace Graphics
         // Fills `object` with region data.
         // `object` has to have its members reflected.
         // The only allowed member types are `Region` and `RegionList`.
-        template <typename T> void InitRegions(T &object, std::string suffix) const
+        template <typename T>
+        void InitRegions(T &object, std::string suffix) const
         {
             static_assert(Refl::Class::members_known<T> && Refl::Class::member_names_known<T>, "Members of this class are not reflected.");
 

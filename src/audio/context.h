@@ -34,12 +34,12 @@ namespace Audio
 
     class Context
     {
-        inline static Context *instance = 0;
+        inline static Context *instance = nullptr;
 
         struct Data
         {
-            ALCdevice *device = 0;
-            ALCcontext *context = 0;
+            ALCdevice *device = nullptr;
+            ALCcontext *context = nullptr;
         };
         Data data;
 
