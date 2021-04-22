@@ -9,41 +9,40 @@
 # Project configuration (i.e. sources and compiler settings) is stored in `project_config.mk`.
 #
 # Machine-specific configuration (i.e. what compiler to use) is stored in `local_config.mk`.
-# If `local_config.mk` is absent, you will be asked to create it.
+# If `local_config.mk` is missing, you will be asked to create it.
 # Make sure it contains valid compiler paths before building.
 #
 # -- WINDOWS SUPPORT
 #
-# Windows builds are supported, but not with MSVC compiler.
-# You need to use GCC or Clang. (You can get them from MSYS2.)
-# On windows you need MSYS2 shell (or something similar).
-# Native Windows shell with (`mingw32-make` instead of `make`) may or may not work, since `mingw32-make` is buggy.
+# Windows builds are supported, but not with the MSVC compiler.
+# You need to use GCC or Clang. (Which you can get from MSYS2.)
+# On windows you also need the MSYS2 shell (or something similar).
+# The native Windows shell (with `mingw32-make` instead of `make`) will not work.
 #
 # -- USAGE TL;DR
 #
 # Inspect `local_config.mk` and adjust any compiler and tool paths if necessary.
 #
 # Then run `make mode=release -j4`. If this project doesn't support 'release'
-# build mode, you'll be given a list of the available modes to pick from.
+# build mode, you'll be given a list of the available modes to choose from.
 #
-# Some projects might expect you to provide a set of prebuilt dependencies, consult a project documentation.
+# Some projects might expect you to provide a set of prebuilt dependencies, consult the project documentation.
 #
 # -- USAGE
 #
 # This makefile uses a concept of 'build modes'.
 # A build mode is essentially a named set of compiler settings, such as 'debug', 'release', and so on.
-# See `project_config.mk` for the list of available modes for this project (look
-# for `$(call new_mode, ...)` mode declarations).
+# See `project_config.mk` for the list of available modes for this project (look for `$(call new_mode, ...)` mode declarations).
 #
-# Object files and precompiled headers for each mode are stored separately,  which allows switching
+# Object files and precompiled headers for each mode are stored separately, which allows switching
 # between modes quickly. But this doesn't apply to the resulting executable, so it will always be
 # relinked when you build after changing the mode.
 #
 # A list of public `make` targets is provided below.
 #
 # Targets marked with `[M]` are affected by the selected build mode. Those targets can be
-# invoked with `mode=...` (`...` = mode name) to selected a specific mode.
-# Last used mode is remembered (saved to `.current_mode.mk`) and is used by default until changed again.
+# invoked with `mode=<mode_name>` to selected a specific mode.
+# The last used mode is remembered (saved to `.current_mode.mk`) and is used by default until changed later.
 # If you haven't selected a mode yet, failure to specify `mode=...` is a error.
 # Targets NOT marked with `[M]` are not affected by current build mode and don't accept the `mode=...` flag.
 #
@@ -62,13 +61,13 @@
 #                               should contain only the file that stores the name of the last used mode.
 #
 # Next, there is a 'dependency management' feature that projects can enable.
-# If a project uses dependency management, it relies on a packa of prebuilt libraries that have to be downloaded separately.
-# When you build the project for the first time, at the very beginning of the build sequence, an expected location of those dependencies
+# If a project uses dependency management, it relies on a pack of prebuilt libraries that have to be downloaded separately.
+# When you build the project for the first time, at the very beginning of the build sequence, the expected location of those dependencies
 # will be checked, and some information about them will be collected.
-# Then, at the end of the build sequence, shared libraries used by the application (the standard ones,and the ones coming from the library
-# pack, as determined by `LDD`) will be copied to the build directory.
+# Then, at the end of the build sequence, shared libraries used by the application (the standard ones, and the ones coming from the library
+# pack, as determined by LDD) will be copied to the build directory.
 #
-# If you enable dependency management, several additional targets are enabled:
+# If you enable dependency management, several additional targets become availabe:
 #
 #     * `make find_deps`      - Checks if the prebuilt dependencies are in the correct location. Runs `pkg-config` on them and saves the results.
 #                               This runs automatically at the beginning of the build sequence, but you can use this target to check dependencies
