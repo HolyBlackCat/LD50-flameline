@@ -9,7 +9,7 @@
 #include "audio/buffer.h"
 #include "audio/sound.h"
 #include "meta/misc.h"
-#include "meta/template_string_literals.h"
+#include "meta/string_template_params.h"
 #include "program/errors.h"
 
 namespace Audio
@@ -36,7 +36,7 @@ namespace Audio
         template <typename T> concept ChannelsOrNullptr = Meta::same_as_any_of<T, Channels, std::nullptr_t>;
         template <typename T> concept FormatOrNullptr = Meta::same_as_any_of<T, Format, std::nullptr_t>;
 
-        template <ChannelsOrNullptr auto ChannelCount, FormatOrNullptr auto FileFormat, Meta::StringParam Name>
+        template <ChannelsOrNullptr auto ChannelCount, FormatOrNullptr auto FileFormat, Meta::ConstString Name>
         struct RegisterAutoLoadedBuffer
         {
             [[maybe_unused]] inline static const Buffer &ref = []() -> Buffer &
@@ -55,8 +55,8 @@ namespace Audio
 
     // Returns a reference to a buffer, loaded from the filename passed as the parameter.
     // The load doesn't happen at the call point, and is done by `LoadMentionedFiles()`, which magically knows all files that it needs to load in this manner.
-    template <impl::ChannelsOrNullptr auto ChannelCount = nullptr, impl::FormatOrNullptr auto FileFormat = nullptr, Meta::StringParam Name>
-    [[nodiscard]] const Buffer &File(Meta::value_tag<Name>)
+    template <impl::ChannelsOrNullptr auto ChannelCount = nullptr, impl::FormatOrNullptr auto FileFormat = nullptr, Meta::ConstString Name>
+    [[nodiscard]] const Buffer &File(Meta::ConstStringParam<Name>)
     {
         return impl::RegisterAutoLoadedBuffer<ChannelCount, FileFormat, Name>::ref;
     }
