@@ -8,8 +8,8 @@
 
 #include "audio/buffer.h"
 #include "audio/sound.h"
-#include "macros/template_string_literals.h"
 #include "meta/misc.h"
+#include "meta/template_string_literals.h"
 #include "program/errors.h"
 
 namespace Audio
@@ -36,15 +36,14 @@ namespace Audio
         template <typename T> concept ChannelsOrNullptr = Meta::same_as_any_of<T, Channels, std::nullptr_t>;
         template <typename T> concept FormatOrNullptr = Meta::same_as_any_of<T, Format, std::nullptr_t>;
 
-        template <ChannelsOrNullptr auto ChannelCount, FormatOrNullptr auto FileFormat, char ...C>
+        template <ChannelsOrNullptr auto ChannelCount, FormatOrNullptr auto FileFormat, Meta::StringParam Name>
         struct RegisterAutoLoadedBuffer
         {
             [[maybe_unused]] inline static const Buffer &ref = []() -> Buffer &
             {
-                constexpr char name[] = {C..., '\0'};
-                auto it = GetAutoLoadedBuffers().find(name);
+                auto it = GetAutoLoadedBuffers().find(Name.str);
                 ASSERT(it == GetAutoLoadedBuffers().end(), "Attempt to register a duplicate auto-loaded sound file. This shouldn't be possible.");
-                AutoLoadedBuffer &data = GetAutoLoadedBuffers().try_emplace(it, name)->second;
+                AutoLoadedBuffer &data = GetAutoLoadedBuffers().try_emplace(it, Name.str)->second;
                 if constexpr (!std::is_null_pointer_v<decltype(ChannelCount)>)
                     data.channels_override = ChannelCount;
                 if constexpr (!std::is_null_pointer_v<decltype(FileFormat)>)
@@ -56,10 +55,10 @@ namespace Audio
 
     // Returns a reference to a buffer, loaded from the filename passed as the parameter.
     // The load doesn't happen at the call point, and is done by `LoadMentionedFiles()`, which magically knows all files that it needs to load in this manner.
-    template <impl::ChannelsOrNullptr auto ChannelCount = nullptr, impl::FormatOrNullptr auto FileFormat = nullptr, char ...C>
-    [[nodiscard]] const Buffer &File(LIT_PARAM(C))
+    template <impl::ChannelsOrNullptr auto ChannelCount = nullptr, impl::FormatOrNullptr auto FileFormat = nullptr, Meta::StringParam Name>
+    [[nodiscard]] const Buffer &File(Meta::value_tag<Name>)
     {
-        return impl::RegisterAutoLoadedBuffer<ChannelCount, FileFormat, C...>::ref;
+        return impl::RegisterAutoLoadedBuffer<ChannelCount, FileFormat, Name>::ref;
     }
 
     // Loads (or reloads) all files mentioned in all known `Audio::File(...)` calls.

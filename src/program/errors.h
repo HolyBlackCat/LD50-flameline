@@ -44,7 +44,8 @@ namespace Program
     namespace impl
     {
         // An assertion function.
-        inline void Assert(const char *context, const char *function, bool condition, std::string_view message_or_expr, const char *expr_or_nothing = nullptr)
+        // Making it constexpr allows us using it in compile-time contexts (as long as the condition is true, which is exactly the point).
+        inline constexpr void Assert(const char *context, const char *function, bool condition, std::string_view message_or_expr, const char *expr_or_nothing = nullptr)
         {
             if (condition)
                 return;
@@ -65,7 +66,7 @@ namespace Program
 
         // A template overload that allows using explicitly-but-not-implicitly-convertible-to-bool expressions as conditions.
         template <typename T>
-        void Assert(const char *context, const char *function, const T &condition, std::string_view message_or_expr, const char *expr_or_nothing = nullptr)
+        constexpr void Assert(const char *context, const char *function, const T &condition, std::string_view message_or_expr, const char *expr_or_nothing = nullptr)
         {
             return Assert(context, function, bool(condition), message_or_expr, expr_or_nothing);
         }
