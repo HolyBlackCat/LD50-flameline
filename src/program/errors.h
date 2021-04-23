@@ -60,8 +60,6 @@ namespace Program
                 // User didn't specify a message.
                 HardError(STR("Assertion failed!\n   at   ", (context), "\n   in   ", (function), "\nExpression:\n   ", (message_or_expr)));
             }
-
-            return;
         }
 
         // A template overload that allows using explicitly-but-not-implicitly-convertible-to-bool expressions as conditions.
