@@ -58,11 +58,12 @@ class RangeSet
 
     struct IteratorState
     {
-        typename std::vector<Range>::const_iterator range_iter{}, range_iter_end{};
+        // We use raw pointers instead of `std::vector<Range>::const_iterator`, because libstdc++ with _GLIBCXX_DEBUG complains when you try to `==`-compare two null iterators.
+        const Range *range_iter = nullptr, *range_iter_end = nullptr;
         elem_type value{};
 
         IteratorState() {}
-        IteratorState(const std::vector<Range> &vec) : range_iter(vec.begin()), range_iter_end(vec.end())
+        IteratorState(const std::vector<Range> &vec) : range_iter(vec.data()), range_iter_end(vec.data() + vec.size())
         {
             if (!Finished())
                 value = range_iter->begin;
