@@ -27,7 +27,7 @@ namespace Audio
         // We rely on `std::map` never invalidating the references.
         using AutoLoadedBuffersMap = std::map<std::string, AutoLoadedBuffer, std::less<>>;
 
-        AutoLoadedBuffersMap &GetAutoLoadedBuffers()
+        inline AutoLoadedBuffersMap &GetAutoLoadedBuffers()
         {
             static AutoLoadedBuffersMap ret;
             return ret;
