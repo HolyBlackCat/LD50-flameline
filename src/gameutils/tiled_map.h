@@ -15,6 +15,7 @@
 namespace Tiled
 {
     Json::View FindLayer(Json::View map, std::string name);
+    Json::View FindLayerOpt(Json::View map, std::string name);
 
     using TileLayer = MultiArray<2, int>;
     TileLayer LoadTileLayer(Json::View source);

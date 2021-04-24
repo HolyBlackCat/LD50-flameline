@@ -7,6 +7,14 @@ namespace Tiled
 {
     Json::View FindLayer(Json::View map, std::string name)
     {
+        Json::View ret = FindLayerOpt(map, name);
+        if (!ret)
+            Program::Error(FMT("Map layer `{}` is missing.", name));
+        return ret;
+    }
+
+    Json::View FindLayerOpt(Json::View map, std::string name)
+    {
         Json::View ret;
 
         map["layers"].ForEachArrayElement([&](Json::View elem)
@@ -26,7 +34,7 @@ namespace Tiled
     TileLayer LoadTileLayer(Json::View source)
     {
         if (!source)
-            Program::Error("Tile map layer doesn't exist.");
+            Program::Error("Attempt to load a null tile layer.");
 
         if (source["type"].GetString() != "tilelayer")
             Program::Error("Expected `", source["name"].GetString(), "` to be a tile layer.");
@@ -50,7 +58,7 @@ namespace Tiled
     PointLayer LoadPointLayer(Json::View source)
     {
         if (!source)
-            Program::Error("Point map layer doesn't exist.");
+            Program::Error("Attempt to load a null point layer.");
 
         if (source["type"].GetString() != "objectgroup")
             Program::Error("Expected `", source["name"].GetString(), "` to be an object layer.");
