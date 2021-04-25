@@ -70,6 +70,9 @@ namespace Stream
 
         ~Output() // If `Flush` throws, the destructor swallows the exception.
         {
+            if (!*this)
+                return;
+
             try
             {
                 ASSERT(data.buffer_pos == 0, "Suggest flushing the stream before destroying it.\nNot doing so in a release build will silently ignore any possible exceptions.");
