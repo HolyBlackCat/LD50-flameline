@@ -126,7 +126,6 @@ namespace Sig
                     else
                         base.OnUnbindAlive(*local_con, *local_owner, *old_remote_owner);
                 };
-
         };
 
         // A helper class with some type aliases, common for connections and connection lists.
@@ -399,7 +398,7 @@ namespace Sig
 
             // Change the owner of this object to `new_owner`.
             // Since it requires modifying remote state, does nothing if this connection is not bound.
-            // Does nothing if the already have this owner.
+            // Does nothing if we already have this owner.
             // Invokes the "remote owner moved" callback on the remote.
             // If this is called together with `MoveFrom`, I think `MoveFrom` should be called first.
             void OwnerWasMovedTo(owner_t &new_owner) noexcept
