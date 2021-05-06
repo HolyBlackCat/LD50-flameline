@@ -13,12 +13,12 @@ namespace Input
         mutable fvec2 cur_pos_f = fvec2(0), cur_pos_delta_f = fvec2(0);
         mutable ivec2 cur_pos = ivec2(0), cur_pos_delta = ivec2(0);
         mutable ivec2 cur_movement = ivec2(0);
-        mutable bool no_delta_next_tick = 1;
+        mutable bool no_delta_next_tick = true;
         fmat3 matrix = fmat3();
 
         void Update() const
         {
-            // Get window
+            // Get window.
             auto window = Interface::Window::Get();
 
             // Stop if the mouse was already updated this tick.
@@ -26,29 +26,31 @@ namespace Input
             if (update_time == tick)
                 return;
 
-            // Remember old cur_pos
+            // Remember old cur_pos.
             fvec2 prev_pos_f = cur_pos_f;
             ivec2 prev_pos = cur_pos;
 
-            // Get cur_pos and transform it
+            // Get cur_pos and transform it.
             cur_pos_f = (matrix * window.MousePos().to_vec3(1)).to_vec2();
             cur_pos = iround(cur_pos_f);
 
-            // Get movement
+            // Get movement.
             cur_movement = window.MouseMovement();
 
-            // Compute delta if needed
-            if (no_delta_next_tick == 0)
+            // Compute delta if needed.
+            if (no_delta_next_tick)
+            {
+                no_delta_next_tick = false;
+                cur_pos_delta_f = fvec2();
+                cur_pos_delta = ivec2();
+            }
+            else
             {
                 cur_pos_delta_f = cur_pos_f - prev_pos_f;
                 cur_pos_delta = cur_pos - prev_pos;
             }
-            else
-            {
-                no_delta_next_tick = 0;
-            }
 
-            // Remember current time
+            // Remember current time.
             update_time = tick;
         }
 
@@ -59,60 +61,60 @@ namespace Input
             SetMatrix(mat);
         }
 
-        ivec2 pos() const
+        [[nodiscard]] ivec2 pos() const
         {
             Update();
             return cur_pos;
         }
-        ivec2 pos_delta() const
+        [[nodiscard]] ivec2 pos_delta() const
         {
             Update();
             return cur_pos_delta;
         }
-        fvec2 pos_f() const
+        [[nodiscard]] fvec2 pos_f() const
         {
             Update();
             return cur_pos_f;
         }
-        fvec2 pos_delta_f() const
+        [[nodiscard]] fvec2 pos_delta_f() const
         {
             Update();
             return cur_pos_delta_f;
         }
-        ivec2 movement() const
+        [[nodiscard]] ivec2 movement() const
         {
             Update();
             return cur_movement;
         }
 
-        Button left   = Button(Input::mouse_left);
-        Button middle = Button(Input::mouse_middle);
-        Button right  = Button(Input::mouse_right);
-        Button x1     = Button(Input::mouse_x1);
-        Button x2     = Button(Input::mouse_x2);
-        Button wheel_up    = Button(Input::mouse_wheel_up);
-        Button wheel_down  = Button(Input::mouse_wheel_down);
-        Button wheel_left  = Button(Input::mouse_wheel_left);
-        Button wheel_right = Button(Input::mouse_wheel_right);
+        Button left   = Button(mouse_left);
+        Button middle = Button(mouse_middle);
+        Button right  = Button(mouse_right);
+        Button x1     = Button(mouse_x1);
+        Button x2     = Button(mouse_x2);
+        Button wheel_up    = Button(mouse_wheel_up);
+        Button wheel_down  = Button(mouse_wheel_down);
+        Button wheel_left  = Button(mouse_wheel_left);
+        Button wheel_right = Button(mouse_wheel_right);
 
-        void HideCursor(bool hide = 1)
+        void HideCursor(bool hide = true)
         {
             Interface::Window::Get().HideCursor(hide);
         }
 
-        void RelativeMouseMode(bool relative = 1)
+        void RelativeMouseMode(bool relative = true)
         {
             Interface::Window::Get().RelativeMouseMode(relative);
         }
 
-        const fmat3 &Matrix() const
+        [[nodiscard]] const fmat3 &Matrix() const
         {
             return matrix;
         }
         void SetMatrix(const fmat3 &mat)
         {
             matrix = mat;
-            no_delta_next_tick = 1;
+            no_delta_next_tick = true;
         }
     };
 }
