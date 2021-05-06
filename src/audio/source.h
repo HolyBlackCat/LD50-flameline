@@ -11,7 +11,13 @@
 
 namespace Audio
 {
-    enum SourceState {playing, paused, stopped};
+    enum class SourceState
+    {
+        initial, // Sources start in this state. Mostly equivalent to `stopped`.
+        playing,
+        paused,
+        stopped,
+    };
 
     class Source
     {
@@ -76,33 +82,33 @@ namespace Audio
             return data.handle;
         }
 
+        // Returns the source state, or `stopped` if null.
         [[nodiscard]] SourceState GetState() const
         {
             if (!data.handle)
-                return stopped;
+                return SourceState::stopped;
             int state;
             alGetSourcei(data.handle, AL_SOURCE_STATE, &state);
             switch (state)
             {
-              case AL_INITIAL:
-              case AL_STOPPED:
-                return stopped;
-                break;
-              case AL_PLAYING:
-                return playing;
-                break;
-              case AL_PAUSED:
-                return paused;
-                break;
+                case AL_INITIAL: return SourceState::initial;
+                case AL_PLAYING: return SourceState::playing;
+                case AL_PAUSED:  return SourceState::paused;
+                case AL_STOPPED: return SourceState::stopped;
             }
-            return stopped;
+            return SourceState::stopped;
+        }
+
+        [[nodiscard]] bool IsPlaying() const
+        {
+            return GetState() == SourceState::playing;
         }
 
         [[nodiscard]] bool IsLooping() const
         {
             if (!data.handle)
                 return false;
-            int ret;
+            int ret = 0;
             alGetSourcei(data.handle, AL_LOOPING, &ret);
             return bool(ret);
         }

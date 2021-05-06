@@ -31,10 +31,10 @@ namespace Audio
             return sources.emplace_back(std::make_shared<Source>(buffer));
         }
 
-        // Releases sources that aren't playing.
+        // Releases sources that aren't playing (i.e. are stopped, paused, or not played yet).
         void Tick()
         {
-            std::erase_if(sources, [](const std::shared_ptr<Source> &ptr){return ptr->GetState() == stopped;});
+            std::erase_if(sources, [](const std::shared_ptr<Source> &ptr){return !ptr->IsPlaying();});
         }
 
         [[nodiscard]] std::size_t ActiveSources() const
