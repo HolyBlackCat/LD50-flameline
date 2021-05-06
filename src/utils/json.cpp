@@ -21,9 +21,9 @@ std::string Json::ParseStringLow(const char *&cur)
     cur++;
 
     const char *begin = cur;
-    bool backslash_preceding = 0;
+    bool backslash_preceding = false;
 
-    while (1)
+    while (true)
     {
         // Stop on `"`.
         if (*cur == '"' && !backslash_preceding)
@@ -167,7 +167,7 @@ Json Json::ParseLow(const char *&cur, int allowed_depth)
       default: // number
         {
             std::string str;
-            bool real = 0;
+            bool real = false;
 
             if (*cur == '-')
             {
@@ -185,7 +185,7 @@ Json Json::ParseLow(const char *&cur, int allowed_depth)
             {
                 cur++;
 
-                real = 1;
+                real = true;
                 str += '.';
 
                 while (*cur >= '0' && *cur <= '9')
@@ -199,7 +199,7 @@ Json Json::ParseLow(const char *&cur, int allowed_depth)
             {
                 cur++;
 
-                real = 1;
+                real = true;
                 str += 'e';
 
                 if (*cur == '+' || *cur == '-')
@@ -248,8 +248,8 @@ Json Json::ParseLow(const char *&cur, int allowed_depth)
 
             array_t vec;
 
-            bool first = 1;
-            while (1)
+            bool first = true;
+            while (true)
             {
                 ParseSkipWhitespace(cur);
 
@@ -258,7 +258,7 @@ Json Json::ParseLow(const char *&cur, int allowed_depth)
 
                 if (first)
                 {
-                    first = 0;
+                    first = false;
                 }
                 else
                 {
@@ -292,8 +292,8 @@ Json Json::ParseLow(const char *&cur, int allowed_depth)
 
             object_t map;
 
-            bool first = 1;
-            while (1)
+            bool first = true;
+            while (true)
             {
                 ParseSkipWhitespace(cur);
 
@@ -302,7 +302,7 @@ Json Json::ParseLow(const char *&cur, int allowed_depth)
 
                 if (first)
                 {
-                    first = 0;
+                    first = false;
                 }
                 else
                 {
@@ -382,12 +382,12 @@ void Json::View::DebugPrint(std::ostream &stream) const
       case array:
         {
             const array_t &obj = *std::get_if<int(array)>(&ptr->variant);
-            bool first = 1;
+            bool first = true;
             stream << '[';
             for (const auto &it : obj)
             {
                 if (first)
-                    first = 0;
+                    first = false;
                 else
                     stream << ',';
                 it.GetView().DebugPrint(stream);
@@ -398,12 +398,12 @@ void Json::View::DebugPrint(std::ostream &stream) const
       case object:
         {
             const object_t &obj = *std::get_if<int(object)>(&ptr->variant);
-            bool first = 1;
+            bool first = true;
             stream << '{';
             for (const auto &it : obj)
             {
                 if (first)
-                    first = 0;
+                    first = false;
                 else
                     stream << ',';
                 stream << "\"" << it.first << "\":";

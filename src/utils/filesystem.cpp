@@ -13,7 +13,7 @@ namespace Filesystem
     ObjInfo GetObjectInfo(const std::string &entry_name, bool *ok)
     {
         if (ok)
-            *ok = 0;
+            *ok = false;
 
         struct stat info;
         if (stat(entry_name.c_str(), &info))
@@ -40,14 +40,14 @@ namespace Filesystem
         ret.time_modified = info.st_mtime; // `struct stat` also contains last access time and last parameter change time, but we don't really need those.
 
         if (ok)
-            *ok = 1;
+            *ok = true;
         return ret;
     }
 
     std::vector<std::string> GetDirectoryContents(const std::string &dir_name, bool *ok)
     {
         if (ok)
-            *ok = 0;
+            *ok = false;
 
         DIR *dir = opendir(dir_name.c_str());
         if (!dir)
@@ -60,7 +60,7 @@ namespace Filesystem
 
         std::vector<std::string> ret;
 
-        while (1)
+        while (true)
         {
             dirent *entry = readdir(dir); // `entry` doesn't need to be free'd.
             if (!entry)
@@ -70,20 +70,20 @@ namespace Filesystem
         }
 
         if (ok)
-            *ok = 1;
+            *ok = true;
         return ret;
     }
 
     static TreeNode GetObjectTreeLow(const std::string &name, const std::string &path, int max_depth, bool *ok)
     {
         if (ok)
-            *ok = 0;
+            *ok = false;
 
         TreeNode ret;
         ret.name = name;
         ret.path = path;
 
-        bool info_ok = 1;
+        bool info_ok = true;
         ret.info = GetObjectInfo(path, ok ? &info_ok : 0);
         if (!info_ok)
             return ret;
@@ -117,7 +117,7 @@ namespace Filesystem
         }
 
         if (ok)
-            *ok = 1;
+            *ok = true;
         return ret;
     }
 

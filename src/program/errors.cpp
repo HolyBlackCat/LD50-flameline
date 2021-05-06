@@ -51,7 +51,7 @@ namespace Program
         HardError("Terminated.");
     }
 
-    static bool handers_set = 0;
+    static bool handers_set = false;
 
     void SetErrorHandlers(bool only_if_not_set_before)
     {
@@ -65,6 +65,6 @@ namespace Program
 
         std::set_terminate(TerminateHandler);
 
-        handers_set = 1;
+        handers_set = true;
     }
 }
