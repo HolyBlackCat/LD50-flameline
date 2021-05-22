@@ -33,9 +33,31 @@ namespace Meta
         constexpr ConstString(const char (&new_str)[N])
         {
             ASSERT(new_str[N-1] == '\0');
-            std::copy_n(new_str, N, str);
+            std::copy_n(new_str, size, str);
         }
     };
+
+    template <std::size_t A, std::size_t B>
+    [[nodiscard]] constexpr ConstString<A + B - 1> operator+(const ConstString<A> &a, const ConstString<B> &b)
+    {
+        ConstString<A + B - 1> ret;
+        std::copy_n(a.str, a.size, ret.str);
+        std::copy_n(b.str, b.size, ret.str + a.size);
+        return ret;
+    }
+
+    template <std::size_t A, std::size_t B>
+    [[nodiscard]] constexpr ConstString<A + B - 1> operator+(const ConstString<A> &a, const char (&b)[B])
+    {
+        return a + ConstString<B>(b);
+    }
+
+    template <std::size_t A, std::size_t B>
+    [[nodiscard]] constexpr ConstString<A + B - 1> operator+(const char (&a)[A], const ConstString<B> &b)
+    {
+        return ConstString<A>(a) + b;
+    }
+
 
     // A tag structure returned by `operator""_c` below.
     template <Meta::ConstString S>
