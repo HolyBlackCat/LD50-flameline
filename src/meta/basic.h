@@ -43,4 +43,10 @@ namespace Meta
     }
 
     using deduce = impl::deduce_helper &;
+
+
+    // Lambda overloader.
+
+    template <typename ...P> struct overload : P... { using P::operator()...; };
+    template <typename ...P> overload(P...) -> overload<P...>;
 }

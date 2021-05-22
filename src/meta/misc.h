@@ -10,12 +10,6 @@
 
 namespace Meta
 {
-    // Lambda overloader.
-
-    template <typename ...P> struct overload : P... { using P::operator()...; };
-    template <typename ...P> overload(P...) -> overload<P...>;
-
-
     // A wrapper that resets the underlying object to the default-constructed value.
     // The wrapper is copyable, and the value is not changed on copy.
 
