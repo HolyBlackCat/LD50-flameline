@@ -11,7 +11,7 @@
 #pragma GCC diagnostic ignored "-Wpragmas" // Silence GCC warning about the next line disabling a warning that GCC doesn't have.
 #pragma GCC diagnostic ignored "-Wstring-plus-int" // Silence clang warning about `1+R"()"` pattern.
 
-#define VERSION "1.1.1"
+#define VERSION "1.1.2"
 
 namespace data
 {
@@ -162,8 +162,6 @@ int main(int argc, char **argv)
                 // This implementation works on both GCC and Clang.
                 #define MA_ABORT(msg) MA_ABORT_impl(GCC error msg)
                 #define MA_ABORT_impl(msg) _Pragma(MA_STR(msg))
-                // Same as `MA_ABORT`, but calling it with no parameters does nothing.
-                #define MA_ABORT_IF_NOT_EMPTY(...) __VA_OPT__(MA_ABORT(__VA_ARGS__))
             )");
         }
 
@@ -234,6 +232,10 @@ int main(int argc, char **argv)
 
         { // Misc
             output(1+R"(
+                // Causes an error if the argument is not empty. Expands to nothing.
+                #define MA_EXPECT_EMPTY(...) MA_EXPECT_EMPTY_impl(__VA_ARGS__)
+                #define MA_EXPECT_EMPTY_impl()
+
                 // Expands to nothing.
                 #define MA_NULL(...)
 
