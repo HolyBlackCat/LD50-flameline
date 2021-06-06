@@ -22,10 +22,10 @@ override CXXFLAGS += -Ilib/include/cglfl_gl3.2_core # OpenGL version
 override LDFLAGS += $(filter-out -mwindows,$(deps_linker_flags))
 
 # Build modes
-$(call new_mode,debug)
+$(call new_mode,debug_soft)
 $(mode_flags) CXXFLAGS += -g -D_GLIBCXX_ASSERTIONS
 
-$(call new_mode,debug_hard)
+$(call new_mode,debug)
 $(mode_flags) CXXFLAGS += -g -D_GLIBCXX_DEBUG
 
 $(call new_mode,release)
@@ -35,12 +35,20 @@ ifeq ($(TARGET_OS),windows)
 $(mode_flags) LDFLAGS += -mwindows
 endif
 
-$(call new_mode,release_profiled)
+$(call new_mode,profile)
 $(mode_flags) CXXFLAGS += -DNDEBUG -O3 -pg
 $(mode_flags) LDFLAGS += -O3 -pg
 ifeq ($(TARGET_OS),windows)
 $(mode_flags) LDFLAGS += -mwindows
 endif
+
+$(call new_mode,sanitize_address)
+$(mode_flags) CXXFLAGS += -g -D_GLIBCXX_DEBUG -fsanitize=address
+$(mode_flags) LDFLAGS += -fsanitize=address
+
+$(call new_mode,sanitize_ub)
+$(mode_flags) CXXFLAGS += -g -D_GLIBCXX_DEBUG -fsanitize=undefined
+$(mode_flags) LDFLAGS += -fsanitize=undefined
 
 # File-specific flags
 FILE_SPECIFIC_FLAGS := lib/implementation.cpp lib/cglfl.cpp > -g0 -O3
@@ -49,7 +57,7 @@ FILE_SPECIFIC_FLAGS := lib/implementation.cpp lib/cglfl.cpp > -g0 -O3
 PRECOMPILED_HEADERS := src/game/*.cpp src/game/*.h > src/game/master.hpp
 
 # Code generation
-GEN_CXXFLAGS := -std=c++2a -Wall -Wextra -pedantic-errors
+GEN_CXXFLAGS := -std=c++20 -Wall -Wextra -pedantic-errors
 override generators_dir := gen
 override generated_headers := math:src/utils/mat.h macros:src/macros/generated.h
 override generate_file = $(call host_native_path,$2) : $(generators_dir)/make_$1.cpp ; \

@@ -27,27 +27,39 @@
             "presentation": {"echo": true, "reveal": "always", "focus": false, "panel": "shared", "showReuseMessage": false, "clear": true},
         },
         {
+            "label": "↪ Debug (soft)",
+            "type": "shell",
+            "command": "make use mode=debug_soft",
+            "presentation": {"echo": true, "reveal": "always", "focus": false, "panel": "shared", "showReuseMessage": false, "clear": true},
+        },
+        {
             "label": "↪ Debug",
             "type": "shell",
             "command": "make use mode=debug",
             "presentation": {"echo": true, "reveal": "always", "focus": false, "panel": "shared", "showReuseMessage": false, "clear": true},
         },
         {
-            "label": "↪ Debug (hard)",
-            "type": "shell",
-            "command": "make use mode=debug_hard",
-            "presentation": {"echo": true, "reveal": "always", "focus": false, "panel": "shared", "showReuseMessage": false, "clear": true},
-        },
-        {
-            "label": "↪ Profile (optimized)",
-            "type": "shell",
-            "command": "make use mode=release_profiled",
-            "presentation": {"echo": true, "reveal": "always", "focus": false, "panel": "shared", "showReuseMessage": false, "clear": true},
-        },
-        {
             "label": "↪ Release",
             "type": "shell",
             "command": "make use mode=release",
+            "presentation": {"echo": true, "reveal": "always", "focus": false, "panel": "shared", "showReuseMessage": false, "clear": true},
+        },
+        {
+            "label": "↪ Profile",
+            "type": "shell",
+            "command": "make use mode=profile",
+            "presentation": {"echo": true, "reveal": "always", "focus": false, "panel": "shared", "showReuseMessage": false, "clear": true},
+        },
+        {
+            "label": "↪ Sanitize address",
+            "type": "shell",
+            "command": "make use mode=sanitize_address",
+            "presentation": {"echo": true, "reveal": "always", "focus": false, "panel": "shared", "showReuseMessage": false, "clear": true},
+        },
+        {
+            "label": "↪ Sanitize UB",
+            "type": "shell",
+            "command": "make use mode=sanitize_ub",
             "presentation": {"echo": true, "reveal": "always", "focus": false, "panel": "shared", "showReuseMessage": false, "clear": true},
         },
         {
