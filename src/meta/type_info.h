@@ -30,14 +30,14 @@ namespace Meta
         inline constexpr bool GetRawTypeNameFormat(RawTypeNameFormat *format)
         {
             const auto &str = RawTypeName<int>();
-            for (std::size_t i = 0;; i++)
+            for (std::size_t i = 0; i < sizeof str; i++)
             {
                 if (str[i] == 'i' && str[i+1] == 'n' && str[i+2] == 't')
                 {
                     if (format)
                     {
                         format->leading_junk = i;
-                        format->trailing_junk = sizeof(str)-i-3-1; // `3` is the length of "int", `1` is the space for the null terminator.
+                        format->trailing_junk = sizeof str - i - 3 - 1; // `3` is the length of "int", `1` is the space for the null terminator.
                     }
                     return true;
                 }
@@ -47,7 +47,7 @@ namespace Meta
 
         inline static constexpr RawTypeNameFormat format =
         []{
-            static_assert(GetRawTypeNameFormat(nullptr), "Unable to figure out how to generate type names on this compiler.");
+            static_assert(GetRawTypeNameFormat(nullptr), "Not sure how to generate type names on this compiler.");
             RawTypeNameFormat format;
             GetRawTypeNameFormat(&format);
             return format;
@@ -60,7 +60,7 @@ namespace Meta
     template <typename T>
     [[nodiscard]] constexpr auto CexprTypeName()
     {
-        constexpr std::size_t len = sizeof(impl::RawTypeName<T>()) - impl::format.leading_junk - impl::format.trailing_junk;
+        constexpr std::size_t len = sizeof impl::RawTypeName<T>() - impl::format.leading_junk - impl::format.trailing_junk;
         std::array<char, len> name{};
         for (std::size_t i = 0; i < len-1; i++)
             name[i] = impl::RawTypeName<T>()[i + impl::format.leading_junk];
