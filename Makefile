@@ -460,7 +460,8 @@ $(foreach x,$(subst |, ,$(subst $(space),<,$(FILE_SPECIFIC_FLAGS))),$(foreach y,
 # --- RULES FOR CREATING FOLDERS ---
 override files_requiring_folders := $(OUTPUT_FILE_EXT) $(objects) $(compiled_headers) $(current_mode_file) $(lib_pack_info_file)
 $(foreach x,$(files_requiring_folders),$(eval $x: | $(dir $x)))
-$(foreach x,$(sort $(dir $(files_requiring_folders))),$(eval $x: ; @mkdir -p $(call quote,$x)))
+$(sort $(dir $(files_requiring_folders))):
+	@mkdir -p $(call quote,$@)
 
 
 # --- TARGETS ---
