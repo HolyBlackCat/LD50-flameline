@@ -4,6 +4,9 @@ constexpr std::string_view window_name = "Iota";
 Interface::Window window(std::string(window_name), screen_size * 2, Interface::windowed, adjust_(Interface::WindowSettings{}, min_size = screen_size));
 Graphics::DummyVertexArray dummy_vao = nullptr;
 
+Audio::Context audio_context = nullptr;
+Audio::SourceManager audio_controller;
+
 const Graphics::ShaderConfig shader_config = Graphics::ShaderConfig::Core();
 Interface::ImGuiController gui_controller(Poly::derived<Interface::ImGuiController::GraphicsBackend_Modern>, adjust_(Interface::ImGuiController::Config{}, shader_header = shader_config.common_header));
 
@@ -70,16 +73,19 @@ struct ProgramState : Program::DefaultBasicState
         // window.ProcessEvents();
         window.ProcessEvents({gui_controller.EventHook()});
 
+        if (window.ExitRequested())
+            Program::Exit();
         if (window.Resized())
         {
             Resize();
             Graphics::Viewport(window.Size());
         }
-        if (window.ExitRequested())
-            Program::Exit();
 
         gui_controller.PreTick();
         state_manager.Tick();
+        audio_controller.Tick();
+
+        Audio::CheckErrors();
     }
 
     void Render() override
@@ -88,8 +94,8 @@ struct ProgramState : Program::DefaultBasicState
         adaptive_viewport.BeginFrame();
         state_manager.Render();
         adaptive_viewport.FinishFrame();
-        Graphics::CheckErrors();
         gui_controller.PostRender();
+        Graphics::CheckErrors();
 
         window.SwapBuffers();
     }
@@ -127,6 +133,17 @@ namespace States
 
             angle += 0.01;
             ImGui::ShowDemoWindow();
+
+            if (mouse.right.pressed())
+            {
+                static Audio::Buffer buf = []{
+                    int16_t array[10000];
+                    for (size_t i = 0; i < std::size(array); i++)
+                        array[i] = std::sin(i / 30.f) * 0x7fff;
+                    return Audio::Sound(48000, Audio::mono, std::size(array), array);
+                }();
+                audio_controller.Add(buf)->play();
+            }
         }
 
         void Render() const override
@@ -137,6 +154,7 @@ namespace States
             r.BindShader();
 
             r.iquad(mouse.pos(), ivec2(32)).center().rotate(angle).color(mouse.left.down() ? fvec3(1,0.5,0) : fvec3(0,0.5,1));
+            r.itext(mouse.pos(), Graphics::Text(Fonts::main, STR((audio_controller.ActiveSources())))).color(fvec3(1));
 
             r.Finish();
         }
