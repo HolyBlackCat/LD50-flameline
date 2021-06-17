@@ -4,7 +4,6 @@
 #include <cstddef>
 
 #include "meta/basic.h"
-#include "program/errors.h"
 
 // This file offers compile-time strings that can be used as template parameters.
 // Example 1:
@@ -16,6 +15,12 @@
 
 namespace Meta
 {
+    namespace impl
+    {
+        // Does nothing, but causes an error if called from a `consteval` function.
+        inline void expectedNullTerminatedArray() {}
+    }
+
     // A string that can be used as a template parameter.
     template <std::size_t N>
     struct ConstString
@@ -29,10 +34,11 @@ namespace Meta
             return {str, str + size};
         }
 
-        constexpr ConstString() {}
-        constexpr ConstString(const char (&new_str)[N])
+        consteval ConstString() {}
+        consteval ConstString(const char (&new_str)[N])
         {
-            ASSERT(new_str[N-1] == '\0');
+            if (new_str[N-1] != '\0')
+                impl::expectedNullTerminatedArray();
             std::copy_n(new_str, size, str);
         }
     };
