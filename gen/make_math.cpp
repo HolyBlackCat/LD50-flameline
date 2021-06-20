@@ -7,7 +7,7 @@
 #include <sstream>
 #include <type_traits>
 
-#define VERSION "3.2.5"
+#define VERSION "3.2.6"
 
 #pragma GCC diagnostic ignored "-Wpragmas" // Silence GCC warning about the next line disabling a warning that GCC doesn't have.
 #pragma GCC diagnostic ignored "-Wstring-plus-int" // Silence clang warning about `1+R"()"` pattern.
@@ -114,6 +114,12 @@ void output_str(const std::string &str)
             if (std::strchr(" \t\r", ch))
                 continue;
 
+            if (ch == '\n')
+            {
+                impl::output_file.put('\n');
+                continue;
+            }
+
             for (int i = 0; i < impl::indentation; i++)
                 impl::output_file << (i == impl::indentation-1 && ch == '@' ? impl::indentation_string_labels : impl::indentation_string);
             impl::at_line_start = 0;
@@ -184,6 +190,7 @@ int main(int argc, char **argv)
         output(1+R"(
             #include <algorithm>
             #include <cmath>
+            #include <concepts>
             #include <cstddef>
             #include <cstdint>
             #include <istream>
@@ -262,6 +269,27 @@ int main(int argc, char **argv)
                         next_line();
                 }
             }
+        });
+
+        next_line();
+
+        section("namespace Custom // Customization points.", []
+        {
+            output(1+R"(
+                // Specializing this adds corresponding constructors and conversion operators to vectors and matrices.
+                // The template arguments will never be const.
+                template <typename From, typename To>
+                struct Convert
+                {
+                    // To operator()(const From &) const {...}
+                };
+
+                template <typename From, typename To>
+                concept convertable = requires(const Convert<From, To> conv, const From from)
+                {
+                    { conv(from) } -> std::same_as<To>;
+                };
+            )");
         });
 
         next_line();
@@ -433,6 +461,13 @@ int main(int argc, char **argv)
                                 output(data::fields[i],"(obj.",data::fields[i],")");
                             }
                             output(" {}\n");
+                        }
+
+                        { // Customization point constructor and conversion operator
+                            output(1+R"(
+                                template <typename TT> requires Custom::convertable<TT, vec> explicit constexpr vec(const TT &obj) {*this = Custom::Convert<TT, vec>{}(obj);}
+                                template <typename TT> requires Custom::convertable<vec, TT> explicit operator TT() const {return Custom::Convert<vec, TT>{}(*this);}
+                            )");
                         }
 
                         { // Convert to type
@@ -719,6 +754,13 @@ int main(int argc, char **argv)
                                 output(data::fields[i],"(obj.",data::fields[i],")");
                             }
                             output(" {}\n");
+                        }
+
+                        { // Customization point constructor and conversion operator
+                            output(1+R"(
+                                template <typename TT> requires Custom::convertable<TT, mat> explicit constexpr mat(const TT &obj) {*this = Custom::Convert<TT, mat>{}(obj);}
+                                template <typename TT> requires Custom::convertable<mat, TT> explicit operator TT() const {return Custom::Convert<mat, TT>{}(*this);}
+                            )");
                         }
 
                         { // Convert to type
