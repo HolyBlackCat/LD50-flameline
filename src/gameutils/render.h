@@ -24,7 +24,7 @@ class Render
 
   public:
     Render();
-    Render(int queue_size, const Graphics::ShaderConfig &config);
+    Render(std::size_t queue_size, const Graphics::ShaderConfig &config);
 
     Render(Render &&) noexcept;
     Render &operator=(Render &&) noexcept;

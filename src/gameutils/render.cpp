@@ -52,7 +52,7 @@ void main()
     Uniforms uni;
     Graphics::Shader shader;
 
-    Data(int queue_size, const Graphics::ShaderConfig &config) : queue(queue_size), shader("Main", config, Graphics::ShaderPreferences{}, Meta::tag<Attribs>{}, uni, vertex_source, fragment_source) {}
+    Data(std::size_t queue_size, const Graphics::ShaderConfig &config) : queue(queue_size), shader("Main", config, Graphics::ShaderPreferences{}, Meta::tag<Attribs>{}, uni, vertex_source, fragment_source) {}
 };
 
 void *Render::GetRenderQueuePtr()
@@ -62,7 +62,7 @@ void *Render::GetRenderQueuePtr()
 
 Render::Render() {}
 
-Render::Render(int queue_size, const Graphics::ShaderConfig &config)
+Render::Render(std::size_t queue_size, const Graphics::ShaderConfig &config)
 {
     data = std::make_unique<Data>(queue_size, config);
     SetMatrix(fmat4());

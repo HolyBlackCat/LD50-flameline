@@ -10,16 +10,18 @@
 
 namespace Graphics
 {
-    template <typename T, int N> class SimpleRenderQueue
+    template <typename T, int N>
+    class SimpleRenderQueue
     {
         static_assert(Graphics::VertexBuffer<T>::is_reflected, "The type must be reflected.");
         static_assert(N >= 1 && N <= 3, "N must be 1 (points), 2 (lines), or 3 (triangles).");
 
-        int pos = 0, size = 0; // These are measured in primitives, not vertices.
+        std::size_t pos = 0, size = 0; // These are measured in primitives, not vertices.
         std::unique_ptr<T[]> storage;
         Graphics::VertexBuffer<T> buffer;
 
-        template <typename ...P> void AddLow(const P &... p)
+        template <typename ...P>
+        void AddLow(const P &... p)
         {
             static_assert(sizeof...(P) == N);
             static_assert((std::is_same_v<P, T> && ...));
@@ -32,14 +34,29 @@ namespace Graphics
 
       public:
         SimpleRenderQueue() {}
-        SimpleRenderQueue(int size) : size(size), storage(std::make_unique<T[]>(size * N)), buffer(size * N, 0, Graphics::stream_draw) {}
 
-        explicit operator bool()
+        // The size is measured in primitives, not vertices.
+        SimpleRenderQueue(std::size_t size) : size(size), storage(std::make_unique<T[]>(size * N)), buffer(size * N, 0, Graphics::stream_draw) {}
+
+        [[nodiscard]] explicit operator bool()
         {
             return bool(storage);
         }
 
-        int Size() const
+        // Returns true if the next operation would flush.
+        [[nodiscard]] bool Full()
+        {
+            return pos == size;
+        }
+
+        // How many primitives are currently in the queue.
+        [[nodiscard]] std::size_t Pos() const
+        {
+            return pos;
+        }
+
+        // The max number of primitives the queue can hold.
+        [[nodiscard]] std::size_t Size() const
         {
             return size;
         }
@@ -53,24 +70,20 @@ namespace Graphics
             pos = 0;
         }
 
-        void Add(const T &a)
+        void Add(const T &a) requires (N == 1)
         {
-            static_assert(N == 1, "Incorrect parameter count.");
             AddLow(a);
         }
-        void Add(const T &a, const T &b)
+        void Add(const T &a, const T &b) requires (N == 2)
         {
-            static_assert(N == 2, "Incorrect parameter count.");
             AddLow(a, b);
         }
-        void Add(const T &a, const T &b, const T &c)
+        void Add(const T &a, const T &b, const T &c) requires (N == 3)
         {
-            static_assert(N == 3, "Incorrect parameter count.");
             AddLow(a, b, c);
         }
-        void Add(const T &a, const T &b, const T &c, const T &d)
+        void Add(const T &a, const T &b, const T &c, const T &d) requires (N == 3/*sic*/)
         {
-            static_assert(N == 3/*sic*/, "Incorrect parameter count.");
             AddLow(a, b, d);
             AddLow(d, b, c);
         }
