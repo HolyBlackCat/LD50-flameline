@@ -84,6 +84,14 @@
 #  error Invalid platform flags: Compiler.
 #endif
 
+// - Compiler categories
+
+#if PLATFORM_IS(gcc) || PLATFORM_IS(clang)
+#  define PLATFORM_FLAG_gcc_clang 1
+#else
+#  define PLATFORM_FLAG_gcc_clang 0
+#endif
+
 // - Operating systems
 
 #ifndef PLATFORM_FLAG_windows
