@@ -1,5 +1,8 @@
 #pragma once
 
+#include <type_traits>
+#include <utility>
+
 namespace Meta
 {
     // Tag dispatch helpers.
@@ -13,7 +16,7 @@ namespace Meta
     template <typename T> using identity_t = T;
 
 
-    // Dependent values and types, good for `static_asserts` and SFINAE.
+    // Dependent values and types, good for `static_assert`s and SFINAE.
 
     namespace impl
     {
@@ -49,4 +52,26 @@ namespace Meta
 
     template <typename ...P> struct overload : P... { using P::operator()...; };
     template <typename ...P> overload(P...) -> overload<P...>;
+
+
+    // A helper function that invokes a callback.
+    // If the callback returns void, the function returns `default_var` explicitly converted to `R`.
+    // Otherwise returns the return value of of the callback, explicitly converted to `R` .
+
+    template <typename R, deduce..., typename D, typename F, typename ...P>
+    R return_value_or(D &&default_val, F &&func, P &&... params)
+    requires
+        std::is_constructible_v<R, D> &&
+        requires{requires std::is_void_v<std::invoke_result_t<F, P...>> || std::is_constructible_v<std::invoke_result_t<F, P...>, R>;}
+    {
+        if constexpr (std::is_void_v<std::invoke_result_t<F, P...>>)
+        {
+            std::invoke(std::forward<F>(func), std::forward<P>(params)...);
+            return R(std::forward<D>(default_val));
+        }
+        else
+        {
+            return R(std::invoke(std::forward<F>(func), std::forward<P>(params)...));
+        }
+    }
 }

@@ -125,29 +125,6 @@ namespace Meta
     template <typename T, typename ...P> concept same_as_any_of = (std::same_as<T, P> || ...);
 
 
-    // A helper function that invokes a callback.
-    // It expects the callback to either have the same return type as the type of the first parameter, or void. Otherwise a static assertion is triggered.
-    // The callback is invoked, and if returns a non-void type, its return value is returned from this function.
-    // Otherwise the value of the first parameter is returned.
-
-    template <deduce..., typename F, typename R, typename ...P>
-    R invoke_and_get_return_value_or(const R &default_val, F &&func, P &&... params)
-    {
-        using ret_t = decltype(std::forward<F>(func)(std::forward<P>(params)...));
-        static_assert(same_as_any_of<ret_t, R, void>, "The return type of the callback must either be void or match the type of the first parameter.");
-        if constexpr (std::is_void_v<ret_t>)
-        {
-            std::forward<F>(func)(std::forward<P>(params)...);
-            return default_val;
-        }
-        else
-        {
-            // The cast is necessary if `R` is an lvalue reference.
-            return static_cast<R>(std::forward<F>(func)(std::forward<P>(params)...));
-        }
-    }
-
-
     // Constexpr replacement for the for loop.
 
     template <typename Integer, Integer ...I, typename F> constexpr void cexpr_for_each(std::integer_sequence<Integer, I...>, F &&func)
