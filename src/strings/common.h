@@ -7,6 +7,9 @@
 #include <sstream>
 #include <string_view>
 #include <string>
+#include <type_traits>
+
+#include "meta/basic.h"
 
 namespace Strings
 {
@@ -30,7 +33,7 @@ namespace Strings
     }
 
     // Trims the string, and either replaces any sequences of whitespace characters with single spaces, or removes them completely.
-    // A whitespace sequences is removed completely unless on both sides it has has letters, numbers, or unknown characters (>= 128).
+    // A whitespace sequence is removed completely unless on both sides it has has letters, numbers, or unknown characters (>= 128).
     [[nodiscard]] inline std::string Condense(std::string_view str)
     {
         auto IsLetter = [&](unsigned char ch)
@@ -80,5 +83,38 @@ namespace Strings
 
         ret += source.substr(last_pos);
         return ret;
+    }
+
+    // Splits the string by a specific character.
+    // `func` is `R func(std::string_view elem [, bool is_final])`, where `R` is either void or contextually convertible to bool.
+    // If it returns a truthy value, the loop stops and true is returned.
+    template <typename F>
+    bool Split(std::string_view str, char sep, F &&func)
+    {
+        auto it = str.begin();
+        auto elem_start = it;
+        while (true)
+        {
+            bool is_end = it == str.end();
+            bool is_sep = !is_end && *it == sep;
+            if (is_sep || is_end)
+            {
+                bool stop;
+                if constexpr (std::is_invocable_v<F, std::string_view, bool>)
+                    stop = Meta::return_value_or<bool>(false, std::forward<F>(func), std::string_view(elem_start, it), bool(is_end)); // Note the cast, it protects the original variable.
+                else
+                    stop = Meta::return_value_or<bool>(false, std::forward<F>(func), std::string_view(elem_start, it));
+                if (stop)
+                    return true;
+            }
+
+            if (is_end)
+                return false;
+
+            it++;
+
+            if (is_sep)
+                elem_start = it;
+        }
     }
 }
