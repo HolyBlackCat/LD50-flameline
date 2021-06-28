@@ -9,7 +9,7 @@
 
 
 // Export some variables to advise video drivers to use the best available video card for the application.
-PLATFORM_IF(windows)
+IMP_PLATFORM_IF(windows)
 (
     extern "C"
     {
@@ -120,7 +120,7 @@ namespace Interface
     Window::Window(std::string title, ivec2 size, FullscreenMode mode, const WindowSettings &settings)
     {
         constexpr const char *extra_error_details =
-            PLATFORM_IF(pc)
+            IMP_PLATFORM_IF(pc)
             (
                 "\n"
                 "If you have several video cards, change your video driver settings\n"
@@ -128,7 +128,7 @@ namespace Interface
                 "If it doesn't help, try updating your video card driver.\n"
                 "If it doesn't help as well, your video card is probably too old to run this application.";
             )
-            PLATFORM_IF(mobile)
+            IMP_PLATFORM_IF(mobile)
             (
                 "\n"
                 "Your device doesn't support this application.";

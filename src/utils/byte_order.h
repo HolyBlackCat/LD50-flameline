@@ -11,7 +11,7 @@ namespace ByteOrder
 {
     enum Order {little, big};
 
-    inline constexpr Order native = PLATFORM_IF(little_endian)( little ) PLATFORM_IF(big_endian)( big );
+    inline constexpr Order native = IMP_PLATFORM_IF(little_endian)( little ) IMP_PLATFORM_IF(big_endian)( big );
 
     inline void SwapBytes(std::uint8_t *data, std::size_t len)
     {

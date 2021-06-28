@@ -9,7 +9,7 @@
 #include "interface/window.h"
 #include "reflection/structs.h"
 
-#ifdef IMP_RE_HAVE_FRAMEBUFFERS
+#ifdef IMP_HAVE_FRAMEBUFFERS
 
 struct AdaptiveViewport::Data
 {

@@ -14,10 +14,10 @@
 namespace Graphics
 {
     #if defined(GL_FRAMEBUFFER_BINDING) || defined(GL_DRAW_FRAMEBUFFER_BINDING)
-    #  define IMP_RE_HAVE_FRAMEBUFFERS
+    #  define IMP_HAVE_FRAMEBUFFERS
     #endif
 
-    #ifdef IMP_RE_HAVE_FRAMEBUFFERS
+    #ifdef IMP_HAVE_FRAMEBUFFERS
     class FrameBuffer
     {
         struct Data
