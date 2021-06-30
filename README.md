@@ -22,4 +22,4 @@ Licensed under [ZLIB LICENSE](LICENSE.md).
 
 ---
 
-Currently I'm targeting Clang 10.0.0 (with GCC 10's libstdc++; Windows and Linux). GCC 10 should work with minor adjustments. MSVC support would require significant changes, and a new built system.
+Currently I'm targeting Clang 12 (with GCC 10's libstdc++; Windows and Linux). GCC 10 should work with minor adjustments. MSVC support would require significant changes, and a new build system.
