@@ -36,7 +36,7 @@ namespace Audio
         template <typename T> concept ChannelsOrNullptr = Meta::same_as_any_of<T, Channels, std::nullptr_t>;
         template <typename T> concept FormatOrNullptr = Meta::same_as_any_of<T, Format, std::nullptr_t>;
 
-        template <ChannelsOrNullptr auto ChannelCount, FormatOrNullptr auto FileFormat, Meta::ConstString Name>
+        template <Meta::ConstString Name, ChannelsOrNullptr auto ChannelCount, FormatOrNullptr auto FileFormat>
         struct RegisterAutoLoadedBuffer
         {
             [[maybe_unused]] inline static const Buffer &ref = []() -> Buffer &
@@ -55,13 +55,13 @@ namespace Audio
 
     // Returns a reference to a buffer, loaded from the filename passed as the parameter.
     // The load doesn't happen at the call point, and is done by `LoadMentionedFiles()`, which magically knows all files that it needs to load in this manner.
-    template <impl::ChannelsOrNullptr auto ChannelCount = nullptr, impl::FormatOrNullptr auto FileFormat = nullptr, Meta::ConstString Name>
-    [[nodiscard]] const Buffer &File(Meta::ConstStringParam<Name>)
+    template <Meta::ConstString Name, impl::ChannelsOrNullptr auto ChannelCount = nullptr, impl::FormatOrNullptr auto FileFormat = nullptr>
+    [[nodiscard]] const Buffer &File()
     {
-        return impl::RegisterAutoLoadedBuffer<ChannelCount, FileFormat, Name>::ref;
+        return impl::RegisterAutoLoadedBuffer<Name, ChannelCount, FileFormat>::ref;
     }
 
-    // Loads (or reloads) all files mentioned in all known `Audio::File(...)` calls.
+    // Loads (or reloads) all files mentioned in all known `Audio::File()` calls.
     // The number of channels and the file format can be overridden by the `File()` calls.
     // `process_filename` is a function that processes filenames before use. You can use the default function returned by `LoadFromPrefix()`.
     // The signatures is `std::string (const std::string &name, std::optional<Channels> channels, Format format)`, it processes the filenames before loading them.
