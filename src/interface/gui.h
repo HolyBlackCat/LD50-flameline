@@ -96,10 +96,10 @@ namespace Interface
       private:
         struct Data
         {
-            ImGuiContext *context = 0;
+            ImGuiContext *context = nullptr;
 
-            bool frame_started = 0;
-            bool frame_rendered = 0;
+            bool frame_started = false;
+            bool frame_rendered = false;
 
             std::vector<std::function<void()>> execute_before_next_frame;
 
@@ -140,7 +140,7 @@ namespace Interface
             // Set file name.
             if (config.store_state_in_file.empty())
             {
-                ImGui::GetIO().IniFilename = 0;
+                ImGui::GetIO().IniFilename = nullptr;
             }
             else
             {
@@ -201,7 +201,7 @@ namespace Interface
                 // Handle event.
                 bool event_used = ImGui_ImplSDL2_ProcessEvent(&event);
                 if (!event_used)
-                    return 1;
+                    return true;
 
                 // Discard keyboard events if the keyboard is captured.
                 // Note that we don't discard `SDL_KEYUP` to prevent keys from getting stuck.
@@ -213,7 +213,7 @@ namespace Interface
                 if (ImGui::GetIO().WantCaptureMouse && (event.type == SDL_MOUSEBUTTONDOWN || event.type == SDL_MOUSEWHEEL))
                     return false_if_blocking;
 
-                return 1;
+                return true;
             };
         }
 
@@ -226,14 +226,14 @@ namespace Interface
             if (data.frame_started)
             {
                 ImGui::EndFrame();
-                data.frame_started = 0;
+                data.frame_started = false;
             }
 
             data.graphics_backend->NewFrame();
             ImGui_ImplSDL2_NewFrame(Window::Get().Handle());
             ImGui::NewFrame();
 
-            data.frame_started = 1;
+            data.frame_started = true;
         }
 
         void PreRender()
@@ -244,9 +244,9 @@ namespace Interface
 
             if (data.frame_started)
             {
-                data.frame_started = 0;
+                data.frame_started = false;
                 ImGui::Render();
-                data.frame_rendered = 1;
+                data.frame_rendered = true;
             }
         }
 
