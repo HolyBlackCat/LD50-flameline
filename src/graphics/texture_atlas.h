@@ -78,7 +78,8 @@ namespace Graphics
         TextureAtlas() {}
 
         // Pass empty string as `source_dir` to disallow regeneration.
-        TextureAtlas(ivec2 target_size, const std::string &source_dir, const std::string &out_image_file, const std::string &out_desc_file, bool add_gaps = 1);
+        // `artifical_regions` are empty "images" that are added to the atlas.
+        TextureAtlas(ivec2 target_size, const std::string &source_dir, const std::string &out_image_file, const std::string &out_desc_file, const std::map<std::string, ivec2> &artifical_regions = {}, bool add_gaps = true);
 
         [[nodiscard]] const std::string &SourceDirectory() const
         {

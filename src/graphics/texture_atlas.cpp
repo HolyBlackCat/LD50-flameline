@@ -9,7 +9,7 @@
 
 namespace Graphics
 {
-    TextureAtlas::TextureAtlas(ivec2 target_size, const std::string &source_dir, const std::string &out_image_file, const std::string &out_desc_file, bool add_gaps)
+    TextureAtlas::TextureAtlas(ivec2 target_size, const std::string &source_dir, const std::string &out_image_file, const std::string &out_desc_file, const std::map<std::string, ivec2> &artifical_regions, bool add_gaps)
         : source_dir(source_dir)
     {
         constexpr int max_nesting_level = 32;
@@ -19,18 +19,13 @@ namespace Graphics
 
         Filesystem::TreeNode source_tree;
 
-        // If regeneration is allowed, get source directory tree and its modification time.
+        // If regeneration is allowed, try getting the source directory tree and its modification time.
         if (allow_regeneration)
         {
-            // Get the tree.
-            bool tree_ok;
-            Filesystem::TreeNode new_source_tree = Filesystem::GetObjectTree(source_dir, max_nesting_level, &tree_ok); // This throws if no such file or directory.
-            if (tree_ok)
-            {
-                if (new_source_tree.info.category != Filesystem::directory)
-                    Program::Error("Texture atlas source location `", source_dir, "` is not a directory.");
-                source_tree = std::move(new_source_tree); // We use a temporary to make sure that if it's not a directory, we have an empty file tree.
-            }
+            // `GetObjectTree` will throw if the source directory doesn't exist.
+            source_tree = Filesystem::GetObjectTree(source_dir, max_nesting_level);
+            if (source_tree.info.category != Filesystem::directory)
+                Program::Error("Texture atlas source location `", source_dir, "` is not a directory.");
         }
 
         std::time_t image_time_modified = 0;
@@ -66,14 +61,21 @@ namespace Graphics
             // Try loading the existing atlas because either regeneration is disabled, or atlas image and description are new enough.
             try
             {
+                // Load and parse description.
+                Refl::FromString(desc, Stream::Input(out_desc_file));
+
+                // Make sure that all requested artifical regions are present in the atlas. If not, attempt to regenerate it.
+                for (const auto &[name, size] : artifical_regions)
+                {
+                    auto it = desc.images.find(name);
+                    if (it == desc.images.end() || it->second.size != size)
+                        Program::Error("The texture atlas doesn't include some of the requested artifical regions.");
+                }
+
                 // Load image.
                 image = Image(out_image_file);
 
-                // Load and parse description.
-                // We don't pass `desc` directly to `FromString` because if conversion fails, we might need `description` to be empty to regenerate the atlas into it.
-                desc = Refl::FromString<Desc>(Stream::Input(out_desc_file));
-
-                return; // The atlas is loaded successfully.
+                return; // The atlas was loaded successfully.
             }
             catch (...)
             {
@@ -88,7 +90,7 @@ namespace Graphics
         // Begin regenerating atlas.
 
         // Count images.
-        int image_count = 0;
+        int image_count = artifical_regions.size();
         Filesystem::ForEachObject(source_tree, [&](const Filesystem::TreeNode &node)
         {
             if (node.info.category != Filesystem::file)
@@ -104,6 +106,13 @@ namespace Graphics
         };
         std::vector<Elem> elem_list;
         elem_list.reserve(image_count);
+
+        for (const auto &[name, size] : artifical_regions)
+        {
+            auto &new_elem = elem_list.emplace_back();
+            new_elem.name = name;
+            new_elem.image = Image(size);
+        }
 
         Filesystem::ForEachObject(source_tree, [&](const Filesystem::TreeNode &node)
         {
@@ -134,6 +143,7 @@ namespace Graphics
 
         // Construct description and final image.
         image = Image(target_size, u8vec4(0));
+        desc = {}; // In case we started populating it and failed.
         for (size_t i = 0; i < elem_list.size(); i++)
         {
             // Add image to description.

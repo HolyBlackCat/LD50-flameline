@@ -3,6 +3,7 @@ bin/*
 !bin/*.*
 bin/*.exe
 bin/imgui.ini
+bin/assets/atlas.*
 bin/*.dll
 bin/*.so
 bin/*.so.*

@@ -21,8 +21,8 @@ namespace Fonts
 }
 
 Graphics::TextureAtlas texture_atlas = []{
-    Graphics::TextureAtlas ret(ivec2(2048), "assets/_images", "assets/atlas.png", "assets/atlas.refl");
-    auto font_region = ret.Get("font_storage.png");
+    Graphics::TextureAtlas ret(ivec2(2048), "assets/_images", "assets/atlas.png", "assets/atlas.refl", {{"/font_storage", ivec2(256)}});
+    auto font_region = ret.Get("/font_storage");
 
     Unicode::CharSet glyph_ranges;
     glyph_ranges.Add(Unicode::Ranges::Basic_Latin);
