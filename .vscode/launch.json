@@ -22,7 +22,8 @@
                 // Register pretty-printers.
                 // Normally they are auto-loaded, but it doesn't work when libstdc++'s `.so` is in a non-default path.
                 // Following force-loads the printers, but the command is gcc version-dependent.
-                "python import sys; sys.path.insert(0, '/usr/share/gcc-10/python'); from libstdcxx.v6.printers import register_libstdcxx_printers; register_libstdcxx_printers(None)",
+                // NOTE: If GDB says `ModuleNotFoundError: No module named 'libstdcxx'`, then you need to update the path given to `sys.path.insert()`.
+                "python import sys; sys.path.insert(0, '/usr/share/gcc/python'); from libstdcxx.v6.printers import register_libstdcxx_printers; register_libstdcxx_printers(None)",
             ],
         },
     ]
