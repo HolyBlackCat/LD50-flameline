@@ -26,7 +26,7 @@ namespace Ent
     // A common base class for components.
     struct Component {};
 
-    // The alignment that components get. Overaligned components trigger a static assertion.
+    // The maximum alignment that components can get. Overaligned components trigger a static assertion.
     inline constexpr std::size_t component_alignment = __STDCPP_DEFAULT_NEW_ALIGNMENT__;
 
     // A concept for components.
@@ -177,7 +177,8 @@ namespace Ent
             template <typename T>
             operator T() const
             {
-                return T{}; // If you get an error here, you tried to default-construct a non-default-constructible component.
+                static_assert(std::default_initializable<T>, "This component is not default-constructible.");
+                return T{};
             }
         };
 
@@ -321,10 +322,10 @@ namespace Ent
         };
 
 
-        // Check if component list `L` satisfies requirements of component `C`.
+        // Check if component list `L` satisfies requirements of its elements.
         // Always returns true, but triggers a static assertion on failure.
         // Note that the function is written in a way that should provide decent
-        //   error messages (i.e. point at specific components that caused the problem).
+        //   error messages (i.e. point to specific components that caused the problem).
         // Make sure it stays this way if you decide to rewrite it.
         template <typename L>
         constexpr bool CheckComponentRequirements()
@@ -741,13 +742,13 @@ namespace Ent
     // The return value must depend only on the parameter.
     using list_predicate_t = bool(component_predicate_t *);
 
-    // A function object implementing `list_predicate_t`. Returns true if an entity has all the specified components.
+    // A function implementing `list_predicate_t`. Returns true if an entity has all the specified components.
     // Use a lambda instead if you need a more complex condition.
     template <ValidComponent ...C>
-    inline auto has_components = [](component_predicate_t *pred) -> bool
+    [[nodiscard]] bool HasComponents(component_predicate_t *pred)
     {
         return (pred(typeid(C)) && ...);
-    };
+    }
 
 
     // The entity controller.
@@ -947,8 +948,7 @@ namespace Ent
                 Program::Error("Refuse to create an entity that doesn't belong to any lists.");
 
             // Determine a full list of the components, and the actual entity type.
-            using components = Meta::list_apply_types<full_component_list, Meta::list_cat<DefaultComponents, Meta::type_list<C...>>>;
-            using entity_type = Meta::list_apply_types<impl::SpecificEntityWithNodes, components>;
+            using entity_type = Meta::list_apply_types<impl::SpecificEntityWithNodes, full_component_list<C...>>;
             static_assert(alignof(entity_type) <= component_alignment);
 
             // Allocate storage.
@@ -961,7 +961,7 @@ namespace Ent
             {
                 return const_cast<List &>(operator()(list_handles[i]));
             };
-            entity_type *entity = new(storage) entity_type(typename entity_type::have_enough_storage{}, list_handles.size(), ith_list_head, std::forward<P>(params)...);
+            entity_type *entity = ::new(storage) entity_type(typename entity_type::have_enough_storage{}, list_handles.size(), ith_list_head, std::forward<P>(params)...);
 
             entity_count.value++;
 
