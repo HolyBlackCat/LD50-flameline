@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cmath>
+#include <compare>
 #include <concepts>
 #include <limits>
 #include <stdexcept>
@@ -19,33 +20,6 @@
 
 namespace Robust
 {
-    // A partial ordering.
-    // "Partial" means that some values are not comparable (i.e. NaNs, that's what `unordered` is for).
-    enum class Ordering {less, equal, greater, unordered};
-
-    // This set of operators allows comparisons between an `Ordering` and 0.
-    // `ordering < 0` -> less
-    // `ordering > 0` -> greater
-    // `ordering <= 0` -> less or equal
-    // `ordering >= 0` -> greater or equal
-    // `ordering == 0` -> equal
-    // `ordering != 0` -> not equal
-    // If the ordering is `unordered`, then only `!= 0` returns true.
-    // The operands can be swapped if that looks better to you.
-    [[nodiscard]] inline bool operator<(Ordering o, decltype(nullptr)) {return o == Ordering::less;}
-    [[nodiscard]] inline bool operator>(Ordering o, decltype(nullptr)) {return o == Ordering::greater;}
-    [[nodiscard]] inline bool operator<=(Ordering o, decltype(nullptr)) {return o == Ordering::less || o == Ordering::equal;}
-    [[nodiscard]] inline bool operator>=(Ordering o, decltype(nullptr)) {return o == Ordering::greater || o == Ordering::equal;}
-    [[nodiscard]] inline bool operator==(Ordering o, decltype(nullptr)) {return o == Ordering::equal;}
-    [[nodiscard]] inline bool operator!=(Ordering o, decltype(nullptr)) {return o != Ordering::equal;}
-    [[nodiscard]] inline bool operator<(decltype(nullptr), Ordering o) {return o > 0;}
-    [[nodiscard]] inline bool operator>(decltype(nullptr), Ordering o) {return o < 0;}
-    [[nodiscard]] inline bool operator<=(decltype(nullptr), Ordering o) {return o >= 0;}
-    [[nodiscard]] inline bool operator>=(decltype(nullptr), Ordering o) {return o <= 0;}
-    [[nodiscard]] inline bool operator==(decltype(nullptr), Ordering o) {return o == 0;}
-    [[nodiscard]] inline bool operator!=(decltype(nullptr), Ordering o) {return o != 0;}
-
-
     namespace impl
     {
         // Compares an integral and a floating-point value.
@@ -54,7 +28,7 @@ namespace Robust
         // See following thread for the explanation of the algorithm and for alternative implementations:
         //   https://stackoverflow.com/questions/58734034/how-to-properly-compare-an-integer-and-a-floating-point-value
         template <typename I, typename F>
-        [[nodiscard]] Ordering compare_int_float_three_way(I i, F f)
+        [[nodiscard]] std::partial_ordering compare_int_float_three_way(I i, F f)
         {
             if constexpr (std::is_integral_v<F> && std::is_floating_point_v<I>)
             {
@@ -77,9 +51,9 @@ namespace Robust
                 {
                     // Manually check for special floating-point values.
                     if (std::isinf(f))
-                        return f > 0 ? Ordering::less : Ordering::greater;
+                        return f > 0 ? std::partial_ordering::less : std::partial_ordering::greater;
                     if (std::isnan(f))
-                        return Ordering::unordered;
+                        return std::partial_ordering::unordered;
                 }
 
                 if (limits_overflow || f >= I_min_as_F)
@@ -89,26 +63,26 @@ namespace Robust
                     {
                         I f_trunc = f;
                         if (f_trunc < i)
-                            return Ordering::greater;
+                            return std::partial_ordering::greater;
                         if (f_trunc > i)
-                            return Ordering::less;
+                            return std::partial_ordering::less;
 
                         F f_frac = f - f_trunc;
                         if (f_frac < 0)
-                            return Ordering::greater;
+                            return std::partial_ordering::greater;
                         if (f_frac > 0)
-                            return Ordering::less;
+                            return std::partial_ordering::less;
 
-                        return Ordering::equal;
+                        return std::partial_ordering::equivalent;
                     }
 
-                    return Ordering::less;
+                    return std::partial_ordering::less;
                 }
 
                 if (f < 0)
-                    return Ordering::greater;
+                    return std::partial_ordering::greater;
 
-                return Ordering::unordered;
+                return std::partial_ordering::unordered;
             }
         }
     }
@@ -128,7 +102,7 @@ namespace Robust
         }
         else if constexpr (a_is_int != b_is_int)
         {
-            return impl::compare_int_float_three_way(a, b) == Ordering::equal;
+            return impl::compare_int_float_three_way(a, b) == 0;
         }
         else // a_is_int && b_is_int
         {
@@ -168,7 +142,7 @@ namespace Robust
         }
         else if constexpr (a_is_int != b_is_int)
         {
-            return impl::compare_int_float_three_way(a, b) == Ordering::less;
+            return impl::compare_int_float_three_way(a, b) < 0;
         }
         else // a_is_int && b_is_int
         {
@@ -207,7 +181,7 @@ namespace Robust
 
 
     template <typename A, typename B>
-    [[nodiscard]] constexpr Ordering compare_three_way(A a, B b)
+    [[nodiscard]] constexpr auto compare_three_way(A a, B b) -> std::conditional_t<std::is_floating_point_v<A> || std::is_floating_point_v<B>, std::partial_ordering, std::strong_ordering>
     {
         static_assert(std::is_arithmetic_v<A> && std::is_arithmetic_v<B>, "Parameters must be arithmetic.");
 
@@ -218,17 +192,19 @@ namespace Robust
         {
             return impl::compare_int_float_three_way(a, b);
         }
+        else if constexpr (!a_is_int && !b_is_int)
+        {
+            return a <=> b;
+        }
         else // a_is_int && b_is_int
         {
-            // This looks silly to me.
+            // This looks silly.
             if (less(a, b))
-                return Ordering::less;
-            if (greater(a, b))
-                return Ordering::greater;
-            if (equal(a, b))
-                return Ordering::equal;
-
-            return Ordering::unordered;
+                return std::strong_ordering::less;
+            else if (greater(a, b))
+                return std::strong_ordering::greater;
+            else // equal(a, b)
+                return std::strong_ordering::equal;
         }
     }
 
@@ -250,9 +226,9 @@ namespace Robust
 
 
     // Attempts to convert `value` to type `A`. Throws if it's not represesntable as `A`.
-    // Usage `Robust::safe_cast<A>(value)`.
+    // Usage `Robust::cast<A>(value)`.
     template <typename A, Meta::deduce..., typename B>
-    [[nodiscard]] constexpr A safe_cast(B value)
+    [[nodiscard]] constexpr A cast(B value)
     {
         static_assert(std::is_arithmetic_v<A> && std::is_arithmetic_v<B>, "Parameters must be arithmetic.");
         A result = value;
