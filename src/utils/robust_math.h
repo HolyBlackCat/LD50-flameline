@@ -20,6 +20,9 @@
 
 namespace Robust
 {
+    template <typename T> concept arithmetic = std::is_arithmetic_v<T>;
+
+
     namespace impl
     {
         // Compares an integral and a floating-point value.
@@ -27,12 +30,12 @@ namespace Robust
         // Follows a so-called 'partial ordering': for some pairs of values you get a special 'undefined' result (i.e. for NaNs compared with any number).
         // See following thread for the explanation of the algorithm and for alternative implementations:
         //   https://stackoverflow.com/questions/58734034/how-to-properly-compare-an-integer-and-a-floating-point-value
-        template <typename I, typename F>
+        template <arithmetic I, arithmetic F>
         [[nodiscard]] std::partial_ordering compare_int_float_three_way(I i, F f)
         {
             if constexpr (std::is_integral_v<F> && std::is_floating_point_v<I>)
             {
-                return compare_int_float_three_way(f, i);
+                return 0 <=> compare_int_float_three_way(f, i);
             }
             else
             {
@@ -87,12 +90,9 @@ namespace Robust
         }
     }
 
-
-    template <typename A, typename B>
+    template <arithmetic A, arithmetic B>
     [[nodiscard]] constexpr bool equal(A a, B b)
     {
-        static_assert(std::is_arithmetic_v<A> && std::is_arithmetic_v<B>, "Parameters must be arithmetic.");
-
         constexpr bool a_is_int = std::is_integral_v<A>;
         constexpr bool b_is_int = std::is_integral_v<B>;
 
@@ -118,21 +118,16 @@ namespace Robust
         }
     }
 
-    template <typename A, typename B>
+    template <arithmetic A, arithmetic B>
     [[nodiscard]] constexpr bool not_equal(A a, B b)
     {
-        // We could remove the `static_assert`, but then the error messages would get longer.
-        // Also, in theory, ADL could kick in if a class is passed.
-        static_assert(std::is_arithmetic_v<A> && std::is_arithmetic_v<B>, "Parameters must be arithmetic.");
         return !equal(a, b);
     }
 
 
-    template <typename A, typename B>
+    template <arithmetic A, arithmetic B>
     [[nodiscard]] constexpr bool less(A a, B b)
     {
-        static_assert(std::is_arithmetic_v<A> && std::is_arithmetic_v<B>, "Parameters must be arithmetic.");
-
         constexpr bool a_is_int = std::is_integral_v<A>;
         constexpr bool b_is_int = std::is_integral_v<B>;
 
@@ -158,33 +153,28 @@ namespace Robust
         }
     }
 
-    template <typename A, typename B>
+    template <arithmetic A, arithmetic B>
     [[nodiscard]] constexpr bool greater(A a, B b)
     {
-        static_assert(std::is_arithmetic_v<A> && std::is_arithmetic_v<B>, "Parameters must be arithmetic.");
         return less(b, a);
     }
 
-    template <typename A, typename B>
+    template <arithmetic A, arithmetic B>
     [[nodiscard]] constexpr bool less_eq(A a, B b)
     {
-        static_assert(std::is_arithmetic_v<A> && std::is_arithmetic_v<B>, "Parameters must be arithmetic.");
         return !less(b, a);
     }
 
-    template <typename A, typename B>
+    template <arithmetic A, arithmetic B>
     [[nodiscard]] constexpr bool greater_eq(A a, B b)
     {
-        static_assert(std::is_arithmetic_v<A> && std::is_arithmetic_v<B>, "Parameters must be arithmetic.");
         return !less(a, b);
     }
 
 
-    template <typename A, typename B>
+    template <arithmetic A, arithmetic B>
     [[nodiscard]] constexpr auto compare_three_way(A a, B b) -> std::conditional_t<std::is_floating_point_v<A> || std::is_floating_point_v<B>, std::partial_ordering, std::strong_ordering>
     {
-        static_assert(std::is_arithmetic_v<A> && std::is_arithmetic_v<B>, "Parameters must be arithmetic.");
-
         constexpr bool a_is_int = std::is_integral_v<A>;
         constexpr bool b_is_int = std::is_integral_v<B>;
 
@@ -209,16 +199,42 @@ namespace Robust
     }
 
 
+    // A helper to quickly peform comparisons.
+    // Example: `Robust::compare(x) <= x` expands to `Robust::less_eq(x, y)`.
+    template <arithmetic T>
+    class [[nodiscard]] compare
+    {
+        T value;
+
+      public:
+        constexpr compare(T value) : value(value) {}
+        compare(const compare &) = delete;
+        compare &operator=(const compare &) = delete;
+
+        // No `!=` needed since C++20.
+        // We manually spell all relational operators because currently the 3-way integral comparison is implemented suboptimally.
+        [[nodiscard]] constexpr friend bool operator==(compare &&c, arithmetic auto other) {return equal     (c.value, other);}
+        [[nodiscard]] constexpr friend bool operator< (compare &&c, arithmetic auto other) {return less      (c.value, other);}
+        [[nodiscard]] constexpr friend bool operator> (compare &&c, arithmetic auto other) {return greater   (c.value, other);}
+        [[nodiscard]] constexpr friend bool operator<=(compare &&c, arithmetic auto other) {return less_eq   (c.value, other);}
+        [[nodiscard]] constexpr friend bool operator>=(compare &&c, arithmetic auto other) {return greater_eq(c.value, other);}
+        [[nodiscard]] constexpr friend bool operator==(arithmetic auto other, compare &&c) {return equal     (other, c.value);}
+        [[nodiscard]] constexpr friend bool operator< (arithmetic auto other, compare &&c) {return less      (other, c.value);}
+        [[nodiscard]] constexpr friend bool operator> (arithmetic auto other, compare &&c) {return greater   (other, c.value);}
+        [[nodiscard]] constexpr friend bool operator<=(arithmetic auto other, compare &&c) {return less_eq   (other, c.value);}
+        [[nodiscard]] constexpr friend bool operator>=(arithmetic auto other, compare &&c) {return greater_eq(other, c.value);}
+    };
+
+
     // Returns true if `value` can be represented as `A`.
-    template <typename A, Meta::deduce..., typename B>
+    template <arithmetic A, Meta::deduce..., arithmetic B>
     [[nodiscard]] constexpr bool representable_as(B value)
     {
-        static_assert(std::is_arithmetic_v<A> && std::is_arithmetic_v<B>, "Parameters must be arithmetic.");
         return equal(value, A(value));
     }
 
     // Returns true if `value` can not be represented as `A`.
-    template <typename A, Meta::deduce..., typename B>
+    template <arithmetic A, Meta::deduce..., arithmetic B>
     [[nodiscard]] constexpr bool not_representable_as(B value)
     {
         return !representable_as<A>(value);
@@ -227,10 +243,9 @@ namespace Robust
 
     // Attempts to convert `value` to type `A`. Throws if it's not represesntable as `A`.
     // Usage `Robust::cast<A>(value)`.
-    template <typename A, Meta::deduce..., typename B>
+    template <arithmetic A, Meta::deduce..., arithmetic B>
     [[nodiscard]] constexpr A cast(B value)
     {
-        static_assert(std::is_arithmetic_v<A> && std::is_arithmetic_v<B>, "Parameters must be arithmetic.");
         A result = value;
         if (not_equal(result, value))
             throw std::runtime_error("The value can't be represented by the specified type.");
@@ -239,10 +254,9 @@ namespace Robust
 
     // Does `dst = src`.
     // If the value of `src` couldn't be represented by `dst` exactly, returns `true`.
-    template <Meta::deduce..., typename A, typename B>
+    template <Meta::deduce..., arithmetic A, arithmetic B>
     [[nodiscard]] constexpr bool conversion_fails(A src, B &dst)
     {
-        static_assert(std::is_arithmetic_v<A> && std::is_arithmetic_v<B>, "Parameters must be arithmetic.");
         dst = src;
         if constexpr (std::is_same_v<A, B>)
             return false;
@@ -376,7 +390,7 @@ namespace Robust
           public:
             constexpr weakly_typed_wrapper(value obj) : obj(obj) {}
 
-            template <typename U>
+            template <integral_non_bool U>
             constexpr operator value<U>() const
             {
                 return obj.cast_to<U>();
@@ -396,7 +410,7 @@ namespace Robust
         [[nodiscard]] constexpr T get_value_or_throw() const
         {
             if (invalid)
-                throw std::runtime_error("An invalid `Robust::value`.");
+                throw std::runtime_error("A result of an arithmetic expression is out of range.");
             return val;
         }
         [[nodiscard]] constexpr T get_value_even_if_invalid() const
@@ -508,7 +522,7 @@ namespace Robust
           public:
             constexpr constant() {}
 
-            template <typename T>
+            template <integral_non_bool T>
             constexpr operator value<T>() const
             {
                 // Not sure why it doesn't work without specifying the template parameter. A Clang bug?
