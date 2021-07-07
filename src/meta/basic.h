@@ -16,6 +16,12 @@ namespace Meta
     template <typename T> using identity_t = T;
 
 
+    // Some concepts.
+
+    template <typename T> concept cv_unqualified = std::is_same_v<std::remove_cv_t<T>, T>;
+    template <typename T> concept cvref_unqualified = std::is_same_v<std::remove_cvref_t<T>, T>;
+
+
     // Dependent values and types, good for `static_assert`s and SFINAE.
 
     namespace impl
