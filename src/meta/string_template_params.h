@@ -18,7 +18,7 @@ namespace Meta
     namespace impl
     {
         // Does nothing, but causes an error if called from a `consteval` function.
-        inline void expectedNullTerminatedArray() {}
+        inline void ExpectedNullTerminatedArray() {}
     }
 
     // A string that can be used as a template parameter.
@@ -38,7 +38,7 @@ namespace Meta
         consteval ConstString(const char (&new_str)[N])
         {
             if (new_str[N-1] != '\0')
-                impl::expectedNullTerminatedArray();
+                impl::ExpectedNullTerminatedArray();
             std::copy_n(new_str, size, str);
         }
     };
