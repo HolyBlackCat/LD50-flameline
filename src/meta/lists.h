@@ -10,6 +10,11 @@ namespace Meta
 
     namespace impl
     {
+        // Generates a list from the arguments of an artibrary template.
+        template <typename T> struct list_from {};
+        template <template <typename...> typename T, typename ...P> struct list_from<T<P...>> {using type = type_list<P...>;};
+        template <template <auto...> typename T, auto ...P> struct list_from<T<P...>> {using type = value_list<P...>;};
+
         // Substitute elements of a list into a template.
         template <template <typename...> typename T, typename L> struct list_apply_types {};
         template <template <typename...> typename T, typename ...P> struct list_apply_types<T, type_list<P...>> {using type = T<P...>;};
@@ -67,16 +72,46 @@ namespace Meta
         template <typename ...A, typename B> struct list_is_subset_of<type_list<A...>, B> : std::bool_constant<(list_contains_type<B, A>::value && ...)> {};
         template <auto ...A, typename B> struct list_is_subset_of<value_list<A...>, B> : std::bool_constant<(list_contains_value<B, A>::value && ...)> {};
 
-        // Return index of the first occurence of an element in a list, abort if not found.
-        template <typename L, typename T> struct list_type_index {};
-        template <typename T> struct list_type_index<type_list<>, T> {static_assert(value<false, T>, "No such type in the list.");};
-        template <typename F, typename ...P, typename T> struct list_type_index<type_list<F, P...>, T> {static constexpr std::size_t value = 1+list_type_index<type_list<P...>,T>::value;};
-        template <typename F, typename ...P> struct list_type_index<type_list<F, P...>, F> {static constexpr std::size_t value = 0;};
+        // Return index of the first occurence of an element in a list, or the size of the list if not found.
+        template <typename L, typename T> struct list_find_type {};
+        template <typename T>
+        struct list_find_type<type_list<>, T> : std::integral_constant<std::size_t, 0>
+        {
+            static constexpr bool found = false;
+            using remaining = Meta::type_list<>;
+        };
+        template <typename F, typename ...P, typename T>
+        struct list_find_type<type_list<F, P...>, T> : std::integral_constant<std::size_t, 1 + list_find_type<type_list<P...>,T>::value>
+        {
+            static constexpr bool found = list_find_type::value <=/*sic*/ sizeof...(P);
+            using remaining = typename list_find_type<type_list<P...>,T>::remaining;
+        };
+        template <typename F, typename ...P>
+        struct list_find_type<type_list<F, P...>, F> : std::integral_constant<std::size_t, 0>
+        {
+            static constexpr bool found = true;
+            using remaining = Meta::type_list<P...>;
+        };
 
-        template <typename L, auto V> struct list_value_index {};
-        template <auto V> struct list_value_index<value_list<>, V> {static_assert(value<false, value_tag<V>>, "No such type in the list.");};
-        template <auto F, auto ...P, auto V> struct list_value_index<value_list<F, P...>, V> {static constexpr std::size_t value = 1+list_value_index<value_list<P...>,V>::value;};
-        template <auto F, auto ...P> struct list_value_index<value_list<F, P...>, F> {static constexpr std::size_t value = 0;};
+        template <typename L, auto V> struct list_find_value {};
+        template <auto V>
+        struct list_find_value<value_list<>, V> : std::integral_constant<std::size_t, 0>
+        {
+            static constexpr bool found = false;
+            using remaining = Meta::value_list<>;
+        };
+        template <auto F, auto ...P, auto V>
+        struct list_find_value<value_list<F, P...>, V> : std::integral_constant<std::size_t, 1 + list_find_value<value_list<P...>,V>::value>
+        {
+            static constexpr bool found = list_find_value::value <=/*sic*/ sizeof...(P);
+            using remaining = typename list_find_value<value_list<P...>,V>::remaining;
+        };
+        template <auto F, auto ...P>
+        struct list_find_value<value_list<F, P...>, F> : std::integral_constant<std::size_t, 0>
+        {
+            static constexpr bool found = true;
+            using remaining = Meta::value_list<P...>;
+        };
 
         // For each element of A, append it to B if it's not already in B.
         template <typename A, typename B> struct list_copy_uniq {};
@@ -97,7 +132,10 @@ namespace Meta
         template <auto ...P> struct list_uniq<value_list<P...>> {using type = typename list_copy_uniq<value_list<P...>, value_list<>>::type;};
     }
 
-    // Substitutes elements of a list into a type template;
+    // Generates a list from the arguments of an artibrary template.
+    template <typename T> using list_from = typename impl::list_from<T>::type;
+
+    // Substitutes elements of a list into a type template.
     template <template <typename...> typename T, typename L> using list_apply_types = typename impl::list_apply_types<T, L>::type;
     template <template <auto...> typename T, typename L> using list_apply_values = typename impl::list_apply_values<T, L>::type;
 
@@ -118,9 +156,12 @@ namespace Meta
     // Check if a list is a subset of a different list.
     template <typename A, typename B> inline constexpr bool list_is_subset_of = impl::list_is_subset_of<A, B>::value;
 
-    // Return the index of the first occurence of the element in the list.
-    template <typename L, typename T> inline constexpr std::size_t list_type_index = impl::list_type_index<L, T>::value;
-    template <typename L, auto V> inline constexpr std::size_t list_value_index = impl::list_value_index<L, V>::value;
+    // Those types have following members:
+    // - `std::size_t value` - the element index, or the list size if not found.
+    // - `bool found` - whether the element was found or not.
+    // - `using remaining` - the list of elements after the one that was found, or an empty list if not found.
+    template <typename L, typename T> using list_find_type = impl::list_find_type<L, T>;
+    template <typename L, auto V> using list_find_value = impl::list_find_value<L, V>;
 
     // Add all elements from `A` that don't exist in `B` to `B`.
     template <typename A, typename B> using list_copy_uniq = typename impl::list_copy_uniq<A, B>::type;
