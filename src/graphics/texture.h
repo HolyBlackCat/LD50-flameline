@@ -7,8 +7,8 @@
 
 #include "graphics/image.h"
 #include "macros/finally.h"
+#include "utils/indexed_set.h"
 #include "utils/mat.h"
-#include "utils/resource_allocator.h"
 
 namespace Graphics
 {
@@ -78,11 +78,11 @@ namespace Graphics
 
     class TexUnit
     {
-        using res_alloc_t = ResourceAllocator<int>;
+        using index_alloc_t = IndexedSet<int>;
 
-        static res_alloc_t &Allocator() // Wrapped into a function to prevent the static init order fiasco.
+        static index_alloc_t &Allocator() // Wrapped into a function to prevent the static init order fiasco.
         {
-            static res_alloc_t ret(64);
+            static index_alloc_t ret(64);
             return ret;
         }
 
@@ -100,14 +100,14 @@ namespace Graphics
         TexUnit()
         {
             // We need to create the allocator even in the null constructor to dodge the destruction order fiasco.
-            Allocator();
+            (void)Allocator();
         }
 
         TexUnit(decltype(nullptr))
         {
-            if (Allocator().RemainingCapacity() == 0)
+            if (Allocator().IsFull())
                 Program::Error("No free texture units.");
-            data.index = Allocator().Allocate();
+            data.index = Allocator().InsertAny();
         }
         explicit TexUnit(GLuint handle) : TexUnit(nullptr)
         {
@@ -128,7 +128,7 @@ namespace Graphics
         ~TexUnit()
         {
             if (*this)
-                Allocator().Free(data.index);
+                Allocator().EraseUnordered(data.index);
         }
 
         explicit operator bool() const
