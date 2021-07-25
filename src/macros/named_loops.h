@@ -33,13 +33,16 @@
     /* being used outside of the loop with the matching name. */\
     if ([[maybe_unused]] constexpr bool _namedloop_InvalidBreakOrContinue = false) \
     { \
-        [[maybe_unused]] MA_CAT(_namedloop_break_,name): break; \
-        [[maybe_unused]] MA_CAT(_namedloop_continue_,name): continue; \
+        [[maybe_unused]] LOOP_NAME_impl_cat(_namedloop_break_,name): break; \
+        [[maybe_unused]] LOOP_NAME_impl_cat(_namedloop_continue_,name): continue; \
     } \
     else
 
-#define BREAK(name) goto MA_CAT(_namedloop_break_,name)
-#define CONTINUE(name) goto MA_CAT(_namedloop_continue_,name)
+#define LOOP_NAME_impl_cat(x, y) LOOP_NAME_impl_cat_(x, y)
+#define LOOP_NAME_impl_cat_(x, y) x##y
+
+#define BREAK(name) goto LOOP_NAME_impl_cat(_namedloop_break_,name)
+#define CONTINUE(name) goto LOOP_NAME_impl_cat(_namedloop_continue_,name)
 
 #ifdef __clang__
 #pragma clang diagnostic push
