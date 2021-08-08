@@ -7,8 +7,8 @@
 
 #include "graphics/image.h"
 #include "macros/finally.h"
-#include "utils/indexed_set.h"
 #include "utils/mat.h"
+#include "utils/sparse_set.h"
 
 namespace Graphics
 {
@@ -78,7 +78,7 @@ namespace Graphics
 
     class TexUnit
     {
-        using index_alloc_t = IndexedSet<int>;
+        using index_alloc_t = SparseSet<int>;
 
         static index_alloc_t &Allocator() // Wrapped into a function to prevent the static init order fiasco.
         {

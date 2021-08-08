@@ -17,7 +17,7 @@
 // Also lets you find element indices in O(1), or check if they are present or not.
 // Under the hood, uses two vectors of the specified capacity.
 template <typename T = int>
-class IndexedSet
+class SparseSet
 {
     static_assert(std::is_integral_v<T>, "The template parameter must be integral.");
   public:
@@ -33,9 +33,9 @@ class IndexedSet
     std::vector<elem_t> values, indices;
 
   public:
-    constexpr IndexedSet() {}
+    constexpr SparseSet() {}
 
-    IndexedSet(elem_t new_capacity)
+    SparseSet(elem_t new_capacity)
     {
         Reserve(new_capacity);
     }
@@ -94,7 +94,7 @@ class IndexedSet
     [[nodiscard]] elem_t InsertAny()
     {
         if (IsFull())
-            throw std::runtime_error("Attempt to insert into a full `IndexedSet`.");
+            throw std::runtime_error("Attempt to insert into a full `SparseSet`.");
 
         return values[pos.value++];
     }
@@ -168,7 +168,7 @@ class IndexedSet
     [[nodiscard]] elem_t GetElem(elem_t index) const
     {
         if (index < 0 || index >= Capacity())
-            Program::Error("Out of range index for an `IndexedSet` element.");
+            Program::Error("Out of range index for an `SparseSet` element.");
         return values[index];
     }
 
@@ -178,7 +178,7 @@ class IndexedSet
     elem_t GetElemIndex(elem_t elem) const
     {
         if (elem < 0 || elem >= Capacity())
-            Program::Error("Out of range elem for an `IndexedSet` index search.");
+            Program::Error("Out of range elem for an `SparseSet` index search.");
         return indices[elem];
     }
 
@@ -203,6 +203,6 @@ class IndexedSet
                     return false;
             }
             return true;
-        }(), "Consistency check failed for an `IndexedSet`.");
+        }(), "Consistency check failed for an `SparseSet`.");
     }
 };
