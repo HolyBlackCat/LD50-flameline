@@ -92,10 +92,6 @@ namespace SimpleIterator
                     return this == &other;
                 }
             }
-            bool operator!=(const Iter &other) const
-            {
-                return !operator==(other);
-            }
         };
     }
 
@@ -127,56 +123,4 @@ namespace SimpleIterator
     };
     template <typename State> Forward(const State &) -> Forward<State>;
     template <typename State> Forward(State &&) -> Forward<State>;
-
-
-    // Equivalent to `Input(func)`.
-    // This function is there so that you don't have to think about which iterator type to pick.
-    template <Meta::deduce..., typename F>
-    [[nodiscard]] auto Make(F &&func)
-    {
-        return Input(std::forward<F>(func));
-    }
-
-    // Constructs a forward iterator with the value type matching the type of first parameter (`remove_cvref_t<V>`).
-    // `func` is `void func(remove_cvref_t<V> &)`, it's used to modify the value when the iterator is incremented.
-    // Types of both `state` and `func` don't have to be default-constructible (default-constructed iterators are
-    // non-dereferencable and non-incrementable).
-    // `==` is overloaded for the resulting iterator to compare the stored values (and default-constructed iterators
-    // compare equal to each other, and unequal to everything else).
-    template <Meta::deduce..., typename V, typename F>
-    [[nodiscard]] auto Make(V &&value, F &&func)
-    {
-        struct State
-        {
-            struct Data
-            {
-                std::remove_cvref_t<V> value;
-                std::remove_cvref_t<F> func;
-
-                Data(V &&value, F &&func) : value(std::forward<V>(value)), func(std::forward<F>(func)) {}
-
-                bool operator==(const Data &other) const
-                {
-                    return value == other.value;
-                }
-            };
-            std::optional<Data> data;
-
-            const auto &operator()(std::false_type) const
-            {
-                return data->value;
-            }
-            void operator()(std::true_type)
-            {
-                static_assert(std::is_void_v<decltype(data->func(data->value))>, "The callback shouldn't return anything.");
-                data->func(data->value);
-            }
-
-            bool operator==(const State &other) const
-            {
-                return data == other.data;
-            }
-        };
-        return Forward<State>(typename State::Data(std::forward<V>(value), std::forward<F>(func)));
-    }
 }
