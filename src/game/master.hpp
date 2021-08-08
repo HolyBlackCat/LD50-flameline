@@ -11,7 +11,6 @@
 #include <vector>
 
 #include "audio/complete.h"
-#include "entities/base.h"
 #include "gameutils/adaptive_viewport.h"
 #include "gameutils/class_sequence.h"
 #include "gameutils/fps_counter.h"
