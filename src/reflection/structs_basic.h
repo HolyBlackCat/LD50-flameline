@@ -434,7 +434,7 @@ namespace Refl
         template <typename T> [[nodiscard]] std::size_t CombinedBaseIndex(const char *name)
         {
             // Concatenates `bases<T>` and `virtual_bases<T>` and returns the index in the combined list.
-            return Utils::GetStringIndex<impl::StringList_Classes<Meta::list_cat<bases<T>, virtual_bases<T>>>>(name);
+            return Utils::GetStringIndex<impl::StringList_Classes<combined_bases<T>>>(name);
         }
 
         template <typename T> [[nodiscard]] std::size_t MemberIndex      (const std::string &name) {return MemberIndex      <T>(name.c_str());}
