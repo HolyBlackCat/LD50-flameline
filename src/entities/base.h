@@ -1,1027 +1,1107 @@
 #pragma once
 
+#include <algorithm>
+#include <atomic>
 #include <concepts>
 #include <cstddef>
-#include <functional>
+#include <cstdint>
+#include <limits>
 #include <memory>
-#include <new>
-#include <tuple>
 #include <type_traits>
-#include <typeindex>
-#include <typeinfo>
-#include <unordered_map>
-#include <utility>
-#include <vector>
 
-#include "macros/finally.h"
 #include "meta/lists.h"
 #include "meta/misc.h"
 #include "meta/type_info.h"
 #include "program/errors.h"
-#include "utils/alignment.h"
+#include "reflection/full.h"
+#include "strings/format.h"
+#include "utils/robust_math.h"
 #include "utils/simple_iterator.h"
+#include "utils/sparse_set.h"
 
 namespace Ent
 {
-    // A common base class for components.
-    struct Component {};
-
-    // The maximum alignment that components can get. Overaligned components trigger a static assertion.
-    inline constexpr std::size_t component_alignment = __STDCPP_DEFAULT_NEW_ALIGNMENT__;
-
-    // A concept for components.
-    // A component is a class inheriting from `Component`.
-    // It can't be overaligned, and can't have cv-qualifiers.
-    // The `Component` base must be unambiguous (because if it is, then EBO probably doesn't apply, and you waste some storage).
-    // Note that `std::derived` automatically makes sure the base is unambiguous.
-    template <typename T>
-    concept ValidComponent =
-        std::derived_from<T, Component> && !std::is_same_v<T, Component> &&
-        !std::is_const_v<T> && !std::is_volatile_v<T> && alignof(T) <= component_alignment;
+    // Some functions below use `__attribute__((const))`.
+    // It's a hint to the optimizer. It means that the return value depends only on the parameters, and there are no side effects.
 
 
     namespace impl
     {
-        // Returns a pointer to a tuple element with specified `std::type_index`, null if no such element.
-        // The tuple is supposed to contain unique types only.
-        template <typename ...P>
-        const void *GetTupleElemByTypeIndex(const std::tuple<P...> &tuple, std::type_index type_index) noexcept
+        // The allocation/deallocation functions receive this tag, to reduce the chance of accidentally calling them.
+        struct MemoryManagementTag
         {
-            using tuple_t = std::tuple<P...>;
-            const void *ret = nullptr;
-            Meta::cexpr_any<sizeof...(P)>([&](auto index)
+            explicit MemoryManagementTag() {}
+        };
+
+
+        template <typename Registry> struct TypeRegistrationHelper;
+
+        // Assigns indices to types.
+        // `StateT` is maintained as a singleton.
+        // If `StateT state; state.RegisterType<T>();` is well-formed, it will be called for each registered type.
+        template <typename StateT>
+        class TypeRegistry
+        {
+            friend TypeRegistrationHelper<TypeRegistry>;
+
+            static std::size_t &MutableCounter() {static std::size_t ret = 0; return ret;}
+
+            template <typename T>
+            static std::size_t &MutableIndex() {static std::size_t ret = -1; return ret;}
+
+            static StateT &MutableState()
             {
-                constexpr auto i = index.value;
-                using member_t = std::tuple_element_t<i, tuple_t>;
-                if (typeid(member_t) != type_index)
-                    return false;
-                ret = &std::get<i>(tuple);
-                return true;
-            });
-            return ret;
-        }
+                static StateT ret{};
+                return ret;
+            }
+
+          public:
+            TypeRegistry() = delete;
+            ~TypeRegistry() = delete;
+
+            // Returns the singleton of the user-provided type, which may or may not hold some useful state.
+            [[nodiscard]] static const StateT &State() {return MutableState();}
+
+            // The amount of registered types.
+            [[nodiscard]] static std::size_t Count() {return MutableCounter();}
+
+            // The index of a registered type, or `-1` if not registered.
+            template <typename T>
+            [[nodiscard]] static std::size_t Index() {return MutableIndex<T>();}
+        };
+
+        // Helps to register types in a `TypeRegistry`.
+        template <typename Registry>
+        struct TypeRegistrationHelper
+        {
+            // Touching this registers a type.
+            template <typename T>
+            inline static const std::nullptr_t register_type = []{
+                Registry::template MutableIndex<T>() = Registry::MutableCounter()++;
+                // Run the optional user-provided registration code.
+                if constexpr (requires{Registry::MutableState().template RegisterType<T>();})
+                    Registry::MutableState().template RegisterType<T>();
+                return nullptr;
+            }();
+        };
     }
 
-    // A common abstract base for entities.
-    class Entity
-    {
-        /* Explanation on `__attribute__((const))`:
-         * It's is a hint to the optimizer. It means that the return value depends only on the parameters,
-         * and there are no side effects. Since the functions below merely return `this + offset` or booleans, it should be allowed.
-         * GCC doesn't seem to be clever enough to utilize this attribute though, but Clang appears to use it.
-         */
+    // A type that could be a valid component, but isn't necessarily a component.
+    // Can be checked even if the type is incomplete.
+    template <typename T>
+    concept PossibleComponentType = Meta::cv_unqualified<T> && std::is_class_v<T>;
 
-        // Returns a pointer to a component of this entity with the specified type index, or null if no such component.
-        __attribute__((const))
-        virtual const void *GetComponentPtr(std::type_index index) const noexcept = 0;
+    // Specifies which components, if any, a component implies. See `ComponentType` below.
+    template <PossibleComponentType ...C>
+    struct Component final
+    {
+        Component() = delete;
+        ~Component() = delete;
+
+        using implies = Meta::type_list<C...>;
+    };
+
+    // A component that is not an entity.
+    // See `ComponentType` below.
+    template <typename T>
+    concept ComponentNonEntityType = PossibleComponentType<T> && Meta::specialization_of<typename T::component, Component>;
+
+    // A component that is an entity.
+    // See `ComponentType` below.
+    template <typename T>
+    concept ComponentEntityType = PossibleComponentType<T> && Meta::specialization_of<typename T::entity, Component>;
+
+    // A type that is a component.
+    // Component classes are required to have `using {component,entity} = Ent::Component<...>;`.
+    // The ONLY difference between `component` and `entity` is that entities can be created as entities.
+    template <typename T>
+    concept ComponentType = (ComponentNonEntityType<T> || ComponentEntityType<T>) && !(ComponentNonEntityType<T> && ComponentEntityType<T>);
+
+
+    // The default tag.
+    // Entities and controllers are tagged, but components are not.
+    // The tags are the primary customization point.
+    // Things with different tags are completely isolated from each other.
+    struct DefaultTag
+    {
+        // An index type for entities. Should probably be unsigned.
+        // Limits the max number of entities.
+        using entity_index_t = std::uint32_t;
+
+        // An generation type for entities. Should probably be unsigned.
+        // Using a small type increases the risks of entity ID collisions.
+        using entity_generation_t = std::uint64_t;
+
+        // Those components are added to all entities.
+        using common_components_t = Meta::type_list<>;
+
+        // The entity base class inherits from this.
+        // Anything in this class will be accessible to the user.
+        struct EntityBase {};
+
+        // The specific entity types are wrapped in this template.
+        // This struct must always inherit from its first template parameter, which will be derived from `EntityBase`.
+        // This struct must always inherit the constructors.
+        // The base will also contain following members:
+        //     using primary_component_t = C0;
+        //     using component_types_t = Meta::type_list<C...>;
+        //     std::tuple<C...> components;
+        template <typename Base>
+        struct EntityAdditions : Base
+        {
+            using Base::Base;
+        };
+
+
+        // A fraction describing the capacity growth factor.
+        static constexpr std::size_t capacity_growth_num = 3, capacity_growth_den = 2;
+
+
+        // A customizable allocation function.
+        template <typename T, Meta::deduce..., typename ...P>
+        [[nodiscard]] static T *Allocate(impl::MemoryManagementTag, P &&... params)
+        {
+            return new T(std::forward<P>(params)...);
+        }
+
+        // A customizable deallocation function.
+        // The type this receives can be a base class of the actual allocated type.
+        template <Meta::deduce..., typename T>
+        static void Free(impl::MemoryManagementTag, T *memory) noexcept
+        {
+            delete memory;
+        }
+    };
+
+    // A concept for tags.
+    template <typename T>
+    concept TagType = Meta::cv_unqualified<T> && std::is_base_of_v<DefaultTag, T>;
+
+
+    namespace impl
+    {
+        // A state for `TypeRegistry`.
+        template <TagType Tag> struct RegistryState_Components {};
+    }
+
+    // Assigns indices to components.
+    template <TagType Tag>
+    using ComponentRegistry = impl::TypeRegistry<impl::RegistryState_Components<Tag>>;
+
+
+    // Entity controller. See the definition below.
+    template <TagType Tag>
+    class Controller;
+
+    // A base class for entities.
+    template <TagType Tag>
+    class Entity : public Tag::EntityBase
+    {
+        __attribute__((const)) virtual int GetComponentCountLow(std::size_t index) const noexcept = 0;
+        __attribute__((const)) virtual const void *GetComponentPtrLow(std::size_t index) const noexcept = 0;
+
+        template <ComponentType C>
+        __attribute__((const)) int GetComponentCount() const noexcept
+        {
+            return GetComponentCountLow(ComponentRegistry<Tag>::template Index<C>());
+        }
+
+        template <ComponentType C>
+        __attribute__((const)) const C *GetComponentPtr() const noexcept
+        {
+            return reinterpret_cast<const C *>(GetComponentPtrLow(ComponentRegistry<Tag>::template Index<C>()));
+        }
+
+      protected:
+        // The unique entity index. Indices of destroyed entities can be reused.
+        typename Tag::entity_index_t entity_index = 0;
+
+        // Destroy the entity. Automatically remove it from all lists, etc.
+        virtual void Destroy(Controller<Tag> &controller) noexcept = 0;
 
       public:
-        Entity() {}
+        constexpr Entity() {}
 
-        // Prevent assignment of references to entities.
+        // Non-copyable for safety.
         Entity(const Entity &) = delete;
         Entity &operator=(const Entity &) = delete;
 
         virtual ~Entity() = default;
 
-        // `has` and `get` should be decently optimized in release builds
-        // (due to the custom attribute on `GetComponentPtr`),
-        // so you shouldn't have to cache the results (at least in trivial cases).
-
         // Check if this entity has a specific component.
-        template <ValidComponent T>
-        [[nodiscard]] bool has() const
+        template <ComponentType C>
+        [[nodiscard]] bool has(bool unique = true) const
         {
-            return bool(GetComponentPtr(typeid(T)));
+            if (unique)
+                return bool(GetComponentPtr<C>()); // We do this instead of `GetComponentCount<C>() == 1` to hopefully help the optimizer.
+            else
+                return GetComponentCount<C>() > 0;
         }
 
         // Get component by type. Throws if no such component.
-        template <ValidComponent T>
-        [[nodiscard]] T &get()
+        template <ComponentType C>
+        [[nodiscard]] C &get()
         {
-            return const_cast<T &>(std::as_const(*this).get<T>());
+            return const_cast<C &>(std::as_const(*this).template get<C>());
         }
         // Get component by type. Throws if no such component.
-        template <ValidComponent T>
-        [[nodiscard]] const T &get() const
+        template <ComponentType C>
+        [[nodiscard]] const C &get() const
         {
-            const void *ret = GetComponentPtr(typeid(T));
+            const C *ret = GetComponentPtr<C>();
             if (!ret)
-                Program::Error(FMT("No component `{}` in this entity.", Meta::TypeName<T>()));
-            return *static_cast<const T *>(ret);
+                Program::Error(FMT("{} component `{}` in this entity.", GetComponentCount<C>() > 1 ? "Ambiguous" : "No", Meta::TypeName<C>()));
+            return *ret;
         }
 
         // Set component by type. Throws if no such component.
         // Returns a reference to this entity, to allow chaining.
-        template <ValidComponent T>
-        Entity &set(const T &value)
+        template <ComponentType C>
+        Entity &set(const C &value)
         {
-            get<T>() = value;
+            get<C>() = value;
             return *this;
         }
         // Set component by type. Throws if no such component.
         // Returns a reference to this entity, to allow chaining.
-        template <ValidComponent T>
-        Entity &set(T &&value)
+        template <ComponentType C>
+        Entity &set(C &&value)
         {
-            get<T>() = std::move(value);
+            // No perfect forwarding will happen here, because `ComponentType` rejects references and cv-qualifiers.
+            get<C>() = std::move(value);
             return *this;
         }
+
+        // Describes an entity type.
+        struct Desc
+        {
+            [[nodiscard]] __attribute__((const))
+            virtual bool HasComponent(std::size_t index, bool unique = true) const = 0;
+
+            template <ComponentType C>
+            [[nodiscard]] __attribute__((const))
+            bool HasComponent(bool unique = true) const
+            {
+                return HasComponent(ComponentRegistry<Tag>::template Index<C>(), unique);
+            }
+
+          protected:
+            ~Desc() {}
+        };
+        [[nodiscard]] virtual const Desc &Description() const = 0;
     };
 
 
     namespace impl
     {
-        // Base classes for `Requires` and `Implies`.
-        // See comments on `DirectlyRequiredComponents` for why we need them.
-        struct Requires_Base {};
-        struct Implies_Base {};
-        struct ConflictsWith_Base {};
+        // Inherits `Entity` and exposes some hidden properties.
+        template <TagType Tag>
+        class EntityHidden : public Entity<Tag>
+        {
+          public:
+            using Entity<Tag>::entity_index;
+            using Entity<Tag>::Destroy;
+        };
     }
 
-    // Inherit a component from this class to indicate which components it depends on.
-    // Attempt to create an entity with this component but without some of its dependencies
-    // will cause a compile-time error.
-    template <ValidComponent ...C>
-    struct Requires : impl::Requires_Base
+    // An abstract base class for entity lists.
+    // It seems we could make it not depend on the tag, but it would be less safe.
+    template <TagType Tag>
+    struct List
     {
-        using _component_requires = Meta::type_list<C...>;
+        List() {}
+
+        // Move-only, to prevent the user from copying those.
+        List(List &&) = default;
+        List &operator=(List &&) = default;
+
+        virtual ~List() {}
+
+        // This is called to increase capacity when needed.
+        virtual void IncreaseCapacity(std::size_t new_capacity) {(void)new_capacity;}
+
+        // Add an entity to the list. You don't need to support indices larger than the requested capacity.
+        virtual void Insert(Entity<Tag> &entity) = 0;
+        // Remove an entity from the list. You don't need to support indices larger than the requested capacity.
+        // Unlike `Insert` this can't throw.
+        virtual void Erase(Entity<Tag> &entity) noexcept = 0;
     };
 
-    // Inherit a component from this class to indicate which components it depends on.
-    // Adding this component to an entity will automatically add the dependencies.
-    template <ValidComponent ...C>
-    struct Implies : impl::Implies_Base
+    // A concept for list types derived from `List`.
+    template <typename T, typename Tag>
+    concept ListType = Meta::cv_unqualified<T> && std::derived_from<T, List<Tag>> && !std::is_abstract_v<T>;
+
+    // An implemenetation of `ListBase` based on a sparse set.
+    // NOTE: Deleting an element makes the pointers/iterators that were pointing to it point to the next element.
+    template <TagType Tag, bool Ordered>
+    class BasicSparseSet : public List<Tag>
     {
-        using _component_implies = Meta::type_list<C...>;
+        using index_t = typename Tag::entity_index_t;
+
+        std::vector<Entity<Tag> *> dense;
+        std::vector<index_t> sparse;
+
+        struct IterState
+        {
+            typename decltype(dense)::const_iterator vec_iter{};
+
+            bool operator==(const IterState &) const = default;
+
+            Entity<Tag> &operator()(std::false_type) const
+            {
+                return **vec_iter;
+            }
+
+            void operator()(std::true_type)
+            {
+                vec_iter++;
+            }
+        };
+
+      public:
+        void IncreaseCapacity(std::size_t new_capacity) override
+        {
+            sparse.resize(new_capacity, index_t(-1));
+        }
+
+        void Insert(Entity<Tag> &entity) override
+        {
+            auto entity_index = static_cast<impl::EntityHidden<Tag> &>(entity).entity_index;
+            ASSERT(Robust::less(entity_index, sparse.size()), "Internal error: Entity sparse set is too small.");
+            ASSERT(sparse[entity_index] == index_t(-1), "Internal error: Entity already exists in the sparse set.");
+            sparse[entity_index] = dense.size();
+            dense.push_back(&entity);
+        }
+
+        void Erase(Entity<Tag> &entity) noexcept override
+        {
+            auto entity_index = static_cast<impl::EntityHidden<Tag> &>(entity).entity_index;
+            ASSERT(Robust::less(entity_index, sparse.size()), "Internal error: Entity sparse set is too small.");
+            ASSERT(sparse[entity_index] != index_t(-1), "Internal error: Entity already exists in the sparse set.");
+            std::size_t dense_index = sparse[entity_index];
+            ASSERT(Robust::less(dense_index, dense.size()), "Internal error: Index in the sparse array in the entity sparse set is too small.");
+
+            if constexpr (Ordered)
+            {
+                sparse[entity_index] = index_t(-1);
+                dense.erase(dense.begin() + dense_index);
+                for (std::size_t i = dense_index; i < dense.size(); i++)
+                    sparse[static_cast<impl::EntityHidden<Tag> *>(dense[i])->entity_index] = i;
+            }
+            else
+            {
+                sparse[static_cast<impl::EntityHidden<Tag> *>(dense.back())->entity_index] = dense_index;
+                sparse[entity_index] = index_t(-1);
+                std::swap(dense[dense_index], dense.back());
+                dense.pop_back();
+            }
+
+            ASSERT(
+                sparse.size() - std::count(sparse.begin(), sparse.end(), index_t(-1)) == dense.size(),
+                "Internal error: Entity sparse set consistency check failed: Sparse and dense array sizes mismatch."
+            );
+            ASSERT(
+                std::all_of(dense.begin(), dense.end(), [&](Entity<Tag> *e)
+                {
+                    auto i = static_cast<impl::EntityHidden<Tag> *>(e)->entity_index;
+                    return i == static_cast<impl::EntityHidden<Tag> *>(dense[sparse[i]])->entity_index;
+                }),
+                "Internal error: Entity sparse set consistency check failed: Sparse and dense roundtrip failed."
+            );
+        }
+
+        // Return the current list size.
+        [[nodiscard]] std::size_t size() const
+        {
+            return dense.size();
+        }
+
+        [[nodiscard]] auto begin() const {return SimpleIterator::Forward(IterState{dense.begin()});}
+        [[nodiscard]] auto end  () const {return SimpleIterator::Forward(IterState{dense.end  ()});}
     };
 
-    // Inherit a component from this class to indicate which components it conflicts with.
-    // Using both of those components in the same entity will trigger a static assertion.
-    template <ValidComponent ...C>
-    struct ConflictsWith : impl::ConflictsWith_Base
+    template <TagType Tag> using SparseSetOrdered = BasicSparseSet<Tag, true>;
+    template <TagType Tag> using SparseSetUnordered = BasicSparseSet<Tag, false>;
+
+    // An implemenetation of `ListBase` that can only hold a single entity.
+    template <TagType Tag>
+    class Single : public List<Tag>
     {
-        using _component_conflicts = Meta::type_list<C...>;
+        Entity<Tag> *cur_entity = nullptr;
+
+      public:
+        // Add an entity to the list. You don't need to support indices larger than the requested capacity.
+        void Insert(Entity<Tag> &entity) override
+        {
+            if (cur_entity)
+                Program::Error("Expected at most one entity for this entity list.");
+            cur_entity = &entity;
+        }
+
+        // Remove an entity from the list. You don't need to support indices larger than the requested capacity.
+        void Erase(Entity<Tag> &entity) noexcept override
+        {
+            (void)entity;
+            ASSERT(cur_entity == &entity, "Internal error: Attempt to erase a wrong entity from a single-entity list.");
+            cur_entity = nullptr;
+        }
+
+
+        // Returns true if the entity exists.
+        [[nodiscard]] explicit operator bool() const
+        {
+            return bool(cur_entity);
+        }
+
+        // Returns the target entity, or throws if none.
+        [[nodiscard]] Entity<Tag> &operator*() const
+        {
+            if (!cur_entity)
+                Program::Error("A single-entity list contains no entitiy.");
+            return *cur_entity;
+        }
+
+        // Returns the target entity, or throws if none.
+        [[nodiscard]] Entity<Tag> *operator->() const
+        {
+            return &**this;
+        }
+
+        // Returns the target entity or null if none.
+        [[nodiscard]] Entity<Tag> *get() const
+        {
+            return cur_entity;
+        }
     };
 
 
     namespace impl
     {
-        // Implementation of an entity class inheriting from `Entity` and providing storage for components.
-
-
-        // The element-wise constructor of `SpecificEntity` uses this
-        // to initialize components that didn't get an initializer.
-        struct DefaultComponentInitializer
+        // The base class for entity categories.
+        template <TagType Tag>
+        struct CategoryBase
         {
-            template <typename T>
+            // Should return true if the list should contain this entity.
+            virtual bool ShouldContain(const typename Entity<Tag>::Desc &desc) const = 0;
+        };
+    }
+
+    // An abstract base for entity categories. Categories must be stateless.
+    // If `C` is not empty, a specialization is used, which is not abstract.
+    template <TagType Tag, template <typename> typename List, PossibleComponentType ...C>
+    struct Category : impl::CategoryBase<Tag>
+    {};
+
+    // A concept for entity categories.
+    template <typename T, typename Tag>
+    concept CategoryType = Meta::cv_unqualified<T> && std::derived_from<T, impl::CategoryBase<Tag>> && !std::is_abstract_v<T>;
+
+
+    // A non-abstract class derived from the `Category` primary template.
+    // Represents a category of entities that
+    template <TagType Tag, template <typename> typename List, PossibleComponentType C0, PossibleComponentType ...C>
+    struct Category<Tag, List, C0, C...> : Category<Tag, List>
+    {
+        bool ShouldContain(const typename Entity<Tag>::Desc &desc) const
+        {
+            return (desc.template HasComponent<C0>() && ... && desc.template HasComponent<C>());
+        }
+    };
+
+
+    namespace impl
+    {
+        // Touch this to register a component.
+        template <TagType Tag, ComponentType C>
+        constexpr void RegisterComponent()
+        {
+            // Register the component itself.
+            (void)TypeRegistrationHelper<ComponentRegistry<Tag>>::template register_type<C>;
+
+            // Recursivelt register its direct bases (virtual and regular).
+            []<typename ...L>(Meta::type_list<L...>){
+                ([]{
+                    if constexpr (ComponentType<L>)
+                        RegisterComponent<Tag, L>();
+                }(), ...);
+            }(Meta::list_cat<Refl::Class::bases<C>, Refl::Class::direct_virtual_bases<C>>{});
+        }
+
+
+        // A class convertible to any component type.
+        // The resulting object is default-constructed, or a static assertion is triggered if it's not default-constructible.
+        struct ComponentDefaultInitializer
+        {
+            ComponentDefaultInitializer() {}
+            ComponentDefaultInitializer(const ComponentDefaultInitializer &) = delete;
+            ComponentDefaultInitializer &operator=(const ComponentDefaultInitializer &) = delete;
+
+            template <ComponentType T>
             operator T() const
             {
-                static_assert(std::default_initializable<T>, "This component is not default-constructible.");
+                constexpr bool x = std::default_initializable<T>;
+                static_assert(("Component", Meta::tag<T>{}, "is not default-constructible and requires an explicit initializer.", x));
                 return T{};
             }
         };
 
-        // Returns the index of `T` in `P...`, or -1 if not found, or -2 if found more than once.
-        // Ignores cvref when comparing types.
-        template <typename T, typename ...P>
-        inline constexpr std::size_t find_type_index_ignoring_cvref = []{
-            std::size_t index = 0, ret = -1;
-            int matches = 0;
-            ((std::is_same_v<std::remove_cvref_t<T>, std::remove_cvref_t<P>> ? void((ret = index, matches++)) : void(), index++), ...);
-            if (matches > 1)
-                ret = -2;
-            return ret;
-        }();
-
         // Inherits from `Entity` and stores components `C...`.
-        // Don't use this class directly, because it doesn't remove duplicates from `C...` and doesn't enforce component dependencies.
-        template <ValidComponent ...C>
-        class SpecificEntity : public Entity
+        // Don't use this class directly, since it doesn't preprocess the list of components.
+        // `PrimaryComponent` is merely a tag, useful for serialization/deserialization.
+        template <ComponentEntityType PrimaryComponent, TagType Tag, typename L>
+        class EntityWithComponents;
+
+        template <ComponentEntityType PrimaryComponent, TagType Tag, ComponentType ...C>
+        class EntityWithComponents<PrimaryComponent, Tag, Meta::type_list<C...>> : public EntityHidden<Tag>
         {
+          protected:
+            using primary_component_t = PrimaryComponent;
+            using component_types_t = Meta::type_list<C...>;
             std::tuple<C...> components;
 
-            __attribute__((const)) // See the base class for the explanation of this attribute.
-            const void *GetComponentPtr(std::type_index index) const noexcept override final
+          private:
+            template <ComponentType T>
+            static constexpr bool contains_component = Meta::list_contains_type<component_types_t, T>;
+
+            // Calls the `func` for each component (either direct or a base of a component). It will be called more than once for ambiguous components.
+            // `func` is `void func(Component *)`. If `e` is null, the argument will also be null, but still with the correct type.
+            static void ForEachComponentRecursively(const EntityWithComponents *e, auto &&func)
             {
-                return GetTupleElemByTypeIndex(components, index);
+                auto lambda = [&]<typename T>(auto &lambda, const T *c)
+                {
+                    if constexpr (ComponentType<T>)
+                        func(c);
+
+                    // Call the lambda for direct non-virtual bases (recursively).
+                    [&]<typename ...L>(Meta::type_list<L...>){
+                        (lambda(lambda, c ? static_cast<const L *>(c) : nullptr), ...);
+                    }(Refl::Class::bases<T>{});
+                };
+
+                // For each component...
+                ([&]{
+                    using component_t = C;
+                    // Call the lambda for the component itself, and its direct non-virtual bases (recursively).
+                    lambda(lambda, e ? &std::get<component_t>(e->components) : nullptr);
+                    // Call the lambda for the virtual bases, including indirect ones.
+                    [&]<typename ...L>(Meta::type_list<L...>){
+                        (lambda(lambda, e ? static_cast<const L *>(&std::get<component_t>(e->components)) : nullptr), ...);
+                    }(Refl::Class::virtual_bases<component_t>{});
+                }(), ...);
+            }
+
+            // Returns 0 if no such component, 1 if it's present, or >1 if it's ambiguous.
+            __attribute__((const))
+            static int GetComponentCountLowStatic(std::size_t index) noexcept
+            {
+                static const std::vector<int> table = []{
+                    std::vector<int> table(ComponentRegistry<Tag>::Count());
+
+                    ForEachComponentRecursively(nullptr, [&]<ComponentType T>(const T *)
+                    {
+                        table[ComponentRegistry<Tag>::template Index<T>()]++;
+                    });
+
+                    return table;
+                }();
+                if (index == std::size_t(-1))
+                    return 0; // This component is not registered.
+                return table[index];
+            }
+
+            __attribute__((const))
+            int GetComponentCountLow(std::size_t index) const noexcept override final
+            {
+                return GetComponentCountLowStatic(index);
+            }
+
+            __attribute__((const))
+            const void *GetComponentPtrLow(std::size_t index) const noexcept override final
+            {
+                // Register the components (at compile-time).
+                // Because this function is virtual, this conveniently runs even if it's unused.
+                (RegisterComponent<Tag, C>(), ...);
+
+                // Pre-compute the offsets (relative to the tuple) for all known components for this tag.
+                // `-1` means the component is missing.
+                // `-2` means the component is ambiguous.
+                static const std::vector<std::ptrdiff_t> offsets = [&]{
+                    std::vector<std::ptrdiff_t> offsets(ComponentRegistry<Tag>::Count(), -1);
+
+                    // A shame that we have to use an actual instance to compute the offsets.
+                    ForEachComponentRecursively(this, [&]<ComponentType T>(const T *component)
+                    {
+                        std::ptrdiff_t &offset = offsets[ComponentRegistry<Tag>::template Index<T>()];
+                        if (offset != -1)
+                        {
+                            // The base is ambiguous, but don't stop because we need to process all bases.
+                            offset = -2;
+                        }
+                        else
+                        {
+                            // Save the offset for this base.
+                            offset = reinterpret_cast<const char *>(component) - reinterpret_cast<const char *>(&components);
+                        }
+                    });
+
+                    return offsets;
+                }();
+                if (index == std::size_t(-1))
+                    return nullptr; // This component is not registered.
+                std::ptrdiff_t offset = offsets[index];
+                if (offset < 0)
+                    return nullptr;
+                return reinterpret_cast<const char *>(&components) + offset;
             }
 
           public:
-            // Value-initializes all components. (The tuple constructor does that by default.)
-            // Note the `requires`. It's not necessary per se, because the tuple won't have a default constructor
-            // if some of the components are not default-constructible. However, it gives us a nicer error message
-            // when user tries to default-construct a component, instead of a cryptic "a tuple doesn't have a default constructor".
-            // The other (fancy) constructor is selected, and the error message for it should indireclty point the user
-            // to a specific component that lacks the default constructor.
-            SpecificEntity()
-            requires(std::default_initializable<C> && ...)
+            // This function is written in a very specific manner to show nice messages on a static assertion.
+            template <typename ...P>
+            requires (contains_component<std::remove_cvref_t<P>> && ...)
+            EntityWithComponents(P &&... params)
+                : components(
+                    [&]() -> decltype(auto) {
+                        using component_t = C;
+                        using search = Meta::list_find_type<Meta::type_list<std::remove_cvref_t<P>...>, component_t>;
+                        if constexpr (!search::found)
+                        {
+                            return ComponentDefaultInitializer{};
+                        }
+                        else if constexpr (Meta::list_contains_type<typename search::remaining, component_t>)
+                        {
+                            constexpr bool x = Meta::value<false, P...>;
+                            static_assert(("Duplicate component type in the initializer:", Meta::tag<component_t>{}, x));
+                        }
+                        else
+                        {
+                            return std::get<search::value>(std::forward_as_tuple(std::forward<P>(params)...));
+                        }
+                    }()...
+                )
             {}
 
-            // Initializes each component separately.
-            // If there's a parameter with the same type as the component (ignoring cv-qualifiers and value category),
-            //   the corresponding component is initialized with it. Otherwise it's initialized
-            //   with `DefaultComponentInitializer{}`, which should default-construct it.
-            template <typename ...P>
-            requires(ValidComponent<std::remove_cvref_t<P>> && ...)
-            SpecificEntity(P &&... params) : components(
-                // Make a list of initializers for the tuple.
-                []<typename T>(Meta::tag<T>, P &&... params) -> decltype(auto)
+            struct EntityDesc : Entity<Tag>::Desc
+            {
+                __attribute__((const))
+                bool HasComponent(std::size_t index, bool unique) const override
                 {
-                    // Here `T` is one of `C...`.
-                    constexpr std::size_t index = find_type_index_ignoring_cvref<C, P...>;
-
-                    // Make sure we didn't get more than one initializer.
-                    // Note that the condition is separated into a variable, to prevent it from cluttering the error message.
-                    constexpr bool x = index != std::size_t(-2);
-                    static_assert(("More than one initializer was provided for component", Meta::tag<C>{}, x));
-
-                    if constexpr (index == std::size_t(-1))
-                        return DefaultComponentInitializer{};
+                    if (unique)
+                        return GetComponentCountLowStatic(index) == 1;
                     else
-                        return std::get<index>(std::forward_as_tuple(std::forward<P>(params)...));
-                }(Meta::tag<C>{}, std::forward<P>(params)...)...)
+                        return GetComponentCountLowStatic(index) > 0;
+                }
+            };
+
+            const typename Entity<Tag>::Desc &Description() const override
             {
-                // Make sure we don't have any extra unused initializers.
-                ([]<typename T>(Meta::tag<T>)
-                {
-                    // Here `T` is one of `P...`.
-                    // Check if the entity actually has a component `std::remove_cvref<T>`.
-                    // Note that the condition is separated into a variable, to prevent it from cluttering the error message.
-                    constexpr bool x = Meta::list_contains_type<Meta::type_list<C...>, std::remove_cvref_t<T>>;
-                    static_assert(("This entity doesn't contain component", Meta::tag<T>{}, "but an initializer for it was provided.", x));
-                }(Meta::tag<P>{}), ...);
+
+                static const EntityDesc ret;
+                return ret;
             }
         };
 
 
-        // `::type` is a `Meta::type_list` of components directly required by `C`.
+        // Returns a list of components directly implied by the parameter component.
+        // Unsure why I can't use `ComponentType T` instead of `typename T` here.
+        template <typename T> struct DirectlyImpliedComponents {};
+        template <ComponentNonEntityType T> struct DirectlyImpliedComponents<T> {using type = typename T::component::implies;};
+        template <ComponentEntityType T> struct DirectlyImpliedComponents<T> {using type = typename T::entity::implies;};
+
+
+        // `R` should start as an empty `Meta::type_list<>`.
+        // Returns the list `L`, recursively amended with implied components.
+        template <typename L, typename R>
+        struct ImpliedComponents {};
+        template <typename R>
+        struct ImpliedComponents<Meta::type_list<>, R>
+        {
+            using type = R;
+        };
+        template <ComponentType C0, ComponentType ...C, typename R> requires Meta::list_contains_type<R, C0>
+        struct ImpliedComponents<Meta::type_list<C0, C...>, R>
+        {
+            using type = typename ImpliedComponents<Meta::type_list<C...>, R>::type;
+        };
+        template <ComponentType C0, ComponentType ...C, typename R> requires(!Meta::list_contains_type<R, C0>)
+        struct ImpliedComponents<Meta::type_list<C0, C...>, R>
+        {
+            using type =
+                typename ImpliedComponents<
+                    Meta::list_cat<
+                        typename DirectlyImpliedComponents<C0>::type, // Add directly implied components.
+                        Meta::list_cat<
+                            Meta::list_cat<
+                                Refl::Class::bases<C0>, // Add direct non-virtual bases.
+                                Refl::Class::direct_virtual_bases<C0> // Add direct virtual bases.
+                            >,
+                            Meta::type_list<C...> // Add remaining components.
+                        >
+                    >,
+                    Meta::list_cat<R, Meta::type_list<C0>> // Add `C0` to the returned list.
+                >::type;
+        };
+
+
+        template <TagType Tag, template <typename> typename List>
+        constexpr Meta::tag<List<Tag>> ListFromCategoryHelper(Category<Tag, List> *) {return {};}
+
+        // Returns the list type used by a category `C`.
         template <typename C>
-        struct DirectlyRequiredComponents
-        {
-            using type = Meta::type_list<>;
-        };
-        // Note that we use inheritance to check if a component has requirements, rather
-        //   than directly checking for the member typedef. If user accidentally inherits from
-        //   `Requires<...>` non-publicly or more than once, we'll be able to detect that, instead of
-        //   silently ignoring the requirements due to the member typedef being ambiguous or inaccessible.
-        // Note the use of `std::is_base_of` instead of `std::derived_from`, because the latter would return false for an ambiguous base.
-        template <typename C> requires std::is_base_of_v<Requires_Base, C>
-        struct DirectlyRequiredComponents<C>
-        {
-            // `std::derived_from` (unlike `std::is_base_of_v`) makes sure the base is non-ambiguous.
-            // We also check that the member typedef is accessible.
-            static_assert(std::derived_from<C, Requires_Base> && requires{typename C::_component_requires;},
-                "A component can inherit from `Requires<...>` at most once, and the inheritance must be public.");
-            using type = typename C::_component_requires;
-        };
-
-        // `::type` is a `Meta::type_list` of components directly implied by `C`.
-        // See comments on `DirectlyRequiredComponents` for the explanation of the implementation.
-        template <typename C>
-        struct DirectlyImpliedComponents
-        {
-            using type = Meta::type_list<>;
-        };
-        template <typename C> requires std::is_base_of_v<Implies_Base, C>
-        struct DirectlyImpliedComponents<C>
-        {
-            static_assert(std::derived_from<C, Implies_Base> && requires{typename C::_component_implies;},
-                "A component can inherit from `Implies<...>` at most once, and the inheritance must be public.");
-            using type = typename C::_component_implies;
-        };
-
-        // `::type` is a `Meta::type_list` of components that `C` conflicts with.
-        // See comments on `DirectlyRequiredComponents` for the explanation of the implementation.
-        template <typename C>
-        struct ConflictingComponents
-        {
-            using type = Meta::type_list<>;
-        };
-        template <typename C> requires std::is_base_of_v<ConflictsWith_Base, C>
-        struct ConflictingComponents<C>
-        {
-            static_assert(std::derived_from<C, ConflictsWith_Base> && requires{typename C::_component_conflicts;},
-                "A component can inherit from `ConflictsWith<...>` at most once, and the inheritance must be public.");
-            using type = typename C::_component_conflicts;
-        };
+        using ListFromCategory = typename decltype(ListFromCategoryHelper((C *)nullptr))::type;
 
 
-        // Returns a list of all components recursively implied by `P...`, including `P...` themselves.
-        template <typename ...P>
-        struct AddImpliedComponents
+        // A state for `TypeRegistry` for categries.
+        template <TagType Tag>
+        struct RegistryState_Categories
         {
-            using type = Meta::type_list<>;
-        };
-        template <typename T, typename ...P>
-        struct AddImpliedComponents<T, P...>
-        {
-            using type = Meta::list_copy_uniq<typename AddImpliedComponents<P...>::type, // 3. Remaining types.
-                         Meta::list_copy_uniq<typename Meta::list_apply_types<AddImpliedComponents, typename DirectlyImpliedComponents<T>::type>::type, // 2. Dependencies of this type.
-                                              Meta::type_list<T>>>; // 1. This type.
-        };
+            // Functions that can be used to construct the lists corresponding to the categories.
+            std::vector<std::unique_ptr<List<Tag>> (*)()> list_factory_funcs;
 
+            // The singleton instances of the category types.
+            std::vector<const CategoryBase<Tag> *> instances;
 
-        // Check if component list `L` satisfies requirements of its elements.
-        // Always returns true, but triggers a static assertion on failure.
-        // Note that the function is written in a way that should provide decent
-        //   error messages (i.e. point to specific components that caused the problem).
-        // Make sure it stays this way if you decide to rewrite it.
-        template <typename L>
-        constexpr bool CheckComponentRequirements()
-        {
-            // Convert `L` to a parameter pack `ListElements...`.
-            []<typename ...ListElements>(Meta::type_list<ListElements...>)
+            template <CategoryType<Tag> C>
+            void RegisterType()
             {
-                // For `ListElement` = each type in `ListElements...`.
-                ([]<typename ListElement>(Meta::tag<ListElement>)
-                {
-                    // Check requirements.
-                    // Convert `DirectlyRequiredComponents<ListElement>` to parameter pack `RequiredComponents...`.
-                    []<typename ...RequiredComponents>(Meta::type_list<RequiredComponents...>)
-                    {
-                        // For `RequiredComponent` = each type in `RequiredComponents...`.
-                        ([]<typename RequiredComponent>(Meta::tag<RequiredComponent>)
-                        {
-                            // Here `RequiredComponent` is one of the components required by `ListElement`.
-
-                            // Note that we don't need to recursively check the requirements of `RequiredComponent`. If some of the directly required
-                            // components are missing, you'll get an error regardless, and if all of them are present, they'll check
-                            // their own requirements.
-                            // The condition is separated into a variable to prevent it form being included in the assertion message.
-                            constexpr bool x = Meta::list_contains_type<L, RequiredComponent>;
-                            // `Meta::tag<...>{}` is used to print types in the error message.
-                            static_assert(("Entity lacks component:", Meta::tag<RequiredComponent>{}, "required by:", Meta::tag<ListElement>{}, x));
-                        }(Meta::tag<RequiredComponents>{}), ...);
-                    }(typename DirectlyRequiredComponents<ListElement>::type{});
-
-                    // Check conflicts.
-                    // Convert `ConflictingComponents<ListElement>` to parameter pack `Conflicts...`.
-                    []<typename ...Conflicts>(Meta::type_list<Conflicts...>)
-                    {
-                        // For `Conflict` = each type in `Conflicts...`.
-                        ([]<typename Conflict>(Meta::tag<Conflict>)
-                        {
-                            // Here `Conflict` is one of the components that `ListElement` conflicts with.
-
-                            // See comments in the lambda-loop above on why we write the assertion in this specific way.
-                            constexpr bool x = !Meta::list_contains_type<L, Conflict>;
-                            static_assert(("Component", Meta::tag<ListElement>{}, "conflicts with", Meta::tag<Conflict>{}, x));
-                        }(Meta::tag<Conflicts>{}), ...);
-                    }(typename ConflictingComponents<ListElement>::type{});
-                }(Meta::tag<ListElements>{}), ...);
-            }(L{});
-            return true;
-        }
-
-        // Constructs a `Meta::type_list` of components that includes `C...` and recursively all components implied by them.
-        // Verifies that all component dependencies are met.
-        // The resulting list is accessible as `::components`.
-        template <ValidComponent ...C>
-        struct MakeComponentList
-        {
-            static_assert(sizeof...(C) > 0, "Refuse to create an entity with zero components.");
-            using components = typename AddImpliedComponents<C...>::type;
-
-            // No error message needed, because `CheckComponentRequirements` always triggers
-            // a static assertion on failure.
-            static_assert(CheckComponentRequirements<components>());
-        };
-
-
-
-        // Implementation of intrusive linked lists for entities.
-
-
-        // A node class for the intrusive linked lists of entities.
-        class ListNode
-        {
-            ListNode *prev = nullptr;
-            ListNode *next = nullptr;
-            Entity *target = nullptr;
-
-          public:
-            // Non-copyable, non-movable. Primarily for simplicity.
-            ListNode(const ListNode &) = delete;
-            ListNode &operator=(const ListNode &) = delete;
-
-            ~ListNode()
-            {
-                ASSERT(next->prev == this && prev->next == this, "Entity linked list consistency check failed.");
-
-                // If `next = prev = this`, this is a no-op.
-                prev->next = next;
-                next->prev = prev;
-
-                // This should help catch errors in debug builds.
-                next = nullptr;
-                prev = nullptr;
-            }
-
-            struct insert_before {};
-            // Inserts the node before an other node.
-            ListNode(insert_before, ListNode &other, Entity *entity) noexcept
-            {
-                target = entity;
-                next = &other;
-                prev = other.prev;
-                other.prev->next = this;
-                other.prev = this;
-            }
-
-            struct list_head {};
-            // Constructs a list head node. Both `next` and `prev` are initially equal to `this`.
-            ListNode(list_head) noexcept
-            {
-                prev = this;
-                next = this;
-            }
-
-            // The entity this node points to, or null if this node is a list head.
-            [[nodiscard]] Entity *Target() const noexcept
-            {
-                return target;
-            }
-
-            // Next and prev pointers are never null, at least not until the node is destroyed.
-            // Note that the linked lists are circular, but there's always a single dummy node with `Target() == null`.
-            [[nodiscard]] ListNode *Next() const noexcept
-            {
-                ASSERT(next->prev == this, "Entity linked list consistency check failed.");
-                return next;
-            }
-            [[nodiscard]] ListNode *Prev() const noexcept
-            {
-                ASSERT(prev->next == this, "Entity linked list consistency check failed.");
-                return prev;
+                list_factory_funcs.push_back([]() -> std::unique_ptr<List<Tag>> {return std::make_unique<ListFromCategory<C>>();});
+                static C instance{};
+                instances.push_back(&instance);
             }
         };
 
-        // Inherits from `SpecificEntity` and adds stuff for the intrusive linked lists of entities.
-        // Uses something similar to a flexible-array-member, so be careful when allocating memory for those.
-        template <ValidComponent ...C>
-        class SpecificEntityWithNodes final : public SpecificEntity<C...>
+        // A state for `TypeRegistry` for entity types.
+        template <TagType Tag>
+        struct RegistryState_EntityTypes
         {
-            // The amount of lists that this object is a part of,
-            // equal to the amount of `ListNode`s following this class in memory.
-            int node_count = 0;
+            // Entity type descriptions.
+            std::vector<const typename Entity<Tag>::Desc *> descriptions;
 
-          public:
-            // Note that this class is non-copyable and non-movable,
-            // because the same is true for `Entity` it inherits from.
-
-            struct have_enough_storage {};
-            // YOU MUST INVOKE THIS CONSTRUCTOR USING PLACEMENT NEW, AND HAVE ENOUGH STORAGE ALLOCATED.
-            // The required size of storage can be obtained from `RequiredStorageSize()`.
-            // Constructs all the nodes using placement-new, in memory immediately following this instance.
-            // `func` is `ListNode &func(int i)`, where `i = 0..node_count-1. It must return a reference to
-            //   the head node of i-th list to which this entity should be appended.
-            // The `params...` are forwarded to the constructor of `SpecificEntity`, see it for details.
-            template <typename F, typename ...P>
-            explicit SpecificEntityWithNodes(have_enough_storage, int node_count, F &&func, P &&... params)
-                requires(noexcept(func(int{})))
-                : SpecificEntityWithNodes::SpecificEntity(std::forward<P>(params)...), node_count(node_count)
+            template <typename T>
+            void RegisterType()
             {
-                for (int i = 0; i < node_count; i++)
-                    ::new(GetNodeStoragePtr(i)) ListNode(ListNode::insert_before{}, func(i), this);
-            }
-
-            // Destroys the owned nodes.
-            ~SpecificEntityWithNodes()
-            {
-                for (int i = 0; i < node_count; i++)
-                    GetNode(i).~ListNode();
-            }
-
-            // This class uses a trick similar to a flexible-array-member.
-            // This function returns the amount of memory needed to store an instance of this class,
-            // followed by `node_count` nodes (which is the amount of entity lists you want the instance to be a part of).
-            [[nodiscard]] static std::size_t RequiredStorageSize(int node_count)
-            {
-                // Note how the size is increased to be a multiple of the alignment of `ListNode`.
-                // We don't want the nodes to end up with a wrong alignment.
-                return Storage::Align<alignof(ListNode)>(sizeof(SpecificEntityWithNodes)) + sizeof(ListNode) * node_count;
-            }
-
-            // The amount of lists that this instance is a part of, equal to
-            // the amount of `ListNode`s that follow it in the memory.
-            [[nodiscard]] int NodeCount() const
-            {
-                return node_count;
-            }
-            // A pointer to the storage of ith node. You need to `reinterpret_cast` and then `std::launder` it
-            //   to access the actual node, which is what `GetNode` does. This function is exposed only to allow
-            //   calling placement-new on the nodes.
-            // I don't think we really need a `const` overload.
-            [[nodiscard]] char *GetNodeStoragePtr(int index)
-            {
-                ASSERT(index >= 0 && index < node_count, "Node index is out of range.");
-                return reinterpret_cast<char *>(this) + RequiredStorageSize(index);
-            }
-            // Returns a reference to the ith node.
-            // I don't think we really need a `const` overload.
-            [[nodiscard]] ListNode &GetNode(int index)
-            {
-                return *std::launder(reinterpret_cast<ListNode *>(GetNodeStoragePtr(index)));
+                static typename T::EntityDesc desc;
+                descriptions.push_back(&desc);
             }
         };
     }
 
-    // Describes a linked list of entities.
-    // Shouldn't be created directly, the `Controller` will create those when requested.
-    // Doesn't actually own the entities. They're owned by `Controller` that owns this list.
-    class List
+    // Assigns indices to categories.
+    template <TagType Tag>
+    using CategoryRegistry = impl::TypeRegistry<impl::RegistryState_Categories<Tag>>;
+
+    // Assigns indices to entity types.
+    template <TagType Tag>
+    using EntityTypeRegistry = impl::TypeRegistry<impl::RegistryState_EntityTypes<Tag>>;
+
+
+    // The entity pointer.
+    // Use `controller(entity)` to form one and `controller(pointer)` to access the entity.
+    template <TagType Tag, bool IsConst>
+    class BasicPointer
     {
-        // A dummy "head" node.
-        impl::ListNode head = impl::ListNode::list_head{};
-
+        friend BasicPointer<Tag, !IsConst>;
+        friend Controller<Tag>;
       public:
-        List() {}
+        using index_t = typename Tag::entity_index_t;
+        using generation_t = typename Tag::entity_generation_t;
 
-        // Non-copyable and non-movable, because the same is true for `ListNode`.
-        List(const List &) = delete;
-        List &operator=(const List &) = delete;
-
-        // For internal use. Returns the head node of the linked list that this instance owns.
-        // Non-explicit for convenience. Since non-const lists shouldn't be exposed to user anyway, it shouldn't hurt.
-        [[nodiscard]] operator impl::ListNode &()
-        {
-            return head;
-        }
-
-        // Iterators.
-        // In short, use `.begin()` and `.end()` (which return `iterator_t`) to iterate forward.
-        // You can also use `.reverse().begin()` and `.reverse().end()` (which return `reverse_iterator_t`) to iterate in the opposite direction.
-        // Obviously, you can use the instance of this class and `.reverse()` in ranged-for loops.
-        // All provided iterators are forward iterators.
-        // The iterators are invalidated only when the entity they point to is destroyed.
       private:
-        // An iterator state, for `SimpleIterator`-based iterators.
-        template <bool Reverse>
-        struct IteratorState
-        {
-            // State.
-            const impl::ListNode *node = nullptr;
-
-            // Increment.
-            void operator()(std::true_type)
-            {
-                if constexpr (Reverse)
-                    node = node->Prev();
-                else
-                    node = node->Next();
-            }
-
-            // Dereference.
-            Entity &operator()(std::false_type)
-            {
-                ASSERT(node->Target());
-                return *node->Target();
-            }
-
-            // Check for equality.
-            bool operator==(const IteratorState &other) const
-            {
-                return node == other.node;
-            }
-        };
-
-        // A wrapper for a pair of iterators, to conveniently pass them to ranged-for loops, among other things.
-        template <bool Reverse>
-        class Range
-        {
-            const List &list;
-            using state_t = IteratorState<Reverse>;
-
-          public:
-            Range(const List &list) : list(list) {}
-
-            using iterator_t = SimpleIterator::Forward<state_t>;
-
-            [[nodiscard]] iterator_t begin() const {return state_t{list.head.Next()};}
-            [[nodiscard]] iterator_t end  () const {return state_t{&list.head};}
-        };
-
-        using range_t = Range<false>; // Note that this is private, unlike `reverse_range_t`.
+        index_t index = -1;
+        generation_t generation = 0;
 
       public:
-        using iterator_t = range_t::iterator_t;
-        [[nodiscard]] iterator_t begin() const {return range_t(*this).begin();}
-        [[nodiscard]] iterator_t end  () const {return range_t(*this).end  ();}
+        constexpr BasicPointer() {}
+        constexpr BasicPointer(std::nullptr_t) {}
 
-        using reverse_range_t = Range<true>;
-        using reverse_iterator_t = reverse_range_t::iterator_t;
-        [[nodiscard]] reverse_range_t reverse() const {return reverse_range_t(*this);}
-    };
-
-    // Use this to get an `List` from an `Controller`.
-    class ListHandle
-    {
-        std::size_t index = -1;
-
-      public:
-        // Makes a null (invalid) handle.
-        ListHandle() {}
-
-        // Checks if the handle is null or not.
-        [[nodiscard]] explicit operator bool() const
+        // Returns true if the pointer is not null.
+        // To additionally check if it's not expired, you need to access it with `controller(pointer)`.
+        [[nodiscard]] bool IsSet() const
         {
-            return index != std::size_t(-1);
+            return index != index_t(-1);
         }
 
-        // Mostly for internal use. Constructs a new handle given a list index.
-        [[nodiscard]] static ListHandle ConstructFromIndex(std::size_t index)
+        // Implicit conversion from non-const to const pointer.
+        [[nodiscard]] operator BasicPointer<Tag, true>() const requires(!IsConst)
         {
-            ListHandle ret;
+            BasicPointer<Tag, true> ret;
             ret.index = index;
+            ret.generation = generation;
             return ret;
         }
 
-        // For internal use. Returns the list index stored in the object.
-        [[nodiscard]] std::size_t GetIndex() const
+        // Returns the entity index, mostly for debug purposes.
+        [[nodiscard]] index_t GetIndex() const
         {
             return index;
         }
-    };
-
-
-    // For internal use, unless you're writing a custom entity template cache.
-    // A non-template base for `EntityTemplate`.
-    class UntypedEntityTemplate
-    {
-        std::vector<ListHandle> list_handles;
-
-      public:
-        explicit UntypedEntityTemplate(std::vector<ListHandle> list_handles) : list_handles(std::move(list_handles)) {}
-
-        // For internal use.
-        [[nodiscard]] const std::vector<ListHandle> &GetListHandles() const
+        // Returns the entity generation, mostly for debug purposes.
+        [[nodiscard]] generation_t GetGeneration() const
         {
-            return list_handles;
+            return generation;
+        }
+
+        // The regular comparisons.
+        auto operator<=>(const BasicPointer &) const = default;
+
+        // Comparisons with different constness.
+        bool operator==(const BasicPointer<Tag, !IsConst> &p) const
+        {
+            return *this <=> p == 0;
+        }
+        auto operator<=>(const BasicPointer<Tag, !IsConst> &p) const
+        {
+            return BasicPointer<Tag, true>(*this) <=> BasicPointer<Tag, true>(p);
         }
     };
-
-    // Stores all information necessary to create an entity, for a specific `Controller` configuration.
-    // You're supposed to cache those, either manually or using `EntityTemplateCache` (see below).
-    // Entity templates can be reused for different controllers with the same configuration and same
-    //   default components.
-    template <ValidComponent ...C>
-    class EntityTemplate : public UntypedEntityTemplate
-    {
-      public:
-        // For internal use.
-        EntityTemplate(UntypedEntityTemplate base) : UntypedEntityTemplate(std::move(base)) {}
-    };
-
-
-    // A common base class for entity template caches.
-    class BasicEntityTemplateCache {};
-
-    // A concept for entity template caches.
-    // Simply checks if it inherits from the base and is default-constructible, because writing a proper concept seems to be too tricky.
-    template <typename T>
-    concept ValidEntityTemplateCache =
-        std::derived_from<T, BasicEntityTemplateCache> && !std::is_same_v<T, BasicEntityTemplateCache> &&
-        std::default_initializable<T> &&
-        !std::is_const_v<T> && !std::is_volatile_v<T>;
-
-    // A default implementation of an entity template cache.
-    // Uses a hash map under the hood.
-    class EntityTemplateCache : public BasicEntityTemplateCache
-    {
-        std::unordered_map<std::type_index, UntypedEntityTemplate> map;
-
-      public:
-        // If the template for `C...` is cached, a reference to it is returned.
-        // Otherwise it's constructed by calling `create_template()`, which should return an `UntypedEntityTemplate` by value.
-        template <Meta::specialization_of<Meta::type_list> L, typename F>
-        [[nodiscard]] const UntypedEntityTemplate &GetTemplate(F &&create_template)
-        {
-            struct S
-            {
-                F &&func;
-                operator UntypedEntityTemplate() {return std::forward<F>(func)();}
-            };
-
-            return map.try_emplace(typeid(Meta::type_list<L>), S{std::forward<F>(create_template)}).first->second;
-        }
-    };
-
-
-    // The default allocator.
-    // Dealing with `std::allocator_traits`-based allocators seems to be way too compilcated,
-    // so this class serves as a more simple abstraction.
-    class DefaultAllocator
-    {
-      public:
-        // Throws on failure.
-        // The allocated memory should be aligned at least to `component_alignment`.
-        [[nodiscard]] char *Allocate(std::size_t size)
-        {
-            return static_cast<char *>(operator new(size));
-        }
-        // Deleting null is a no-op.
-        void Deallocate(char *pointer) noexcept
-        {
-            return operator delete(pointer);
-        }
-    };
-
-    // An allocator concept.
-    template <typename T>
-    concept ValidAllocator = std::movable<T> && requires(T t)
-    {
-        {t.Allocate(std::size_t())} -> std::same_as<char *>;
-        {t.Deallocate((char *)nullptr)} noexcept -> std::same_as<void>;
-    };
-
-
-    // Returns true if the entity type being described contains a component with the specified index.
-    using component_predicate_t = bool(std::type_index);
-    // Returns true if the list being described should include entities described by the parameter predicate.
-    // The return value must depend only on the parameter.
-    using list_predicate_t = bool(component_predicate_t *);
-
-    // A function implementing `list_predicate_t`. Returns true if an entity has all the specified components.
-    // Use a lambda instead if you need a more complex condition.
-    template <ValidComponent ...C>
-    [[nodiscard]] bool HasComponents(component_predicate_t *pred)
-    {
-        return (pred(typeid(C)) && ...);
-    }
+    template <TagType Tag> using Pointer = BasicPointer<Tag, false>;
+    template <TagType Tag> using ConstPointer = BasicPointer<Tag, true>;
 
 
     // The entity controller.
-    // Owns several entity lists, and the entities included in them.
-    // To be usable, needs to be configured once after construction using `ControllerConfig`.
-    template <
-        // A `Meta::type_list` of default components that are added to all entities.
-        Meta::specialization_of<Meta::type_list> DefaultComponents = Meta::type_list<>,
-        // An allocator for the entities.
-        ValidAllocator Allocator = DefaultAllocator
-    >
+    template <TagType Tag>
     class Controller
     {
-        friend class ControllerConfig;
-        [[no_unique_address]] Allocator allocator;
+        // The entity lists.
+        std::vector<std::unique_ptr<List<Tag>>> lists;
 
-        struct ListWithPred
+        struct EntityDeleter
         {
-            List list;
-            std::function<list_predicate_t> predicate;
+            void operator()(Entity<Tag> *e) const
+            {
+                Tag::Free(impl::MemoryManagementTag{}, e);
+            }
         };
-        std::vector<ListWithPred> entity_lists;
+        using entity_unique_ptr_t = std::unique_ptr<Entity<Tag>, EntityDeleter>;
 
-        // Entity count, for debugging purposes. Can be removed without affecting anything.
-        // A temporary measure, until we figure out a decent customization point to plug this in.
-        Meta::ResetIfMovedFrom<std::size_t> entity_count;
+        struct EntityData
+        {
+            // Entity pointer.
+            entity_unique_ptr_t ptr;
+
+            // Entity generation.
+            typename Tag::entity_generation_t generation = 0;
+        };
+
+        // Entities. The size of this vector is the current controller capacity.
+        std::vector<EntityData> entities;
+
+        // Manages entity indices. Should have the same capacity as the size of `entities`.
+        SparseSet<typename Tag::entity_index_t> entity_indices;
+
+        // Returns the class from which the final entity type should be inherited, based on a specific component.
+        template <ComponentEntityType C>
+        using incomplete_entity_t = typename Tag::template EntityAdditions<
+            impl::EntityWithComponents<
+                C,
+                Tag,
+                typename impl::ImpliedComponents<Meta::list_cat<typename Tag::common_components_t, Meta::type_list<C>>, Meta::type_list<>>::type
+            >
+        >;
+
+        // List indices to which an entity based on component `C` should be added.
+        template <ComponentEntityType C>
+        [[nodiscard]] static const std::vector<std::size_t> &GetEntityListIndices()
+        {
+            static std::vector<std::size_t> ret = []{
+                std::vector<std::size_t> ret;
+                typename incomplete_entity_t<C>::EntityDesc desc{};
+                for (std::size_t i = 0; i < CategoryRegistry<Tag>::Count(); i++)
+                {
+                    if (CategoryRegistry<Tag>::State().instances[i]->ShouldContain(desc))
+                        ret.push_back(i);
+                }
+                if (ret.empty())
+                    Program::Error(FMT("Refuse to create an entity based on component `{}` that doesn't belong to any lists.", Meta::TypeName<C>()));
+                return ret;
+            }();
+            return ret;
+        }
+
+        // The final entity type.
+        template <ComponentEntityType C>
+        struct FinalEntity final : incomplete_entity_t<C>
+        {
+            using incomplete_entity_t<C>::incomplete_entity_t;
+
+            void Destroy(Controller &con) noexcept override
+            {
+                // Remove the entity from lists.
+                for (std::size_t i : GetEntityListIndices<C>())
+                    con.lists[i]->Erase(*this);
+
+                auto index = static_cast<impl::EntityHidden<Tag> *>(this)->entity_index;
+
+                // Increment the generation.
+                con.entities[index].generation++;
+
+                // Release the index.
+                con.entity_indices.EraseUnordered(index);
+
+                // Destroy self.
+                con.entities[index].ptr = nullptr;
+            }
+        };
+
+        // Private to prevent prevent accidental misuse. Use the factory functions below.
+        constexpr Controller() {}
 
       public:
-        // Default-constructible (assuming the allocator is default-constructible),
-        // but needs to be configured with `ControllerConfig` before use.
-        Controller() {}
-
-        // Construct from an allocator.
-        Controller(const Allocator &allocator) : allocator(allocator) {}
-        Controller(Allocator &&allocator) : allocator(std::move(allocator)) {}
-
-        // Movable.
         Controller(Controller &&) = default;
         Controller &operator=(Controller &&) = default;
+        ~Controller() = default;
 
-        // Destroys all entities owned by this controller.
-        ~Controller()
+        // Creates an null controller.
+        [[nodiscard]] static constexpr Controller MakeEmptyController()
         {
-            DestroyAllEntities();
+            return {};
         }
 
-
-        // Expands a list of components by adding implied dependencies (specified with `Implies<...>`).
-        // Checks components requirements (specified with `Requires<...>`) and conflicts (specified with `ConflictsWith<...>`),
-        //   and triggers a static assertion on failure.
-        // Before any of that happens, `DefaultComponents` (the template parameter of the controller) is automatically added to the input list.
-        // Returns a `Meta::type_list` of components.
-        template <ValidComponent ...C>
-        using full_component_list = typename Meta::list_apply_types<impl::MakeComponentList, Meta::list_cat<DefaultComponents, Meta::type_list<C...>>>::components;
-
-        // Check if the controller is null or not.
-        [[nodiscard]] explicit operator bool() const
+        // Creates a valid controller.
+        [[nodiscard]] static Controller MakeController()
         {
-            return !entity_lists.empty();
-        }
-
-        // Returns the allocator.
-        [[nodiscard]]       Allocator &GetAllocator()       {return allocator;}
-        [[nodiscard]] const Allocator &GetAllocator() const {return allocator;}
-
-        // Returns the current entity count.
-        [[nodiscard]] std::size_t GetEntityCount() const {return entity_count.value;}
-
-        // Returns the entity list with the specified handle. Throws if the handle is invalid.
-        [[nodiscard]] const List &operator()(ListHandle list_handle) const
-        {
-            if (!list_handle)
-                Program::Error("Attempt to use a null entity list handle.");
-            return entity_lists.at(list_handle.GetIndex()).list;
-        }
-        // Same as `operator()`, but throws if the list has more than one entity.
-        [[nodiscard]] const List &GetAtMostOne(ListHandle list_handle) const
-        {
-            const List &list = operator()(list_handle);
-            List::iterator_t it = list.begin();
-            if (it != list.end() && ++it != list.end())
-                Program::Error("Expected at most one entity in the specified list.");
-            return list;
-        }
-        // Same as `operator()`, but throws if the list has less than one entity.
-        [[nodiscard]] const List &GetAtLeastOne(ListHandle list_handle) const
-        {
-            const List &list = operator()(list_handle);
-            if (list.begin() == list.end())
-                Program::Error("Expected at least one entity in the specified list.");
-            return list;
-        }
-        // If the list contains a single entity, returns it, otherwise throws.
-        [[nodiscard]] Entity &GetOne(ListHandle list_handle) const
-        {
-            const List &list = operator()(list_handle);
-            List::iterator_t it = list.begin();
-            if (it == list.end())
-                Program::Error("Expected exactly one entity in the specified list, but got none.");
-            Entity &ret = *it;
-            if (++it != list.end())
-                Program::Error("Expected exactly one entity in the specified list, but got more.");
+            Controller ret;
+            for (std::size_t i = 0; i < CategoryRegistry<Tag>::Count(); i++)
+                ret.lists.push_back(CategoryRegistry<Tag>::State().list_factory_funcs[i]());
             return ret;
         }
 
-        // Destroys a single entity.
-        // WARNING: This invalidates any list iterators pointing to that entity.
-        void Destroy(Entity &entity)
+        // Reports the current entity count.
+        [[nodiscard]] std::size_t EntityCount() const
         {
-            entity.~Entity();
-            allocator.Deallocate(reinterpret_cast<char *>(&entity));
-            entity_count.value--;
-        }
-        // Destroys all entities in the specified list.
-        void DestroyListed(ListHandle list_handle)
-        {
-            const auto &list = operator()(list_handle);
-            for (auto it = list.begin(); it != list.end();)
-            {
-                Entity &entity = *it;
-                it++; // Destroying the entity invalidates its iterators, so we must increment before doing that.
-                Destroy(entity);
-            }
-        }
-        // Destroys all entities owned by this controller.
-        void DestroyAllEntities()
-        {
-            // Each entity must belong to at least one list. Because of that,
-            // we can simply iterate over all lists and destroy every entity in them.
-            for (std::size_t i = 0; i < entity_lists.size(); i++)
-                DestroyListed(ListHandle::ConstructFromIndex(i));
+            return entity_indices.ElemCount();
         }
 
-        // Create an entity using a template.
-        // The `params` is a list of components, a subset of `C...`.
-        // The matching components from `C...` are initialized from those, and other components are value-initialized.
-        template <ValidComponent ...C, typename ...P>
-        Entity &Create(const EntityTemplate<C...> &entity_template, P &&... params)
+        // Returns the current controller capacity, i.e. the number of entities it can hold without allocating more memory.
+        [[nodiscard]] std::size_t Capacity() const
         {
-            return CreateFromUntypedTemplate<C...>(entity_template, std::forward<P>(params)...);
-        }
-        // Create an entity by grabbing a template for it from a cache.
-        // If there's no matching template in the cache, it will be added automatically.
-        // The `params` is a list of components, a subset of `C...`.
-        // The matching components from `C...` are initialized from those, and other components are value-initialized.
-        template <ValidComponent ...C, typename ...P>
-        Entity &Create(ValidEntityTemplateCache auto &template_cache, P &&... params)
-        {
-            auto lambda = [this]
-            {
-                return MakeEntityTemplate<C...>();
-            };
-
-            return CreateFromUntypedTemplate<C...>(template_cache.template GetTemplate<Meta::type_list<C...>>(lambda), std::forward<P>(params)...);
+            return entities.size(); // Sic.
         }
 
-        // Makes an "entity template".
-        // A template is necessary to create an entity with a specific set of components.
-        // Templates are exposed solely to allow them to be cached by the user.
-        // Constructing one requires examining every registered entity list, so they should be cached.
-        template <ValidComponent ...C>
-        [[nodiscard]] EntityTemplate<C...> MakeEntityTemplate()
+        // Returns the max possible capacity, which depends on `Tag::entity_index_t`.
+        [[nodiscard]] static std::size_t MaxPossibleCapacity()
         {
-            // A full list of components in this entity, including the default components.
-            using components = full_component_list<C...>;
-
-            // A predicate describing this entity. Returns true if a component with a given index is included.
-            auto predicate = [](std::type_index index)
-            {
-                return [&]<typename ...P>(Meta::type_list<P...>){
-                    return ((typeid(P) == index) || ...);
-                }(components{});
-            };
-
-            // Iterate over all lists, and make a list of handles for the matching lists.
-            std::vector<ListHandle> handles;
-            for (std::size_t i = 0; i < entity_lists.size(); i++)
-            {
-                if (entity_lists[i].predicate(predicate))
-                    handles.push_back(ListHandle::ConstructFromIndex(i));
-            }
-
-            // Construct a template.
-            return UntypedEntityTemplate(std::move(handles));
-        }
-
-      private:
-        template <ValidComponent ...C, typename ...P>
-        Entity &CreateFromUntypedTemplate(const UntypedEntityTemplate &entity_template, P &&... params)
-        {
-            const auto &list_handles = entity_template.GetListHandles();
-
-            // Stop if the entity wouldn't have been inserted into any lists.
-            // Note that this is tied to the logic of `DestroyAllEntities()` and the destructor.
-            // The entity must be a part of at least one list to be cleaned up properly.
-            if (list_handles.empty())
-                Program::Error("Refuse to create an entity that doesn't belong to any lists.");
-
-            // Determine a full list of the components, and the actual entity type.
-            using entity_type = Meta::list_apply_types<impl::SpecificEntityWithNodes, full_component_list<C...>>;
-            static_assert(alignof(entity_type) <= component_alignment);
-
-            // Allocate storage.
-            std::size_t storage_size = entity_type::RequiredStorageSize(list_handles.size());
-            char *storage = allocator.Allocate(storage_size);
-            FINALLY_ON_THROW( allocator.Deallocate(storage); )
-
-            // Construct the entity using placement-new.
-            auto ith_list_head = [&](int i) noexcept -> impl::ListNode &
-            {
-                return const_cast<List &>(operator()(list_handles[i]));
-            };
-            entity_type *entity = ::new(storage) entity_type(typename entity_type::have_enough_storage{}, list_handles.size(), ith_list_head, std::forward<P>(params)...);
-
-            entity_count.value++;
-
-            return *entity;
-        }
-    };
-
-    // A configurator for `Controller`s.
-    // An entity controller must be configured using one of those before it can be used.
-    class ControllerConfig
-    {
-        struct ListEntry
-        {
-            std::function<list_predicate_t> predicate;
-        };
-        std::vector<ListEntry> entity_lists;
-
-        bool finalized = false;
-
-        void ThrowIfFinalized()
-        {
-            if (finalized)
-                Program::Error("Can't change configuration of a `ControllerConfig` after it was used to configure an entity controller.");
-        }
-
-      public:
-        // Registers a list for the specified predicate.
-        // Gives you a handle that can be used to access the list in
-        // any `Controller` configured using this instance.
-        [[nodiscard]] ListHandle AddList(std::function<list_predicate_t> predicate)
-        {
-            ThrowIfFinalized();
-            auto ret = ListHandle::ConstructFromIndex(entity_lists.size());
-            entity_lists.push_back({std::move(predicate)});
+            static std::size_t ret = []{
+                std::size_t ret = 0;
+                // Note the lack of `+ 1` here.
+                // This ensures that we can always use `-1` as an invalid entity index.
+                if (Robust::value(std::numeric_limits<typename Tag::entity_index_t>::max()) >>= ret)
+                    ret = -1;
+                return ret;
+            }();
             return ret;
         }
 
-        // Configures the `controller` using the stored data.
-        // After you call this function at least once, attempting to modify this configuration will throw an exception.
-        template <Meta::specialization_of<Controller> C>
-        void ConfigureController(C &controller)
+        // Increases capacity. Can't increase it past `MaxPossibleCapacity()`.
+        void IncreaseCapacity(std::size_t new_capacity)
         {
-            FINALLY_ON_SUCCESS( finalized = true; )
+            new_capacity = std::min(new_capacity, MaxPossibleCapacity());
 
-            // Stop if the `controller` was already configured.
-            if (bool(controller))
-                Program::Error("Attempt to reconfigure an entity controller.");
+            if (new_capacity <= Capacity())
+                return;
 
-            // Stop if the controller would have 0 lists.
-            if (entity_lists.empty())
-                Program::Error("Refuse to configure an entity controller without any entity lists.");
+            // Note `resize` instead of `reserve`.
+            entities.resize(new_capacity);
+            entity_indices.Reserve(new_capacity);
 
-            // Create the lists in the controller.
-            controller.entity_lists = decltype(controller.entity_lists)(entity_lists.size());
-            for (std::size_t i = 0; i < entity_lists.size(); i++)
-            {
-                // Note that we don't move the predicate, because the factory
-                // can be used to configure several separate controllers.
-                controller.entity_lists[i].predicate = entity_lists[i].predicate;
-            }
+            for (const auto &list : lists)
+                list->IncreaseCapacity(new_capacity);
+        }
+
+        // Creates a new entity.
+        template <ComponentEntityType C, Meta::deduce..., typename ...P>
+        Pointer<Tag> Create(P &&... params)
+        {
+            if (EntityCount() >= Capacity()) [[unlikely]]
+                IncreaseCapacity(Capacity() * Tag::capacity_growth_num / Tag::capacity_growth_den + 1); // Note `+ 1`. We need to be able to handle zero capacity.
+
+            // Allocate the index.
+            // We do it before allocating the entity, because the index allocation is more likely to fail.
+            auto new_index = entity_indices.InsertAny();
+            FINALLY_ON_THROW( entity_indices.EraseUnordered(new_index); )
+
+            // Allocate the entity.
+            auto &new_entity = entities[new_index];
+            new_entity.ptr = entity_unique_ptr_t(Tag::template Allocate<FinalEntity<C>>(impl::MemoryManagementTag{}, std::forward<P>(params)...));
+            FINALLY_ON_THROW( new_entity.ptr = nullptr; )
+            static_cast<impl::EntityHidden<Tag> &>(*new_entity.ptr).entity_index = new_index;
+
+            // Indices of lists to which the entity should be added.
+            const auto& list_indices = GetEntityListIndices<C>();
+
+            // Add the entity to the lists.
+            std::size_t list_pos = 0;
+            FINALLY_ON_THROW(
+                // Removing from the lists not in the reverse order. It shouldn't matter.
+                for (std::size_t i = 0; i < list_pos; i++)
+                    lists[list_indices[i]]->Erase(*new_entity.ptr);
+            )
+            for (; list_pos < list_indices.size(); list_pos++)
+                lists[list_indices[list_pos]]->Insert(*new_entity.ptr);
+
+            // Form a pointer.
+            Pointer<Tag> ret;
+            ret.index = new_index;
+            ret.generation = new_entity.generation;
+            return ret;
+        }
+
+        // Destroys an entity.
+        void Destroy(Entity<Tag> &e) noexcept
+        {
+            static_cast<impl::EntityHidden<Tag> &>(e).Destroy(*this);
+        }
+        // Destroys an entity. Does nothing if the pointer is null.
+        void Destroy(Entity<Tag> *p) noexcept
+        {
+            if (p)
+                Destroy(*p);
+        }
+        // Destroys an entity. Does nothing if the pointer is null or expired.
+        void Destroy(const Pointer<Tag> &p) noexcept
+        {
+            if (auto e = operator()(p))
+                Destroy(*e);
+        }
+
+        // Provides access to an entity list.
+        // The parameter is non-const to discourage ad-hoc (rvalue) categories, since creating too many categories can get expensive.
+        template <CategoryType<Tag> C>
+        [[nodiscard]] const impl::ListFromCategory<C> &operator()(C &) const
+        {
+            (void)impl::TypeRegistrationHelper<CategoryRegistry<Tag>>::template register_type<C>;
+            return static_cast<impl::ListFromCategory<C> &>(*lists[CategoryRegistry<Tag>::template Index<C>()]);
+        }
+
+        // Forms a pointer to an entity.
+        [[nodiscard]] Pointer<Tag> operator()(Entity<Tag> &e) const
+        {
+            Pointer<Tag> ret;
+            ret.index = static_cast<impl::EntityHidden<Tag> &>(e).entity_index;
+            ret.generation = entities[ret.index].generation;
+        }
+        // Forms a const pointer to an entity.
+        [[nodiscard]] ConstPointer<Tag> operator()(const Entity<Tag> &e) const
+        {
+            return operator()(const_cast<Entity<Tag> &>(e));
+        }
+
+        // Reads a pointer to an entity. Returns null if the pointer is null or expired.
+        [[nodiscard]] Entity<Tag> *operator()(const Pointer<Tag> &p) const
+        {
+            return const_cast<Entity<Tag> *>(operator()(ConstPointer<Tag>(p)));
+        }
+        // Reads a const pointer to an entity. Returns null if the pointer is null or expired.
+        [[nodiscard]] const Entity<Tag> *operator()(const ConstPointer<Tag> &p) const
+        {
+            if (!p.IsSet())
+                return nullptr;
+            ASSERT(p.index < entities.size(), "Entity index is out of range."); // This should be impossible, unless you used a pointer from a different controller.
+            if (p.index >= entities.size())
+                return nullptr;
+            const EntityData &data = entities[p.index];
+            if (data.generation != p.generation)
+                return nullptr; // Expired.
+            return data.ptr.get();
         }
     };
 }
