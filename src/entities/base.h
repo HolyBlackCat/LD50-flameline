@@ -27,13 +27,6 @@ namespace Ent
 
     namespace impl
     {
-        // The allocation/deallocation functions receive this tag, to reduce the chance of accidentally calling them.
-        struct MemoryManagementTag
-        {
-            explicit MemoryManagementTag() {}
-        };
-
-
         template <typename Registry> struct TypeRegistrationHelper;
 
         // Assigns indices to types.
@@ -118,10 +111,40 @@ namespace Ent
     concept ComponentType = (ComponentNonEntityType<T> || ComponentEntityType<T>) && !(ComponentNonEntityType<T> && ComponentEntityType<T>);
 
 
+    namespace impl
+    {
+        // The allocation/deallocation functions receive this tag, to reduce the chance of accidentally calling them.
+        struct MemoryManagementTag
+        {
+            explicit MemoryManagementTag() {}
+        };
+
+
+        // Returns `M0<Derived,M1<Derived,...Mn<Derived,Base>>>`.
+        // `Base` is intended to be the `DefaultTag`.
+        // `Derived` is the assumed most-derived class in the chain. It's gived to each mixin as a template parameter.
+        template <typename Derived, typename Base, template <typename, typename> typename ...M>
+        struct CombineMixins
+        {
+            using type = Base;
+        };
+
+        template <typename Derived, typename Base, template <typename, typename> typename M0, template <typename, typename> typename ...M>
+        struct CombineMixins<Derived, Base, M0, M...>
+        {
+            using NextBase = typename CombineMixins<Derived, Base, M...>::type;
+            using type = M0<Derived, NextBase>;
+            static_assert(std::derived_from<type, NextBase>, "Mixins must inherit from their second template parameters.");
+        };
+    }
+
     // The default tag.
+    // Tags are the primary customization point.
     // Entities and controllers are tagged, but components are not.
-    // The tags are the primary customization point.
     // Things with different tags are completely isolated from each other.
+    // You can either use `DefaultTag` directly, or inherit from it.
+    // Inheriting can be done either directly or by inheriting from `Ent::TagWithMixins<YourTag, Ent::DefaultTag, Mixins...>`,
+    // where `Mixins...` are some of the optional mixins provided in `namespace Ent::Mixins`.
     struct DefaultTag
     {
         // An index type for entities. Should probably be unsigned.
@@ -140,7 +163,7 @@ namespace Ent
         struct EntityBase {};
 
         // The specific entity types are wrapped in this template.
-        // This struct must always inherit from its first template parameter, which will be derived from `EntityBase`.
+        // This struct must always inherit from its template parameter, which will be derived from `EntityBase`.
         // This struct must always inherit the constructors.
         // The base will also contain following members:
         //     using primary_component_t = C0;
@@ -155,6 +178,15 @@ namespace Ent
 
         // A fraction describing the capacity growth factor.
         static constexpr std::size_t capacity_growth_num = 3, capacity_growth_den = 2;
+
+        // This is added to the controller.
+        // This struct must always inherit from its template parameter.
+        // This struct must always inherit the constructors.
+        template <typename Base>
+        struct ControllerAdditions : Base
+        {
+            using Base::Base;
+        };
 
 
         // A customizable allocation function.
@@ -173,15 +205,32 @@ namespace Ent
         }
     };
 
-    // A concept for tags.
+    // A concept for tags, which must be derived from `DefaultTag`.
+    // Must work on incomplete types, so we don't actually check inheritance.
     template <typename T>
-    concept TagType = Meta::cv_unqualified<T> && std::is_base_of_v<DefaultTag, T>;
+    concept TagType = Meta::cv_unqualified<T> && std::is_class_v<T>;
+
+    // Same as `TagType`, but applies only to complete types, thus can check more requirements.
+    template <typename T>
+    concept CompleteTagType = TagType<T> && std::is_base_of_v<DefaultTag, T>;
+
+
+    // This is a CRTP base for adding mixins to tags.
+    // `Derived` is the derived class.
+    // `Base` is the tag we're inheriting from, normally `DefaultTag`.
+    // `Mixins...` are mixins. Each mixin must inherit from its second template parameter. The first parameter receives `Derived`.
+    template <TagType Derived, TagType Base, template <typename, typename> typename ...Mixins>
+    using TagWithMixins = typename impl::CombineMixins<Derived, Base, Mixins...>::type;
 
 
     namespace impl
     {
         // A state for `TypeRegistry`.
         template <TagType Tag> struct RegistryState_Components {};
+
+        // Entity controller core. See the definition below.
+        template <TagType Tag>
+        class ControllerBase;
     }
 
     // Assigns indices to components.
@@ -217,7 +266,7 @@ namespace Ent
         typename Tag::entity_index_t entity_index = 0;
 
         // Destroy the entity. Automatically remove it from all lists, etc.
-        virtual void Destroy(Controller<Tag> &controller) noexcept = 0;
+        virtual void Destroy(impl::ControllerBase<Tag> &controller) noexcept = 0;
 
       public:
         constexpr Entity() {}
@@ -800,7 +849,7 @@ namespace Ent
     class BasicPointer
     {
         friend BasicPointer<Tag, !IsConst>;
-        friend Controller<Tag>;
+        friend impl::ControllerBase<Tag>;
       public:
         using index_t = typename Tag::entity_index_t;
         using generation_t = typename Tag::entity_generation_t;
@@ -857,251 +906,265 @@ namespace Ent
     template <TagType Tag> using ConstPointer = BasicPointer<Tag, true>;
 
 
-    // The entity controller.
-    template <TagType Tag>
-    class Controller
+    namespace impl
     {
-        // The entity lists.
-        std::vector<std::unique_ptr<List<Tag>>> lists;
-
-        struct EntityDeleter
+        // The core part of the entity controller.
+        // `Derived` is the most-derived controller class.
+        template <TagType Tag>
+        class ControllerBase
         {
-            void operator()(Entity<Tag> *e) const
+            static_assert(CompleteTagType<Tag>);
+
+            // The entity lists.
+            std::vector<std::unique_ptr<List<Tag>>> lists;
+
+            struct EntityDeleter
             {
-                Tag::Free(impl::MemoryManagementTag{}, e);
-            }
-        };
-        using entity_unique_ptr_t = std::unique_ptr<Entity<Tag>, EntityDeleter>;
-
-        struct EntityData
-        {
-            // Entity pointer.
-            entity_unique_ptr_t ptr;
-
-            // Entity generation.
-            typename Tag::entity_generation_t generation = 0;
-        };
-
-        // Entities. The size of this vector is the current controller capacity.
-        std::vector<EntityData> entities;
-
-        // Manages entity indices. Should have the same capacity as the size of `entities`.
-        SparseSet<typename Tag::entity_index_t> entity_indices;
-
-        // Returns the class from which the final entity type should be inherited, based on a specific component.
-        template <ComponentEntityType C>
-        using incomplete_entity_t = typename Tag::template EntityAdditions<
-            impl::EntityWithComponents<
-                C,
-                Tag,
-                typename impl::ImpliedComponents<Meta::list_cat<typename Tag::common_components_t, Meta::type_list<C>>, Meta::type_list<>>::type
-            >
-        >;
-
-        // List indices to which an entity based on component `C` should be added.
-        template <ComponentEntityType C>
-        [[nodiscard]] static const std::vector<std::size_t> &GetEntityListIndices()
-        {
-            static std::vector<std::size_t> ret = []{
-                std::vector<std::size_t> ret;
-                typename incomplete_entity_t<C>::EntityDesc desc{};
-                for (std::size_t i = 0; i < CategoryRegistry<Tag>::Count(); i++)
+                void operator()(Entity<Tag> *e) const
                 {
-                    if (CategoryRegistry<Tag>::State().instances[i]->ShouldContain(desc))
-                        ret.push_back(i);
+                    Tag::Free(impl::MemoryManagementTag{}, e);
                 }
-                if (ret.empty())
-                    Program::Error(FMT("Refuse to create an entity based on component `{}` that doesn't belong to any lists.", Meta::TypeName<C>()));
-                return ret;
-            }();
-            return ret;
-        }
+            };
+            using entity_unique_ptr_t = std::unique_ptr<Entity<Tag>, EntityDeleter>;
 
-        // The final entity type.
-        template <ComponentEntityType C>
-        struct FinalEntity final : incomplete_entity_t<C>
-        {
-            using incomplete_entity_t<C>::incomplete_entity_t;
-
-            void Destroy(Controller &con) noexcept override
+            struct EntityData
             {
-                // Remove the entity from lists.
-                for (std::size_t i : GetEntityListIndices<C>())
-                    con.lists[i]->Erase(*this);
+                // Entity pointer.
+                entity_unique_ptr_t ptr;
 
-                auto index = static_cast<impl::EntityHidden<Tag> *>(this)->entity_index;
+                // Entity generation.
+                typename Tag::entity_generation_t generation = 0;
+            };
 
-                // Increment the generation.
-                con.entities[index].generation++;
+            // Entities. The size of this vector is the current controller capacity.
+            std::vector<EntityData> entities;
 
-                // Release the index.
-                con.entity_indices.EraseUnordered(index);
+            // Manages entity indices. Should have the same capacity as the size of `entities`.
+            SparseSet<typename Tag::entity_index_t> entity_indices;
 
-                // Destroy self.
-                con.entities[index].ptr = nullptr;
+            // Returns the class from which the final entity type should be inherited, based on a specific component.
+            template <ComponentEntityType C>
+            using incomplete_entity_t = typename Tag::template EntityAdditions<
+                impl::EntityWithComponents<
+                    C,
+                    Tag,
+                    typename impl::ImpliedComponents<Meta::list_cat<typename Tag::common_components_t, Meta::type_list<C>>, Meta::type_list<>>::type
+                >
+            >;
+
+            // List indices to which an entity based on component `C` should be added.
+            template <ComponentEntityType C>
+            [[nodiscard]] static const std::vector<std::size_t> &GetEntityListIndices()
+            {
+                static std::vector<std::size_t> ret = []{
+                    std::vector<std::size_t> ret;
+                    typename incomplete_entity_t<C>::EntityDesc desc{};
+                    for (std::size_t i = 0; i < CategoryRegistry<Tag>::Count(); i++)
+                    {
+                        if (CategoryRegistry<Tag>::State().instances[i]->ShouldContain(desc))
+                            ret.push_back(i);
+                    }
+                    if (ret.empty())
+                        Program::Error(FMT("Refuse to create an entity based on component `{}` that doesn't belong to any lists.", Meta::TypeName<C>()));
+                    return ret;
+                }();
+                return ret;
+            }
+
+            // The final entity type.
+            template <ComponentEntityType C>
+            struct FinalEntity final : incomplete_entity_t<C>
+            {
+                using incomplete_entity_t<C>::incomplete_entity_t;
+
+                void Destroy(ControllerBase &con) noexcept override
+                {
+                    // Remove the entity from lists.
+                    for (std::size_t i : GetEntityListIndices<C>())
+                        con.lists[i]->Erase(*this);
+
+                    auto index = static_cast<impl::EntityHidden<Tag> *>(this)->entity_index;
+
+                    // Increment the generation.
+                    con.entities[index].generation++;
+
+                    // Release the index.
+                    con.entity_indices.EraseUnordered(index);
+
+                    // Destroy self.
+                    con.entities[index].ptr = nullptr;
+                }
+            };
+
+          protected:
+            // Protected to prevent prevent accidental misuse. Use the factory functions below.
+            constexpr ControllerBase() {}
+
+          public:
+            ControllerBase(ControllerBase &&) = default;
+            ControllerBase &operator=(ControllerBase &&) = default;
+            ~ControllerBase() = default;
+
+            // Creates an null controller.
+            [[nodiscard]] static constexpr Controller<Tag> MakeEmptyController()
+            {
+                return {};
+            }
+
+            // Creates a valid controller.
+            [[nodiscard]] static Controller<Tag> MakeController()
+            {
+                Controller<Tag> ret;
+                for (std::size_t i = 0; i < CategoryRegistry<Tag>::Count(); i++)
+                    ret.lists.push_back(CategoryRegistry<Tag>::State().list_factory_funcs[i]());
+                return ret;
+            }
+
+            // Reports the current entity count.
+            [[nodiscard]] std::size_t EntityCount() const
+            {
+                return entity_indices.ElemCount();
+            }
+
+            // Returns the current controller capacity, i.e. the number of entities it can hold without allocating more memory.
+            [[nodiscard]] std::size_t Capacity() const
+            {
+                return entities.size(); // Sic.
+            }
+
+            // Returns the max possible capacity, which depends on `Tag::entity_index_t`.
+            [[nodiscard]] static std::size_t MaxPossibleCapacity()
+            {
+                static std::size_t ret = []{
+                    std::size_t ret = 0;
+                    // Note the lack of `+ 1` here.
+                    // This ensures that we can always use `-1` as an invalid entity index.
+                    if (Robust::value(std::numeric_limits<typename Tag::entity_index_t>::max()) >>= ret)
+                        ret = -1;
+                    return ret;
+                }();
+                return ret;
+            }
+
+            // Increases capacity. Can't increase it past `MaxPossibleCapacity()`.
+            void IncreaseCapacity(std::size_t new_capacity)
+            {
+                new_capacity = std::min(new_capacity, MaxPossibleCapacity());
+
+                if (new_capacity <= Capacity())
+                    return;
+
+                // Note `resize` instead of `reserve`.
+                entities.resize(new_capacity);
+                entity_indices.Reserve(new_capacity);
+
+                for (const auto &list : lists)
+                    list->IncreaseCapacity(new_capacity);
+            }
+
+            // Creates a new entity.
+            template <ComponentEntityType C, Meta::deduce..., typename ...P>
+            Pointer<Tag> Create(P &&... params)
+            {
+                if (EntityCount() >= Capacity()) [[unlikely]]
+                    IncreaseCapacity(Capacity() * Tag::capacity_growth_num / Tag::capacity_growth_den + 1); // Note `+ 1`. We need to be able to handle zero capacity.
+
+                // Allocate the index.
+                // We do it before allocating the entity, because the index allocation is more likely to fail.
+                auto new_index = entity_indices.InsertAny();
+                FINALLY_ON_THROW( entity_indices.EraseUnordered(new_index); )
+
+                // Allocate the entity.
+                auto &new_entity = entities[new_index];
+                new_entity.ptr = entity_unique_ptr_t(Tag::template Allocate<FinalEntity<C>>(impl::MemoryManagementTag{}, std::forward<P>(params)...));
+                FINALLY_ON_THROW( new_entity.ptr = nullptr; )
+                static_cast<impl::EntityHidden<Tag> &>(*new_entity.ptr).entity_index = new_index;
+
+                // Indices of lists to which the entity should be added.
+                const auto& list_indices = GetEntityListIndices<C>();
+
+                // Add the entity to the lists.
+                std::size_t list_pos = 0;
+                FINALLY_ON_THROW(
+                    // Removing from the lists not in the reverse order. It shouldn't matter.
+                    for (std::size_t i = 0; i < list_pos; i++)
+                        lists[list_indices[i]]->Erase(*new_entity.ptr);
+                )
+                for (; list_pos < list_indices.size(); list_pos++)
+                    lists[list_indices[list_pos]]->Insert(*new_entity.ptr);
+
+                // Form a pointer.
+                Pointer<Tag> ret;
+                ret.index = new_index;
+                ret.generation = new_entity.generation;
+                return ret;
+            }
+
+            // Destroys an entity.
+            void Destroy(Entity<Tag> &e) noexcept
+            {
+                static_cast<impl::EntityHidden<Tag> &>(e).Destroy(*this);
+            }
+            // Destroys an entity. Does nothing if the pointer is null.
+            void Destroy(Entity<Tag> *p) noexcept
+            {
+                if (p)
+                    Destroy(*p);
+            }
+            // Destroys an entity. Does nothing if the pointer is null or expired.
+            void Destroy(const Pointer<Tag> &p) noexcept
+            {
+                if (auto e = operator()(p))
+                    Destroy(*e);
+            }
+
+            // Provides access to an entity list.
+            // The parameter is non-const to discourage ad-hoc (rvalue) categories, since creating too many categories can get expensive.
+            template <CategoryType<Tag> C>
+            [[nodiscard]] const impl::ListFromCategory<C> &operator()(C &) const
+            {
+                (void)impl::TypeRegistrationHelper<CategoryRegistry<Tag>>::template register_type<C>;
+                return static_cast<impl::ListFromCategory<C> &>(*lists[CategoryRegistry<Tag>::template Index<C>()]);
+            }
+
+            // Forms a pointer to an entity.
+            [[nodiscard]] Pointer<Tag> operator()(Entity<Tag> &e) const
+            {
+                Pointer<Tag> ret;
+                ret.index = static_cast<impl::EntityHidden<Tag> &>(e).entity_index;
+                ret.generation = entities[ret.index].generation;
+            }
+            // Forms a const pointer to an entity.
+            [[nodiscard]] ConstPointer<Tag> operator()(const Entity<Tag> &e) const
+            {
+                return operator()(const_cast<Entity<Tag> &>(e));
+            }
+
+            // Reads a pointer to an entity. Returns null if the pointer is null or expired.
+            [[nodiscard]] Entity<Tag> *operator()(const Pointer<Tag> &p) const
+            {
+                return const_cast<Entity<Tag> *>(operator()(ConstPointer<Tag>(p)));
+            }
+            // Reads a const pointer to an entity. Returns null if the pointer is null or expired.
+            [[nodiscard]] const Entity<Tag> *operator()(const ConstPointer<Tag> &p) const
+            {
+                if (!p.IsSet())
+                    return nullptr;
+                ASSERT(p.index < entities.size(), "Entity index is out of range."); // This should be impossible, unless you used a pointer from a different controller.
+                if (p.index >= entities.size())
+                    return nullptr;
+                const EntityData &data = entities[p.index];
+                if (data.generation != p.generation)
+                    return nullptr; // Expired.
+                return data.ptr.get();
             }
         };
+    }
 
-        // Private to prevent prevent accidental misuse. Use the factory functions below.
-        constexpr Controller() {}
-
-      public:
-        Controller(Controller &&) = default;
-        Controller &operator=(Controller &&) = default;
-        ~Controller() = default;
-
-        // Creates an null controller.
-        [[nodiscard]] static constexpr Controller MakeEmptyController()
-        {
-            return {};
-        }
-
-        // Creates a valid controller.
-        [[nodiscard]] static Controller MakeController()
-        {
-            Controller ret;
-            for (std::size_t i = 0; i < CategoryRegistry<Tag>::Count(); i++)
-                ret.lists.push_back(CategoryRegistry<Tag>::State().list_factory_funcs[i]());
-            return ret;
-        }
-
-        // Reports the current entity count.
-        [[nodiscard]] std::size_t EntityCount() const
-        {
-            return entity_indices.ElemCount();
-        }
-
-        // Returns the current controller capacity, i.e. the number of entities it can hold without allocating more memory.
-        [[nodiscard]] std::size_t Capacity() const
-        {
-            return entities.size(); // Sic.
-        }
-
-        // Returns the max possible capacity, which depends on `Tag::entity_index_t`.
-        [[nodiscard]] static std::size_t MaxPossibleCapacity()
-        {
-            static std::size_t ret = []{
-                std::size_t ret = 0;
-                // Note the lack of `+ 1` here.
-                // This ensures that we can always use `-1` as an invalid entity index.
-                if (Robust::value(std::numeric_limits<typename Tag::entity_index_t>::max()) >>= ret)
-                    ret = -1;
-                return ret;
-            }();
-            return ret;
-        }
-
-        // Increases capacity. Can't increase it past `MaxPossibleCapacity()`.
-        void IncreaseCapacity(std::size_t new_capacity)
-        {
-            new_capacity = std::min(new_capacity, MaxPossibleCapacity());
-
-            if (new_capacity <= Capacity())
-                return;
-
-            // Note `resize` instead of `reserve`.
-            entities.resize(new_capacity);
-            entity_indices.Reserve(new_capacity);
-
-            for (const auto &list : lists)
-                list->IncreaseCapacity(new_capacity);
-        }
-
-        // Creates a new entity.
-        template <ComponentEntityType C, Meta::deduce..., typename ...P>
-        Pointer<Tag> Create(P &&... params)
-        {
-            if (EntityCount() >= Capacity()) [[unlikely]]
-                IncreaseCapacity(Capacity() * Tag::capacity_growth_num / Tag::capacity_growth_den + 1); // Note `+ 1`. We need to be able to handle zero capacity.
-
-            // Allocate the index.
-            // We do it before allocating the entity, because the index allocation is more likely to fail.
-            auto new_index = entity_indices.InsertAny();
-            FINALLY_ON_THROW( entity_indices.EraseUnordered(new_index); )
-
-            // Allocate the entity.
-            auto &new_entity = entities[new_index];
-            new_entity.ptr = entity_unique_ptr_t(Tag::template Allocate<FinalEntity<C>>(impl::MemoryManagementTag{}, std::forward<P>(params)...));
-            FINALLY_ON_THROW( new_entity.ptr = nullptr; )
-            static_cast<impl::EntityHidden<Tag> &>(*new_entity.ptr).entity_index = new_index;
-
-            // Indices of lists to which the entity should be added.
-            const auto& list_indices = GetEntityListIndices<C>();
-
-            // Add the entity to the lists.
-            std::size_t list_pos = 0;
-            FINALLY_ON_THROW(
-                // Removing from the lists not in the reverse order. It shouldn't matter.
-                for (std::size_t i = 0; i < list_pos; i++)
-                    lists[list_indices[i]]->Erase(*new_entity.ptr);
-            )
-            for (; list_pos < list_indices.size(); list_pos++)
-                lists[list_indices[list_pos]]->Insert(*new_entity.ptr);
-
-            // Form a pointer.
-            Pointer<Tag> ret;
-            ret.index = new_index;
-            ret.generation = new_entity.generation;
-            return ret;
-        }
-
-        // Destroys an entity.
-        void Destroy(Entity<Tag> &e) noexcept
-        {
-            static_cast<impl::EntityHidden<Tag> &>(e).Destroy(*this);
-        }
-        // Destroys an entity. Does nothing if the pointer is null.
-        void Destroy(Entity<Tag> *p) noexcept
-        {
-            if (p)
-                Destroy(*p);
-        }
-        // Destroys an entity. Does nothing if the pointer is null or expired.
-        void Destroy(const Pointer<Tag> &p) noexcept
-        {
-            if (auto e = operator()(p))
-                Destroy(*e);
-        }
-
-        // Provides access to an entity list.
-        // The parameter is non-const to discourage ad-hoc (rvalue) categories, since creating too many categories can get expensive.
-        template <CategoryType<Tag> C>
-        [[nodiscard]] const impl::ListFromCategory<C> &operator()(C &) const
-        {
-            (void)impl::TypeRegistrationHelper<CategoryRegistry<Tag>>::template register_type<C>;
-            return static_cast<impl::ListFromCategory<C> &>(*lists[CategoryRegistry<Tag>::template Index<C>()]);
-        }
-
-        // Forms a pointer to an entity.
-        [[nodiscard]] Pointer<Tag> operator()(Entity<Tag> &e) const
-        {
-            Pointer<Tag> ret;
-            ret.index = static_cast<impl::EntityHidden<Tag> &>(e).entity_index;
-            ret.generation = entities[ret.index].generation;
-        }
-        // Forms a const pointer to an entity.
-        [[nodiscard]] ConstPointer<Tag> operator()(const Entity<Tag> &e) const
-        {
-            return operator()(const_cast<Entity<Tag> &>(e));
-        }
-
-        // Reads a pointer to an entity. Returns null if the pointer is null or expired.
-        [[nodiscard]] Entity<Tag> *operator()(const Pointer<Tag> &p) const
-        {
-            return const_cast<Entity<Tag> *>(operator()(ConstPointer<Tag>(p)));
-        }
-        // Reads a const pointer to an entity. Returns null if the pointer is null or expired.
-        [[nodiscard]] const Entity<Tag> *operator()(const ConstPointer<Tag> &p) const
-        {
-            if (!p.IsSet())
-                return nullptr;
-            ASSERT(p.index < entities.size(), "Entity index is out of range."); // This should be impossible, unless you used a pointer from a different controller.
-            if (p.index >= entities.size())
-                return nullptr;
-            const EntityData &data = entities[p.index];
-            if (data.generation != p.generation)
-                return nullptr; // Expired.
-            return data.ptr.get();
-        }
+    // The entity controller. See `impl::ControllerBase` for the actual implementation.
+    template <TagType Tag>
+    class Controller : public Tag::template ControllerAdditions<impl::ControllerBase<Tag>>
+    {
+        using Tag::template ControllerAdditions<impl::ControllerBase<Tag>>::ControllerAdditions;
     };
 }
