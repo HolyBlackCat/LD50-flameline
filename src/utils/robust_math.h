@@ -309,10 +309,10 @@ namespace Robust
             c = a;
             return true;
         }
-        if (std::is_signed_v<A> && a == std::numeric_limits<A>::min && b == B(-1))
+        if (std::is_signed_v<A> && a == std::numeric_limits<A>::min() && b == B(-1))
         {
             // Division by -1 when `A` is signed and `a` is is the minimal representable value.
-            c = a; // Wrap around doesn't change this value.
+            c = a; // Wraparound doesn't change this value.
             return true;
         }
 
