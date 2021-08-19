@@ -30,7 +30,7 @@
 // - Endianness
 
 #ifndef IMP_PLATFORM_FLAG_big_endian
-#  if __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
+#  if defined(__BYTE_ORDER__) && __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
 #    define IMP_PLATFORM_FLAG_big_endian 1
 #  else
 #    define IMP_PLATFORM_FLAG_big_endian 0
@@ -38,7 +38,7 @@
 #endif
 
 #ifndef IMP_PLATFORM_FLAG_little_endian
-#  if __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
+#  if defined(__BYTE_ORDER__) && __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
 #    define IMP_PLATFORM_FLAG_little_endian 1
 #  else
 #    define IMP_PLATFORM_FLAG_little_endian 0
