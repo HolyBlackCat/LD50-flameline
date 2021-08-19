@@ -37,6 +37,7 @@
  *   for the string literal prefix (e.g. `L`), which can be empty.
  */
 
+#include <array>
 #include <cstddef>
 #include <initializer_list>
 #include <iterator>
