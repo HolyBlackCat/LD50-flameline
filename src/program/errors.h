@@ -12,7 +12,7 @@ namespace Program
 {
     [[noreturn]] inline void HardError(const std::string &message)
     {
-        static bool first = 1;
+        static bool first = true;
         if (!first)
             Exit(1);
         first = 0;
