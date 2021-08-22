@@ -34,7 +34,7 @@ Graphics::TextureAtlas texture_atlas = []{
 }();
 Graphics::Texture texture_main = Graphics::Texture(nullptr).Wrap(Graphics::clamp).Interpolation(Graphics::nearest).SetData(texture_atlas.GetImage());
 
-AdaptiveViewport adaptive_viewport(shader_config, screen_size);
+GameUtils::AdaptiveViewport adaptive_viewport(shader_config, screen_size);
 Render r = adjust_(Render(0x2000, shader_config), SetTexture(texture_main), SetMatrix(adaptive_viewport.GetDetails().MatrixCentered()));
 
 Input::Mouse mouse;
