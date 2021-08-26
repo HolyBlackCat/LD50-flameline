@@ -90,7 +90,16 @@ namespace Ent
     {
         Component() = delete;
         ~Component() = delete;
+        using implies = Meta::type_list<C...>;
+    };
 
+    // Specifies which components, if any, a component implies. See `ComponentType` below.
+    // Similar to `Component` but additionally allows creating entities based on this component.
+    template <PossibleComponentType ...C>
+    struct EntityComponent final
+    {
+        EntityComponent() = delete;
+        ~EntityComponent() = delete;
         using implies = Meta::type_list<C...>;
     };
 
@@ -102,11 +111,11 @@ namespace Ent
     // A component that is an entity.
     // See `ComponentType` below.
     template <typename T>
-    concept ComponentEntityType = PossibleComponentType<T> && Meta::specialization_of<typename T::entity, Component>;
+    concept ComponentEntityType = PossibleComponentType<T> && Meta::specialization_of<typename T::component, EntityComponent>;
 
     // A type that is a component.
-    // Component classes are required to have `using {component,entity} = Ent::Component<...>;`.
-    // The ONLY difference between `component` and `entity` is that entities can be created as entities.
+    // Component classes are required to have `using component = Ent::[Entity]Component<...>;`.
+    // The ONLY difference between `Component` and `EntityComponent` is that the latter can be created as entities.
     template <typename T>
     concept ComponentType = (ComponentNonEntityType<T> || ComponentEntityType<T>) && !(ComponentNonEntityType<T> && ComponentEntityType<T>);
 
@@ -750,13 +759,6 @@ namespace Ent
         };
 
 
-        // Returns a list of components directly implied by the parameter component.
-        // Unsure why I can't use `ComponentType T` instead of `typename T` here.
-        template <typename T> struct DirectlyImpliedComponents {};
-        template <ComponentNonEntityType T> struct DirectlyImpliedComponents<T> {using type = typename T::component::implies;};
-        template <ComponentEntityType T> struct DirectlyImpliedComponents<T> {using type = typename T::entity::implies;};
-
-
         // `R` should start as an empty `Meta::type_list<>`.
         // Returns the list `L`, recursively amended with implied components.
         template <typename L, typename R>
@@ -777,7 +779,7 @@ namespace Ent
             using type =
                 typename ImpliedComponents<
                     Meta::list_cat<
-                        typename DirectlyImpliedComponents<C0>::type, // Add directly implied components.
+                        typename C0::component::implies, // Add directly implied components.
                         Meta::list_cat<
                             Meta::list_cat<
                                 Refl::Class::bases<C0>, // Add direct non-virtual bases.
