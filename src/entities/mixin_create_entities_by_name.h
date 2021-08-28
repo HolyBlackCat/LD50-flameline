@@ -16,7 +16,7 @@ namespace Ent::Mixins
     {
         // A function that contructs an unknown entity.
         template <TagType Tag>
-        using factory_func_t = Pointer<Tag> (*)(Ent::impl::ControllerBase<Tag> &con);
+        using factory_func_t = Entity<Tag> &(*)(Ent::impl::ControllerBase<Tag> &con);
 
         // A map of `factory_func_t` functions.
         template <TagType Tag>
@@ -45,7 +45,7 @@ namespace Ent::Mixins
             static_assert(Refl::Class::name_known<E>, "The name of this entity type is not reflected.");
 
             inline static std::nullptr_t dummy = []{
-                auto factory_func = +[](Ent::impl::ControllerBase<FinalTag> &con)
+                auto factory_func = +[](Ent::impl::ControllerBase<FinalTag> &con) -> Entity<FinalTag> &
                 {
                     return con.template Create<E>();
                 };
@@ -94,7 +94,7 @@ namespace Ent::Mixins
         template <typename Base>
         struct ControllerAdditions : BaseMixin::template ControllerAdditions<Base>
         {
-            Pointer<FinalTag> CreateByName(std::string_view name)
+            Entity<FinalTag> &CreateByName(std::string_view name)
             {
                 const auto &map = impl::CreateEntitiesByName::FactoryFuncs<FinalTag>();
                 auto it = map.find(name);

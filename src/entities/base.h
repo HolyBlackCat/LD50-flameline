@@ -1066,7 +1066,7 @@ namespace Ent
 
             // Creates a new entity.
             template <ComponentEntityType C, Meta::deduce..., typename ...P>
-            Pointer<Tag> Create(P &&... params)
+            Entity<Tag> &Create(P &&... params)
             {
                 if (EntityCount() >= Capacity()) [[unlikely]]
                     IncreaseCapacity(Capacity() * Tag::capacity_growth_num / Tag::capacity_growth_den + 1); // Note `+ 1`. We need to be able to handle zero capacity.
@@ -1077,7 +1077,7 @@ namespace Ent
                 FINALLY_ON_THROW( entity_indices.EraseUnordered(new_index); )
 
                 // Allocate the entity.
-                auto &new_entity = entities[new_index];
+                EntityData &new_entity = entities[new_index];
                 new_entity.ptr = entity_unique_ptr_t(Tag::template Allocate<FinalEntity<C>>(impl::MemoryManagementTag{}, std::forward<P>(params)...));
                 FINALLY_ON_THROW( new_entity.ptr = nullptr; )
                 static_cast<impl::EntityHidden<Tag> &>(*new_entity.ptr).entity_index = new_index;
@@ -1095,11 +1095,7 @@ namespace Ent
                 for (; list_pos < list_indices.size(); list_pos++)
                     lists[list_indices[list_pos]]->Insert(*new_entity.ptr);
 
-                // Form a pointer.
-                Pointer<Tag> ret;
-                ret.index = new_index;
-                ret.generation = new_entity.generation;
-                return ret;
+                return *new_entity.ptr;
             }
 
             // Destroys an entity.
