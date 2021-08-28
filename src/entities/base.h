@@ -582,7 +582,7 @@ namespace Ent
                     if constexpr (ComponentType<L>)
                         RegisterComponent<Tag, L>();
                 }(), ...);
-            }(Meta::list_cat<Refl::Class::bases<C>, Refl::Class::direct_virtual_bases<C>>{});
+            }(Meta::list_cat_types<Refl::Class::bases<C>, Refl::Class::direct_virtual_bases<C>>{});
         }
 
 
@@ -778,17 +778,13 @@ namespace Ent
         {
             using type =
                 typename ImpliedComponents<
-                    Meta::list_cat<
+                    Meta::list_cat_types<
                         typename C0::component::implies, // Add directly implied components.
-                        Meta::list_cat<
-                            Meta::list_cat<
-                                Refl::Class::bases<C0>, // Add direct non-virtual bases.
-                                Refl::Class::direct_virtual_bases<C0> // Add direct virtual bases.
-                            >,
-                            Meta::type_list<C...> // Add remaining components.
-                        >
+                        Refl::Class::bases<C0>, // Add direct non-virtual bases.
+                        Refl::Class::direct_virtual_bases<C0>, // Add direct virtual bases.
+                        Meta::type_list<C...> // Add remaining components.
                     >,
-                    Meta::list_cat<R, Meta::type_list<C0>> // Add `C0` to the returned list.
+                    Meta::list_cat_types<R, Meta::type_list<C0>> // Add `C0` to the returned list.
                 >::type;
         };
 
@@ -950,7 +946,7 @@ namespace Ent
                 impl::EntityWithComponents<
                     C,
                     Tag,
-                    typename impl::ImpliedComponents<Meta::list_cat<typename Tag::common_components_t, Meta::type_list<C>>, Meta::type_list<>>::type
+                    typename impl::ImpliedComponents<Meta::list_cat_types<typename Tag::common_components_t, Meta::type_list<C>>, Meta::type_list<>>::type
                 >
             >;
 

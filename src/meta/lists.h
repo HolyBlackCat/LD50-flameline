@@ -27,9 +27,17 @@ namespace Meta
         template <auto ...V> struct list_size<value_list<V...>> : std::integral_constant<std::size_t, sizeof...(V)> {};
 
         // Concat two lists.
-        template <typename A, typename B> struct list_cat {};
-        template <typename ...A, typename ...B> struct list_cat<type_list<A...>, type_list<B...>> {using type = type_list<A..., B...>;};
-        template <auto ...A, auto ...B> struct list_cat<value_list<A...>, value_list<B...>> {using type = value_list<A..., B...>;};
+        template <typename ...P> struct list_cat_types {};
+        template <> struct list_cat_types<> {using type = type_list<>;};
+        template <typename ...A> struct list_cat_types<type_list<A...>> {using type = type_list<A...>;}; // Using a parameter pack here to reject non-lists.
+        template <typename ...A, typename ...B> struct list_cat_types<type_list<A...>, type_list<B...>> {using type = type_list<A..., B...>;};
+        template <typename A, typename ...P> struct list_cat_types<A, P...> {using type = typename list_cat_types<A, typename list_cat_types<P...>::type>::type;};
+
+        template <typename ...P> struct list_cat_values {};
+        template <> struct list_cat_values<> {using type = value_list<>;};
+        template <auto ...A> struct list_cat_values<value_list<A...>> {using type = value_list<A...>;}; // Using a parameter pack here to reject non-lists.
+        template <auto ...A, auto ...B> struct list_cat_values<value_list<A...>, value_list<B...>> {using type = value_list<A..., B...>;};
+        template <typename A, typename ...P> struct list_cat_values<A, P...> {using type = typename list_cat_values<A, typename list_cat_values<P...>::type>::type;};
 
         // Return ith element of a list.
         template <typename T, std::size_t I> struct list_at {};
@@ -143,7 +151,8 @@ namespace Meta
     template <typename T> inline constexpr std::size_t list_size = impl::list_size<T>::value;
 
     // Concatenates two lists.
-    template <typename A, typename B> using list_cat = typename impl::list_cat<A, B>::type;
+    template <typename ...P> using list_cat_types = typename impl::list_cat_types<P...>::type;
+    template <typename ...P> using list_cat_values = typename impl::list_cat_values<P...>::type;
 
     // Return ith element of a list.
     template <typename T, std::size_t I> using list_type_at = typename impl::list_at<T, I>::type;

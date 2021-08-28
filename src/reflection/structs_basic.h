@@ -376,7 +376,7 @@ namespace Refl
         template <typename T> using virtual_bases = typename impl::rec_virt_bases_virt<direct_virtual_bases<T>, typename impl::rec_virt_bases_norm<bases<T>, Meta::type_list<>>::type>::type;
         // A list of all bases of a class: regular ones, then virtual ones.
         // Duplicates are not removed from this list, so you should probably check for them separately. If you use `CombinedBaseIndex`, it takes care of that.
-        template <typename T> using combined_bases = Meta::list_cat<bases<T>, virtual_bases<T>>;
+        template <typename T> using combined_bases = Meta::list_cat_types<bases<T>, virtual_bases<T>>;
 
         // Check if a class has a specific attribute.
         template <typename T, typename A> inline constexpr bool class_has_attrib = Meta::list_contains_type<class_attribs<T>, A>;
