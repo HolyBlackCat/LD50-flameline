@@ -61,6 +61,22 @@ namespace Meta
     template <typename ...P> overload(P...) -> overload<P...>;
 
 
+    // Checks if a type is a specialization of a template.
+    // `specialization_of<A, B>` is true if `A` is `B<P...>`, where `P...` are some types.
+
+    namespace impl
+    {
+        template <typename A, template <typename...> typename B>
+        struct specialization_of : std::false_type {};
+
+        template <template <typename...> typename T, typename ...P>
+        struct specialization_of<T<P...>, T> : std::true_type {};
+    }
+
+    template <typename A, template <typename...> typename B>
+    concept specialization_of = impl::specialization_of<A, B>::value;
+
+
     // A helper function that invokes a callback.
     // If the callback returns void, the function returns `default_var` explicitly converted to `R`.
     // Otherwise returns the return value of of the callback, explicitly converted to `R` .

@@ -71,22 +71,6 @@ namespace Meta
     template <template <typename...> typename A, typename ...B> inline constexpr bool is_detected = impl::is_detected<void, A, B...>::value;
 
 
-    // Checks if a type is a specialization of a template.
-    // `specialization_of<A, B>` is true if `A` is `B<P...>`, where `P...` are some types.
-
-    namespace impl
-    {
-        template <typename A, template <typename...> typename B>
-        struct specialization_of : std::false_type {};
-
-        template <template <typename...> typename T, typename ...P>
-        struct specialization_of<T<P...>, T> : std::true_type {};
-    }
-
-    template <typename A, template <typename...> typename B>
-    concept specialization_of = impl::specialization_of<A, B>::value;
-
-
     // An object wrapper that moves the underlying object even when copied.
     // Also has a function-call operator that forwards the call to the underlying objects,
     // which makes it good for putting non-copyable lambdas into `std::function`s.
