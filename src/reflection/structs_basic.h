@@ -303,11 +303,12 @@ namespace Refl
         // Returns a `Meta::type_list`.
         template <typename T> using class_attribs = typename Custom::class_attribs<std::remove_const_t<T>>::type;
 
-        // Direct non-virtual and virtual bases.
+        // Direct non-virtual bases.
         template <typename T> using bases = typename Custom::bases<std::remove_const_t<T>>::type;
+        // Direct virtual bases.
         template <typename T> using direct_virtual_bases = typename Custom::virt_bases<std::remove_const_t<T>>::type;
 
-        // Non-staic members.
+        // Non-static members.
         template <typename T> inline constexpr bool members_known = Custom::members<std::remove_const_t<T>>::count != std::size_t(-1);
         template <typename T> inline constexpr std::size_t member_count = members_known<T> ? Custom::members<std::remove_const_t<T>>::count : 0;
         template <std::size_t I, Meta::deduce..., typename T> constexpr decltype(auto) Member(T &&object)
