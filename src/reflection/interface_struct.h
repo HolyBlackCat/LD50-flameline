@@ -44,7 +44,7 @@ namespace Refl
 
             // It at least one of the bases is not skipped, then don't skip.
             // If the class itself is a base class, don't consider virtual bases.
-            using base_list = std::conditional_t<IsBase, Refl::Class::bases<T>, Refl::Class::combined_bases<T>>;
+            using base_list = std::conditional_t<IsBase, Refl::Class::regular_bases<T>, Refl::Class::combined_bases<T>>;
             Meta::cexpr_for<Meta::list_size<base_list>>([&](auto index)
             {
                 constexpr auto i = index.value;
@@ -156,7 +156,7 @@ namespace Refl
             }
 
             // Output regular bases.
-            using bases = Class::bases<T>;
+            using bases = Class::regular_bases<T>;
             Meta::cexpr_for<Meta::list_size<bases>>([&](auto index)
             {
                 constexpr auto i = index.value;
@@ -242,7 +242,7 @@ namespace Refl
                         Meta::with_cexpr_value<combined_base_count>(base_index, [&](auto index)
                         {
                             constexpr auto i = index.value;
-                            if (!state.NeedVirtualBases() && i >= Meta::list_size<Class::bases<T>>)
+                            if (!state.NeedVirtualBases() && i >= Meta::list_size<Class::regular_bases<T>>)
                                 Program::Error(input.GetExceptionPrefix() + "Virtual base class `" + name + "` must be mentioned in the most derived class, not here.");
 
                             if (obtained_bases[i])
@@ -327,7 +327,7 @@ namespace Refl
                         using this_base = Meta::list_type_at<combined_bases, i>;
                         if constexpr (!Class::class_has_attrib<this_base, Optional> && !impl::Class::skip_base<this_base>)
                         {
-                            if (!state.NeedVirtualBases() && i >= Meta::list_size<Class::bases<T>>)
+                            if (!state.NeedVirtualBases() && i >= Meta::list_size<Class::regular_bases<T>>)
                                 return;
 
                             if (!obtained_bases[i])
@@ -373,7 +373,7 @@ namespace Refl
                 }
 
                 // Read regular bases.
-                using bases = Class::bases<T>;
+                using bases = Class::regular_bases<T>;
                 Meta::cexpr_for<Meta::list_size<bases>>([&](auto index)
                 {
                     constexpr auto i = index.value;
@@ -422,7 +422,7 @@ namespace Refl
             }
 
             // Write regular bases.
-            using bases = Class::bases<T>;
+            using bases = Class::regular_bases<T>;
             Meta::cexpr_for<Meta::list_size<bases>>([&](auto index)
             {
                 constexpr auto i = index.value;
@@ -465,7 +465,7 @@ namespace Refl
             }
 
             // Write regular bases.
-            using bases = Class::bases<T>;
+            using bases = Class::regular_bases<T>;
             Meta::cexpr_for<Meta::list_size<bases>>([&](auto index)
             {
                 constexpr auto i = index.value;

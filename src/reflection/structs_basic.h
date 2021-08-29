@@ -128,7 +128,7 @@ namespace Refl
                 // Aliases for `metadata_type`.
                 template <typename T> using value_name = Meta::value_tag<T::name>;
                 template <typename T> using type_class_attribs = typename T::attribs;
-                template <typename T> using type_bases = typename T::bases;
+                template <typename T> using type_nonvirt_bases = typename T::nonvirt_bases;
                 template <typename T> using type_virt_bases = typename T::virt_bases;
                 template <typename T> using type_member_ptrs = typename T::member_ptrs;
                 template <typename T> using type_member_attribs = typename T::member_attribs;
@@ -141,8 +141,8 @@ namespace Refl
             template <typename T> using name = impl::metadata_type_t<impl::value_name, T>;
             // Returns attributes of a class as a `Refl::impl::Class::ClassAttr`.
             template <typename T> using class_attribs = impl::metadata_type_t<impl::type_class_attribs, T>;
-            // Returns a `Meta::type_list` of bases if they are known.
-            template <typename T> using bases = impl::metadata_type_t<impl::type_bases, T>;
+            // Returns a `Meta::type_list` of non-virtual bases if they are known.
+            template <typename T> using nonvirt_bases = impl::metadata_type_t<impl::type_nonvirt_bases, T>;
             // Returns a `Meta::type_list` of virtual bases if they are known.
             template <typename T> using virt_bases = impl::metadata_type_t<impl::type_virt_bases, T>;
             // Returns a `Meta::value_list` of member pointers.
@@ -186,15 +186,15 @@ namespace Refl
                 using type = typename Macro::class_attribs<T>::list;
             };
 
-            // Provides information about base classes.
-            template <typename T, typename Void = void> struct bases
+            // Provides information about non-virtual base classes.
+            template <typename T, typename Void = void> struct nonvirt_bases
             {
                 static_assert(std::is_void_v<Void>);
                 using type = Meta::type_list<>;
             };
-            template <typename T> struct bases<T, Meta::void_type<Macro::bases<T>>>
+            template <typename T> struct nonvirt_bases<T, Meta::void_type<Macro::nonvirt_bases<T>>>
             {
-                using type = Macro::bases<T>;
+                using type = Macro::nonvirt_bases<T>;
             };
 
             // Provides information about virtual base classes.
@@ -304,7 +304,7 @@ namespace Refl
         template <typename T> using class_attribs = typename Custom::class_attribs<std::remove_const_t<T>>::type;
 
         // Direct non-virtual bases.
-        template <typename T> using bases = typename Custom::bases<std::remove_const_t<T>>::type;
+        template <typename T> using regular_bases = typename Custom::nonvirt_bases<std::remove_const_t<T>>::type;
         // Direct virtual bases.
         template <typename T> using direct_virtual_bases = typename Custom::virt_bases<std::remove_const_t<T>>::type;
 
@@ -346,17 +346,28 @@ namespace Refl
 
         namespace impl
         {
-            // Helpers for recursively determining all virtual base classes.
-            template <typename Bases, typename Out> struct rec_virt_bases_norm {}; // Collect all recursive virtual bases of `Bases` to `Out`.
+            // Helper for recursively determining all non-virtual base classes. The list can contain duplicates.
+            // Returns `Bases...` and all their non-virtual bases recursively.
+            template <typename Bases> struct rec_nonvirt_bases {};
+            template <typename ...Bases> struct rec_nonvirt_bases<Meta::type_list<Bases...>>
+            {
+                using type = Meta::list_cat_types<
+                    Meta::type_list<Bases...>,
+                    typename rec_nonvirt_bases<regular_bases<Bases>>::type...
+                >;
+            };
+
+            // Helpers for recursively determining all (unique) virtual base classes.
+            template <typename Bases, typename Out> struct rec_virt_bases_nonvirt {}; // Collect all recursive virtual bases of `Bases` to `Out`.
             template <typename VirtBases, typename Out> struct rec_virt_bases_virt {}; // Collect `VirtBases` and all their recursive virtual bases to `Out`.
 
-            template <typename Out> struct rec_virt_bases_norm<Meta::type_list<>, Out> {using type = Out;};
-            template <typename FirstBase, typename ...Bases, typename Out> struct rec_virt_bases_norm<Meta::type_list<FirstBase, Bases...>, Out>
+            template <typename Out> struct rec_virt_bases_nonvirt<Meta::type_list<>, Out> {using type = Out;};
+            template <typename FirstBase, typename ...Bases, typename Out> struct rec_virt_bases_nonvirt<Meta::type_list<FirstBase, Bases...>, Out>
             {
                 using type =
-                    typename rec_virt_bases_virt<direct_virtual_bases<FirstBase>, // ^ 3. Recursively process virtual bases of the first base.
-                    typename rec_virt_bases_norm<bases<FirstBase>,                // | 2. Recursively process bases of the first base.
-                    typename rec_virt_bases_norm<Meta::type_list<Bases...>,       // | 1. Process the remaining bases.
+                    typename rec_virt_bases_virt   <direct_virtual_bases<FirstBase>, // ^ 3. Recursively process virtual bases of the first base.
+                    typename rec_virt_bases_nonvirt<regular_bases       <FirstBase>, // | 2. Recursively process bases of the first base.
+                    typename rec_virt_bases_nonvirt<Meta::type_list     <Bases...>,  // | 1. Process the remaining bases.
                 Out>::type>::type>::type;
             };
 
@@ -364,19 +375,21 @@ namespace Refl
             template <typename FirstVirtBase, typename ...VirtBases, typename Out> struct rec_virt_bases_virt<Meta::type_list<FirstVirtBase, VirtBases...>, Out>
             {
                 using type =
-                    typename rec_virt_bases_virt<direct_virtual_bases<FirstVirtBase>, // ^ 4. Recursively process virtual bases of the first base.
-                    typename rec_virt_bases_norm<bases<FirstVirtBase>,                // | 3. Recursively process bases of the first base.
-                    typename rec_virt_bases_virt<Meta::type_list<VirtBases...>,       // | 2. Process the remaining virtual bases. // Sic! Note `_virt` here. The `rec_virt_bases_norm` uses `_norm` here instead.
-                    Meta::list_copy_uniq<Meta::type_list<FirstVirtBase>,              // | 1. Add the first virtual base.
+                    typename rec_virt_bases_virt   <direct_virtual_bases<FirstVirtBase>, // ^ 4. Recursively process virtual bases of the first base.
+                    typename rec_virt_bases_nonvirt<regular_bases       <FirstVirtBase>, // | 3. Recursively process bases of the first base.
+                    typename rec_virt_bases_virt   <Meta::type_list     <VirtBases...>,  // | 2. Process the remaining virtual bases. // Sic! Note `_virt` here. The `rec_virt_bases_nonvirt` uses `_nonvirt` here instead.
+                    Meta::list_copy_uniq<Meta::type_list<FirstVirtBase>,                 // | 1. Add the first virtual base.
                 Out>>::type>::type>::type;
             };
         }
 
+        // Recursively get a list of all non-virtual bases of a class.
+        template <typename T> using recursive_regular_bases = typename impl::rec_nonvirt_bases<regular_bases<T>>::type;
         // Recursively get a list of all virtual bases of a class.
-        template <typename T> using virtual_bases = typename impl::rec_virt_bases_virt<direct_virtual_bases<T>, typename impl::rec_virt_bases_norm<bases<T>, Meta::type_list<>>::type>::type;
-        // A list of all bases of a class: regular ones, then virtual ones.
-        // Duplicates are not removed from this list, so you should probably check for them separately. If you use `CombinedBaseIndex`, it takes care of that.
-        template <typename T> using combined_bases = Meta::list_cat_types<bases<T>, virtual_bases<T>>;
+        template <typename T> using virtual_bases = typename impl::rec_virt_bases_virt<direct_virtual_bases<T>, typename impl::rec_virt_bases_nonvirt<regular_bases<T>, Meta::type_list<>>::type>::type;
+        // A list of direct non-virtual bases, followed by all virtual bases.
+        // Duplicates are not removed from this list (except that virtual bases are inherently unique), so you should probably check for them separately. If you use `CombinedBaseIndex`, it takes care of that.
+        template <typename T> using combined_bases = Meta::list_cat_types<regular_bases<T>, virtual_bases<T>>;
 
         // Check if a class has a specific attribute.
         template <typename T, typename A> inline constexpr bool class_has_attrib = Meta::list_contains_type<class_attribs<T>, A>;
@@ -415,18 +428,17 @@ namespace Refl
             }
         }
 
-        // Those convert {member|base|virtual base} name to its index.
+        // Those convert names of members/bases to their indices.
         // If there is no such entry, -1 is returned.
-        // If a class has several entries with the same name, using corresponding function will cause an assertion at program startup.
-        // (When we get C++20 constexpr algorithms, we can move that assertion to compile-time).
+        // If a class has several entries with the same name, using corresponding function will cause a static assertion.
         template <typename T> [[nodiscard]] std::size_t MemberIndex(const char *name)
         {
             // Note that `remove_const_t` is necessary here, but not in the other three functions.
             return Utils::GetStringIndex<impl::StringList_Members<std::remove_const_t<T>>>(name);
         }
-        template <typename T> [[nodiscard]] std::size_t BaseIndex(const char *name)
+        template <typename T> [[nodiscard]] std::size_t RegularBaseIndex(const char *name)
         {
-            return Utils::GetStringIndex<impl::StringList_Classes<bases<T>>>(name);
+            return Utils::GetStringIndex<impl::StringList_Classes<regular_bases<T>>>(name);
         }
         template <typename T> [[nodiscard]] std::size_t VirtualBaseIndex(const char *name)
         {
@@ -439,7 +451,7 @@ namespace Refl
         }
 
         template <typename T> [[nodiscard]] std::size_t MemberIndex      (const std::string &name) {return MemberIndex      <T>(name.c_str());}
-        template <typename T> [[nodiscard]] std::size_t BaseIndex        (const std::string &name) {return BaseIndex        <T>(name.c_str());}
+        template <typename T> [[nodiscard]] std::size_t RegularBaseIndex (const std::string &name) {return RegularBaseIndex <T>(name.c_str());}
         template <typename T> [[nodiscard]] std::size_t VirtualBaseIndex (const std::string &name) {return VirtualBaseIndex <T>(name.c_str());}
         template <typename T> [[nodiscard]] std::size_t CombinedBaseIndex(const std::string &name) {return CombinedBaseIndex<T>(name.c_str());}
     }
@@ -631,8 +643,8 @@ External metadata, at the same scope as the class.
         // Class attributes. Can be absent if there are none.
         using attribs = Refl::impl::Class::ClassAttr<ATTRIBS>;
 
-        // A list of bases.
-        using bases = ::Meta::type_list<base1, base2, ...>;
+        // A list of non-virtual bases.
+        using nonvirt_bases = ::Meta::type_list<base1, base2, ...>;
         // A list of virtual bases.
         using virt_bases = ::Meta::type_list<base3, base4, ...>;
 
@@ -822,8 +834,8 @@ That's all.
         static constexpr char name[] = MA_STR(name_); \
         /* Attribute list. */\
         MA_IF_NOT_EMPTY(using attribs = ::Refl::impl::Class::ClassAttr<MA_IDENTITY attribs_>;, MA_IDENTITY attribs_) \
-        /* A list of bases. */\
-        using bases = ::Meta::type_list<REFL_STRUCT_impl_strip_leading_comma(REFL_STRUCT_impl_nonvirt_bases(MA_TR_C(MA_IDENTITY bases_) MA_TR_C(MA_IDENTITY fake_bases_)))>; \
+        /* A list of non-virtual bases. */\
+        using nonvirt_bases = ::Meta::type_list<REFL_STRUCT_impl_strip_leading_comma(REFL_STRUCT_impl_nonvirt_bases(MA_TR_C(MA_IDENTITY bases_) MA_TR_C(MA_IDENTITY fake_bases_)))>; \
         /* A list of virtual bases. */\
         using virt_bases = ::Meta::type_list<REFL_STRUCT_impl_strip_leading_comma(REFL_STRUCT_impl_virt_bases_with_prefix(,MA_TR_C(MA_IDENTITY bases_) MA_TR_C(MA_IDENTITY fake_bases_)))>; \
         /* Indicates that the class was explicitly made polymorphic. */\
@@ -869,11 +881,11 @@ That's all.
 
 // Internal. Helper for `REFL_STRUCT_impl_low`. Generates a list of base classes, starting with a colon.
 // `name` is the struct name, possibly followed by `<...>` template parameters.
-// `*bases` are lists of base classes: `(class1,class2,...)` or `()` if empty.
+// `bases` is a list of base classes: `(class1,class2,...)` or `()` if empty.
 // `...` is `x` if the class is polymorphic, empty otherwise.
 #define REFL_STRUCT_impl_low_expand_bases(name, bases, untracked_bases, /*is_poly_if_not_empty*/...) \
     : REFL_STRUCT_impl_strip_leading_comma( \
-        /* Regular bases. */\
+        /* Non-virtual bases. */\
         REFL_STRUCT_impl_nonvirt_bases(MA_TR_C(MA_IDENTITY bases)) \
         /* Virtual bases. */\
         REFL_STRUCT_impl_virt_bases_with_prefix(virtual, MA_TR_C(MA_IDENTITY bases)) \

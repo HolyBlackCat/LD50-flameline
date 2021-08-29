@@ -328,7 +328,7 @@ namespace Refl
             // Otherwise does nothing.
             template <
                 typename Derived, typename Base,
-                typename NextBases = Meta::list_cat_types<Class::bases<Base>, Class::direct_virtual_bases<Base>>,
+                typename NextBases = Meta::list_cat_types<Class::regular_bases<Base>, Class::direct_virtual_bases<Base>>,
                 typename = void
             >
             struct RegisterForEachBaseIfNeeded {};
