@@ -383,13 +383,15 @@ namespace Refl
             };
         }
 
-        // Recursively get a list of all non-virtual bases of a class.
-        template <typename T> using recursive_regular_bases = typename impl::rec_nonvirt_bases<regular_bases<T>>::type;
         // Recursively get a list of all virtual bases of a class.
         template <typename T> using virtual_bases = typename impl::rec_virt_bases_virt<direct_virtual_bases<T>, typename impl::rec_virt_bases_nonvirt<regular_bases<T>, Meta::type_list<>>::type>::type;
         // A list of direct non-virtual bases, followed by all virtual bases.
         // Duplicates are not removed from this list (except that virtual bases are inherently unique), so you should probably check for them separately. If you use `CombinedBaseIndex`, it takes care of that.
         template <typename T> using combined_bases = Meta::list_cat_types<regular_bases<T>, virtual_bases<T>>;
+        // Recursively get a list of all non-virtual bases of a class.
+        template <typename T> using recursive_regular_bases = typename impl::rec_nonvirt_bases<regular_bases<T>>::type;
+        // Recursively get a list of all bases of a class.
+        template <typename T> using recursive_combined_bases = Meta::list_cat_types<recursive_regular_bases<T>, typename impl::rec_nonvirt_bases<virtual_bases<T>>::type>;
 
         // Check if a class has a specific attribute.
         template <typename T, typename A> inline constexpr bool class_has_attrib = Meta::list_contains_type<class_attribs<T>, A>;
@@ -433,15 +435,17 @@ namespace Refl
         // If a class has several entries with the same name, using the corresponding function will cause a static assertion.
         template <typename T> [[nodiscard]] std::size_t MemberIndex               (const char *name) {return Utils::GetStringIndex<impl::StringList_Members<std::remove_const_t<T>>>(name);} // Note that `remove_const_t` is necessary here, but not in the other three functions.
         template <typename T> [[nodiscard]] std::size_t RegularBaseIndex          (const char *name) {return Utils::GetStringIndex<impl::StringList_Classes<regular_bases           <T>>>(name);}
-        template <typename T> [[nodiscard]] std::size_t RecursiveRegularBaseIndex (const char *name) {return Utils::GetStringIndex<impl::StringList_Classes<recursive_regular_bases <T>>>(name);}
         template <typename T> [[nodiscard]] std::size_t VirtualBaseIndex          (const char *name) {return Utils::GetStringIndex<impl::StringList_Classes<virtual_bases           <T>>>(name);}
         template <typename T> [[nodiscard]] std::size_t CombinedBaseIndex         (const char *name) {return Utils::GetStringIndex<impl::StringList_Classes<combined_bases          <T>>>(name);}
+        template <typename T> [[nodiscard]] std::size_t RecursiveRegularBaseIndex (const char *name) {return Utils::GetStringIndex<impl::StringList_Classes<recursive_regular_bases <T>>>(name);}
+        template <typename T> [[nodiscard]] std::size_t RecursiveCombinedBaseIndex(const char *name) {return Utils::GetStringIndex<impl::StringList_Classes<recursive_combined_bases<T>>>(name);}
 
         template <typename T> [[nodiscard]] std::size_t MemberIndex               (const std::string &name) {return MemberIndex               <T>(name.c_str());}
         template <typename T> [[nodiscard]] std::size_t RegularBaseIndex          (const std::string &name) {return RegularBaseIndex          <T>(name.c_str());}
-        template <typename T> [[nodiscard]] std::size_t RecursiveRegularBaseIndex (const std::string &name) {return RecursiveRegularBaseIndex <T>(name.c_str());}
         template <typename T> [[nodiscard]] std::size_t VirtualBaseIndex          (const std::string &name) {return VirtualBaseIndex          <T>(name.c_str());}
         template <typename T> [[nodiscard]] std::size_t CombinedBaseIndex         (const std::string &name) {return CombinedBaseIndex         <T>(name.c_str());}
+        template <typename T> [[nodiscard]] std::size_t RecursiveRegularBaseIndex (const std::string &name) {return RecursiveRegularBaseIndex <T>(name.c_str());}
+        template <typename T> [[nodiscard]] std::size_t RecursiveCombinedBaseIndex(const std::string &name) {return RecursiveCombinedBaseIndex<T>(name.c_str());}
     }
 
     namespace Polymorphic::impl
