@@ -569,20 +569,21 @@ namespace Ent
 
     namespace impl
     {
-        // Touch this to register a component.
+        // Touch this to register a component and all its parents. Always returns true.
         template <TagType Tag, ComponentType C>
-        constexpr void RegisterComponent()
+        constexpr bool RegisterComponent()
         {
-            // Register the component itself.
+            // Register `C`.
             (void)TypeRegistrationHelper<ComponentRegistry<Tag>>::template register_type<C>;
 
-            // Recursivelt register its direct bases (virtual and regular).
+            // Register all its bases.
             []<typename ...L>(Meta::type_list<L...>){
                 ([]{
                     if constexpr (ComponentType<L>)
-                        RegisterComponent<Tag, L>();
+                        (void)TypeRegistrationHelper<ComponentRegistry<Tag>>::template register_type<L>;
                 }(), ...);
-            }(Meta::list_cat_types<Refl::Class::bases<C>, Refl::Class::direct_virtual_bases<C>>{});
+            }(Refl::Class::recursive_combined_bases<C>{});
+            return true;
         }
 
 
@@ -630,10 +631,9 @@ namespace Ent
                     if constexpr (ComponentType<T>)
                         func(c);
 
-                    // Call the lambda for direct non-virtual bases (recursively).
                     [&]<typename ...L>(Meta::type_list<L...>){
                         (lambda(lambda, c ? static_cast<const L *>(c) : nullptr), ...);
-                    }(Refl::Class::bases<T>{});
+                    }(Refl::Class::regular_bases<T>{});
                 };
 
                 // For each component...
@@ -677,8 +677,9 @@ namespace Ent
             const void *GetComponentPtrLow(std::size_t index) const noexcept override final
             {
                 // Register the components (at compile-time).
-                // Because this function is virtual, this conveniently runs even if it's unused.
-                (RegisterComponent<Tag, C>(), ...);
+                // Because this function is virtual, this conveniently happens even if it's unused.
+                // The assertion should never fail.
+                static_assert((RegisterComponent<Tag, C>() && ...));
 
                 // Pre-compute the offsets (relative to the tuple) for all known components for this tag.
                 // `-1` means the component is missing.
@@ -759,33 +760,32 @@ namespace Ent
         };
 
 
+        // Returns a list with `C` and every component implied by it or its bases.
+        template <ComponentType C>
+        struct AddImpliedComponents
+        {
+            template <ComponentType ...L> using directly_implied = Meta::list_cat_types<typename L::component::implies...>;
+            using type = Meta::list_uniq<Meta::list_cat_types<Meta::type_list<C>, directly_implied<C>, Meta::list_apply_types<directly_implied, Refl::Class::recursive_combined_bases<C>>>>;
+        };
+
         // `R` should start as an empty `Meta::type_list<>`.
         // Returns the list `L`, recursively amended with implied components.
         template <typename L, typename R>
-        struct ImpliedComponents {};
+        struct AddImpliedComponentsToList {};
         template <typename R>
-        struct ImpliedComponents<Meta::type_list<>, R>
+        struct AddImpliedComponentsToList<Meta::type_list<>, R>
         {
             using type = R;
         };
         template <ComponentType C0, ComponentType ...C, typename R> requires Meta::list_contains_type<R, C0>
-        struct ImpliedComponents<Meta::type_list<C0, C...>, R>
+        struct AddImpliedComponentsToList<Meta::type_list<C0, C...>, R>
         {
-            using type = typename ImpliedComponents<Meta::type_list<C...>, R>::type;
+            using type = typename AddImpliedComponentsToList<Meta::type_list<C...>, R>::type;
         };
         template <ComponentType C0, ComponentType ...C, typename R> requires(!Meta::list_contains_type<R, C0>)
-        struct ImpliedComponents<Meta::type_list<C0, C...>, R>
+        struct AddImpliedComponentsToList<Meta::type_list<C0, C...>, R>
         {
-            using type =
-                typename ImpliedComponents<
-                    Meta::list_cat_types<
-                        typename C0::component::implies, // Add directly implied components.
-                        Refl::Class::bases<C0>, // Add direct non-virtual bases.
-                        Refl::Class::direct_virtual_bases<C0>, // Add direct virtual bases.
-                        Meta::type_list<C...> // Add remaining components.
-                    >,
-                    Meta::list_cat_types<R, Meta::type_list<C0>> // Add `C0` to the returned list.
-                >::type;
+            using type = typename AddImpliedComponentsToList<Meta::type_list<C...>, Meta::list_copy_uniq<typename AddImpliedComponents<C0>::type, R>>::type;
         };
 
 
@@ -946,7 +946,7 @@ namespace Ent
                 impl::EntityWithComponents<
                     C,
                     Tag,
-                    typename impl::ImpliedComponents<Meta::list_cat_types<typename Tag::common_components_t, Meta::type_list<C>>, Meta::type_list<>>::type
+                    typename AddImpliedComponentsToList<Meta::list_cat_types<typename Tag::common_components_t, Meta::type_list<C>>, Meta::type_list<>>::type
                 >
             >;
 
