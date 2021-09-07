@@ -994,20 +994,11 @@ namespace Ent
                 }
             };
 
-          protected:
-            // Protected to prevent prevent accidental misuse. Use the factory functions below.
-            constexpr ControllerBase() {}
-
           public:
+            explicit constexpr ControllerBase() {}
             ControllerBase(ControllerBase &&) = default;
             ControllerBase &operator=(ControllerBase &&) = default;
             ~ControllerBase() = default;
-
-            // Creates an null controller.
-            [[nodiscard]] static constexpr Controller<Tag> MakeEmptyController()
-            {
-                return {};
-            }
 
             // Creates a valid controller.
             [[nodiscard]] static Controller<Tag> MakeController()
@@ -1160,5 +1151,9 @@ namespace Ent
     class Controller : public Tag::template ControllerAdditions<impl::ControllerBase<Tag>>
     {
         using Tag::template ControllerAdditions<impl::ControllerBase<Tag>>::ControllerAdditions;
+
+      public:
+        // Default constructor explicit-ness doesn't seem to be inherited.
+        explicit constexpr Controller() {}
     };
 }
