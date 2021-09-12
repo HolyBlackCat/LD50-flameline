@@ -13,7 +13,6 @@
 
 #include <double-conversion/double-conversion.h>
 
-#include "macros/check.h"
 #include "meta/basic.h"
 #include "meta/type_info.h"
 #include "program/errors.h"
@@ -26,12 +25,12 @@ namespace Strings
 {
     namespace impl
     {
+        template <typename T>
+        concept SupportedScalar = (std::is_integral_v<T> && sizeof(T) <= sizeof(long long)) || (std::is_floating_point_v<T> && sizeof(T) <= sizeof(long double));
+
         // Uses the most suitable `std::strto*` for the specified type.
         // The return type might be wider than T.
-        template <
-            typename T,
-            CHECK((std::is_integral_v<T> && sizeof(T) <= sizeof(long long)) || (std::is_floating_point_v<T> && sizeof(T) <= sizeof(long double)))
-        >
+        template <SupportedScalar T>
         auto strto_low(const char *str, char **str_end, int base = 0)
         {
             if constexpr (std::is_integral_v<T>)
@@ -89,7 +88,7 @@ namespace Strings
     // Skips leading spaces. Ignores any symbols after the number.
     // Shouldn't throw.
     // If `T` is unsigned, negative values appear to be allowed (if they are greater than -2^n). Otherwise out-of-range values are not allowed.
-    template <typename T, CHECK(std::is_arithmetic_v<T>)>
+    template <impl::SupportedScalar T>
     [[nodiscard]] T strto(const char *str, const char **str_end, int base = 0)
     {
         char *end = const_cast<char *>(str);
@@ -136,11 +135,7 @@ namespace Strings
     // If `T` is a `long double`, it's converted to a pair of `@` separated numbers, that need to be
     //   added together to get the original number. The first number is always as large as possible.
     // If the number is NaN, outputs `nan`. If it's an infinity, outputs `inf` or `-inf` depending on the sign.
-    template <
-        Meta::deduce...,
-        typename T,
-        CHECK((std::is_integral_v<T> && sizeof(T) <= sizeof(long long)) || (std::is_floating_point_v<T> && sizeof(T) <= sizeof(long double)))
-    >
+    template <Meta::deduce..., impl::SupportedScalar T>
     bool ToString(char *buffer, std::size_t buffer_size, T number)
     {
         if constexpr (std::is_same_v<T, bool>)
@@ -235,7 +230,7 @@ namespace Strings
         return true;
     }
 
-    template <typename T, CHECK_EXPR(ToString(nullptr, 0, T{}))>
+    template <impl::SupportedScalar T>
     [[nodiscard]] std::string ToString(T number)
     {
         char buf[ToStringMaxBufferLen()];
@@ -250,10 +245,7 @@ namespace Strings
     // Can handle hex integers and floats, digit separators ('), and special float values ("inf", "+inf", "-inf", "nan").
     // If `T` is a `long double`, expects either a double, or two doubles separated with `@`, that will be
     //   added together to produce the result. This matches the output format of `ToString()`.
-    template <
-        typename T,
-        CHECK((std::is_integral_v<T> && sizeof(T) <= sizeof(long long)) || (std::is_floating_point_v<T> && sizeof(T) <= sizeof(long double)))
-    >
+    template <impl::SupportedScalar T>
     [[nodiscard]] T FromString(std::string_view str)
     {
         static_assert(!std::is_const_v<T> && !std::is_volatile_v<T>);
@@ -347,12 +339,12 @@ namespace Strings
 
     // Works as either `ToString` (T = std::string) or `FromString()` (T is arithmetic).
     // Throws on failure.
-    template <typename T, Meta::deduce..., typename U, CHECK(std::is_same_v<T, std::string>)>
+    template <std::same_as<std::string> T, Meta::deduce..., typename U>
     [[nodiscard]] std::string lexical_cast(U number)
     {
         return ToString(number);
     }
-    template <typename T, Meta::deduce..., CHECK(std::is_arithmetic_v<T>)>
+    template <impl::SupportedScalar T>
     [[nodiscard]] T lexical_cast(std::string_view string)
     {
         return FromString<T>(string);

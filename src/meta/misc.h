@@ -5,7 +5,6 @@
 #include <type_traits>
 #include <utility>
 
-#include "macros/check.h"
 #include "meta/basic.h"
 
 namespace Meta
@@ -202,7 +201,7 @@ namespace Meta
     // Invoke a funciton with a set of constexpr-ized boolean flags.
     // (Beware that 2^n instantinations of the function will be generated.)
     // Example usage:
-    //     T result = Meta::cexpr_flags(0,1,1) >> [](auto a, auto b, auto c) {return a.value + b.value + c.value};
+    //     T result = Meta::with_cexpr_flags(0,1,1) >> [](auto a, auto b, auto c) {return a.value + b.value + c.value};
 
     namespace impl
     {
@@ -235,7 +234,7 @@ namespace Meta
         };
     }
 
-    template <typename ...P, CHECK(std::is_convertible_v<const P &, bool> && ...)>
+    template <typename ...P> requires (std::is_convertible_v<const P &, bool> && ...)
     [[nodiscard]] constexpr auto with_cexpr_flags(const P &... params)
     {
         impl::cexpr_flag_bits_t flags = 0, mask = 1;

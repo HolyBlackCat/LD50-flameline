@@ -6,7 +6,6 @@
 #include <type_traits>
 #include <utility>
 
-#include "macros/check.h"
 #include "meta/assignable_wrapper.h"
 #include "meta/basic.h"
 

@@ -13,7 +13,6 @@
 #include <type_traits>
 #include <vector>
 
-#include "macros/check.h"
 #include "macros/finally.h"
 #include "meta/misc.h"
 #include "program/errors.h"
@@ -133,10 +132,12 @@ namespace Stream
 
         // Constructs a stream bound to a sequential container.
         // It should work at least with strings and vectors of `char` and `std::uint8_t`.
-        template <
-            typename T,
-            CHECK_EXPR(std::declval<T&>().insert(std::declval<T&>().end(), (const std::uint8_t *)0, (const std::uint8_t *)0))
-        >
+        template <typename T>
+        requires requires(T t)
+        {
+            t.insert(t.end(), (const std::uint8_t *)0, (const std::uint8_t *)0);
+            requires sizeof(typename T::value_type) == 1;
+        }
         [[nodiscard]] static Output Container(T &container, capacity_t capacity = default_capacity)
         {
             return Output(STR("Container at ", ((void *)&container)),

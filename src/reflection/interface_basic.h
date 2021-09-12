@@ -1,5 +1,6 @@
 #pragma once
 
+#include <concepts>
 #include <cstddef>
 #include <optional>
 #include <string_view>
@@ -7,7 +8,6 @@
 #include <type_traits>
 #include <utility>
 
-#include "macros/check.h"
 #include "meta/misc.h"
 #include "reflection/utils.h"
 #include "stream/input.h"
@@ -160,7 +160,7 @@ namespace Refl
 
         struct UniversalInitialState
         {
-            template <typename T, CHECK_EXPR(T::InitialState())>
+            template <typename T> requires requires{T::InitialState();}
             [[nodiscard]] operator T() const
             {
                 return T::InitialState();
@@ -205,6 +205,13 @@ namespace Refl
     }
 
 
+    // Returns true if `T` is reflected. That is, if `Interface()` can be called on it.
+    template <typename T>
+    concept reflected = requires
+    {
+        typename impl::SelectInterface<std::remove_cv_t<T>>::type;
+    };
+
     // Constructs an interface for a type.
     template <typename T>
     auto Interface() -> typename impl::SelectInterface<std::remove_cv_t<T>>::type
@@ -241,7 +248,7 @@ namespace Refl
             InputStreamWrapper(const std::string &str) : InputStreamWrapper(std::string_view(str)) {}
 
             // We use SFINAE to make sure this doesn't interfer with the copy/move ctors and with the string ctors.
-            template <typename T, CHECK(!std::is_convertible_v<T, std::string_view> && !std::is_same_v<std::remove_cvref_t<T>, InputStreamWrapper>)>
+            template <typename T> requires(!std::is_convertible_v<T, std::string_view> && !std::is_same_v<std::remove_cvref_t<T>, InputStreamWrapper>)
             InputStreamWrapper(T &&param)
                 : stream_storage(std::in_place, std::forward<T>(param)), stream(*stream_storage)
             {}
@@ -254,12 +261,12 @@ namespace Refl
         };
 
 
-        template <typename T, CHECK_EXPR(Interface<T>())>
+        template <reflected T>
         void ToString(const T &object, Stream::Output &output, const ToStringOptions &options = {})
         {
             InterfaceFor(object).ToString(object, output, options, initial_state); // A qualified call prevents unwanted ADL.
         }
-        template <typename T, CHECK_EXPR(Interface<T>())>
+        template <reflected T>
         [[nodiscard]] std::string ToString(const T &object, const ToStringOptions &options = {})
         {
             std::string ret;
@@ -271,7 +278,7 @@ namespace Refl
 
 
         // Skips any leading and trailing whitespace and comments. Expects `input` to have no junk at the end.
-        template <typename T, CHECK_EXPR(Interface<T>())>
+        template <reflected T>
         void FromString(T &object, InputStreamWrapper input, const FromStringOptions &options = {})
         {
             input.stream.WantLocationStyle(Stream::text_position);
@@ -280,7 +287,7 @@ namespace Refl
             Utils::SkipWhitespaceAndComments(input.stream);
             input.stream.ExpectEnd();
         }
-        template <typename T, CHECK_EXPR(void(Interface<T>()), T{})>
+        template <reflected T> requires std::default_initializable<T>
         [[nodiscard]] T FromString(InputStreamWrapper input, const FromStringOptions &options = {})
         {
             T ret{};
@@ -288,12 +295,12 @@ namespace Refl
             return ret;
         }
 
-        template <typename T, CHECK_EXPR(Interface<T>())>
+        template <reflected T>
         void ToBinary(const T &object, Stream::Output &output, const ToBinaryOptions &options = {})
         {
             InterfaceFor(object).ToBinary(object, output, options, initial_state); // A qualified call prevents unwanted ADL.
         }
-        template <typename C, typename T, CHECK_EXPR(void(Interface<T>()), Stream::Output::Container(std::declval<C &>()))>
+        template <typename C, reflected T> requires requires(C c){Stream::Output::Container(c);}
         [[nodiscard]] C ToBinary(const T &object, const ToBinaryOptions &options = {})
         {
             C ret;
@@ -304,14 +311,14 @@ namespace Refl
         }
 
         // Expects `input_data` to have no junk at the end.
-        template <typename T, CHECK_EXPR(Interface<T>())>
+        template <reflected T>
         void FromBinary(T &object, InputStreamWrapper input, const FromBinaryOptions &options = {})
         {
             input.stream.WantLocationStyle(Stream::byte_offset);
             InterfaceFor(object).FromBinary(object, input.stream, options, initial_state); // A qualified call prevents unwanted ADL.
             input.stream.ExpectEnd();
         }
-        template <typename T, CHECK_EXPR(void(Interface<T>()), T{})>
+        template <reflected T> requires std::default_initializable<T>
         [[nodiscard]] T FromBinary(InputStreamWrapper input, const FromBinaryOptions &options = {})
         {
             T ret{};

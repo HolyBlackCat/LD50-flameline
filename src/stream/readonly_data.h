@@ -1,15 +1,16 @@
 #pragma once
 
+#include <concepts>
 #include <cstddef>
 #include <cstdint>
 #include <cstdio>
+#include <functional>
 #include <iterator>
 #include <memory>
 #include <string>
 #include <type_traits>
 #include <utility>
 
-#include "macros/check.h"
 #include "macros/finally.h"
 #include "program/errors.h"
 #include "stream/better_fopen.h"
@@ -66,21 +67,21 @@ namespace Stream
             return mem_reference(reinterpret_cast<const std::uint8_t *>(begin), reinterpret_cast<const std::uint8_t *>(end));
         }
         // Stores a reference to an existing contaner.
-        template <typename T, CHECK_TYPE(impl::detect_flat_byte_container<T>)>
+        template <impl::FlatByteContainer T>
         [[nodiscard]] static ReadOnlyData mem_reference(const T &container)
         {
             auto pointer = reinterpret_cast<const std::uint8_t *>(std::data(container));
             return mem_reference(pointer, pointer + std::size(container));
         }
 
-        template <typename F, CHECK_EXPR(std::declval<F>()((std::uint8_t *)nullptr))>
+        template <std::invocable<std::uint8_t *> F>
         [[nodiscard]] static ReadOnlyData copy_from_function(std::string name, std::size_t size, F &&func) // `func` is `void func(std::uint8_t *)`.
         {
             ReadOnlyData ret;
             ret.ref = std::make_shared<Data>();
 
             ret.ref->storage = std::make_unique<std::uint8_t[]>(size+1); // Plus one byte for a null-terminator.
-            std::forward<F>(func)(ret.ref->storage.get());
+            std::invoke(std::forward<F>(func), ret.ref->storage.get());
             ret.ref->storage[size] = '\0';
 
             ret.ref->begin = ret.ref->storage.get();
@@ -117,7 +118,7 @@ namespace Stream
             return mem_copy(reinterpret_cast<const std::uint8_t *>(begin), reinterpret_cast<const std::uint8_t *>(end));
         }
         // Copies an existing container, adds a null-terminator.
-        template <typename T, CHECK_TYPE(impl::detect_flat_byte_container<T>)>
+        template <impl::FlatByteContainer T>
         [[nodiscard]] static ReadOnlyData mem_copy(const T &container)
         {
             auto pointer = reinterpret_cast<const std::uint8_t *>(std::data(container));

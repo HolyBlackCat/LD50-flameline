@@ -10,7 +10,6 @@
 #include <utility>
 
 #include "program/errors.h"
-#include "macros/check.h"
 #include "utils/unicode.h"
 
 namespace Strings
@@ -31,7 +30,7 @@ namespace Strings
     // Escapes a string.
     // By default, all control characters are escaped, including `\n` and `\r`, and extended (>= 128) characters are not escaped.
     // If a character can't be escaped with a single symbol (\?), then \xNN is always used.
-    template <typename Iter, CHECK_EXPR(*std::declval<Iter &>()++ = char())>
+    template <typename Iter> requires requires(Iter i){*i++ = char();}
     void Escape(std::string_view str, Iter output_iter, EscapeFlags flags = EscapeFlags::no_flags)
     {
         auto OutputString = [&](const char *ptr)
@@ -113,7 +112,7 @@ namespace Strings
     // Supports following escape sequences: \', \", \\, \a, \b, \f, \n, \r, \t, \v.
     // Doesn't support \?, because it's stupid.
     // Additionally supports octal \[0-7]{1,3}, hex \x[a-zA-Z0-9]{1,2}, and unicode \u[a-zA-Z0-9]{4}, \U[a-zA-Z0-9]{8} escapes.
-    template <typename Iter, CHECK_EXPR(*std::declval<Iter &>()++ = char())>
+    template <typename Iter> requires requires(Iter i){*i++ = char();}
     void Unescape(std::string_view str, Iter output_iter, UnescapeFlags flags = UnescapeFlags::no_flags)
     {
         auto cur = str.begin();
@@ -148,7 +147,7 @@ namespace Strings
             }
             else
             {
-                cur++; // Skip `/`.
+                cur++; // Skip `\`.
                 if (cur == end)
                     Program::Error("Unfinished escape sequence at the end of string.");
 

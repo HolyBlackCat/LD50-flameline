@@ -7,7 +7,6 @@
 #include <memory>
 #include <utility>
 
-#include "macros/check.h"
 #include "macros/finally.h"
 #include "program/errors.h"
 #include "stream/better_fopen.h"
@@ -56,7 +55,7 @@ namespace Stream
     }
 
     // Saves a container to a file. Throws on failure.
-    template <typename T, CHECK_TYPE(impl::detect_flat_byte_container<T>)>
+    template <impl::FlatByteContainer T>
     void SaveFile(std::string file_name, const T &container, SaveMode mode = binary)
     {
         const std::uint8_t *ptr = reinterpret_cast<const std::uint8_t *>(std::data(container));
@@ -80,7 +79,7 @@ namespace Stream
     }
 
     // Saves a container to a file, in a compressed form (see `archive.h` for details). Throws on failure.
-    template <typename T, CHECK_TYPE(impl::detect_flat_byte_container<T>)>
+    template <impl::FlatByteContainer T>
     void SaveFileCompressed(std::string file_name, const T &container)
     {
         const std::uint8_t *ptr = reinterpret_cast<const std::uint8_t *>(std::data(container));
