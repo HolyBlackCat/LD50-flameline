@@ -26,6 +26,7 @@
 #include "macros/named_loops.h"
 #include "meta/misc.h"
 #include "program/entry_point.h"
+#include "program/compiler.h"
 #include "program/errors.h"
 #include "program/exit.h"
 #include "program/main_loop.h"
