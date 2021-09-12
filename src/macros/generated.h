@@ -170,9 +170,12 @@
 #define MA_SEQ_SIZE_impl_16_val 16
 
 // Applies macro `m` to each comma-separated element in `...`.
-// A trailing comma in `...` is mandatory, not adding it causes an immediate error.
-// If your list doesn't have a trailing comma, wrap it in `MA_TR_C(...)`.
-// (Alternatively, you can add the comma manually. But in thsi case, if the list is empty, you'll get one unwanted iteration.)
+// (pre-C++20)
+//     A trailing comma in `...` is mandatory, not adding it causes an immediate error.
+// (C++20, and Clang needs `-Wno-gnu-zero-variadic-macro-arguments`)
+//     The trailing comma in `...` is optional and is ignored.
+// If your list doesn't have a trailing comma, you can wrap it in `MA_TR_C(...)`.
+// (Alternatively, you can add the comma manually. But in this case, if the list is empty, you'll get one unwanted iteration.)
 // `m` will be called as `m(d,i,x)`, where `d` is arbitrary user data, `i` is 0-based index, `x` is current element.
 // Is not reentrant (i.e. can't be nested in itself).
 #define MA_VA_FOR_EACH(d,m,...) __VA_OPT__(MA_VA_FOR_EACH_impl_minus1(d,m,__VA_ARGS__))

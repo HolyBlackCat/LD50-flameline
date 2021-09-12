@@ -14,7 +14,9 @@ USED_PACKAGES := sdl2 openal freetype2 ogg vorbis vorbisfile zlib fmt double-con
 
 
 # Flags
-CXXFLAGS := -std=c++20 -pedantic-errors -Wall -Wextra -Wdeprecated -Wextra-semi
+# `-Wno-gnu-zero-variadic-macro-arguments` - Allow omitting the last `,` when passing zero args to a variadic macro parameter.
+#     The standard allows this since C++20, but Clang's `-pedantic-errors` incorrectly rejects it otherwise.
+CXXFLAGS := -std=c++20 -pedantic-errors -Wall -Wextra -Wdeprecated -Wextra-semi -Wno-gnu-zero-variadic-macro-arguments
 LDFLAGS :=
 # Important flags
 override CXXFLAGS += -include src/program/common_macros.h -include src/program/parachute.h -Isrc -Ilib/include $(subst -Dmain,-DENTRY_POINT_OVERRIDE,$(sort $(deps_compiler_flags)))
