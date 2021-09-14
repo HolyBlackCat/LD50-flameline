@@ -108,7 +108,11 @@ namespace Refl::Utils
         const char *name = nullptr;
         std::size_t index = 0;
 
-        constexpr bool operator==(const NameIndexPair &) const = default;
+        constexpr bool operator==(const NameIndexPair &other) const
+        {
+            return *this <=> other == 0;
+        }
+
         constexpr std::weak_ordering operator<=>(const NameIndexPair &other) const
         {
             return *this <=> other.name;
