@@ -140,7 +140,7 @@ namespace Poly
                     Unique ret;
 
                     ret.data.bytes = new unsigned char[sizeof(D)];
-                    FINALLY_ON_THROW( delete[] ret.data.bytes; )
+                    FINALLY_ON_THROW( delete[] ret.data.bytes; ret.data.bytes = nullptr; ) // Zeroing the pointer is important, because the destructor of `ret` will look at it.
 
                     D *derived = new(ret.data.bytes) D(std::forward<P>(params)...);
                     // Not needed because nothing below this point can throw:
