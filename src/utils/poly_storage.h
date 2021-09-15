@@ -158,8 +158,10 @@ namespace Poly
                 {
                     if (data.bytes)
                     {
-                        // Note that qualifying the destructor call with `T::` silences a clang warning about calling a non-virtual destructor of an abstract class, if we use such class as the template parameter.
-                        data.base->T::~T();
+                        if constexpr (std::has_virtual_destructor_v<T>)
+                            data.base->~T();
+                        else
+                            data.base->T::~T(); // This silences some warnings about the destructor being non-virtual. We insteal have some static assertions to catch common mistakes.
                         delete[] data.bytes;
                     }
                 }
