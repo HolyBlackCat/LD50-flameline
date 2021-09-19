@@ -1,15 +1,13 @@
 #pragma once
 
-// Defines the `_main_` macro, which should be used as the entry point function name, instead of main.
-// The signature should be: `int _main_(int, char **)`.
+// Defines the `IMP_MAIN(argc, argv)` macro, which should be used as the entry point, instead of `int main(int argc, char **argv)`.
+// Parameter names can be empty if unused.
+// The macro includes the return type and the parameter types to enforce the correct types, which are important at least on Windows.
 
-// It expands to `ENTRY_POINT_OVERRIDE` if it's defined, otherwise to `main`.
-// `ENTRY_POINT_OVERRIDE` is supposed to be defined by the build system.
-// We don't make the build system define `_main_` directly, because we want ensure that
-// `_main_` can only used after including this header.
+// The function name is `main` by default, but can be changed with `IMP_ENTRY_POINT_OVERRIDE`.
 
-#ifdef ENTRY_POINT_OVERRIDE
-#  define _main_ ENTRY_POINT_OVERRIDE
+#ifdef IMP_ENTRY_POINT_OVERRIDE
+#  define IMP_MAIN(argc, argv) int IMP_ENTRY_POINT_OVERRIDE(int argc, char **argv)
 #else
-#  define _main_ main
+#  define IMP_MAIN(argc, argv) int main(int argc, char **argv)
 #endif

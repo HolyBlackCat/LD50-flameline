@@ -1,4 +1,4 @@
-int _main_(int, char **)
+IMP_MAIN(,)
 {
     std::cout << "Hello, world!\n";
     return 0;
