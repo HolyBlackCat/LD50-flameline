@@ -38,7 +38,12 @@ namespace Input
         [[nodiscard]] bool down    () const {auto times = Interface::Window::Get().GetInputTimes(index); return times.press > times.release;}
         [[nodiscard]] bool up      () const {return !down();}
 
-        [[nodiscard]] explicit operator bool() const {return index != None;}
+        // Returns true if the key is not null.
+        // We use a function instead of `operator bool` because then it's too easy to forget `.pressed()` (and other similar functions) when referring to a button.
+        [[nodiscard]] bool IsAssigned() const
+        {
+            return index != None;
+        }
 
         [[nodiscard]] Enum Index() const
         {
