@@ -1,250 +1,356 @@
 #pragma once
 
-#include <algorithm>
 #include <cmath>
+#include <concepts>
+#include <cstdint>
+#include <iterator>
 #include <limits>
-#include <ostream>
 #include <random>
+#include <string>
 #include <type_traits>
 #include <utility>
 
-#include "program/platform.h"
+#include "meta/basic.h"
+#include "program/errors.h"
+#include "utils/mat.h"
 #include "utils/robust_math.h"
 
-template <typename DefaultInt = int, typename DefaultReal = float>
-class Random
+/* Convenient random number generation helpers.
+Suggested minimal setup:
+    auto random_generator = Random::RandomDeviceSeedSeq().MakeRng<Random::DefaultGenerator>();
+    Random::Scalar<int> irand(random_generator);
+    Random::Scalar<float> frand(random_generator);
+    Random::Misc<float> miscrand(random_generator);
+
+Usage:
+    A <= {i,f}rand <= B // Types of bounds don't affect the resulting type.
+    A <  {i,f}rand <  B // Bounds can even have different floating-point-ness compared to the target type.
+    {i,f}rand <= A      // The default lower bound is 0, inclusive.
+    {i,f}rand <  A      // ^
+    miscrand.boolean()  // true, false
+    miscrand.sign()     // 1, -1
+    miscrand.angle()    // -pi <= x < pi (the type is controlled by the template parameter of `Random::Misc`)
+    miscrand.index(N)   // 0 <= x < N (the type is always `std::ptrdiff_t`)
+    miscrand.choose({"foo", "bar"})
+    miscrand.choose(some_container) // The container must have random-access iterators. Plain arrays are supported.
+ */
+
+namespace Random
 {
-    static_assert(std::is_integral_v<DefaultInt> && !std::is_same_v<DefaultInt, bool>, "DefaultInt must be integral.");
-    static_assert(std::is_floating_point_v<DefaultReal>, "DefaultReal must be floating-point.");
+    using DefaultGenerator = std::mt19937;
 
-    // Generates numbers distributed in a continuous range.
-    template <typename T, bool HasMin = 0, bool HasMax = 0> class Range
+    // Invokes a function repeatedly to seed a random number generator.
+    // Partially conforms to the `SeedSequence` named requirement, just enough to work in practice.
+    // Unlike `std::sed_seq`, it doesn't try to scramble the seeds, trusting the user with the quality of the randomness.
+    template <typename F>
+    class FuncSeedSeq
     {
-        friend class Random;
+        static_assert(std::is_same_v<decltype(std::declval<F &>()()), std::uint32_t>, "The function must return `std::uint32_t`.");
 
-        static_assert(std::is_integral_v<T> || std::is_floating_point_v<T>, "The type has to be integral or floating point.");
-        static constexpr bool is_integral = std::is_integral_v<T>;
-        static constexpr bool is_floating_point = !is_integral;
-
-        // Representable range for the result type.
-        static constexpr T min_limit = std::numeric_limits<T>::lowest(); // Sic!
-        static constexpr T max_limit = std::numeric_limits<T>::max();
-
-        // Default distribution range.
-        static constexpr T default_min = 0;
-        static constexpr T default_max = max_limit;
-
-        // Get next/previous representable number.
-        // For floating-point numbers those never increment the number into infinity.
-        // For integers there is no overflow check, but it shouldn't be necessary.
-        template <typename U> static U next(U value)
-        {
-            if constexpr (std::is_floating_point_v<U>)
-                return std::nextafter(value, max_limit);
-            else
-                return value + 1;
-        }
-        template <typename U> static U prev(U value)
-        {
-            if constexpr (std::is_floating_point_v<U>)
-                return std::nextafter(value, min_limit);
-            else
-                return value - 1;
-        }
-
-        // Make distribution object from range. The range is inclusive: [min,max].
-        static auto make_distribution(T min, T max)
-        {
-            if (min > max)
-                std::swap(min, max);
-
-            if constexpr (is_integral)
-                return std::uniform_int_distribution<T>(min, max);
-            else
-                return std::uniform_real_distribution<T>(min, next(max)); // Sic!
-        }
-
-        // Prepare min/max bound.
-        // If T is integer, ceil/floor is applied.
-        // The value is clamped to the representable range.
-        template <typename U> static T make_min_bound(U value)
-        {
-            if constexpr (is_integral)
-            {
-                auto val = std::llround(std::ceil(value));
-                if (Robust::less(val, min_limit)) return min_limit;
-                if (Robust::greater(val, max_limit)) return max_limit;
-                return val;
-            }
-            else
-            {
-                T x = value;
-                return x >= min_limit && x <= max_limit ? x : x > 0 ? max_limit : min_limit; // This should ensure a proper handling of NaNs and inifinte values.
-            }
-        }
-        template <typename U> static T make_max_bound(U value)
-        {
-            if constexpr (is_integral)
-            {
-                auto val = std::llround(std::floor(value));
-                if (Robust::less(val, min_limit)) return min_limit;
-                if (Robust::greater(val, max_limit)) return max_limit;
-                return val;
-            }
-            else
-            {
-                T x = value;
-                return x >= min_limit && x <= max_limit ? x : x < 0 ? min_limit : max_limit; // This should ensure a proper handling of NaNs and inifinte values.
-            }
-        }
-
-        Random *source = 0;
-
-        using distribution_t = decltype(make_distribution(0,0));
-        distribution_t distribution = make_distribution(0, 0);
+        mutable F func;
 
       public:
-        Range() {}
-        Range(Random *source) : Range(source, default_min, default_max) {} // Note that the default lower bound is zero.
-        Range(Random *source, T min, T max) : source(source), distribution(make_distribution(min, max)) {}
+        // The standard requires this, and things don't work in practice without it.
+        using result_type = std::uint32_t;
 
-        // Get the range (inclusive).
-        T min() const
+        // Constructs `func` using the provided parameters.
+        FuncSeedSeq(auto &&... params) : func(decltype(params)(params)...) {}
+
+        // Calls the `func` repeatedly to fill the target range.
+        // The standard requires this.
+        template <typename T>
+        void generate(T target_begin, T target_end) const
         {
-            return distribution.a();
-        }
-        T max() const
-        {
-            // We use this logic instead of `.max()`, because it seems to return the same value as `.b()` even for floating point types.
-            if constexpr (is_integral)
-                return distribution.b();
-            else
-                return prev(distribution.b()); // Sic!
+            while (target_begin != target_end)
+                *target_begin++ = func();
         }
 
-        // Use <,>,<=,>= to change the range.
-        // Using different types should be fine, even floating-point ones with integral ranges.
-        // The resulting number will satisfy all provided inequalities, with more priority given to the last applied ones.
-        // If no lower bound is set, it defaults to 0.
-        template <typename U> friend auto operator<=(Range expr, U value)
+        // Constructs a random number generator, e.g. `std::mt19937`.
+        template <typename T>
+        [[nodiscard]] T MakeRng() const
         {
-            T x = make_max_bound(value);
-            return Range<T, HasMin, 1>(expr.source, std::min(expr.min(), x), std::min(HasMax ? expr.max() : max_limit, x));
+            return T(*this);
         }
-        template <typename U> friend auto operator>=(Range expr, U value)
-        {
-            T x = make_min_bound(value);
-            return Range<T, 1, HasMax>(expr.source, std::max(HasMin ? expr.min() : min_limit, x), std::max(expr.max(), x));
-        }
-        template <typename U> friend auto operator<(Range expr, U value) {return expr <= prev(value);}
-        template <typename U> friend auto operator>(Range expr, U value) {return expr >= next(value);}
-        template <typename U> friend auto operator<=(U value, Range expr) {return expr >= value;}
-        template <typename U> friend auto operator>=(U value, Range expr) {return expr <= value;}
-        template <typename U> friend auto operator<(U value, Range expr) {return expr > value;}
-        template <typename U> friend auto operator>(U value, Range expr) {return expr < value;}
+    };
 
-        // This generates a new value based on current constraints.
-        operator T()
+    namespace impl
+    {
+        struct RandomDeviceFunctor
         {
-            static_assert(is_integral || HasMax, "An explicit upper bound is required for floating-point types.");
-            T ret = distribution(source->generator());
-            if constexpr (is_floating_point) // I heard that floating point distributions on some implementations sometimes go slightly out of range.
+            std::random_device r;
+
+            RandomDeviceFunctor() {}
+
+            // The `token` has implementation-defined meaning, see `https://en.cppreference.com/w/cpp/numeric/random/random_device/random_device`.
+            RandomDeviceFunctor(const std::string &token) : r(token) {}
+
+            [[nodiscard]] auto operator()()
             {
-                if (auto x = min(); ret < x)
-                    return x;
-                if (auto x = max(); ret > x)
-                    return x;
+                return r();
             }
+        };
+    }
+
+    // A specialization of `FuncSeedSeq` that uses `std::random_device`.
+    using RandomDeviceSeedSeq = FuncSeedSeq<impl::RandomDeviceFunctor>;
+
+
+    namespace impl
+    {
+        template <typename T> struct UniformDistribution {};
+        template <std::signed_integral T> struct UniformDistribution<T> {using type = std::uniform_int_distribution<T>;};
+        template <std::floating_point T> struct UniformDistribution<T> {using type = std::uniform_real_distribution<T>;};
+    }
+
+    // Signed integral or floating-point type.
+    template <typename T>
+    concept SupportedScalar = requires{typename impl::UniformDistribution<T>::type;};
+
+    namespace impl
+    {
+        // Returns the next or previous representable value.
+        // If there is no such (finite) value, returns the parameter unchanged.
+        template <bool Decrease, Meta::deduce..., SupportedScalar T>
+        [[nodiscard]] T NextRepresentable(T value)
+        {
+            constexpr auto limit = Decrease ? std::numeric_limits<T>::lowest() : std::numeric_limits<T>::max();
+            if constexpr (std::floating_point<T>)
+                return std::nextafter(value, limit);
+            else
+                return value == limit ? limit : value + (Decrease ? -1 : 1);
+        }
+
+        enum BoundType {upper, lower};
+
+        // Converts a `value` to a suitable upper/lower bound of type `T`.
+        template <SupportedScalar T, BoundType Bound, Meta::deduce..., SupportedScalar U>
+        [[nodiscard]] T MakeBound(U value)
+        {
+            if constexpr (std::integral<T> && std::floating_point<U>)
+            {
+                if constexpr (Bound == upper)
+                    value = std::floor(value);
+                else
+                    value = std::ceil(value);
+
+            }
+            if constexpr (std::integral<T>)
+            {
+                T ret;
+                if (Robust::conversion_fails(value, ret))
+                    return value < 0 ? std::numeric_limits<T>::lowest() : std::numeric_limits<T>::max();
+
+                return ret;
+            }
+            else
+            {
+                // This can lead to loss of precision or overflow if both `T` and `U` are floating-point (and `U` is a larger type), but we don't really care.
+                // If `U` is integral, this should never overflow (at least if you don't use non-standard large integers or tiny floats).
+                return value;
+            }
+        }
+
+        // Same, but the bound as exclusive.
+        template <SupportedScalar T, BoundType Bound, Meta::deduce..., SupportedScalar U>
+        [[nodiscard]] T MakeExclusiveBound(U value)
+        {
+            // This seems to work.
+            if constexpr (std::floating_point<U>)
+                value = NextRepresentable<Bound == upper>(value);
+            T ret = MakeBound<T, Bound>(value);
+            if constexpr (!std::floating_point<U>)
+                ret = NextRepresentable<Bound == upper>(ret);
             return ret;
         }
+    }
 
-        // A printing operator.
-        template <typename A, typename B> friend std::basic_ostream<A,B> &operator<<(std::basic_ostream<A,B> &stream, Range expr)
-        {
-            stream << T(expr);
-            return stream;
-        }
-    };
-
-    // Wraps a number-generating function.
-    template <typename F> class Function
+    // Generates a single random scalar. Not thread-safe.
+    template <SupportedScalar T, typename Generator = DefaultGenerator>
+    class Scalar
     {
-        F func;
+        using Distribution = typename impl::UniformDistribution<T>::type;
+        Distribution dist;
+        Generator *gen = nullptr;
+
+        // Generates a random number. Both bounds are inclusive.
+        [[nodiscard]] static T GenerateNumber(Distribution &dist, Generator &gen, T min_value, T max_value)
+        {
+            // Even though the upper bound of `std::uniform_real_distribution` is said to be exclusive,
+            //   cppreference claims (https://en.cppreference.com/w/cpp/numeric/random/uniform_real_distribution)
+            //   that most implementations are bugged and treat it as an inclusive bound.
+            // Thus we can consider both bounds to be inclusive in all cases.
+
+            if constexpr (std::floating_point<T>)
+            {
+                // It's still UB to pass two same values to `std::uniform_real_distribution`, so we check for it.
+                if (min_value == max_value)
+                    return min_value;
+
+                // If one of the bounds is non-finite, return the other one.
+                // If both are non-finite, return zero.
+                if (!std::isfinite(min_value))
+                {
+                    ASSERT(false, "Non-finite `Random::Scalar` range.");
+                    return std::isfinite(max_value) ? max_value : 0;
+                }
+                if (!std::isfinite(max_value))
+                {
+                    ASSERT(false, "Non-finite `Random::Scalar` range.");
+                    return min_value;
+                }
+            }
+
+            if (min_value > max_value)
+            {
+                ASSERT(false, "Invalid `Random::Scalar` range.");
+                return min_value;
+            }
+
+            dist.param(typename Distribution::param_type(min_value, max_value));
+            return dist(gen);
+        }
+
+        template <int D>
+        [[nodiscard]] static vec<D,T> GenerateNumber(Distribution &dist, Generator &gen, const vec<D,T> &min_value, const vec<D,T> &max_value)
+        {
+            return Math::apply_elementwise([&](T a, T b){return GenerateNumber(dist, gen, a, b);}, min_value, max_value);
+        }
+
+        // A helper for generating a random number.
+        // Remembers the lower bound, and needs the upper bound to be specified.
+        class HalfRange
+        {
+            Distribution &dist;
+            Generator &gen;
+
+            T min_value = 0;
+
+          public:
+            HalfRange(Distribution &dist, Generator &gen, T min_value) : dist(dist), gen(gen), min_value(min_value) {}
+
+            HalfRange(const HalfRange &) = delete;
+            HalfRange &operator=(const HalfRange &) = delete;
+
+            [[nodiscard]] T operator<=(SupportedScalar auto max_value) && {return GenerateNumber(dist, gen, min_value, impl::MakeBound         <T, impl::upper>(max_value));}
+            [[nodiscard]] T operator< (SupportedScalar auto max_value) && {return GenerateNumber(dist, gen, min_value, impl::MakeExclusiveBound<T, impl::upper>(max_value));}
+        };
+
+        // A helper for generating a random number.
+        // Uses a range symmetric relative to 0, needs the absolute bound to be specified.
+        class SymmetricRange
+        {
+            Distribution &dist;
+            Generator &gen;
+
+          public:
+            SymmetricRange(Distribution &dist, Generator &gen) : dist(dist), gen(gen) {}
+
+            SymmetricRange(const SymmetricRange &) = delete;
+            SymmetricRange &operator=(const SymmetricRange &) = delete;
+
+            [[nodiscard]] T operator<=(SupportedScalar auto max_abs_value) &&
+            {
+                if (max_abs_value < 0)
+                {
+                    ASSERT(false, "Negative `Random::Scalar` absolute bound.");
+                    return 0;
+                }
+                return GenerateNumber(dist, gen, impl::MakeBound<T, impl::lower>(-max_abs_value), impl::MakeBound<T, impl::upper>(max_abs_value));
+            }
+
+            [[nodiscard]] T operator<(SupportedScalar auto max_abs_value) &&
+            {
+                if (max_abs_value <=/*sic*/ 0)
+                {
+                    ASSERT(false, "Negative `Random::Scalar` absolute bound.");
+                    return 0;
+                }
+                return GenerateNumber(dist, gen, impl::MakeExclusiveBound<T, impl::lower>(-max_abs_value), impl::MakeExclusiveBound<T, impl::upper>(max_abs_value));
+            }
+        };
+
       public:
-        Function(F &&func) : func(std::move(func)) {}
+        Scalar(Generator &gen) : gen(&gen) {}
 
-        operator decltype(std::declval<F>()())()
+        Scalar(const Scalar &) = delete;
+        Scalar &operator=(const Scalar &) = delete;
+
+        [[nodiscard]]       Generator &GetGenerator()       {return *gen;}
+        [[nodiscard]] const Generator &GetGenerator() const {return *gen;}
+
+        [[nodiscard]] friend HalfRange operator<=(SupportedScalar auto min_value, Scalar &self) {return HalfRange(self.dist, *self.gen, impl::MakeBound         <T, impl::lower>(min_value));}
+        [[nodiscard]] friend HalfRange operator< (SupportedScalar auto min_value, Scalar &self) {return HalfRange(self.dist, *self.gen, impl::MakeExclusiveBound<T, impl::lower>(min_value));}
+
+        [[nodiscard]] T operator<=(SupportedScalar auto max_value) {return GenerateNumber(dist, *gen, 0, impl::MakeBound         <T, impl::upper>(max_value));}
+        [[nodiscard]] T operator< (SupportedScalar auto max_value) {return GenerateNumber(dist, *gen, 0, impl::MakeExclusiveBound<T, impl::upper>(max_value));}
+
+        [[nodiscard]] SymmetricRange abs()
         {
-            return func();
+            return SymmetricRange(dist, *gen);
         }
     };
 
-    // Clang doesn't want to do CTAD without this guide, even though it seems redundant. It seems like a Clang bug, but I'm not sure.
-    // GCC, on the other hand, works without the guide and refuses to compile it (because it's not at namespace scope), which is certainly a GCC bug.
-    IMP_PLATFORM_IF(clang)( template <typename F> Function(F &&) -> Function<F>; )
-
-  public:
-    using generator_t = std::mt19937;
-    using result_t = generator_t::result_type;
-    using seed_t = result_t;
-
-  private:
-    generator_t gen;
-
-  public:
-    Random() {}
-
-    Random(seed_t seed) : gen(seed) {}
-
-    void set_seed(seed_t seed)
+    // Helper for generating various random things.
+    template <SupportedScalar DefaultFloat, typename Generator = DefaultGenerator>
+    requires std::floating_point<DefaultFloat>
+    class Misc
     {
-        gen.seed(seed);
-    }
+        Scalar<DefaultFloat> float_helper;
+        Scalar<std::ptrdiff_t> index_helper;
 
-    generator_t &generator()
-    {
-        return gen;
-    }
+      public:
+        Misc(Generator &gen) : float_helper(gen), index_helper(gen) {}
 
-    // All of the functions below return not a number, but an object that generates numbers lazily when cast to T.
+        Misc(const Misc &) = delete;
+        Misc &operator=(const Misc &) = delete;
 
-    template <typename T> Range<T> type()
-    {
-        return Range<T>(this);
-    }
-    template <typename T = DefaultInt> Range<T> integer()
-    {
-        static_assert(std::is_integral_v<T>, "The type must be integral.");
-        return type<T>();
-    }
-    template <typename T = DefaultReal> Range<T> real()
-    {
-        static_assert(std::is_floating_point_v<T>, "The type must be floating point.");
-        return type<T>();
-    }
+        [[nodiscard]]       Generator &GetGenerator()       {return float_helper.GetGenerator();}
+        [[nodiscard]] const Generator &GetGenerator() const {return float_helper.GetGenerator();}
 
-    auto boolean()
-    {
-        return Function([this]() -> bool
+        // Returns either true or false.
+        [[nodiscard]] bool boolean()
         {
-            return gen() <= generator_t::max() / 2; // Sic! We use `<=` here on purpose.
-        });
-    }
+            return bool(GetGenerator()() & 1);
+        }
 
-    auto sign()
-    {
-        return Function([this]() -> DefaultInt
+        // Returns either 1 or -1.
+        [[nodiscard]] int sign()
         {
-            return boolean() * 2 - 1;
-        });
-    }
+            return boolean() ? 1 : -1;
+        }
 
-    template <typename T = DefaultReal> auto angle()
-    {
-        constexpr long double pi = 3.14159265358979323846l;
-        return Function([this]() -> T
+        // Returns a random angle, `-pi <= x < pi`.
+        [[nodiscard]] DefaultFloat angle()
         {
-            return -pi < real<T>() <= pi;
-        });
-    }
-};
+            static const float min = -pi<DefaultFloat>(), max = std::nextafter(pi<DefaultFloat>(), 0);
+            return min <= float_helper <= max;
+        }
+
+        // Returns a random index, `0 <= x < max`.
+        [[nodiscard]] std::ptrdiff_t index(std::ptrdiff_t max)
+        {
+            if (max <= 0)
+                Program::Error("Need a positive upper bound for `Random::Misc::index`.");
+            return index_helper < max;
+        }
+
+        // Returns a random element from a list. Throws if the list is empty.
+        template <typename T>
+        [[nodiscard]] const T &choose(std::initializer_list<T> list)
+        {
+            return *(list.begin() + index(list.size()));
+        }
+
+        // Returns a random element from a container. Throws if the container is empty.
+        // The container needs to have random-access iterators. Plain arrays are supported.
+        template <typename C>
+        [[nodiscard]] auto choose(const C &container) -> decltype(*std::begin(container))
+        requires requires{
+            std::size(container);
+            requires std::same_as<typename std::iterator_traits<decltype(std::begin(container))>::iterator_category, std::random_access_iterator_tag>;
+        }
+        {
+            return *(std::begin(container) + index(std::size(container)));
+        }
+    };
+}
