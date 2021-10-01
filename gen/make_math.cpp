@@ -7,7 +7,7 @@
 #include <sstream>
 #include <type_traits>
 
-#define VERSION "3.2.6"
+#define VERSION "3.2.7"
 
 #pragma GCC diagnostic ignored "-Wpragmas" // Silence GCC warning about the next line disabling a warning that GCC doesn't have.
 #pragma GCC diagnostic ignored "-Wstring-plus-int" // Silence clang warning about `1+R"()"` pattern.
@@ -1734,13 +1734,13 @@ int main(int argc, char **argv)
                     $   return apply_elementwise(frac<vec_base_t<T>>, x);
                 }
 
-                using std::nexttoward;
+                using std::nextafter;
                 template <typename A, typename B, std::enable_if_t<!no_vectors_v<A, B>, std::nullptr_t> = nullptr>
-                [[nodiscard]] A nexttoward(A value, B target)
+                [[nodiscard]] A nextafter(A a, B b)
                 {
-                    static_assert(std::is_floating_point_v<vec_base_t<A>>, "The first argument must be floating-point.");
-                    static_assert(std::is_constructible_v<A, B &>, "Can't convert the second argument to the type of the one.");
-                    return apply_elementwise([](auto a, auto b){return std::nexttoward(a, b);}, value, A(target));
+                    static_assert(is_vector_v<B> <= is_vector_v<A>, "If `b` is a vector, `a` has to be a vector as well.");
+                    static_assert(std::is_floating_point_v<vec_base_t<A>> && std::is_floating_point_v<vec_base_t<B>> && std::is_same_v<vec_base_t<A>, vec_base_t<B>>, "Arguments must be floating-point and have the same base type.");
+                    return apply_elementwise([](auto a, auto b){return std::nextafter(a, b);}, a, b);
                 }
 
                 // Integer division, slightly changed to behave nicely for negative values of the left operand:
