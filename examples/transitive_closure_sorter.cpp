@@ -26,7 +26,7 @@
 #include <set>
 #include <utility>
 
-int _main_(int, char **)
+IMP_MAIN(,)
 {
     std::string line;
     while (std::cout << "# ", std::getline(std::cin, line))

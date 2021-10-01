@@ -161,7 +161,7 @@ namespace States
     };
 }
 
-int _main_(int, char **)
+IMP_MAIN(,)
 {
     ProgramState program_state;
     program_state.Init();
