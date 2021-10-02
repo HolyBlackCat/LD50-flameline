@@ -23,14 +23,16 @@ Suggested minimal setup:
     Random::Misc<float> miscrand(random_generator);
 
 Usage:
-    A <= {i,f}rand <= B // Types of bounds don't affect the resulting type.
-    A <  {i,f}rand <  B // Bounds can even have different floating-point-ness compared to the target type.
-    {i,f}rand <= A      // The default lower bound is 0, inclusive.
-    {i,f}rand <  A      // ^
-    miscrand.boolean()  // true, false
-    miscrand.sign()     // 1, -1
-    miscrand.angle()    // -pi <= x < pi (the type is controlled by the template parameter of `Random::Misc`)
-    miscrand.index(N)   // 0 <= x < N (the type is always `std::ptrdiff_t`)
+    A <= {i,f}rand <= B  // Types of bounds don't affect the resulting type.
+    A <  {i,f}rand <  B  // Bounds can even have different floating-point-ness compared to the target type.
+    {i,f}rand <= A       // The default lower bound is 0, inclusive.
+    {i,f}rand <  A       // ^
+    {i,f}rand.abs() <= A // The lower bound is same as the upper bound negated.
+    {i,f}rand.abs() <  A // ^
+    miscrand.boolean()   // true, false
+    miscrand.sign()      // 1, -1
+    miscrand.angle()     // -pi <= x < pi (the type is controlled by the template parameter of `Random::Misc`)
+    miscrand.index(N)    // 0 <= x < N (the type is always `std::ptrdiff_t`)
     miscrand.choose({"foo", "bar"})
     miscrand.choose(some_container) // The container must have random-access iterators. Plain arrays are supported.
  */
