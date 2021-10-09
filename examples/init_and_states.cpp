@@ -39,9 +39,14 @@ Render r = adjust_(Render(0x2000, shader_config), SetTexture(texture_main), SetM
 
 Input::Mouse mouse;
 
-struct ProgramState : Program::DefaultBasicState
+STRUCT( StateBase EXTENDS GameUtils::State::Base POLYMORPHIC )
 {
-    GameUtils::State::StateManager state_manager;
+    virtual void Render() const = 0;
+};
+
+struct Application : Program::DefaultBasicState
+{
+    GameUtils::State::Manager<StateBase> state_manager;
     GameUtils::FpsCounter fps_counter;
 
     void Resize()
@@ -92,7 +97,7 @@ struct ProgramState : Program::DefaultBasicState
     {
         gui_controller.PreRender();
         adaptive_viewport.BeginFrame();
-        state_manager.Render();
+        state_manager.Call(&StateBase::Render);
         adaptive_viewport.FinishFrame();
         gui_controller.PostRender();
         Graphics::CheckErrors();
@@ -115,19 +120,19 @@ struct ProgramState : Program::DefaultBasicState
         Graphics::Blending::Enable();
         Graphics::Blending::FuncNormalPre();
 
-        state_manager.NextState().Set("Initial");
+        state_manager.SetState("Initial{}");
     }
 };
 
 namespace States
 {
-    STRUCT( Initial EXTENDS GameUtils::State::BasicState )
+    STRUCT( Initial EXTENDS StateBase )
     {
-        UNNAMED_MEMBERS()
+        MEMBERS()
 
         float angle = 0;
 
-        void Tick(const GameUtils::State::NextStateSelector &next_state) override
+        void Tick(std::string &next_state) override
         {
             (void)next_state;
 
@@ -163,9 +168,9 @@ namespace States
 
 IMP_MAIN(,)
 {
-    ProgramState program_state;
-    program_state.Init();
-    program_state.Resize();
-    program_state.RunMainLoop();
+    Application app;
+    app.Init();
+    app.Resize();
+    app.RunMainLoop();
     return 0;
 }
