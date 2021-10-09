@@ -11,15 +11,15 @@ else
 # Cross-compiling from Linux to Windows: (assuming quasi-msys2)
 C_COMPILER   = win-clang
 CXX_COMPILER = win-clang++
-C_LINKER     = win-clang -fuse-ld=lld-12
-CXX_LINKER   = win-clang++ -fuse-ld=lld-12
+C_LINKER     = win-clang -fuse-ld=lld-13
+CXX_LINKER   = win-clang++ -fuse-ld=lld-13
 # Need to specify a custom LDD wrapper, the auto-detected LDD wouldn't work.
 LDD          = win-ldd -R
 endif
 else
 # Linux:
-C_COMPILER   = clang-12
-CXX_COMPILER = clang++-12
-C_LINKER     = clang-12 -fuse-ld=lld-12
-CXX_LINKER   = clang++-12 -fuse-ld=lld-12
+C_COMPILER   = clang-13
+CXX_COMPILER = clang++-13
+C_LINKER     = clang-13 -fuse-ld=lld-13
+CXX_LINKER   = clang++-13 -fuse-ld=lld-13
 endif
