@@ -67,7 +67,7 @@ namespace Audio
             //     gain = ref_dist / (ref_dist + rolloff_fac * (dist - ref_dist))
             // This can be rewritten as:
             //     gain = 1 / (1 + rolloff_fac * (dist / ref_dist - 1))
-            // In simple terms, `volume_factor` follows a hyperbola, which is scaled and translated according to the parameters.
+            // In simple terms, `gain` follows a hyperbola, which is scaled and translated according to the parameters.
             // You start with `gain = 1 / dist`. (Which is what you get if `ref_dist = 1` and `rolloff_fac = 1`.)
             // Then you scale it along the X axis by `ref_dist`, relative to 0. It means that for `dist = ref_dist`, gain is always 1.
             // Then you scale it by `1 / rolloff_fac` along the X axis, relative to `ref_dst`. This, in turn, means that if you
