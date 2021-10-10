@@ -1082,7 +1082,7 @@ That's all.
     MA_NULL MA_VA_FOR_EACH( /* variables */\
         (MA_PARAMS_GET_ONE(, ReflMemberDecl, ReflInit, params, MA_PARAMS_IDENTITY)), /* initializer */\
         REFL_MEMBERS_impl_decl_member, \
-        MA_TR_C(__VA_ARGS__) /* variable names */\
+        __VA_ARGS__ /* variable names */\
     ) () \
     ;
 
@@ -1121,7 +1121,7 @@ That's all.
 #define REFL_MEMBERS_impl_metadata_memptr_body(params, ...) \
     MA_IF_NOT_EMPTY_ELSE(REFL_MEMBERS_impl_metadata_memptr_body_low, MA_NULL, params)(params, __VA_ARGS__)
 
-#define REFL_MEMBERS_impl_metadata_memptr_body_low(params, ...) MA_VA_FOR_EACH(, REFL_MEMBERS_impl_metadata_memptr_pointer, MA_TR_C(__VA_ARGS__) )
+#define REFL_MEMBERS_impl_metadata_memptr_body_low(params, ...) MA_VA_FOR_EACH(, REFL_MEMBERS_impl_metadata_memptr_pointer, __VA_ARGS__ )
 #define REFL_MEMBERS_impl_metadata_memptr_pointer(data, index, name) (,) &t::name MA_IDENTITY
 
 // Internal. Helper for `REFL_MEMBERS_impl_metadata_generic_low`.
@@ -1150,7 +1150,7 @@ That's all.
 #define REFL_MEMBERS_impl_metadata_memattr_body_low(maybe_attr, ...) \
     (,) \
     ::Refl::impl::Class::Attr< \
-        MA_VA_FOR_EACH(, REFL_MEMBERS_impl_metadata_memattr_plus1, MA_TR_C(__VA_ARGS__)), \
+        MA_VA_FOR_EACH(, REFL_MEMBERS_impl_metadata_memattr_plus1, __VA_ARGS__), \
         ::Meta::type_list<MA_IF_NOT_EMPTY(MA_IDENTITY maybe_attr, maybe_attr)> \
     > \
     MA_IDENTITY
@@ -1181,7 +1181,7 @@ That's all.
 #define REFL_MEMBERS_impl_metadata_memname_body(params, ...) \
     MA_IF_NOT_EMPTY_ELSE(REFL_MEMBERS_impl_metadata_memname_body_low, MA_NULL, params)(params, __VA_ARGS__)
 
-#define REFL_MEMBERS_impl_metadata_memname_body_low(params, ...) MA_VA_FOR_EACH(, REFL_MEMBERS_impl_metadata_memname_string, MA_TR_C(__VA_ARGS__) )
+#define REFL_MEMBERS_impl_metadata_memname_body_low(params, ...) MA_VA_FOR_EACH(, REFL_MEMBERS_impl_metadata_memname_string, __VA_ARGS__ )
 
 #define REFL_MEMBERS_impl_metadata_memname_string(data, index, name) #name,
 
