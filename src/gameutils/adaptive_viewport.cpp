@@ -121,6 +121,11 @@ namespace GameUtils
         data->vertex_buf.Draw(Graphics::triangles);
     }
 
+    Graphics::FrameBuffer &AdaptiveViewport::GetFrameBuffer()
+    {
+        return data->fbuf;
+    }
+
     const AdaptiveViewport::Details &AdaptiveViewport::GetDetails() const
     {
         return data->details;

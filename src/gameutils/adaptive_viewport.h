@@ -139,6 +139,10 @@ namespace GameUtils
         // Rescales and outputs the frame to the passed framebuffer.
         void FinishFrame(const Graphics::FrameBuffer *fbuf = 0);
 
+        // Returns the internal framebuffer.
+        // It's bound by default when you call `BeginFrame()`.
+        [[nodiscard]] Graphics::FrameBuffer &GetFrameBuffer();
+
         // Returns some internal measurements.
         [[nodiscard]] const Details &GetDetails() const;
     };
