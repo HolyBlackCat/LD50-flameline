@@ -24,7 +24,8 @@ namespace Tiled
     {
         std::multimap<std::string, fvec2> points;
 
-        template <typename F> void ForEachPointNamed(std::string name, F &&func) const // `func` is `void func(fvec2 pos)`.
+        template <typename F>
+        void ForEachPointNamed(std::string name, F &&func) const // `func` is `void func(fvec2 pos)`.
         {
             auto [begin, end] = points.equal_range(name);
             while (begin != end)
@@ -34,12 +35,13 @@ namespace Tiled
             }
         }
 
-        template <typename F> void ForEachPointWithNamePrefix(std::string prefix, F &&func) const // `func` is `void func(std::string name, fvec2 pos)`.
+        template <typename F>
+        void ForEachPointWithNamePrefix(std::string prefix, F &&func) const // `func` is `void func(std::string_view suffix, fvec2 pos)`.
         {
             auto begin = points.lower_bound(prefix);
             while (begin != points.end() && begin->first.starts_with(prefix))
             {
-                func(begin->first, begin->second);
+                func(std::string_view(begin->first.begin() + prefix.size(), begin->first.end()), begin->second);
                 begin++;
             }
         }
