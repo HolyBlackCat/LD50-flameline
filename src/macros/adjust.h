@@ -36,7 +36,7 @@ namespace Macro
 #define WITH(...) IMPL_WITH(&, __VA_ARGS__)
 #define WITH_(...) IMPL_WITH(, __VA_ARGS__)
 
-#define IMPL_ADJUST(capture, object, ...) (void(), [capture]{ auto _object_ = object; MA_VA_FOR_EACH(,IMPL_ADJUST_STEP,MA_TR_C(__VA_ARGS__)) return _object_; }())
+#define IMPL_ADJUST(capture, object, ...) (void(), [capture]{ auto _object_ = object; MA_VA_FOR_EACH(,IMPL_ADJUST_STEP,__VA_ARGS__) return _object_; }())
 #define IMPL_ADJUST_STEP(data, i, expr) _object_.expr;
 
-#define IMPL_WITH(capture, ...) ->* ::Macro::WithExpr([capture](auto &_object_) { MA_VA_FOR_EACH(,IMPL_ADJUST_STEP,MA_TR_C(__VA_ARGS__)) })
+#define IMPL_WITH(capture, ...) ->* ::Macro::WithExpr([capture](auto &_object_) { MA_VA_FOR_EACH(,IMPL_ADJUST_STEP,__VA_ARGS__) })
