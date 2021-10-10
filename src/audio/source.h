@@ -122,10 +122,12 @@ namespace Audio
         {
             default_rolloff_fac = f;
         }
+        // Defaults to 1.
         static void DefaultRefDistance(float d)
         {
             default_ref_dist = d;
         }
+        // Defaults to FLT_MAX (max finite float).
         static void DefaultMaxDistance(float d)
         {
             default_max_dist = d;
