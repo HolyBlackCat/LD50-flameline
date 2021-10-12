@@ -7,7 +7,7 @@
 #include <sstream>
 #include <type_traits>
 
-#define VERSION "3.2.7"
+#define VERSION "3.3.0"
 
 #pragma GCC diagnostic ignored "-Wpragmas" // Silence GCC warning about the next line disabling a warning that GCC doesn't have.
 #pragma GCC diagnostic ignored "-Wstring-plus-int" // Silence clang warning about `1+R"()"` pattern.
@@ -207,12 +207,23 @@ int main(int argc, char **argv)
 
     section("namespace Math", []
     {
+        section("inline namespace Utility // Scalar concept", []
+        {
+            output(1+R"(
+                // Check if a type is a scalar type.
+                template <typename T> struct impl_is_scalar : std::is_arithmetic<T> {}; // Not `std::is_scalar`, because that includes pointers.
+                template <typename T> concept scalar = impl_is_scalar<T>::value;
+            )");
+        });
+
+        next_line();
+
         section("inline namespace Vector // Declarations", []
         {
             { // Main templates
                 output(1+R"(
-                    template <int D, typename T> struct vec;
-                    template <int W, int H, typename T> struct mat;
+                    template <int D, scalar T> struct vec;
+                    template <int W, int H, scalar T> struct mat;
                 )");
             }
         });
@@ -285,7 +296,7 @@ int main(int argc, char **argv)
                 };
 
                 template <typename From, typename To>
-                concept convertable = requires(const Convert<From, To> conv, const From from)
+                concept convertible = requires(const Convert<From, To> conv, const From from)
                 {
                     { conv(from) } -> std::same_as<To>;
                 };
@@ -298,39 +309,61 @@ int main(int argc, char **argv)
         {
             output(1+R"(
                 // Check if `T` is a vector type (possibly const).
-                template <typename T> struct is_vector_impl : std::false_type {};
-                template <int D, typename T> struct is_vector_impl<      vec<D,T>> : std::true_type {};
-                template <int D, typename T> struct is_vector_impl<const vec<D,T>> : std::true_type {};
-                template <typename T> inline constexpr bool is_vector_v = is_vector_impl<T>::value;
+                template <typename T> struct impl_is_vector : std::false_type {};
+                template <int D, typename T> struct impl_is_vector<      vec<D,T>> : std::true_type {};
+                template <int D, typename T> struct impl_is_vector<const vec<D,T>> : std::true_type {};
+                template <typename T> concept vector = impl_is_vector<T>::value;
+
+                template <typename T> inline constexpr bool vector_or_scalar = scalar<T> || vector<T>;
 
                 // Checks if none of `P...` are vector types.
-                template <typename ...P> inline constexpr bool no_vectors_v = !(is_vector_v<P> || ...);
+                template <typename ...P> inline constexpr bool no_vectors_v = !(vector<P> || ...);
 
                 // Check if `T` is a matrix type (possibly const).
-                template <typename T> struct is_matrix_impl : std::false_type {};
-                template <int W, int H, typename T> struct is_matrix_impl<      mat<W,H,T>> : std::true_type {};
-                template <int W, int H, typename T> struct is_matrix_impl<const mat<W,H,T>> : std::true_type {};
-                template <typename T> inline constexpr bool is_matrix_v = is_matrix_impl<T>::value;
+                template <typename T> struct impl_is_matrix : std::false_type {};
+                template <int W, int H, typename T> struct impl_is_matrix<      mat<W,H,T>> : std::true_type {};
+                template <int W, int H, typename T> struct impl_is_matrix<const mat<W,H,T>> : std::true_type {};
+                template <typename T> concept matrix = impl_is_matrix<T>::value;
 
-                // Check if a type is a scalar type.
-                template <typename T> inline constexpr bool is_scalar_v = std::is_arithmetic_v<T>; // Not `std::is_scalar`, because that includes pointers.
-
-                template <typename A, typename B = void> using enable_if_scalar_t = std::enable_if_t<is_scalar_v<A>, B>;
-
-                // If `T` is a vector (possibly const), returns its element type. Otherwise returns `T`.
-                template <typename T> using vec_base_t = typename std::conditional_t<is_vector_v<T>, T, std::enable_if<1,T>>::type;
+                // If `T` is a vector (possibly const), returns its element type, with the same cv-qualifier. Otherwise returns `T`.
+                template <typename T> struct impl_vec_base {using type = T;};
+                template <int D, typename T> struct impl_vec_base<      vec<D,T>> {using type =       T;};
+                template <int D, typename T> struct impl_vec_base<const vec<D,T>> {using type = const T;};
+                template <typename T> using vec_base_t = typename impl_vec_base<T>::type;
 
                 // If `T` is a vector (possibly const), returns its size. Otherwise returns 1.
-                template <typename T> struct vec_size_impl : std::integral_constant<int, 1> {};
-                template <int D, typename T> struct vec_size_impl<      vec<D,T>> : std::integral_constant<int, D> {};
-                template <int D, typename T> struct vec_size_impl<const vec<D,T>> : std::integral_constant<int, D> {};
-                template <typename T> inline constexpr int vec_size_v = vec_size_impl<T>::value;
+                template <typename T> struct impl_vec_size : std::integral_constant<int, 1> {};
+                template <int D, typename T> struct impl_vec_size<      vec<D,T>> : std::integral_constant<int, D> {};
+                template <int D, typename T> struct impl_vec_size<const vec<D,T>> : std::integral_constant<int, D> {};
+                template <typename T> inline constexpr int vec_size_v = impl_vec_size<T>::value;
+
+                // If `D == 1` returns `T`, otherwise returns `vec<D,T>`.
+                template <int D, typename T> struct impl_ver_or_scalar {using type = vec<D,T>;};
+                template <typename T> struct impl_ver_or_scalar<1,T> {using type = T;};
+                template <int D, typename T> using vec_or_scalar_t = typename impl_ver_or_scalar<D,T>::type;
+
+                // If the set {D...} is either {N} or {1,N}, returns `N`.
+                // If the set {D...} is empty, returns `1`.
+                // Otherwise returns 0.
+                template <int ...D> inline constexpr int common_vec_size_or_zero_v = []{
+                    int ret = 1;
+                    bool ok = ((D == 1 ? true : ret == 1 || ret == D ? (void(ret = D), true) : false) && ...);
+                    return ok * ret;
+                }();
+
+                template <int ...D> concept have_common_vec_size = common_vec_size_or_zero_v<D...> != 0;
+
+                // If the set {D...} is either {N} or {1,N}, returns `N`.
+                // If the set {D...} is empty, returns `1`.
+                // Otherwise causes a soft error.
+                template <int ...D> requires have_common_vec_size<D...>
+                inline constexpr int common_vec_size_v = common_vec_size_or_zero_v<D...>;
 
                 // If `A` is a `[const] vec<D,T>`, returns `[const] vec<D,B>`. Otherwise returns `B`.
-                template <typename A, typename B> struct change_vec_base_impl {using type = B;};
-                template <int D, typename A, typename B> struct change_vec_base_impl<      vec<D,A>,B> {using type =       vec<D,B>;};
-                template <int D, typename A, typename B> struct change_vec_base_impl<const vec<D,A>,B> {using type = const vec<D,B>;};
-                template <typename A, typename B> using change_vec_base_t = typename change_vec_base_impl<A,B>::type;
+                template <typename A, typename B> struct impl_change_vec_base {using type = B;};
+                template <int D, typename A, typename B> struct impl_change_vec_base<      vec<D,A>,B> {using type =       vec<D,B>;};
+                template <int D, typename A, typename B> struct impl_change_vec_base<const vec<D,A>,B> {using type = const vec<D,B>;};
+                template <typename A, typename B> using change_vec_base_t = typename impl_change_vec_base<A,B>::type;
 
                 // Returns a reasonable 'floating-point counterpart' for a type.
                 // Currently if the type is not floating-point, returns `double`. Otherwise returns the same type.
@@ -340,45 +373,35 @@ int main(int argc, char **argv)
                 // 3-way compares two scalar or vector types to determine which one is 'larger' (according to `sizeof`),
                 // except floating-point types are always considered to be larger than integral ones.
                 // For vector types, examines their base types instead.
-                // Returns 0 if the types are same or not comparable.
-                template <typename A, typename B> inline constexpr int compare_types_v =
-                $   (!is_scalar_v<A> && !is_vector_v<A>) || (!is_scalar_v<B> && !is_vector_v<B>) ? 0 :
-                $   std::is_floating_point_v<vec_base_t<A>> < std::is_floating_point_v<vec_base_t<B>> ? -1 :
-                $   std::is_floating_point_v<vec_base_t<A>> > std::is_floating_point_v<vec_base_t<B>> ?  1 :
-                $   sizeof(vec_base_t<A>)                   < sizeof(vec_base_t<B>)                   ? -1 :
-                $   sizeof(vec_base_t<A>)                   > sizeof(vec_base_t<B>)                   ?  1 : 0;
+                // Considers the types equivalent only if they are the same.
+                template <typename A, typename B> inline constexpr std::partial_ordering compare_types_v =
+                $   std::is_same_v<A, B> ? std::partial_ordering::equivalent :
+                $   !vector_or_scalar<A> || !vector_or_scalar<B> ? std::partial_ordering::unordered :
+                $   std::is_floating_point_v<vec_base_t<A>> < std::is_floating_point_v<vec_base_t<B>> ? std::partial_ordering::less    :
+                $   std::is_floating_point_v<vec_base_t<A>> > std::is_floating_point_v<vec_base_t<B>> ? std::partial_ordering::greater :
+                $   sizeof(vec_base_t<A>)                   < sizeof(vec_base_t<B>)                   ? std::partial_ordering::less    :
+                $   sizeof(vec_base_t<A>)                   > sizeof(vec_base_t<B>)                   ? std::partial_ordering::greater : std::partial_ordering::unordered;
 
                 // Internal, see below for the public interface.
                 // Given a list of scalar and vector types, determines the "larger' type among them according to `compare_types_v`.
                 // Returns `void` on failure.
                 // If vector types are present, all of them must have the same size, and the resulting type will also be a vector.
-                template <typename ...P> struct larger_impl {using type = void;};
-                template <typename T> struct larger_impl<T> {using type = T;};
-                template <typename T, typename ...P> struct larger_impl<T,P...> {using type = typename larger_impl<T, typename larger_impl<P...>::type>::type;};
-                template <typename A, typename B> struct larger_impl<A,B> {using type = std::conditional_t<compare_types_v<A,B> != 0, std::conditional_t<(compare_types_v<A,B> > 0), A, B>, std::conditional_t<std::is_same_v<A,B>, A, void>>;};
-                template <int D, typename A, typename B> struct larger_impl<vec<D,A>,B> {using type = std::conditional_t<std::is_void_v<typename larger_impl<A,B>::type>, void, change_vec_base_t<vec<D,A>, typename larger_impl<A,B>::type>>;};
-                template <int D, typename A, typename B> struct larger_impl<B,vec<D,A>> {using type = std::conditional_t<std::is_void_v<typename larger_impl<A,B>::type>, void, change_vec_base_t<vec<D,A>, typename larger_impl<A,B>::type>>;};
-                template <int DA, int DB, typename A, typename B> struct larger_impl<vec<DA,A>,vec<DB,B>>
-                {using type = std::conditional_t<DA != DB || std::is_void_v<typename larger_impl<A,B>::type>, void, change_vec_base_t<vec<DA,A>, typename larger_impl<A,B>::type>>;};
+                template <typename ...P> struct impl_larger {};
+                template <typename T> struct impl_larger<T> {using type = T;};
+                template <typename A, typename B, typename C, typename ...P> requires requires{typename impl_larger<B,C,P...>::type;} struct impl_larger<A,B,C,P...> {using type = typename impl_larger<A, typename impl_larger<B,C,P...>::type>::type;};
+                template <typename A, typename B> requires(compare_types_v<A,B> == std::partial_ordering::equivalent) struct impl_larger<A,B> {using type = A;};
+                template <typename A, typename B> requires(compare_types_v<A,B> == std::partial_ordering::less      ) struct impl_larger<A,B> {using type = B;};
+                template <typename A, typename B> requires(compare_types_v<A,B> == std::partial_ordering::greater   ) struct impl_larger<A,B> {using type = A;};
 
-                // Returns the 'larger' type among `P` or `void` on failure.
-                template <typename ...P> struct opt_larger_impl {using type = typename larger_impl<std::remove_const_t<P>...>::type;};
-                template <typename ...P> using opt_larger_t = typename opt_larger_impl<P...>::type; // void on failure
+                template <typename ...P> using larger_t = vec_or_scalar_t<common_vec_size_v<vec_size_v<P>...>, typename impl_larger<std::remove_cv_t<vec_base_t<P>>...>::type>;
 
                 // Checks if it's possible to determine the 'larger' type among `P`.
-                template <typename ...P> inline constexpr bool have_larger_type_v = !std::is_void_v<opt_larger_t<P...>>;
+                template <typename ...P> concept have_larger_type = requires{typename larger_t<P...>;};
 
-                // Returns the 'larger' type among `P` or causes a SFINAE-friendly error on failure.
-                template <typename ...P> using soft_larger_t = std::enable_if_t<have_larger_type_v<P...>, opt_larger_t<P...>>;
+                template <typename ...P> struct impl_larger_or_void {using type = void;};
+                template <typename ...P> requires have_larger_type<P...> struct impl_larger_or_void<P...> {using type = larger_t<P...>;};
 
-                template <typename ...P> struct hard_larger_impl
-                {
-                    static_assert(have_larger_type_v<P...>, "Can't determine larger type.");
-                    using type = opt_larger_t<P...>;
-                };
-
-                // Returns the 'larger' type among `P` or triggers a static assertion on failure.
-                template <typename ...P> using larger_t = typename hard_larger_impl<P...>::type;
+                template <typename ...P> using larger_or_void_t = typename impl_larger_or_void<P...>::type;
             )");
         });
 
@@ -409,7 +432,6 @@ int main(int argc, char **argv)
 
                         { // Static assertions
                             output("static_assert(!std::is_const_v<T> && !std::is_volatile_v<T>, \"The base type must have no cv-qualifiers.\");\n");
-                            output("static_assert(!std::is_reference_v<T>, \"The base type must not be a reference.\");\n");
                         }
 
                         { // Aliases
@@ -465,8 +487,8 @@ int main(int argc, char **argv)
 
                         { // Customization point constructor and conversion operator
                             output(1+R"(
-                                template <typename TT> requires Custom::convertable<TT, vec> explicit constexpr vec(const TT &obj) {*this = Custom::Convert<TT, vec>{}(obj);}
-                                template <typename TT> requires Custom::convertable<vec, TT> explicit operator TT() const {return Custom::Convert<vec, TT>{}(*this);}
+                                template <typename TT> requires Custom::convertible<TT, vec> explicit constexpr vec(const TT &obj) {*this = Custom::Convert<TT, vec>{}(obj);}
+                                template <typename TT> requires Custom::convertible<vec, TT> explicit operator TT() const {return Custom::Convert<vec, TT>{}(*this);}
                             )");
                         }
 
@@ -621,13 +643,13 @@ int main(int argc, char **argv)
                         }
 
                         { // Tie
-                            output("[[nodiscard]] constexpr auto tie() {return std::tie(",Fields(","),");}\n");
-                            output("[[nodiscard]] constexpr auto tie() const {return std::tie(",Fields(","),");}\n");
+                            output("[[nodiscard]] constexpr auto tie() & {return std::tie(",Fields(","),");}\n");
+                            output("[[nodiscard]] constexpr auto tie() const & {return std::tie(",Fields(","),");}\n");
                         }
 
                         { // Get
-                            output("template <int I> [[nodiscard]] constexpr auto &get() {return std::get<I>(tie());}\n");
-                            output("template <int I> [[nodiscard]] constexpr auto &get() const {return std::get<I>(tie());}\n");
+                            output("template <int I> [[nodiscard]] constexpr type &get() & {return std::get<I>(tie());}\n");
+                            output("template <int I> [[nodiscard]] constexpr const type &get() const & {return std::get<I>(tie());}\n");
                         }
                     });
                 }
@@ -676,7 +698,6 @@ int main(int argc, char **argv)
 
                         { // Static assertions
                             output("static_assert(!std::is_const_v<T> && !std::is_volatile_v<T>, \"The base type must have no cv-qualifiers.\");\n");
-                            output("static_assert(!std::is_reference_v<T>, \"The base type must not be a reference.\");\n");
                         }
 
                         { // Aliases
@@ -758,8 +779,8 @@ int main(int argc, char **argv)
 
                         { // Customization point constructor and conversion operator
                             output(1+R"(
-                                template <typename TT> requires Custom::convertable<TT, mat> explicit constexpr mat(const TT &obj) {*this = Custom::Convert<TT, mat>{}(obj);}
-                                template <typename TT> requires Custom::convertable<mat, TT> explicit operator TT() const {return Custom::Convert<mat, TT>{}(*this);}
+                                template <typename TT> requires Custom::convertible<TT, mat> explicit constexpr mat(const TT &obj) {*this = Custom::Convert<TT, mat>{}(obj);}
+                                template <typename TT> requires Custom::convertible<mat, TT> explicit operator TT() const {return Custom::Convert<mat, TT>{}(*this);}
                             )");
                         }
 
@@ -1055,11 +1076,11 @@ int main(int argc, char **argv)
                 { // Deduction guides
                     // From scalars
                     for (int w = 2; w <= 4; w++)
-                        output("template <typename ...P, typename = std::enable_if_t<sizeof...(P) == ",w*w," && (is_scalar_v<P> && ...)>> mat(P...) -> mat<",w,", ",w,", larger_t<P...>>;\n");
+                        output("template <scalar ...P> requires (sizeof...(P) == ",w*w,") mat(P...) -> mat<",w,", ",w,", larger_t<P...>>;\n");
 
                     // From vectors
                     for (int h = 2; h <= 4; h++)
-                        output("template <typename ...P, typename = std::enable_if_t<sizeof...(P) >= 2 && sizeof...(P) <= 4 && ((vec_size_v<P> == ",h,") && ...)>> mat(P...) -> mat<sizeof...(P), ",h,", larger_t<typename P::type...>>;\n");
+                        output("template <typename ...P> requires (sizeof...(P) >= 2 && sizeof...(P) <= 4 && ((vec_size_v<P> == ",h,") && ...)) mat(P...) -> mat<sizeof...(P), ",h,", larger_t<typename P::type...>>;\n");
                 }
             });
 
@@ -1101,10 +1122,10 @@ int main(int argc, char **argv)
                             output((boolean ? "" : "}"),";}\n");
 
                             // vec @ scalar
-                            output("template <typename V, typename S, typename = enable_if_scalar_t<S>> [[nodiscard]] constexpr ",(boolean ? "bool" : "auto")," operator",op,"(const vec",d,"<V> &v, const S &s) {return v ",op," vec",d,"<S>(s);}\n");
+                            output("template <typename V, scalar S> [[nodiscard]] constexpr ",(boolean ? "bool" : "auto")," operator",op,"(const vec",d,"<V> &v, const S &s) {return v ",op," vec",d,"<S>(s);}\n");
 
                             // scalar @ vec
-                            output("template <typename S, typename V, typename = enable_if_scalar_t<S>> [[nodiscard]] constexpr ",(boolean ? "bool" : "auto")," operator",op,"(const S &s, const vec",d,"<V> &v) {return vec",d,"<S>(s) ",op," v;}\n");
+                            output("template <scalar S, typename V> [[nodiscard]] constexpr ",(boolean ? "bool" : "auto")," operator",op,"(const S &s, const vec",d,"<V> &v) {return vec",d,"<S>(s) ",op," v;}\n");
                         }
 
                         for (auto op : ops2bool)
@@ -1166,7 +1187,7 @@ int main(int argc, char **argv)
                             output("return a;}\n");
 
                             // vec @ scalar
-                            output("template <typename V, typename S, typename = enable_if_scalar_t<S>> constexpr vec",d,"<V> &operator",op,"(vec",d,"<V> &v, const S &s) {return v ",op," vec",d,"<S>(s);}\n");
+                            output("template <typename V, scalar S> constexpr vec",d,"<V> &operator",op,"(vec",d,"<V> &v, const S &s) {return v ",op," vec",d,"<S>(s);}\n");
                         }
                     });
                 }
@@ -1294,7 +1315,7 @@ int main(int argc, char **argv)
                     {
                         static_assert(I >= 0 && I < 4);
                         constexpr bool not_const = std::is_reference_v<T> && !std::is_const_v<std::remove_reference_t<T>>;
-                        if constexpr (!is_vector_v<std::remove_reference_t<T>>)
+                        if constexpr (!vector<std::remove_reference_t<T>>)
                         $   return std::conditional_t<not_const, T &, const T &>(vec);
                         else
                         $   return std::conditional_t<not_const, vec_base_t<std::remove_reference_t<T>> &, const vec_base_t<std::remove_reference_t<T>> &>(vec.template get<I>());
@@ -1350,7 +1371,7 @@ int main(int argc, char **argv)
                 output(1+R"(
                     template <typename T> class vector_range
                     {
-                        static_assert(is_vector_v<T> && !std::is_const_v<T> && std::is_integral_v<vec_base_t<T>>, "The template parameter must be an integral vector.");
+                        static_assert(vector<T> && !std::is_const_v<T> && std::is_integral_v<vec_base_t<T>>, "The template parameter must be an integral vector.");
 
                         T vec_begin = T(0);
                         T vec_end = T(0);
@@ -1459,7 +1480,7 @@ int main(int argc, char **argv)
 
                     template <typename T> class vector_range_halfbound
                     {
-                        static_assert(is_vector_v<T> && !std::is_const_v<T> && std::is_integral_v<vec_base_t<T>>, "The template parameter must be an integral vector.");
+                        static_assert(vector<T> && !std::is_const_v<T> && std::is_integral_v<vec_base_t<T>>, "The template parameter must be an integral vector.");
 
                         T vec_begin = T(0);
 
@@ -1523,11 +1544,12 @@ int main(int argc, char **argv)
                 // Helper for applying a function to one or several scalars or vectors.
                 // Mixing scalars and vectors is allowed, but vectors must have the same size.
                 // If at least one vector is passed, the result is also a vector.
-                template <typename F, typename ...P> constexpr auto apply_elementwise(F &&func, P &&... params)
+                // If `D != 1`, forces the result to be the vector of this size, or causes a hard error if not possible.
+                template <int D = 1, typename F, typename ...P>
+                requires have_common_vec_size<D, vec_size_v<P>...>
+                constexpr auto apply_elementwise(F &&func, P &&... params)
                 {
-                    using larger_type = opt_larger_t<change_vec_base_t<std::remove_reference_t<P>, int>...>;
-                    static_assert(!std::is_void_v<larger_type>, "Parameter size mismatch.");
-                    constexpr int size = vec_size_v<larger_type>;
+                    constexpr int size = common_vec_size_v<D, vec_size_v<std::remove_reference_t<P>>...>;
 
                     using ret_type = decltype(std::declval<F>()(get_vec_element<0>(std::declval<P>())...));
 
@@ -1541,7 +1563,7 @@ int main(int argc, char **argv)
                     }
                     else
                     {
-                        std::conditional_t<size != 1, vec<size, ret_type>, ret_type> ret{};
+                        vec_or_scalar_t<size, ret_type> ret{};
                         cexpr_for<size>([&](auto index)
                         {
                             get_vec_element<index.value>(ret) = func(get_vec_element<index.value>(params)...); // No forwarding to prevent moving.
@@ -1585,7 +1607,7 @@ int main(int argc, char **argv)
 
                 template <typename A, typename B> constexpr void clamp_var_min(A &var, B min)
                 {
-                    static_assert(is_vector_v<B> <= is_vector_v<A>, "If `min` is a vector, `var` has to be a vector as well.");
+                    static_assert(vector<B> <= vector<A>, "If `min` is a vector, `var` has to be a vector as well.");
                     static_assert(std::is_floating_point_v<vec_base_t<B>> <= std::is_floating_point_v<vec_base_t<A>>, "If `min` is a floating-point, `var` has to be floating-point as well.");
                     static_assert(std::is_floating_point_v<vec_base_t<A>> || std::is_signed_v<vec_base_t<A>> == std::is_signed_v<vec_base_t<B>>, "If both arguments are integral, they must have the same signedness.");
 
@@ -1602,7 +1624,7 @@ int main(int argc, char **argv)
 
                 template <typename A, typename B> constexpr void clamp_var_max(A &var, B max)
                 {
-                    static_assert(is_vector_v<B> <= is_vector_v<A>, "If `max` is a vector, `var` has to be a vector as well.");
+                    static_assert(vector<B> <= vector<A>, "If `max` is a vector, `var` has to be a vector as well.");
                     static_assert(std::is_floating_point_v<vec_base_t<B>> <= std::is_floating_point_v<vec_base_t<A>>, "If `max` is a floating-point, `var` has to be floating-point as well.");
                     static_assert(std::is_floating_point_v<vec_base_t<A>> || std::is_signed_v<vec_base_t<A>> == std::is_signed_v<vec_base_t<B>>, "If both arguments are integral, they must have the same signedness.");
 
@@ -1738,7 +1760,7 @@ int main(int argc, char **argv)
                 template <typename A, typename B, std::enable_if_t<!no_vectors_v<A, B>, std::nullptr_t> = nullptr>
                 [[nodiscard]] A nextafter(A a, B b)
                 {
-                    static_assert(is_vector_v<B> <= is_vector_v<A>, "If `b` is a vector, `a` has to be a vector as well.");
+                    static_assert(vector<B> <= vector<A>, "If `b` is a vector, `a` has to be a vector as well.");
                     static_assert(std::is_floating_point_v<vec_base_t<A>> && std::is_floating_point_v<vec_base_t<B>> && std::is_same_v<vec_base_t<A>, vec_base_t<B>>, "Arguments must be floating-point and have the same base type.");
                     return apply_elementwise([](auto a, auto b){return std::nextafter(a, b);}, a, b);
                 }
@@ -1748,7 +1770,7 @@ int main(int argc, char **argv)
                 // div_ex(i,2) : -2  -2  -1  -1  0  0  1  1  2
                 template <typename A, typename B> [[nodiscard]] constexpr A div_ex(A a, B b)
                 {
-                    static_assert(is_vector_v<B> <= is_vector_v<A>, "If `b` is a vector, `a` has to be a vector as well.");
+                    static_assert(vector<B> <= vector<A>, "If `b` is a vector, `a` has to be a vector as well.");
                     static_assert(std::is_integral_v<vec_base_t<A>> && std::is_integral_v<vec_base_t<B>>, "Arguments must be integral.");
 
                     if constexpr (no_vectors_v<A,B>)
@@ -1767,7 +1789,7 @@ int main(int argc, char **argv)
                 // True integral modulo that remains periodic for negative values of the left operand.
                 template <typename A, typename B> [[nodiscard]] constexpr A mod_ex(A a, B b)
                 {
-                    static_assert(is_vector_v<B> <= is_vector_v<A>, "If `b` is a vector, `a` has to be a vector as well.");
+                    static_assert(vector<B> <= vector<A>, "If `b` is a vector, `a` has to be a vector as well.");
                     static_assert(std::is_integral_v<vec_base_t<A>> && std::is_integral_v<vec_base_t<B>>, "Arguments must be integral.");
 
                     if constexpr (no_vectors_v<A,B>)
@@ -1879,7 +1901,7 @@ int main(int argc, char **argv)
                 // Always returns a floating-point type.
                 template <typename A, typename B> [[nodiscard]] auto shrink_to_proportions(A value, B proportions)
                 {
-                    static_assert(is_vector_v<A> && is_vector_v<B> && vec_size_v<A> == vec_size_v<B>, "Arguments must be vectors of same size.");
+                    static_assert(vector<A> && vector<B> && vec_size_v<A> == vec_size_v<B>, "Arguments must be vectors of same size.");
                     using type = larger_t<floating_point_t<A>,floating_point_t<B>>;
                     return (type(value) / type(proportions)).min() * type(proportions);
                 }
@@ -1887,7 +1909,7 @@ int main(int argc, char **argv)
                 // Always returns a floating-point type.
                 template <typename A, typename B> [[nodiscard]] auto expand_to_proportions(A value, B proportions)
                 {
-                    static_assert(is_vector_v<A> && is_vector_v<B> && vec_size_v<A> == vec_size_v<B>, "Arguments must be vectors of same size.");
+                    static_assert(vector<A> && vector<B> && vec_size_v<A> == vec_size_v<B>, "Arguments must be vectors of same size.");
                     using type = larger_t<floating_point_t<A>,floating_point_t<B>>;
                     return (type(value) / type(proportions)).max() * type(proportions);
                 }

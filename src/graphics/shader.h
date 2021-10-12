@@ -421,7 +421,7 @@ namespace Graphics
 
         using effective_type = std::conditional_t<is_texture || is_bool, Math::change_vec_base_t<type, int>, type>; // Textures and bools become ints here
 
-        using base_type = typename std::conditional_t<Math::is_scalar_v<effective_type>, std::enable_if<1, effective_type>, effective_type>::type; // Vectors and matrices become scalars here.
+        using base_type = typename std::conditional_t<Math::scalar<effective_type>, std::enable_if<1, effective_type>, effective_type>::type; // Vectors and matrices become scalars here.
 
 
         Uniform() {}

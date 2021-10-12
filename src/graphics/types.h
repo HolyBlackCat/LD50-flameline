@@ -12,9 +12,9 @@ namespace Graphics
 
     template <typename T> std::string GlslTypeName()
     {
-        if constexpr (Math::is_vector_v<T> || Math::is_matrix_v<T>)
+        if constexpr (Math::vector<T> || Math::matrix<T>)
         {
-            constexpr int is_vec = Math::is_vector_v<T>;
+            constexpr int is_vec = Math::vector<T>;
             using base = typename T::type;
 
             std::string ret;
