@@ -7,7 +7,7 @@
 #include <sstream>
 #include <type_traits>
 
-#define VERSION "3.3.0"
+#define VERSION "3.3.1"
 
 #pragma GCC diagnostic ignored "-Wpragmas" // Silence GCC warning about the next line disabling a warning that GCC doesn't have.
 #pragma GCC diagnostic ignored "-Wstring-plus-int" // Silence clang warning about `1+R"()"` pattern.
@@ -207,12 +207,13 @@ int main(int argc, char **argv)
 
     section("namespace Math", []
     {
-        section("inline namespace Utility // Scalar concept", []
+        section("inline namespace Utility // Scalar concepts", []
         {
             output(1+R"(
                 // Check if a type is a scalar type.
                 template <typename T> struct impl_is_scalar : std::is_arithmetic<T> {}; // Not `std::is_scalar`, because that includes pointers.
                 template <typename T> concept scalar = impl_is_scalar<T>::value;
+                template <typename T> concept cv_unqualified_scalar = scalar<T> && std::is_same_v<T, std::remove_cv_t<T>>;
             )");
         });
 
@@ -222,8 +223,8 @@ int main(int argc, char **argv)
         {
             { // Main templates
                 output(1+R"(
-                    template <int D, scalar T> struct vec;
-                    template <int W, int H, scalar T> struct mat;
+                    template <int D, cv_unqualified_scalar T> struct vec;
+                    template <int W, int H, cv_unqualified_scalar T> struct mat;
                 )");
             }
         });
@@ -429,10 +430,6 @@ int main(int argc, char **argv)
                             }
                             return ret;
                         };
-
-                        { // Static assertions
-                            output("static_assert(!std::is_const_v<T> && !std::is_volatile_v<T>, \"The base type must have no cv-qualifiers.\");\n");
-                        }
 
                         { // Aliases
                             output("using type = T;\n");
@@ -695,10 +692,6 @@ int main(int argc, char **argv)
                             }
                             return ret;
                         };
-
-                        { // Static assertions
-                            output("static_assert(!std::is_const_v<T> && !std::is_volatile_v<T>, \"The base type must have no cv-qualifiers.\");\n");
-                        }
 
                         { // Aliases
                             output("using type = T;\n");

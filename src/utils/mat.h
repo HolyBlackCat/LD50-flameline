@@ -1,6 +1,6 @@
 // mat.h
 // Vector and matrix math
-// Version 3.3.0
+// Version 3.3.1
 // Generated, don't touch.
 
 #pragma once
@@ -20,17 +20,18 @@
 
 namespace Math
 {
-    inline namespace Utility // Scalar concept
+    inline namespace Utility // Scalar concepts
     {
         // Check if a type is a scalar type.
         template <typename T> struct impl_is_scalar : std::is_arithmetic<T> {}; // Not `std::is_scalar`, because that includes pointers.
         template <typename T> concept scalar = impl_is_scalar<T>::value;
+        template <typename T> concept cv_unqualified_scalar = scalar<T> && std::is_same_v<T, std::remove_cv_t<T>>;
     }
 
     inline namespace Vector // Declarations
     {
-        template <int D, scalar T> struct vec;
-        template <int W, int H, scalar T> struct mat;
+        template <int D, cv_unqualified_scalar T> struct vec;
+        template <int W, int H, cv_unqualified_scalar T> struct mat;
     }
 
     inline namespace Alias // Short type aliases
@@ -362,7 +363,6 @@ namespace Math
         //{ Vectors
         template <typename T> struct vec<2,T> // vec2
         {
-            static_assert(!std::is_const_v<T> && !std::is_volatile_v<T>, "The base type must have no cv-qualifiers.");
             using type = T;
             static constexpr int size = 2;
             static constexpr bool is_floating_point = std::is_floating_point_v<type>;
@@ -415,7 +415,6 @@ namespace Math
 
         template <typename T> struct vec<3,T> // vec3
         {
-            static_assert(!std::is_const_v<T> && !std::is_volatile_v<T>, "The base type must have no cv-qualifiers.");
             using type = T;
             static constexpr int size = 3;
             static constexpr bool is_floating_point = std::is_floating_point_v<type>;
@@ -462,7 +461,6 @@ namespace Math
 
         template <typename T> struct vec<4,T> // vec4
         {
-            static_assert(!std::is_const_v<T> && !std::is_volatile_v<T>, "The base type must have no cv-qualifiers.");
             using type = T;
             static constexpr int size = 4;
             static constexpr bool is_floating_point = std::is_floating_point_v<type>;
@@ -512,7 +510,6 @@ namespace Math
         //{ Matrices
         template <typename T> struct mat<2,2,T> // mat2x2
         {
-            static_assert(!std::is_const_v<T> && !std::is_volatile_v<T>, "The base type must have no cv-qualifiers.");
             using type = T;
             using member_type = vec2<T>;
             static constexpr int width = 2, height = 2;
@@ -583,7 +580,6 @@ namespace Math
 
         template <typename T> struct mat<2,3,T> // mat2x3
         {
-            static_assert(!std::is_const_v<T> && !std::is_volatile_v<T>, "The base type must have no cv-qualifiers.");
             using type = T;
             using member_type = vec3<T>;
             static constexpr int width = 2, height = 3;
@@ -621,7 +617,6 @@ namespace Math
 
         template <typename T> struct mat<2,4,T> // mat2x4
         {
-            static_assert(!std::is_const_v<T> && !std::is_volatile_v<T>, "The base type must have no cv-qualifiers.");
             using type = T;
             using member_type = vec4<T>;
             static constexpr int width = 2, height = 4;
@@ -659,7 +654,6 @@ namespace Math
 
         template <typename T> struct mat<3,2,T> // mat3x2
         {
-            static_assert(!std::is_const_v<T> && !std::is_volatile_v<T>, "The base type must have no cv-qualifiers.");
             using type = T;
             using member_type = vec2<T>;
             static constexpr int width = 3, height = 2;
@@ -697,7 +691,6 @@ namespace Math
 
         template <typename T> struct mat<3,3,T> // mat3x3
         {
-            static_assert(!std::is_const_v<T> && !std::is_volatile_v<T>, "The base type must have no cv-qualifiers.");
             using type = T;
             using member_type = vec3<T>;
             static constexpr int width = 3, height = 3;
@@ -795,7 +788,6 @@ namespace Math
 
         template <typename T> struct mat<3,4,T> // mat3x4
         {
-            static_assert(!std::is_const_v<T> && !std::is_volatile_v<T>, "The base type must have no cv-qualifiers.");
             using type = T;
             using member_type = vec4<T>;
             static constexpr int width = 3, height = 4;
@@ -833,7 +825,6 @@ namespace Math
 
         template <typename T> struct mat<4,2,T> // mat4x2
         {
-            static_assert(!std::is_const_v<T> && !std::is_volatile_v<T>, "The base type must have no cv-qualifiers.");
             using type = T;
             using member_type = vec2<T>;
             static constexpr int width = 4, height = 2;
@@ -871,7 +862,6 @@ namespace Math
 
         template <typename T> struct mat<4,3,T> // mat4x3
         {
-            static_assert(!std::is_const_v<T> && !std::is_volatile_v<T>, "The base type must have no cv-qualifiers.");
             using type = T;
             using member_type = vec3<T>;
             static constexpr int width = 4, height = 3;
@@ -909,7 +899,6 @@ namespace Math
 
         template <typename T> struct mat<4,4,T> // mat4x4
         {
-            static_assert(!std::is_const_v<T> && !std::is_volatile_v<T>, "The base type must have no cv-qualifiers.");
             using type = T;
             using member_type = vec4<T>;
             static constexpr int width = 4, height = 4;
