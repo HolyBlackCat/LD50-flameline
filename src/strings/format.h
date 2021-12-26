@@ -1,5 +1,8 @@
 #pragma once
 
+#include "program/compiler.h"
+#include "program/platform.h"
+
 // This header includes libfmt headers, and adds some convenience macros.
 
 /* TL;DR of the macros:
@@ -140,7 +143,11 @@ namespace Strings
 // where `FMT_STRING` is a libfmt macro that enables the compile-time format string validation.
 // Primarily useful for writing other macros.
 // It's callable even with a single parameter. There's no max limit on the amount of parameters.
-#define FORMAT_ARGS_SIMPLE(...) FMT_STRING(MA_VA_FIRST(__VA_ARGS__)) MA_IF_COMMA_ELSE(FORMAT_impl_args, MA_NULL, __VA_ARGS__)(__VA_ARGS__)
+#define FORMAT_ARGS_SIMPLE(...) \
+    IMP_PLATFORM_IF(clang)( IMP_DIAGNOSTICS_PUSH IMP_DIAGNOSTICS_IGNORE("-Wunused-local-typedef") ) \
+    FMT_STRING(MA_VA_FIRST(__VA_ARGS__)) MA_IF_COMMA_ELSE(FORMAT_impl_args, MA_NULL, __VA_ARGS__)(__VA_ARGS__) \
+    IMP_PLATFORM_IF(clang)( IMP_DIAGNOSTICS_POP )
+
 #define FORMAT_impl_args(format, ...) , __VA_ARGS__
 
 
