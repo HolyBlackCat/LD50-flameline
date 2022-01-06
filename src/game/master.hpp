@@ -12,7 +12,6 @@
 
 #include "audio/complete.h"
 #include "gameutils/adaptive_viewport.h"
-#include "gameutils/class_sequence.h"
 #include "gameutils/fps_counter.h"
 #include "gameutils/render.h"
 #include "gameutils/state.h"
