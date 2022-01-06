@@ -27,15 +27,15 @@
             "presentation": {"echo": true, "reveal": "always", "focus": false, "panel": "shared", "showReuseMessage": false, "clear": true},
         },
         {
-            "label": "↪ Debug (soft)",
-            "type": "shell",
-            "command": "make use mode=debug_soft",
-            "presentation": {"echo": true, "reveal": "always", "focus": false, "panel": "shared", "showReuseMessage": false, "clear": true},
-        },
-        {
             "label": "↪ Debug",
             "type": "shell",
             "command": "make use mode=debug",
+            "presentation": {"echo": true, "reveal": "always", "focus": false, "panel": "shared", "showReuseMessage": false, "clear": true},
+        },
+        {
+            "label": "↪ Debug (soft)",
+            "type": "shell",
+            "command": "make use mode=debug_soft",
             "presentation": {"echo": true, "reveal": "always", "focus": false, "panel": "shared", "showReuseMessage": false, "clear": true},
         },
         {

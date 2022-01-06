@@ -25,11 +25,11 @@ override CXXFLAGS += -Ilib/include/cglfl_gl3.2_core # OpenGL version
 override LDFLAGS += $(filter-out -mwindows,$(deps_linker_flags))
 
 # Build modes
-$(call new_mode,debug_soft)
-$(mode_flags) CXXFLAGS += -g -D_GLIBCXX_ASSERTIONS
-
 $(call new_mode,debug)
 $(mode_flags) CXXFLAGS += -g -D_GLIBCXX_DEBUG
+
+$(call new_mode,debug_soft)
+$(mode_flags) CXXFLAGS += -g -D_GLIBCXX_ASSERTIONS
 
 $(call new_mode,release)
 $(mode_flags) CXXFLAGS += -DNDEBUG -O3
