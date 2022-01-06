@@ -10,7 +10,7 @@ LINKER_MODE := CXX
 
 # Dependency set name
 LIBRARY_PACK_NAME := imp-re_deps_21-12
-USED_PACKAGES := sdl2 openal freetype2 ogg vorbis vorbisfile zlib fmt double-conversion bullet
+USED_PACKAGES := sdl2 openal freetype2 ogg vorbis vorbisfile zlib fmt double-conversion # bullet
 
 
 # Flags
