@@ -9,8 +9,8 @@ OUTPUT_FILE := bin/imp-re
 LINKER_MODE := CXX
 
 # Dependency set name
-LIBRARY_PACK_NAME := imp-re_deps_21-12
-USED_PACKAGES := sdl2 openal freetype2 ogg vorbis vorbisfile zlib fmt double-conversion # bullet
+LIBRARY_PACK_NAME := imp-re_deps_22-01
+USED_PACKAGES := sdl2 openal freetype2 ogg vorbis vorbisfile zlib fmt double-conversion # box2d bullet
 
 
 # Flags
