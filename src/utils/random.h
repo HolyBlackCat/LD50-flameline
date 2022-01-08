@@ -115,7 +115,7 @@ namespace Random
         // Converts the parameter to a number that can be properly printed.
         // I.e. converts `char`s to `int`s, and leaves everything else unchanged.
         template <SupportedScalar T> T ToPrintableNumber(T value) {return value;}
-        int ToPrintableNumber(char value) {return int(value);}
+        inline int ToPrintableNumber(char value) {return int(value);}
 
 
         // Returns the next or previous representable value.
