@@ -199,8 +199,12 @@ namespace Unicode
         {
             ++(*this);
         }
-        Iterator(const std::string &str) : Iterator(&*str.begin(), &*str.end()) {}
-        Iterator(std::string_view str) : Iterator(&*str.begin(), &*str.end()) {}
+        explicit Iterator(const std::string &str) : Iterator(&*str.begin(), &*str.end()) {}
+        explicit Iterator(std::string_view str) : Iterator(&*str.begin(), &*str.end()) {}
+
+        // Removing `explicit` from the `string_view` constructor causes a curious template error in libstdc++,
+        // when `return *this` in `begin()` considers the `string_view` constructor, and checks `Iterator` against
+        // iterator concepts.
 
         Iterator begin() const
         {
