@@ -7,7 +7,7 @@
 #include <sstream>
 #include <type_traits>
 
-#define VERSION "3.3.1"
+#define VERSION "3.3.2"
 
 #pragma GCC diagnostic ignored "-Wpragmas" // Silence GCC warning about the next line disabling a warning that GCC doesn't have.
 #pragma GCC diagnostic ignored "-Wstring-plus-int" // Silence clang warning about `1+R"()"` pattern.
@@ -1863,22 +1863,22 @@ int main(int argc, char **argv)
 
                     T scale = T(1), offset = T(0);
 
-                    linear_mapping() = default;
+                    constexpr linear_mapping() {}
 
-                    linear_mapping(T src_a, T src_b, T dst_a, T dst_b)
+                    constexpr linear_mapping(T src_a, T src_b, T dst_a, T dst_b)
                     {
                         T factor = 1 / (src_a - src_b);
                         scale = (dst_a - dst_b) * factor;
                         offset = (dst_b * src_a - dst_a * src_b) * factor;
                     }
 
-                    T operator()(T x) const
+                    constexpr T operator()(T x) const
                     {
                         return x * scale + offset;
                     }
 
                     using matrix_t = mat<vec_size_v<T>+1, vec_size_v<T>+1, vec_base_t<T>>;
-                    matrix_t matrix() const
+                    constexpr matrix_t matrix() const
                     {
                         matrix_t ret{};
                         for (int i = 0; i < vec_size_v<T>; i++)
@@ -1892,7 +1892,7 @@ int main(int argc, char **argv)
 
                 // Shrinks a vector as little as possible to give it specific proportions.
                 // Always returns a floating-point type.
-                template <typename A, typename B> [[nodiscard]] auto shrink_to_proportions(A value, B proportions)
+                template <typename A, typename B> [[nodiscard]] constexpr auto shrink_to_proportions(A value, B proportions)
                 {
                     static_assert(vector<A> && vector<B> && vec_size_v<A> == vec_size_v<B>, "Arguments must be vectors of same size.");
                     using type = larger_t<floating_point_t<A>,floating_point_t<B>>;
@@ -1900,7 +1900,7 @@ int main(int argc, char **argv)
                 }
                 // Expands a vector as little as possible to give it specific proportions.
                 // Always returns a floating-point type.
-                template <typename A, typename B> [[nodiscard]] auto expand_to_proportions(A value, B proportions)
+                template <typename A, typename B> [[nodiscard]] constexpr auto expand_to_proportions(A value, B proportions)
                 {
                     static_assert(vector<A> && vector<B> && vec_size_v<A> == vec_size_v<B>, "Arguments must be vectors of same size.");
                     using type = larger_t<floating_point_t<A>,floating_point_t<B>>;
@@ -1908,7 +1908,7 @@ int main(int argc, char **argv)
                 }
 
                 // Finds an intersection point of two lines.
-                template <typename T> [[nodiscard]] vec2<T> line_intersection(vec2<T> a1, vec2<T> a2, vec2<T> b1, vec2<T> b2)
+                template <typename T> [[nodiscard]] constexpr vec2<T> line_intersection(vec2<T> a1, vec2<T> a2, vec2<T> b1, vec2<T> b2)
                 {
                     static_assert(std::is_floating_point_v<T>, "Arguments must be floating-point.");
                     auto delta_a = a2 - a1;
@@ -1917,26 +1917,51 @@ int main(int argc, char **argv)
                 }
 
                 // Projects a point onto a line. `dir` is assumed to be normalized.
-                template <int D, typename T> [[nodiscard]] vec<D,T> project_onto_line_norm(vec<D,T> point, vec<D,T> dir)
+                template <int D, typename T> [[nodiscard]] constexpr vec<D,T> project_onto_line_norm(vec<D,T> point, vec<D,T> dir)
                 {
                     static_assert(std::is_floating_point_v<T>, "Arguments must be floating-point.");
                     return dir * point.dot(dir);
                 }
                 // Projects a point onto a line.
-                template <int D, typename T> [[nodiscard]] vec<D,T> project_onto_line(vec<D,T> point, vec<D,T> dir)
+                template <int D, typename T> [[nodiscard]] constexpr vec<D,T> project_onto_line(vec<D,T> point, vec<D,T> dir)
                 {
                     return project_onto_line_norm(point, dir.norm());
                 }
 
                 // Projects a point onto a plane. `plane_normal` is assumed to be normalized.
-                template <typename T> [[nodiscard]] vec3<T> project_onto_plane_norm(vec3<T> point, vec3<T> plane_normal)
+                template <typename T> [[nodiscard]] constexpr vec3<T> project_onto_plane_norm(vec3<T> point, vec3<T> plane_normal)
                 {
                     return point - project_onto_line_norm(point, plane_normal);
                 }
                 // Projects a point onto a plane.
-                template <typename T> [[nodiscard]] vec3<T> project_onto_plane(vec3<T> point, vec3<T> plane_normal)
+                template <typename T> [[nodiscard]] constexpr vec3<T> project_onto_plane(vec3<T> point, vec3<T> plane_normal)
                 {
                     return project_onto_plane_norm(point, plane_normal.norm());
+                }
+
+                // Compares the angles of `a` and `b` without doing any trigonometry. Works with integers too.
+                // The assumed angles are in range [0;2pi), with +X having angle 0.
+                // Zero vectors are considered to be greater than everything else.
+                template <typename T> [[nodiscard]] constexpr bool less_positively_rotated(vec2<T> a, vec2<T> b)
+                {
+                    // This check makes (0,0) worse than any other vector,
+                    // and doesn't seem to affect the result if zero vectors are not involved.
+                    if (int d = (a == vec2<T>()) - (b == vec2<T>()))
+                        return d < 0;
+
+                    if (int d = (a.y < 0) - (b.y < 0))
+                        return d < 0;
+                    if (int d = (a.y == 0 && a.x < 0) - (b.y == 0 && b.x < 0))
+                        return d < 0;
+
+                    return a.x * b.y > b.x * a.y;
+                }
+
+                // Same, but angle 0 is mapped to `dir` instead of +X.
+                template <typename T> [[nodiscard]] constexpr bool less_positively_rotated(vec2<T> dir, vec2<T> a, vec2<T> b)
+                {
+                    imat2 mat = imat2(dir, dir.rot90());
+                    return less_positively_rotated(a * mat, b * mat);
                 }
             )");
         });
