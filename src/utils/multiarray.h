@@ -25,15 +25,22 @@ class MultiArray
     using index_vec_t = index_vec<D>;
 
   private:
-    index_vec_t size_vec;
+    index_vec_t size_vec{};
     std::vector<type> storage;
 
   public:
-    MultiArray(index_vec_t size_vec = index_vec_t(0)) : size_vec(size_vec), storage(size_vec.prod())
+    constexpr MultiArray() {}
+
+    MultiArray(index_vec_t size_vec) : size_vec(size_vec), storage(size_vec.prod())
     {
         ASSERT(size_vec.min() >= 0, "Invalid multiarray size.");
     }
-    template <typename A, A ...I> MultiArray(Meta::value_list<I...>, std::array<type, index_vec_t(I...).prod()> data) : size_vec(I...), storage(data.begin(), data.end())
+    MultiArray(index_vec_t size_vec, const T &init) : size_vec(size_vec), storage(size_vec.prod(), init)
+    {
+        ASSERT(size_vec.min() >= 0, "Invalid multiarray size.");
+    }
+    template <typename A, A ...I>
+    MultiArray(Meta::value_list<I...>, std::array<type, index_vec_t(I...).prod()> data) : size_vec(I...), storage(data.begin(), data.end())
     {
         static_assert(std::is_integral_v<A>, "Indices must be integral.");
         static_assert(((I >= 0) && ...), "Invalid multiarray size.");
