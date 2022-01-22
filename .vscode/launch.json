@@ -26,5 +26,13 @@
                 "python import sys; sys.path.insert(0, '/usr/share/gcc/python'); from libstdcxx.v6.printers import register_libstdcxx_printers; register_libstdcxx_printers(None)",
             ],
         },
+        {
+            "name": "Debug (LLDB)",
+            "type": "lldb",
+            "request": "launch",
+            "program": "${workspaceRoot}/bin/imp-re",
+            "cwd": "${workspaceRoot}/bin",
+            "preLaunchTask": "Build",
+        }
     ]
 }
