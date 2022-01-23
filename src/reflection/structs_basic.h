@@ -832,7 +832,7 @@ That's all.
         /* If both `REFL_METADATA_ONLY` and `REFL_TERSE` are used, generate metadata */\
         /* for member variables here instead of its normal location. */\
         MA_IF_NOT_EMPTY_ELSE(MA_NULL, REFL_STRUCT_impl_low_extra_metadata, MA_INVERT_EMPTINESS(body_or_empty_) MA_INVERT_EMPTINESS(metadata_only_if_not_empty_)) \
-            (name_ REFL_STRUCT_impl_tparams(tparams_seq_), MA_IDENTITY body_or_empty_) \
+            ((name_ REFL_STRUCT_impl_tparams(tparams_seq_)), MA_IDENTITY body_or_empty_) \
     }; \
     /* Define a helper function that returns the metadata structure. */\
     REFL_STRUCT_impl_tparams_decl(tparams_seq_) /* Template parameters. */ \
@@ -895,7 +895,7 @@ That's all.
 // Internal. Helper for `REFL_STRUCT_impl_low`. Used for generating field metadata if both `REFL_METADATA_ONLY` and `REFL_TERSE` are used.
 #define REFL_STRUCT_impl_low_extra_metadata(...) REFL_STRUCT_impl_low_extra_metadata_low(__VA_ARGS__)
 #define REFL_STRUCT_impl_low_extra_metadata_low(name, unnamed_if_not_empty, seq) \
-    using t [[maybe_unused]] = name; \
+    using t [[maybe_unused]] = MA_IDENTITY name; \
     REFL_MEMBERS_impl_metadata_generic(seq) \
     MA_IF_NOT_EMPTY_ELSE(MA_NULL, REFL_STRUCT_impl_low_extra_metadata_low_names, unnamed_if_not_empty)(seq)
 
