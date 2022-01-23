@@ -7,7 +7,7 @@
 #include <sstream>
 #include <type_traits>
 
-#define VERSION "3.3.2"
+#define VERSION "3.3.3"
 
 #pragma GCC diagnostic ignored "-Wpragmas" // Silence GCC warning about the next line disabling a warning that GCC doesn't have.
 #pragma GCC diagnostic ignored "-Wstring-plus-int" // Silence clang warning about `1+R"()"` pattern.
@@ -410,6 +410,8 @@ int main(int argc, char **argv)
 
         section("inline namespace Vector // Definitions", []
         {
+            output("struct uninit {}; // A constructor tag.\n");
+
             decorative_section("Vectors", [&]
             {
                 for (int w = 2; w <= 4; w++)
@@ -456,7 +458,10 @@ int main(int argc, char **argv)
 
                         { // Constructors
                             // Default
-                            output("constexpr vec() = default;\n");
+                            output("constexpr vec() : ",Fields(", ", "", "{}")," {}\n");
+
+                            // Uninitialized
+                            output("constexpr vec(uninit) {}\n");
 
                             // Element-wise
                             output("constexpr vec(",Fields(", ","type "),") : ");
@@ -731,6 +736,9 @@ int main(int argc, char **argv)
                                 output("01"[x == y]);
                             }
                             output(") {}\n");
+
+                            // Uninitialized
+                            output("constexpr mat(uninit) : ",LargeFields(", ", "", "(uninit{})")," {}\n");
 
                             // Element-wise
                             output("constexpr mat(",LargeFields(", ","const member_type &"),") : ");

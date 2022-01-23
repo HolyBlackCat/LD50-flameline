@@ -1,6 +1,6 @@
 // mat.h
 // Vector and matrix math
-// Version 3.3.2
+// Version 3.3.3
 // Generated, don't touch.
 
 #pragma once
@@ -360,6 +360,7 @@ namespace Math
 
     inline namespace Vector // Definitions
     {
+        struct uninit {}; // A constructor tag.
         //{ Vectors
         template <typename T> struct vec<2,T> // vec2
         {
@@ -368,7 +369,8 @@ namespace Math
             static constexpr bool is_floating_point = std::is_floating_point_v<type>;
             union {type x, r;};
             union {type y, g;};
-            constexpr vec() = default;
+            constexpr vec() : x{}, y{} {}
+            constexpr vec(uninit) {}
             constexpr vec(type x, type y) : x(x), y(y) {}
             explicit constexpr vec(type obj) : x(obj), y(obj) {}
             template <typename TT> constexpr vec(vec2<TT> obj) : x(obj.x), y(obj.y) {}
@@ -421,7 +423,8 @@ namespace Math
             union {type x, r;};
             union {type y, g;};
             union {type z, b;};
-            constexpr vec() = default;
+            constexpr vec() : x{}, y{}, z{} {}
+            constexpr vec(uninit) {}
             constexpr vec(type x, type y, type z) : x(x), y(y), z(z) {}
             explicit constexpr vec(type obj) : x(obj), y(obj), z(obj) {}
             template <typename TT> constexpr vec(vec3<TT> obj) : x(obj.x), y(obj.y), z(obj.z) {}
@@ -468,7 +471,8 @@ namespace Math
             union {type y, g;};
             union {type z, b;};
             union {type w, a;};
-            constexpr vec() = default;
+            constexpr vec() : x{}, y{}, z{}, w{} {}
+            constexpr vec(uninit) {}
             constexpr vec(type x, type y, type z, type w) : x(x), y(y), z(z), w(w) {}
             explicit constexpr vec(type obj) : x(obj), y(obj), z(obj), w(obj) {}
             template <typename TT> constexpr vec(vec4<TT> obj) : x(obj.x), y(obj.y), z(obj.z), w(obj.w) {}
@@ -518,6 +522,7 @@ namespace Math
             union {member_type x, r;};
             union {member_type y, g;};
             constexpr mat() : mat(1,0,0,1) {}
+            constexpr mat(uninit) : x(uninit{}), y(uninit{}) {}
             constexpr mat(const member_type &x, const member_type &y) : x(x), y(y) {}
             constexpr mat(type xx, type yx, type xy, type yy) : x(xx,xy), y(yx,yy) {}
             template <typename TT> constexpr mat(const mat2x2<TT> &obj) : x(obj.x), y(obj.y) {}
@@ -587,6 +592,7 @@ namespace Math
             union {member_type x, r;};
             union {member_type y, g;};
             constexpr mat() : mat(1,0,0,1,0,0) {}
+            constexpr mat(uninit) : x(uninit{}), y(uninit{}) {}
             constexpr mat(const member_type &x, const member_type &y) : x(x), y(y) {}
             constexpr mat(type xx, type yx, type xy, type yy, type xz, type yz) : x(xx,xy,xz), y(yx,yy,yz) {}
             template <typename TT> constexpr mat(const mat2x3<TT> &obj) : x(obj.x), y(obj.y) {}
@@ -624,6 +630,7 @@ namespace Math
             union {member_type x, r;};
             union {member_type y, g;};
             constexpr mat() : mat(1,0,0,1,0,0,0,0) {}
+            constexpr mat(uninit) : x(uninit{}), y(uninit{}) {}
             constexpr mat(const member_type &x, const member_type &y) : x(x), y(y) {}
             constexpr mat(type xx, type yx, type xy, type yy, type xz, type yz, type xw, type yw) : x(xx,xy,xz,xw), y(yx,yy,yz,yw) {}
             template <typename TT> constexpr mat(const mat2x4<TT> &obj) : x(obj.x), y(obj.y) {}
@@ -662,6 +669,7 @@ namespace Math
             union {member_type y, g;};
             union {member_type z, b;};
             constexpr mat() : mat(1,0,0,0,1,0) {}
+            constexpr mat(uninit) : x(uninit{}), y(uninit{}), z(uninit{}) {}
             constexpr mat(const member_type &x, const member_type &y, const member_type &z) : x(x), y(y), z(z) {}
             constexpr mat(type xx, type yx, type zx, type xy, type yy, type zy) : x(xx,xy), y(yx,yy), z(zx,zy) {}
             template <typename TT> constexpr mat(const mat3x2<TT> &obj) : x(obj.x), y(obj.y), z(obj.z) {}
@@ -700,6 +708,7 @@ namespace Math
             union {member_type y, g;};
             union {member_type z, b;};
             constexpr mat() : mat(1,0,0,0,1,0,0,0,1) {}
+            constexpr mat(uninit) : x(uninit{}), y(uninit{}), z(uninit{}) {}
             constexpr mat(const member_type &x, const member_type &y, const member_type &z) : x(x), y(y), z(z) {}
             constexpr mat(type xx, type yx, type zx, type xy, type yy, type zy, type xz, type yz, type zz) : x(xx,xy,xz), y(yx,yy,yz), z(zx,zy,zz) {}
             template <typename TT> constexpr mat(const mat3x3<TT> &obj) : x(obj.x), y(obj.y), z(obj.z) {}
@@ -796,6 +805,7 @@ namespace Math
             union {member_type y, g;};
             union {member_type z, b;};
             constexpr mat() : mat(1,0,0,0,1,0,0,0,1,0,0,0) {}
+            constexpr mat(uninit) : x(uninit{}), y(uninit{}), z(uninit{}) {}
             constexpr mat(const member_type &x, const member_type &y, const member_type &z) : x(x), y(y), z(z) {}
             constexpr mat(type xx, type yx, type zx, type xy, type yy, type zy, type xz, type yz, type zz, type xw, type yw, type zw) : x(xx,xy,xz,xw), y(yx,yy,yz,yw), z(zx,zy,zz,zw) {}
             template <typename TT> constexpr mat(const mat3x4<TT> &obj) : x(obj.x), y(obj.y), z(obj.z) {}
@@ -834,6 +844,7 @@ namespace Math
             union {member_type z, b;};
             union {member_type w, a;};
             constexpr mat() : mat(1,0,0,0,0,1,0,0) {}
+            constexpr mat(uninit) : x(uninit{}), y(uninit{}), z(uninit{}), w(uninit{}) {}
             constexpr mat(const member_type &x, const member_type &y, const member_type &z, const member_type &w) : x(x), y(y), z(z), w(w) {}
             constexpr mat(type xx, type yx, type zx, type wx, type xy, type yy, type zy, type wy) : x(xx,xy), y(yx,yy), z(zx,zy), w(wx,wy) {}
             template <typename TT> constexpr mat(const mat4x2<TT> &obj) : x(obj.x), y(obj.y), z(obj.z), w(obj.w) {}
@@ -871,6 +882,7 @@ namespace Math
             union {member_type z, b;};
             union {member_type w, a;};
             constexpr mat() : mat(1,0,0,0,0,1,0,0,0,0,1,0) {}
+            constexpr mat(uninit) : x(uninit{}), y(uninit{}), z(uninit{}), w(uninit{}) {}
             constexpr mat(const member_type &x, const member_type &y, const member_type &z, const member_type &w) : x(x), y(y), z(z), w(w) {}
             constexpr mat(type xx, type yx, type zx, type wx, type xy, type yy, type zy, type wy, type xz, type yz, type zz, type wz) : x(xx,xy,xz), y(yx,yy,yz), z(zx,zy,zz), w(wx,wy,wz) {}
             template <typename TT> constexpr mat(const mat4x3<TT> &obj) : x(obj.x), y(obj.y), z(obj.z), w(obj.w) {}
@@ -909,6 +921,7 @@ namespace Math
             union {member_type z, b;};
             union {member_type w, a;};
             constexpr mat() : mat(1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1) {}
+            constexpr mat(uninit) : x(uninit{}), y(uninit{}), z(uninit{}), w(uninit{}) {}
             constexpr mat(const member_type &x, const member_type &y, const member_type &z, const member_type &w) : x(x), y(y), z(z), w(w) {}
             constexpr mat(type xx, type yx, type zx, type wx, type xy, type yy, type zy, type wy, type xz, type yz, type zz, type wz, type xw, type yw, type zw, type ww) : x(xx,xy,xz,xw), y(yx,yy,yz,yw), z(zx,zy,zz,zw), w(wx,wy,wz,ww) {}
             template <typename TT> constexpr mat(const mat4x4<TT> &obj) : x(obj.x), y(obj.y), z(obj.z), w(obj.w) {}
