@@ -62,12 +62,36 @@ namespace Refl
     }
 
     template <typename T>
+    struct DefaultStructCallbacks
+    {
+        static void PreSerialize   (const T &object) {(void)object;}
+        static void PostSerialize  (const T &object) {(void)object;}
+        static void PreDeserialize (      T &object) {(void)object;}
+        static void PostDeserialize(      T &object) {(void)object;}
+    };
+
+    // You're welcome to specialize this struct for your types.
+    // The functions are allowed to throw.
+    template <typename T>
+    struct StructCallbacks : DefaultStructCallbacks<T> {};
+
+    template <typename T>
     class Interface_Struct : public InterfaceBasic<T>
     {
       public:
         void ToString(const T &object, Stream::Output &output, const ToStringOptions &options, impl::ToStringState state) const override
         {
             static_assert(Class::members_known<T>, "Can't convert T to string: its members are not reflected.");
+
+            // Initial callback.
+            try
+            {
+                StructCallbacks<T>::PreSerialize(object);
+            }
+            catch (std::exception &e)
+            {
+                Program::Error(output.GetExceptionPrefix() + e.what());
+            }
 
             constexpr bool named_members = Class::member_names_known<T>;
 
@@ -192,11 +216,31 @@ namespace Refl
                 output.WriteString(",\n").WriteChar(' ', state.CurIndent());
 
             output.WriteChar(")}"[named_members]);
+
+            // Final callback.
+            try
+            {
+                StructCallbacks<T>::PostSerialize(object);
+            }
+            catch (std::exception &e)
+            {
+                Program::Error(output.GetExceptionPrefix() + e.what());
+            }
         }
 
         void FromString(T &object, Stream::Input &input, const FromStringOptions &options, impl::FromStringState state) const override
         {
             static_assert(Class::members_known<T>, "Can't convert string to T: its members are not reflected.");
+
+            // Initial callback.
+            try
+            {
+                StructCallbacks<T>::PreDeserialize(object);
+            }
+            catch (std::exception &e)
+            {
+                Program::Error(input.GetExceptionPrefix() + e.what());
+            }
 
             constexpr bool named_members = Class::member_names_known<T>;
 
@@ -396,10 +440,30 @@ namespace Refl
                     Utils::SkipWhitespaceAndComments(input);
                 input.Discard(')');
             }
+
+            // Final callback.
+            try
+            {
+                StructCallbacks<T>::PostDeserialize(object);
+            }
+            catch (std::exception &e)
+            {
+                Program::Error(input.GetExceptionPrefix() + e.what());
+            }
         }
 
         void ToBinary(const T &object, Stream::Output &output, const ToBinaryOptions &options, impl::ToBinaryState state) const override
         {
+            // Initial callback.
+            try
+            {
+                StructCallbacks<T>::PreSerialize(object);
+            }
+            catch (std::exception &e)
+            {
+                Program::Error(output.GetExceptionPrefix() + e.what());
+            }
+
             auto next_member_state = state.MemberOrElem(options);
             auto next_base_state = state.BaseClass(options);
 
@@ -439,10 +503,30 @@ namespace Refl
                 if constexpr (!impl::Class::skip_member<type>)
                     WriteEntry(Class::Member<i>(object), next_member_state);
             });
+
+            // Final callback.
+            try
+            {
+                StructCallbacks<T>::PostSerialize(object);
+            }
+            catch (std::exception &e)
+            {
+                Program::Error(output.GetExceptionPrefix() + e.what());
+            }
         }
 
         void FromBinary(T &object, Stream::Input &input, const FromBinaryOptions &options, impl::FromBinaryState state) const override
         {
+            // Initial callback.
+            try
+            {
+                StructCallbacks<T>::PreDeserialize(object);
+            }
+            catch (std::exception &e)
+            {
+                Program::Error(input.GetExceptionPrefix() + e.what());
+            }
+
             auto next_member_state = state.MemberOrElem(options);
             auto next_base_state = state.BaseClass(options);
 
@@ -482,6 +566,16 @@ namespace Refl
                 if constexpr (!impl::Class::skip_member<type>)
                     ReadEntry(Class::Member<i>(object), next_member_state);
             });
+
+            // Final callback.
+            try
+            {
+                StructCallbacks<T>::PostDeserialize(object);
+            }
+            catch (std::exception &e)
+            {
+                Program::Error(input.GetExceptionPrefix() + e.what());
+            }
         }
     };
 
