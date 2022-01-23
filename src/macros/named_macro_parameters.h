@@ -69,7 +69,12 @@
 #define MA_PARAMS_GET_impl_call(m, ...) m(__VA_ARGS__) // Used instead of `MA_CALL` since it's not reentrant.
 
 #define MA_PARAMS_GET_impl_verify(category, param) \
-    MA_IF_NOT_EMPTY(MA_ABORT("Invalid argument for a named macro parameter."), MA_CAT4(MA_PARAMS_category_,category,_X_,param))
+    MA_PARAMS_GET_impl_verify0(MA_CAT4(MA_PARAMS_category_,category,_X_,param))
+
+#define MA_PARAMS_GET_impl_verify0(...) MA_PARAMS_GET_impl_wrong_category(__VA_ARGS__)
+
+// If you get an error here, you used an incorrect named argument, which is intended to be used elsewhere.
+#define MA_PARAMS_GET_impl_wrong_category()
 
 // Similar to `MA_PARAMS_GET`, but expects at most one parameter with a matching name.
 // Expands to the matching parameter (or nothing, if there is none).
@@ -84,9 +89,9 @@
     MA_PARAMS_GET_impl_verify(category, curparam) \
     MA_IF_NOT_EMPTY_ELSE(MA_NULL, MA_PARAMS_GET_ONE_impl1, MA_CAT4(MA_PARAMS_equal_,param,_X_,curparam))(data, macro, MA_IDENTITY curvalue)
 
-#define MA_PARAMS_GET_ONE_impl1(data, macro, ...) (x) macro(data, __VA_ARGS__) MA_PARAMS_GET_ONE_impl_dupe
+#define MA_PARAMS_GET_ONE_impl1(data, macro, ...) (x) macro(data, __VA_ARGS__) MA_PARAMS_GET_ONE_impl_found_duplicate
 
-#define MA_PARAMS_GET_ONE_impl_dupe(...) __VA_OPT__(MA_ABORT("Duplicate named macro parameter."))
+#define MA_PARAMS_GET_ONE_impl_found_duplicate()
 
 // This can be passed as `macro` to `MA_PARAMS_GET[_ONE]`.
 // Expands to the parameter.
@@ -103,7 +108,7 @@
 // This can be passed as `macro` to `MA_PARAMS_GET[_ONE]`.
 // Expands to a single `x`.
 // Emits an error if the parameter is not empty.
-#define MA_PARAMS_DUMMY_EMPTY(data, ...) x MA_PARAMS_DUMMY_EMPTY_impl_expect_empty(__VA_ARGS__)
+#define MA_PARAMS_DUMMY_EMPTY(data, ...) x MA_PARAMS_DUMMY_EMPTY_impl_expected_empty(__VA_ARGS__)
 
 // If you get a compilation error here, you passed an argument to a named parameter that expects none.
-#define MA_PARAMS_DUMMY_EMPTY_impl_expect_empty()
+#define MA_PARAMS_DUMMY_EMPTY_impl_expected_empty()
