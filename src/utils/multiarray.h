@@ -12,6 +12,7 @@
 #include "strings/format.h"
 #include "utils/mat.h"
 
+
 template <int D, typename T>
 class MultiArray
 {
@@ -23,6 +24,8 @@ class MultiArray
     using type = T;
     using index_t = std::ptrdiff_t;
     using index_vec_t = index_vec<D>;
+
+    struct ReflHelper; // Our reflection metadata uses this to access private fields.
 
   private:
     index_vec_t size_vec{};

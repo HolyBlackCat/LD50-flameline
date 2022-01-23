@@ -9,11 +9,11 @@
 
 namespace Refl::Class::Custom
 {
-    template <std::size_t D, typename M> struct name<Math::vec<D, M>>
+    template <int D, typename M> struct name<Math::vec<D, M>>
     {
         static constexpr const char *value = "vec";
     };
-    template <std::size_t D, typename M> struct members<Math::vec<D, M>>
+    template <int D, typename M> struct members<Math::vec<D, M>>
     {
         using T = Math::vec<D, M>;
         static constexpr std::size_t count = D;
@@ -23,11 +23,11 @@ namespace Refl::Class::Custom
         }
     };
 
-    template <std::size_t W, std::size_t H, typename M> struct name<Math::mat<W, H, M>>
+    template <int W, int H, typename M> struct name<Math::mat<W, H, M>>
     {
         static constexpr const char *value = "mat";
     };
-    template <std::size_t W, std::size_t H, typename M> struct members<Math::mat<W, H, M>>
+    template <int W, int H, typename M> struct members<Math::mat<W, H, M>>
     {
         using T = Math::mat<W, H, M>;
         static constexpr std::size_t count = W * H;
