@@ -103,4 +103,7 @@
 // This can be passed as `macro` to `MA_PARAMS_GET[_ONE]`.
 // Expands to a single `x`.
 // Emits an error if the parameter is not empty.
-#define MA_PARAMS_DUMMY_EMPTY(data, ...) x __VA_OPT__(MA_ABORT("This named parameter has to be empty"))
+#define MA_PARAMS_DUMMY_EMPTY(data, ...) x MA_PARAMS_DUMMY_EMPTY_impl_expect_empty(__VA_ARGS__)
+
+// If you get a compilation error here, you passed an argument to a named parameter that expects none.
+#define MA_PARAMS_DUMMY_EMPTY_impl_expect_empty()
