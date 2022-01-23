@@ -221,11 +221,8 @@ namespace Refl
 
 // This must be used if and only if the enum is defined at class scope.
 // Failure to do so causes a hard error.
-// We define it conditionally, because the same macro is used for structs.
-#ifndef REFL_AT_CLASS_SCOPE
 #define REFL_AT_CLASS_SCOPE MA_PARAM(ReflAtClassScope)
 #define MA_PARAMS_equal_ReflAtClassScope_X_ReflAtClassScope
-#endif
 #define MA_PARAMS_category_ReflEnum_X_ReflAtClassScope
 
 

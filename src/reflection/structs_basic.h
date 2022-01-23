@@ -758,11 +758,8 @@ That's all.
 // An optional parameter for `REFL_STRUCT`.
 // This must be present if and only if the struct is at class scope.
 // Failure to do it causes a hard error.
-// We define it conditionally, because the same macro is used for enums.
-#ifndef REFL_AT_CLASS_SCOPE
 #define REFL_AT_CLASS_SCOPE MA_PARAM(ReflAtClassScope)
 #define MA_PARAMS_equal_ReflAtClassScope_X_ReflAtClassScope
-#endif
 #define MA_PARAMS_category_ReflStruct_X_ReflAtClassScope
 
 // An optional parameter for `REFL_STRUCT`.
