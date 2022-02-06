@@ -101,9 +101,9 @@ namespace Strings
             {
                 bool stop;
                 if constexpr (std::is_invocable_v<F, std::string_view, bool>)
-                    stop = Meta::return_value_or<bool>(false, std::forward<F>(func), std::string_view(elem_start, it), bool(is_end)); // Note the cast, it protects the original variable.
+                    stop = Meta::return_value_or<bool>(false, func, std::string_view(elem_start, it), bool(is_end)); // Note the cast, it protects the original variable.
                 else
-                    stop = Meta::return_value_or<bool>(false, std::forward<F>(func), std::string_view(elem_start, it));
+                    stop = Meta::return_value_or<bool>(false, func, std::string_view(elem_start, it));
                 if (stop)
                     return true;
             }
