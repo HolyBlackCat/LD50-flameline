@@ -7,7 +7,7 @@
 #include <stdexcept>
 #include <type_traits>
 
-#include "meta/basic.h"
+#include "meta/common.h"
 
 /* The functions in this file can be used for ROBUST comparisons between integral and/or floating-point types.
  *

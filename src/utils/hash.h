@@ -7,7 +7,7 @@
 #include <tuple>
 #include <utility>
 
-#include "meta/misc.h"
+#include "meta/common.h"
 
 namespace Hash
 {

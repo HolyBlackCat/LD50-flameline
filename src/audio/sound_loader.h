@@ -8,7 +8,7 @@
 
 #include "audio/buffer.h"
 #include "audio/sound.h"
-#include "meta/misc.h"
+#include "meta/common.h"
 #include "meta/string_template_params.h"
 #include "program/errors.h"
 

@@ -7,7 +7,7 @@
 
 #include "graphics/types.h"
 #include "macros/finally.h"
-#include "meta/misc.h"
+#include "meta/common.h"
 #include "program/errors.h"
 #include "reflection/structs.h"
 #include "utils/mat.h"

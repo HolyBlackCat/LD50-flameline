@@ -8,7 +8,7 @@
 
 #include "graphics/vertex_buffer.h"
 #include "macros/finally.h"
-#include "meta/misc.h"
+#include "meta/common.h"
 #include "program/errors.h"
 
 namespace Graphics

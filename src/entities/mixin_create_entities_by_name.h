@@ -5,7 +5,7 @@
 #include <map>
 
 #include "entities/base.h"
-#include "meta/basic.h"
+#include "meta/common.h"
 #include "meta/type_info.h"
 #include "reflection/full.h"
 #include "strings/format.h"

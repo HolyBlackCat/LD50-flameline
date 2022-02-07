@@ -10,9 +10,8 @@
 
 #include "macros/generated.h"
 #include "macros/named_macro_parameters.h"
-#include "meta/basic.h"
+#include "meta/common.h"
 #include "meta/lists.h"
-#include "meta/misc.h"
 #include "program/errors.h"
 #include "reflection/interface_basic.h"
 #include "reflection/interface_std_string.h"

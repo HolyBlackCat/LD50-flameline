@@ -3,7 +3,7 @@
 #include <algorithm>
 #include <cstddef>
 
-#include "meta/basic.h"
+#include "meta/common.h"
 
 // This file offers compile-time strings that can be used as template parameters.
 // Example 1:

@@ -9,7 +9,7 @@
 #include <string>
 #include <type_traits>
 
-#include "meta/basic.h"
+#include "meta/common.h"
 
 namespace Strings
 {

@@ -23,7 +23,7 @@
 #include "macros/finally.h"
 #include "macros/maybe_const.h"
 #include "macros/named_loops.h"
-#include "meta/misc.h"
+#include "meta/common.h"
 #include "program/entry_point.h"
 #include "program/compiler.h"
 #include "program/errors.h"

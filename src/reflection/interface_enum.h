@@ -8,7 +8,7 @@
 
 #include "macros/generated.h"
 #include "macros/named_macro_parameters.h"
-#include "meta/misc.h"
+#include "meta/common.h"
 #include "program/errors.h"
 #include "reflection/interface_basic.h"
 #include "reflection/interface_scalar.h"

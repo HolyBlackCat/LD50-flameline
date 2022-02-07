@@ -3,7 +3,7 @@
 #include <cstddef>
 #include <type_traits>
 
-#include "meta/misc.h"
+#include "meta/common.h"
 #include "meta/type_info.h"
 #include "program/errors.h"
 

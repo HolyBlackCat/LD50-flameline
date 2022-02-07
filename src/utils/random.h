@@ -10,7 +10,7 @@
 #include <type_traits>
 #include <utility>
 
-#include "meta/basic.h"
+#include "meta/common.h"
 #include "program/errors.h"
 #include "utils/mat.h"
 #include "utils/robust_math.h"

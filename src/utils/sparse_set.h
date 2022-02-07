@@ -8,7 +8,7 @@
 #include <vector>
 
 #include "macros/finally.h"
-#include "meta/misc.h"
+#include "meta/common.h"
 #include "program/errors.h"
 
 // Can store unique numbers, with values less than its capacity.
