@@ -49,10 +49,14 @@ namespace Utils
                 IMP_PLATFORM_IF(windows)
                 (
                     // Convert to UTF-8.
-                    auto ret_converted = std::filesystem::path(std::move(ret)).string();
-                    // Replace `\` with `/`.
-                    std::replace(ret_converted.begin(), ret_converted.end(), '\\', '/');
-                    return ret_converted;
+                    // On MinGW, `.string()` is enough. But on MSVC, it doesn't like Unicode on the default locale.
+                    // So we have to use `.u8string()`.
+                    auto ret_narrow_u8 = std::filesystem::path(std::move(ret)).u8string();
+                    std::string ret_narrow;
+                    ret_narrow.reserve(ret_narrow_u8.size());
+                    // Replace `\` with `/`, and convert `char8_t` to `char`.
+                    std::transform(ret_narrow_u8.begin(), ret_narrow_u8.end(), std::back_inserter(ret_narrow), [](char8_t ch){return ch == '\\' ? '/' : ch;});
+                    return ret_narrow;
                 )
                 IMP_PLATFORM_IF_NOT(windows)
                 (
