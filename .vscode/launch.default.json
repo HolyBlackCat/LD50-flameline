@@ -8,11 +8,11 @@
             "name": "Debug",
             "type": "gdb",
             "request": "launch",
-            // The `"terminal": ""` part creates a separate terminal on Windows. We need it to be able to Ctrl+C it to update the checkpoints after placing them.
-            // On Linux checkpoints work properly without this trick. And also, on Linux it causes a new terminal to spawn each time you debug, which is bad, so we don't use it.
-            "windows": {"target": "./imp-re.exe", "terminal": ""},
-            "linux": {"target": "./imp-re"},
-            "cwd": "${workspaceRoot}/bin",
+            "target": "${workspaceRoot}/<MAIN_EXECUTABLE>",
+            // The `"terminal": ""` part creates a separate terminal on Windows. We need it to be able to Ctrl+C it to update the breakpoints after placing them.
+            // On Linux breakpoints work properly without this trick. And also, on Linux it causes a new terminal to spawn each time you debug, which is bad, so we don't use it.
+            "windows": {"terminal": ""},
+            "cwd": "${workspaceRoot}",
             "valuesFormatting": "prettyPrinters",
             "internalConsoleOptions": "openOnSessionStart",
             "preLaunchTask": "Build",
@@ -32,6 +32,7 @@
             "request": "launch",
             "program": "${workspaceRoot}/bin/imp-re",
             "cwd": "${workspaceRoot}/bin",
+            "internalConsoleOptions": "openOnSessionStart",
             "preLaunchTask": "Build",
         }
     ]

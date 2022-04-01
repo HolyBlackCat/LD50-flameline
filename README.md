@@ -22,4 +22,4 @@ Licensed under [ZLIB LICENSE](LICENSE.md).
 
 ---
 
-Currently I'm targeting Clang 13 (with GCC 11's libstdc++; Windows and Linux). GCC 11 should work with minor adjustments. MSVC support would require some code changes, and a new build system.
+Currently I'm targeting Clang 14 (with GCC 11's libstdc++; Windows and Linux). GCC 11 should work with minor adjustments. MSVC support would require some code changes, and a new build system.
