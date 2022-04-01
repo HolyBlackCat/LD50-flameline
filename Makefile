@@ -1188,8 +1188,12 @@ dist: build-default
 # --- 'Clean for storage' target ---
 
 # Cleans the project for long-term storage.
+# Also archives library sources (if any) and deletes the originals.
 .PHONY: prepare-for-storage
+ifneq ($(wildcard $(LIB_SRC_DIR)),)
 prepare-for-storage: dist-deps
+endif
+prepare-for-storage:
 	$(call safe_shell_exec,rm -rf $(call quote,$(BIN_DIR)))
 	$(call safe_shell_exec,rm -rf $(call quote,$(OBJ_DIR)))
 	$(call safe_shell_exec,rm -rf $(call quote,$(LIB_DIR)))
