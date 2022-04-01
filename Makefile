@@ -835,7 +835,8 @@ override source_files_to_main_outputs = $(patsubst %,$(OBJ_DIR)/$(os_mode_string
 # Given source PCH filenames $1 and a project $2, returns the compiled PCH filename.
 override pch_files_to_outputs = $(patsubst %,$(OBJ_DIR)/$(os_mode_string)/$2/%.gch,$1)
 # Same, but if `ALLOW_PCH` is false, returns the arguments unchanged.
-override pch_files_to_outputs_or_orig = $(if $(ALLOW_PCH),$(call pch_files_to_outputs,$1,$2),$1)
+# Note: can't just use `$(if $(ALLOW_PCH),)` here. This kind of check allows us to temporarily disable PCH by wrapping the function in `$(foreach ALLOW_PCH,0,...)`.
+override pch_files_to_outputs_or_orig = $(if $(filter-out 0,$(ALLOW_PCH)),$(call pch_files_to_outputs,$1,$2),$1)
 
 # Given a source file $1 and a project $2, returns the PCH header for it, if any.
 override pch_header_for_source = $(if $(language_pchflag-$(call guess_lang_from_filename_opt,$1)),$(call find_first_match,$(pch_rule_sep),;,$(subst *,%,$(__projsetting_pch_$2)),$1))
@@ -1036,7 +1037,8 @@ commands:
 	$(call var,__first := 1)
 	$(file >$(COMMANDS_FILE),[)
 	$(foreach x,$(proj_list),$(foreach y,$(__proj_allsources_$x),\
-		$(file >>$(COMMANDS_FILE),   $(if $(__first),$(call var,__first :=) ,$(comma)){"directory": $(__curdir), "file": $(call doublequote,$(abspath $y)), "command": $(call doublequote,$(call language_command-$(call guess_lang_from_filename,$y),$y,,$x))})\
+		$(call, ### Note the trick to set ALLOW_PCH to 0 just for this line.)\
+		$(file >>$(COMMANDS_FILE),   $(if $(__first),$(call var,__first :=) ,$(comma)){"directory": $(__curdir), "file": $(call doublequote,$(abspath $y)), "command": $(call doublequote,$(foreach ALLOW_PCH,0,$(call language_command-$(call guess_lang_from_filename,$y),$y,,$x)))})\
 	))
 	$(file >>$(COMMANDS_FILE),])
 	@true
