@@ -1,6 +1,7 @@
 #include "main.h"
 
 #include "game/map.h"
+#include "game/particles.h"
 #include "game/sounds.h"
 
 struct Controls
@@ -81,6 +82,7 @@ namespace States
         Map map = Stream::ReadOnlyData(Program::ExeDir() + "map.json");
 
         Player p;
+        ParticleController par;
 
         int lava_y = (map.size().y - 8) * tile_size;
 
@@ -97,6 +99,8 @@ namespace States
 
             constexpr float gravity = 0.1, low_jump_gravity = 0.3;
 
+            par.Tick(camera_pos);
+
             { // Player.
                 constexpr float
                     max_speed_x = 4,
@@ -112,7 +116,21 @@ namespace States
                 p.prev_ground = p.ground;
                 p.ground = p.SolidAtOffset(map, ivec2(0, 1));
                 if (p.ground && !p.prev_ground)
+                {
                     Sounds::landing(clamp((p.prev_vel.y - 1) / 3));
+
+                    float v = clamp((p.prev_vel.y - 1) / 3) * 0.7;
+                    if (v > 0.1)
+                    {
+                        for (int i = 0; i < 8; i++)
+                        {
+                            float x = ra.f.abs() <= 1;
+                            fvec3 color(1, ra.f <= 1, 0);
+                            fvec2 pos = p.pos with(y += 11 <= ra.f <= 13, x += x * 3);
+                            par.particles.push_back(adjust(Particle{}, pos = pos, damp = 0.01, life = 20 <= ra.i <= 40, size = 1 <= ra.i <= 3, vel = v * fvec2(p.prev_vel.x * 0.8 + pow(abs(x), 2) * sign(x) * 2, -0.9 <= ra.f <= 0), end_size = 1, color = color));
+                        }
+                    }
+                }
 
 
                 { // Controls.
@@ -135,12 +153,27 @@ namespace States
                     else
                         p.walking_timer = 0;
 
-
                     // Jumping.
                     if (p.ground && con.jump.pressed())
                     {
                         p.vel.y = -jump_speed;
                         Sounds::jump();
+
+                        for (int i = 0; i < 8; i++)
+                        {
+                            float x = ra.f.abs() <= 1;
+                            fvec3 color(1, ra.f <= 1, 0);
+                            fvec2 pos = p.pos with(y += 11 <= ra.f <= 13, x += x * 3);
+                            par.particles.push_back(adjust(Particle{}, pos = pos, damp = 0.01, life = 20 <= ra.i <= 40, size = 1 <= ra.i <= 3, vel = fvec2(p.prev_vel.x * 0.4 + pow(abs(x), 2) * sign(x) * 0.5, -1.2 <= ra.f <= 0), end_size = 1, color = color));
+                        }
+                    }
+
+                    // Walking particles.
+                    if (p.walking_timer % 10 == 5)
+                    {
+                        fvec3 color(1, ra.f <= 1, 0);
+                        fvec2 pos = p.pos with(y += 11 <= ra.f <= 13, x += ra.f.abs() <= 1);
+                        par.particles.push_back(adjust(Particle{}, pos = pos, damp = 0.01, life = 20 <= ra.i <= 40, size = 1 <= ra.i <= 3, vel = fvec2(p.prev_vel.x * 0.3 + (ra.f.abs() <= 0.2), -0.7 <= ra.f <= 0), end_size = 1, color = color));
                     }
                 }
 
@@ -277,6 +310,9 @@ namespace States
 
             // Map.
             map.render(camera_pos);
+
+            // Particles.
+            par.Render(camera_pos);
 
             r.Finish();
         }
