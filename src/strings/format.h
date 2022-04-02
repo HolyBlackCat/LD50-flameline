@@ -133,22 +133,23 @@ namespace Strings
 // -- THE SIMPLE MACROS --
 
 // A wrapper/replacement for `fmt::format(...)`, accepts parameters in the same way.
-// Automatically wraps the first argument in `FMT_STRING(...)`, enabling compile-time format string validation.
-// The first argument must be a string literal.
-// Uses `FORMAT_ARGS_SIMPLE` under the hood.
+// On MSVC, automatically wraps the first argument in `FMT_STRING(...)`, enabling compile-time format string validation.
+// On other compilers `FMT_STRING` is unnecessary, and sometimes causes weird warnings on Clang.
 #define FMT(...) FORMAT_FMT(__VA_ARGS__)
 #define FORMAT_FMT(...) ::fmt::format(FORMAT_ARGS_SIMPLE(__VA_ARGS__))
 
-// A convenience macro. `FORMAT_ARGS_SIMPLE(string, ...)` expands to `FMT_STRING(string), ...`,
+// A convenience macro. On MSVC `FORMAT_ARGS_SIMPLE(string, ...)` expands to `FMT_STRING(string), ...`,
 // where `FMT_STRING` is a libfmt macro that enables the compile-time format string validation.
+// On other compilers it's an identity macro, since the validation works without `FMT_STRING` (which sometimes causes weird warnings on Clang).
 // Primarily useful for writing other macros.
 // It's callable even with a single parameter. There's no max limit on the amount of parameters.
-#define FORMAT_ARGS_SIMPLE(...) \
-    IMP_PLATFORM_IF(clang)( IMP_DIAGNOSTICS_PUSH IMP_DIAGNOSTICS_IGNORE("-Wunused-local-typedef") ) \
-    FMT_STRING(MA_VA_FIRST(__VA_ARGS__)) MA_IF_COMMA_ELSE(FORMAT_impl_args, MA_NULL, __VA_ARGS__)(__VA_ARGS__) \
-    IMP_PLATFORM_IF(clang)( IMP_DIAGNOSTICS_POP )
-
+#if !IMP_PLATFORM_IS(msvc)
+#define FORMAT_ARGS_SIMPLE(...) __VA_ARGS__
+#else
+#define FORMAT_ARGS_SIMPLE(...) FMT_STRING(MA_VA_FIRST(__VA_ARGS__)) MA_IF_COMMA_ELSE(FORMAT_impl_args, MA_NULL, __VA_ARGS__)(__VA_ARGS__)
 #define FORMAT_impl_args(format, ...) , __VA_ARGS__
+#endif
+
 
 
 // -- THE FANCY MACROS --
