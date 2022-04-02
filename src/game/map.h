@@ -47,6 +47,7 @@ struct Cell
 struct Map
 {
     Array2D<Cell> cells;
+    Array2D<unsigned char> random;
 
     MAYBE_CONST(
         [[nodiscard]] CV Cell &at(ivec2 pos) CV
@@ -54,6 +55,11 @@ struct Map
             return cells.clamped_at(pos);
         }
     )
+
+    [[nodiscard]] unsigned char rand_at(ivec2 pos) const
+    {
+        return random.unsafe_at(mod_ex(pos, random.size()));
+    }
 
     [[nodiscard]] ivec2 size() const
     {

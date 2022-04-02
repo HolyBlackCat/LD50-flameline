@@ -8,13 +8,18 @@ Map::Map(Stream::ReadOnlyData data)
     auto tiles = Tiled::LoadTileLayer(Tiled::FindLayer(json.GetView(), "mid"));
 
     cells = Array2D<Cell>(tiles.size());
+    random = Array2D<unsigned char>(tiles.size());
 
     for (auto pos : vector_range(cells.size()))
     {
         auto tile = Tile(tiles.unsafe_at(pos));
         if (tile < Tile{} || tile >= Tile::_count)
             throw std::runtime_error(FMT("Invalid tile index {} at {}.", int(tile), pos));
-        cells.unsafe_at(pos).tile = tile;
+
+        Cell &cell = cells.unsafe_at(pos);
+        cell.tile = tile;
+
+        random.unsafe_at(pos) = ra.i <= 255;
     }
 }
 
@@ -36,6 +41,12 @@ void Map::render(ivec2 camera_pos) const
             }
 
             ivec2 variant(bits % 4, bits / 4);
+            // if (bits == 15)
+            // {
+            //     int randvar = rand_at(tile_pos) / 8;
+            //     if (randvar < 4)
+            //         variant = ivec2(4, randvar);
+            // }
 
             ivec2 dual_pixel_pos = tile_pos * tile_size + tile_size / 2 - camera_pos;
             r.iquad(dual_pixel_pos, region.region(variant * tile_size, ivec2(tile_size)));
