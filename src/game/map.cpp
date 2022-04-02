@@ -25,6 +25,7 @@ Map::Map(Stream::ReadOnlyData data)
     auto points = Tiled::LoadPointLayer(Tiled::FindLayer(json.GetView(), "points"));
 
     player_start = points.GetSinglePoint("player");
+    initial_lava_level = points.GetSinglePoint("lava").y;
 }
 
 void Map::render(ivec2 camera_pos) const

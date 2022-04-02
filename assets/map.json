@@ -49,6 +49,18 @@
                  "width":0,
                  "x":180,
                  "y":96
+                }, 
+                {
+                 "height":0,
+                 "id":2,
+                 "name":"lava",
+                 "point":true,
+                 "rotation":0,
+                 "type":"",
+                 "visible":true,
+                 "width":0,
+                 "x":114,
+                 "y":144
                 }],
          "opacity":1,
          "type":"objectgroup",
@@ -57,7 +69,7 @@
          "y":0
         }],
  "nextlayerid":3,
- "nextobjectid":2,
+ "nextobjectid":3,
  "orientation":"orthogonal",
  "renderorder":"right-down",
  "tiledversion":"1.8.4",

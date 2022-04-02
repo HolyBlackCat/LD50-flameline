@@ -40,7 +40,7 @@ endif
 
 # --- Project config ---
 
-ASSETS_IGNORED_PATTERNS += atlas.*
+# ASSETS_IGNORED_PATTERNS += atlas.*
 
 _proj_cxxflags += -std=c++2b -pedantic-errors -Wall -Wextra -Wdeprecated -Wextra-semi -Wno-gnu-zero-variadic-macro-arguments
 _proj_cxxflags += -include src/program/common_macros.h -include src/program/parachute.h
