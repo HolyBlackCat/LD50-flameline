@@ -63,7 +63,7 @@ struct Application : Program::DefaultBasicState
     void EndFrame() override
     {
         fps_counter.Update();
-        window.SetTitle(STR((window_name), " TPS:", (fps_counter.Tps()), " FPS:", (fps_counter.Fps())));
+        window.SetTitle(STR((window_name), " TPS:", (fps_counter.Tps()), " FPS:", (fps_counter.Fps()), " AUDIO:", (audio_controller.ActiveSources())));
     }
 
     void Tick() override
@@ -102,6 +102,7 @@ struct Application : Program::DefaultBasicState
     void Init()
     {
         ImGui::StyleColorsDark();
+        Audio::LoadMentionedFiles(Audio::LoadFromPrefixWithExt(Program::ExeDir() + "assets/"), Audio::mono, Audio::wav);
 
         SDL_MaximizeWindow(window.Handle());
 

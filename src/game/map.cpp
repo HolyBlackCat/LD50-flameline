@@ -21,6 +21,10 @@ Map::Map(Stream::ReadOnlyData data)
 
         random.unsafe_at(pos) = ra.i <= 255;
     }
+
+    auto points = Tiled::LoadPointLayer(Tiled::FindLayer(json.GetView(), "points"));
+
+    player_start = points.GetSinglePoint("player");
 }
 
 void Map::render(ivec2 camera_pos) const

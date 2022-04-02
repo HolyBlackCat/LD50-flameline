@@ -49,10 +49,17 @@ struct Map
     Array2D<Cell> cells;
     Array2D<unsigned char> random;
 
+    ivec2 player_start;
+
     MAYBE_CONST(
         [[nodiscard]] CV Cell &at(ivec2 pos) CV
         {
             return cells.clamped_at(pos);
+        }
+
+        [[nodiscard]] CV Cell &at_pixel(ivec2 pixel_pos) CV
+        {
+            return at(div_ex(pixel_pos, tile_size));
         }
     )
 
@@ -60,6 +67,8 @@ struct Map
     {
         return random.unsafe_at(mod_ex(pos, random.size()));
     }
+
+
 
     [[nodiscard]] ivec2 size() const
     {
