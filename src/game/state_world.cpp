@@ -78,6 +78,11 @@ struct Player
         return SolidAtPos(map, pos + offset);
     }
 
+    [[nodiscard]] bool VisibleAsGhost() const
+    {
+        return !dead;
+    }
+
     ivec2 pos;
     fvec2 vel;
     fvec2 prev_vel;
@@ -113,6 +118,9 @@ struct TimeManager
 
     bool shifting_now = false;
 
+    int shifting_timer = 0;
+    float shifting_lag = 0;
+
     float shifting_effects_alpha = 0;
 
     void NextTimeline()
@@ -130,6 +138,9 @@ struct TimeManager
 
     void RenderGhosts(ivec2 camera_pos) const
     {
+        static const auto &pl_region = texture_atlas.Get("player.png");
+        constexpr ivec2 pl_size(36);
+
         for (std::size_t ghost_index = 0; ghost_index + 1/*sic*/ < ghosts.size(); ghost_index++)
         {
             const Ghost &ghost = ghosts[ghost_index];
@@ -141,9 +152,9 @@ struct TimeManager
                 continue; // Too late.
 
             const Player &p = ghost.states[rel_time];
+            if (!p.VisibleAsGhost())
+                continue; // Invisible, possibly dead.
 
-            static const auto &pl_region = texture_atlas.Get("player.png");
-            constexpr ivec2 pl_size(36);
             r.iquad(p.pos - camera_pos, pl_region.region(pl_size * ivec2(p.anim_variant, p.anim_state), pl_size)).center().alpha(0.5);
         }
     }
@@ -201,13 +212,27 @@ namespace States
                     time.NextTimeline();
 
                 if (!time.shifting_now)
+                {
                     time.time++;
-                else
-                    clamp_var_min(--time.time);
-            }
+                    time.shifting_timer = 0;
 
-            // Particles.
-            par.Tick(camera_pos);
+                    // Particles.
+                    par.Tick(camera_pos);
+                }
+                else
+                {
+                    float speed = clamp_max(time.shifting_timer / 100.f, 2);
+                    time.shifting_lag += speed;
+                    int num_shifts = time.shifting_lag;
+                    time.shifting_lag -= num_shifts;
+                    clamp_var_min(time.time -= num_shifts);
+                    time.shifting_timer++;
+
+                    // Particles.
+                    for (int i = 0; i < num_shifts; i++)
+                        par.ReverseTick();
+                }
+            }
 
             // Player.
             if (!time.shifting_now)
@@ -241,7 +266,7 @@ namespace States
                             float x = ra.f.abs() <= 1;
                             fvec3 color(1, ra.f <= 1, 0);
                             fvec2 pos = p.pos with(y += 8 <= ra.f <= 10, x += x * 3);
-                            par.particles.push_back(adjust(Particle{}, pos = pos, damp = 0.01, life = 20 <= ra.i <= 40, size = 1 <= ra.i <= 3, vel = v * fvec2(p.prev_vel.x * 0.8 + pow(abs(x), 2) * sign(x) * 2, -0.9 <= ra.f <= 0), end_size = 1, color = color));
+                            par.Add(adjust(Particle{}, s.pos = pos, damp = 0.01, life = 20 <= ra.i <= 40, size = 1 <= ra.i <= 3, s.vel = v * fvec2(p.prev_vel.x * 0.8 + pow(abs(x), 2) * sign(x) * 2, -0.9 <= ra.f <= 0), end_size = 1, color = color));
                         }
                     }
                 }
@@ -279,7 +304,7 @@ namespace States
                             float x = ra.f.abs() <= 1;
                             fvec3 color(1, ra.f <= 1, 0);
                             fvec2 pos = p.pos with(y += 8 <= ra.f <= 10, x += x * 3);
-                            par.particles.push_back(adjust(Particle{}, pos = pos, damp = 0.01, life = 20 <= ra.i <= 40, size = 1 <= ra.i <= 3, vel = fvec2(p.prev_vel.x * 0.4 + pow(abs(x), 2) * sign(x) * 0.5, -1.2 <= ra.f <= 0), end_size = 1, color = color));
+                            par.Add(adjust(Particle{}, s.pos = pos, damp = 0.01, life = 20 <= ra.i <= 40, size = 1 <= ra.i <= 3, s.vel = fvec2(p.prev_vel.x * 0.4 + pow(abs(x), 2) * sign(x) * 0.5, -1.2 <= ra.f <= 0), end_size = 1, color = color));
                         }
                     }
 
@@ -288,7 +313,7 @@ namespace States
                     {
                         fvec3 color(1, ra.f <= 1, 0);
                         fvec2 pos = p.pos with(y += 8 <= ra.f <= 10, x += ra.f.abs() <= 1);
-                        par.particles.push_back(adjust(Particle{}, pos = pos, damp = 0.01, life = 20 <= ra.i <= 40, size = 1 <= ra.i <= 3, vel = fvec2(p.prev_vel.x * 0.3 + (ra.f.abs() <= 0.2), -0.7 <= ra.f <= 0), end_size = 1, color = color));
+                        par.Add(adjust(Particle{}, s.pos = pos, damp = 0.01, life = 20 <= ra.i <= 40, size = 1 <= ra.i <= 3, s.vel = fvec2(p.prev_vel.x * 0.3 + (ra.f.abs() <= 0.2), -0.7 <= ra.f <= 0), end_size = 1, color = color));
                     }
                 }
 
@@ -371,7 +396,7 @@ namespace States
                             fvec2 dir = fvec2::dir(ra.angle());
                             float dist = ra.f <= 1;
                             fvec3 color(1, ra.f <= 1, 0);
-                            par.particles.push_back(adjust(Particle{}, pos = p.pos + dir * dist * fvec2(8, 12), damp = 0, life = 60 <= ra.i <= 180, size = 1 <= ra.i <= 1+t*7, vel = dir * dist * pow(1 - t, 1.5) * 4 + p.prev_vel * 0.05, end_size = 1, color = color));
+                            par.Add(adjust(Particle{}, s.pos = p.pos + dir * dist * fvec2(8, 12), damp = 0, life = 60 <= ra.i <= 180, size = 1 <= ra.i <= 1+t*7, s.vel = dir * dist * pow(1 - t, 1.5) * 4 + p.prev_vel * 0.05, end_size = 1, color = color));
                         }
                     }
                 }
@@ -490,7 +515,7 @@ namespace States
                 constexpr int num_rays = 64;
                 static const float
                     dist_min = 192,
-                    dist_max = screen_size.x;
+                    dist_max = (screen_size / 2).len() + 16;
 
                 float t = smoothstep(time.shifting_effects_alpha);
 
@@ -498,9 +523,9 @@ namespace States
                 {
                     for (int i = 0; i < num_rays; i++)
                     {
-                        float angle = time.time * 0.003f + i * 2 * f_pi / num_rays;
+                        float angle = time.time * 0.001f + i * 2 * f_pi / num_rays;
 
-                        r.fquad(fvec2(), fvec2(dist_max - dist_min, 1)).center(fvec2(-dist_min, 0.5f)).rotate(angle).color(fvec3(1)).alpha(t * 0.5).beta(1);
+                        r.fquad(fvec2(), fvec2(dist_max - dist_min, 1)).center(fvec2(-dist_min, 0.5f)).rotate(angle).color(fvec3(1)).alpha(0, t * 0.5, t * 0.5, 0).beta(1);
                     }
                 }
             }
