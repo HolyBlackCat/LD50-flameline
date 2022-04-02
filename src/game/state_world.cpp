@@ -369,6 +369,11 @@ namespace States
             // Particles.
             par.Render(camera_pos);
 
+            { // Vignette.
+                static const auto &region = texture_atlas.Get("vignette.png");
+                r.iquad(ivec2(), region).alpha(0.35).center();
+            }
+
             r.Finish();
         }
     };
