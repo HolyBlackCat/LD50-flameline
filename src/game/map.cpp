@@ -29,31 +29,60 @@ Map::Map(Stream::ReadOnlyData data)
 
 void Map::render(ivec2 camera_pos) const
 {
-    ivec2 corner_a = div_ex(camera_pos - screen_size / 2 - tile_size / 2, tile_size);
-    ivec2 corner_b = div_ex(camera_pos + screen_size / 2 - tile_size / 2, tile_size);
-
     static const auto &region = texture_atlas.Get("tiles.png");
 
-    for (ivec2 tile_pos : corner_a <= vector_range <= corner_b)
-    {
-        { // Dual grid.
-            int bits = 0;
-            for (ivec2 tile_offset : vector_range(ivec2(2)))
+    ivec2 corner_a = div_ex(camera_pos - screen_size / 2, tile_size);
+    ivec2 corner_b = div_ex(camera_pos + screen_size / 2, tile_size);
+
+    { // Bottom layer.
+        for (ivec2 tile_pos : corner_a <= vector_range <= corner_b)
+        {
+            const Cell &cell = at(tile_pos);
+            const TileInfo &info = cell.info();
+            if (info.spike_like_dir != -1)
             {
-                bits |= 16 * at(tile_pos + tile_offset).info().uses_dual_grid;
-                bits >>= 1;
+                int sign = info.spike_like_dir == 1 ? -1 : 1;
+
+                ivec2 dir = ivec2::dir4(info.spike_like_dir);
+                fmat2 mat(dir, dir.rot90());
+                ivec2 offset_a = ivec2(-1 * sign, 0).rot90(info.spike_like_dir);
+                ivec2 offset_b = ivec2( 1 * sign, 0).rot90(info.spike_like_dir);
+                bool same_a = at(tile_pos + offset_a).tile == cell.tile;
+                bool same_b = at(tile_pos + offset_b).tile == cell.tile;
+
+                ivec2 pixel_pos = tile_pos * tile_size + tile_size/2 - camera_pos;
+                r.iquad(pixel_pos, region.region(ivec2(0, tile_size * (info.spike_like_tex + same_a)), ivec2(tile_size) with(x /= 2))).center(ivec2(tile_size/2)).matrix(mat).flip_x(sign < 0);
+                r.iquad(pixel_pos, region.region(ivec2(tile_size/2, tile_size * (info.spike_like_tex + same_b)), ivec2(tile_size) with(x /= 2))).center(ivec2(0, tile_size/2)).matrix(mat).flip_x(sign < 0);
             }
+        }
+    }
 
-            ivec2 variant(bits % 4, bits / 4);
-            // if (bits == 15)
-            // {
-            //     int randvar = rand_at(tile_pos) / 8;
-            //     if (randvar < 4)
-            //         variant = ivec2(4, randvar);
-            // }
+    { // Dual-grid layer.
+        ivec2 dual_corner_a = div_ex(camera_pos - screen_size / 2 - tile_size / 2, tile_size);
+        ivec2 dual_corner_b = div_ex(camera_pos + screen_size / 2 - tile_size / 2, tile_size);
 
-            ivec2 dual_pixel_pos = tile_pos * tile_size + tile_size / 2 - camera_pos;
-            r.iquad(dual_pixel_pos, region.region(variant * tile_size, ivec2(tile_size)));
+
+        for (ivec2 tile_pos : dual_corner_a <= vector_range <= dual_corner_b)
+        {
+            { // Dual grid.
+                int bits = 0;
+                for (ivec2 tile_offset : vector_range(ivec2(2)))
+                {
+                    bits |= 16 * at(tile_pos + tile_offset).info().is_dual_grid_tile;
+                    bits >>= 1;
+                }
+
+                ivec2 variant(bits % 4, bits / 4);
+                // if (bits == 15)
+                // {
+                //     int randvar = rand_at(tile_pos) / 8;
+                //     if (randvar < 4)
+                //         variant = ivec2(4, randvar);
+                // }
+
+                ivec2 dual_pixel_pos = tile_pos * tile_size + tile_size / 2 - camera_pos;
+                r.iquad(dual_pixel_pos, region.region((variant + ivec2(1, 0)) * tile_size, ivec2(tile_size)));
+            }
         }
     }
 }

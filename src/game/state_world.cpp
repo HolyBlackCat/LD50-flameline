@@ -41,9 +41,13 @@ Controls con;
 struct Player
 {
     inline static const std::vector<ivec2> hitbox = {
-        ivec2(-5,  -7), ivec2(4,  -7),
-        ivec2(-5,   0), ivec2(4,   0),
-        ivec2(-5,  11), ivec2(4,  11),
+        ivec2(-5, -9), ivec2(4, -9),
+        ivec2(-5,  0), ivec2(4,  0),
+        ivec2(-5,  8), ivec2(4,  8),
+    };
+
+    inline static const std::vector<ivec2> spike_hitbox = {
+        ivec2(-5,  0), ivec2(4,  0),
     };
 
     [[nodiscard]] static bool SolidAtPos(const Map &map, ivec2 pos)
@@ -71,6 +75,12 @@ struct Player
 
     bool is_walking = false;
     int walking_timer = 0;
+
+    bool dead = false;
+    int death_timer = 0;
+
+    int anim_state = 0;
+    int anim_variant = 0;
 };
 
 namespace States
@@ -105,10 +115,10 @@ namespace States
                 constexpr float
                     max_speed_x = 4,
                     max_speed_y_up = 3,
-                    max_speed_y_down = 3,
-                    walk_acc = 0.5,
+                    max_speed_y_down = 3.5,
+                    walk_acc = 0.4,
                     walk_dec = 0.2,
-                    walk_speed = 2,
+                    walk_speed = 1.5,
                     jump_speed = 3.56,
                     vel_lag_damp = 0.01;
 
@@ -126,14 +136,15 @@ namespace States
                         {
                             float x = ra.f.abs() <= 1;
                             fvec3 color(1, ra.f <= 1, 0);
-                            fvec2 pos = p.pos with(y += 11 <= ra.f <= 13, x += x * 3);
+                            fvec2 pos = p.pos with(y += 8 <= ra.f <= 10, x += x * 3);
                             par.particles.push_back(adjust(Particle{}, pos = pos, damp = 0.01, life = 20 <= ra.i <= 40, size = 1 <= ra.i <= 3, vel = v * fvec2(p.prev_vel.x * 0.8 + pow(abs(x), 2) * sign(x) * 2, -0.9 <= ra.f <= 0), end_size = 1, color = color));
                         }
                     }
                 }
 
-
-                { // Controls.
+                // Controls.
+                if (!p.dead)
+                {
                     // Walking.
                     int hc = con.right.down() - con.left.down();
                     if (hc && p.vel.x * hc < walk_speed)
@@ -163,7 +174,7 @@ namespace States
                         {
                             float x = ra.f.abs() <= 1;
                             fvec3 color(1, ra.f <= 1, 0);
-                            fvec2 pos = p.pos with(y += 11 <= ra.f <= 13, x += x * 3);
+                            fvec2 pos = p.pos with(y += 8 <= ra.f <= 10, x += x * 3);
                             par.particles.push_back(adjust(Particle{}, pos = pos, damp = 0.01, life = 20 <= ra.i <= 40, size = 1 <= ra.i <= 3, vel = fvec2(p.prev_vel.x * 0.4 + pow(abs(x), 2) * sign(x) * 0.5, -1.2 <= ra.f <= 0), end_size = 1, color = color));
                         }
                     }
@@ -172,18 +183,23 @@ namespace States
                     if (p.walking_timer % 10 == 5)
                     {
                         fvec3 color(1, ra.f <= 1, 0);
-                        fvec2 pos = p.pos with(y += 11 <= ra.f <= 13, x += ra.f.abs() <= 1);
+                        fvec2 pos = p.pos with(y += 8 <= ra.f <= 10, x += ra.f.abs() <= 1);
                         par.particles.push_back(adjust(Particle{}, pos = pos, damp = 0.01, life = 20 <= ra.i <= 40, size = 1 <= ra.i <= 3, vel = fvec2(p.prev_vel.x * 0.3 + (ra.f.abs() <= 0.2), -0.7 <= ra.f <= 0), end_size = 1, color = color));
                     }
                 }
 
                 // Gravity.
-                if (p.vel.y < 0 && !con.jump.down())
-                    p.vel.y += low_jump_gravity;
-                else
-                    p.vel.y += gravity;
+                if (!p.dead)
+                {
+                    if (p.vel.y < 0 && !con.jump.down())
+                        p.vel.y += low_jump_gravity;
+                    else
+                        p.vel.y += gravity;
+                }
 
-                { // Apply velocity.
+                // Apply velocity.
+                if (!p.dead)
+                {
                     p.prev_vel = p.vel;
 
                     fvec2 clamped_vel = clamp(p.vel, ivec2(-max_speed_x, -max_speed_y_up), ivec2(max_speed_x, max_speed_y_down));
@@ -220,6 +236,72 @@ namespace States
                                     p.vel_lag[i] = 0;
                             }
                         }
+                    }
+                }
+
+                // Death conditions.
+                if (!p.dead)
+                {
+                    // Spikes.
+                    for (ivec2 offset : p.spike_hitbox)
+                        if (map.at_pixel(p.pos + offset).info().kills)
+                            p.dead = true;
+
+                    // Lava.
+                    if (p.pos.y > lava_y + 12)
+                        p.dead = true;
+                }
+
+                // Death effects.
+                if (p.dead)
+                {
+                    if (p.death_timer == 1)
+                        Sounds::death();
+
+                    float t = clamp_min(1 - p.death_timer / 15.f);
+
+                    if (t > 0)
+                    {
+                        for (int i = 0; i < 4; i++)
+                        {
+                            fvec2 dir = fvec2::dir(ra.angle());
+                            float dist = ra.f <= 1;
+                            fvec3 color(1, ra.f <= 1, 0);
+                            par.particles.push_back(adjust(Particle{}, pos = p.pos + dir * dist * fvec2(8, 12), damp = 0, life = 60 <= ra.i <= 180, size = 1 <= ra.i <= 1+t*7, vel = dir * dist * pow(1 - t, 1.5) * 4 + p.prev_vel * 0.05, end_size = 1, color = color));
+                        }
+                    }
+                }
+
+                { // Timers.
+                    if (p.dead)
+                        p.death_timer++;
+                }
+
+                { // Determining the current sprite.
+                    constexpr int
+                    breathing_variant_len = 20,
+                    running_variant_len = 8, running_num_variants = 4;
+
+                    constexpr float jumping_variant_speeds[] = {-1, -0.5, 0.5};
+
+                    if (!p.ground)
+                    {
+                        // Jumping.
+                        p.anim_state = 2;
+                        p.anim_variant = std::lower_bound(std::begin(jumping_variant_speeds), std::end(jumping_variant_speeds), p.vel.y) - std::begin(jumping_variant_speeds);
+                    }
+                    else if (p.is_walking)
+                    {
+                        // Running.
+                        p.anim_state = 1;
+                        p.anim_variant = p.walking_timer / running_variant_len % running_num_variants;
+                    }
+                    else
+                    {
+                        // Breathing.
+                        p.anim_state = 0;
+                        constexpr int breathing_anim[] = {0, 0, 0, 1, 2, 2, 2, 1};
+                        p.anim_variant = breathing_anim[window.Ticks() / breathing_variant_len % std::size(breathing_anim)];
                     }
                 }
             }
@@ -260,36 +342,9 @@ namespace States
                 static const auto &pl_region = texture_atlas.Get("player.png");
                 constexpr ivec2 pl_size(36);
 
-                constexpr int
-                    breathing_variant_len = 20,
-                    running_variant_len = 8, running_num_variants = 4;
+                float alpha = clamp_min(1 - p.death_timer / 10.f);
 
-                constexpr float jumping_variant_speeds[] = {-1, -0.5, 0.5};
-
-                int anim_state = 0;
-                int anim_variant = 0;
-
-                if (!p.ground)
-                {
-                    // Jumping.
-                    anim_state = 2;
-                    anim_variant = std::lower_bound(std::begin(jumping_variant_speeds), std::end(jumping_variant_speeds), p.vel.y) - std::begin(jumping_variant_speeds);
-                }
-                else if (p.is_walking)
-                {
-                    // Running.
-                    anim_state = 1;
-                    anim_variant = p.walking_timer / running_variant_len % running_num_variants;
-                }
-                else
-                {
-                    // Breathing.
-                    anim_state = 0;
-                    constexpr int breathing_anim[] = {0, 0, 0, 1, 2, 2, 2, 1};
-                    anim_variant = breathing_anim[window.Ticks() / breathing_variant_len % std::size(breathing_anim)];
-                }
-
-                r.iquad(p.pos - camera_pos, pl_region.region(pl_size * ivec2(anim_variant, anim_state), pl_size)).center().flip_x(p.facing_left);
+                r.iquad(p.pos - camera_pos, pl_region.region(pl_size * ivec2(p.anim_variant, p.anim_state), pl_size)).center().flip_x(p.facing_left).alpha(alpha);
             }
 
             { // Lava.

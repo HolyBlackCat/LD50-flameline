@@ -6,6 +6,10 @@ enum class Tile
 {
     air,
     wall,
+    spike_up,
+    spike_down,
+    spike_left,
+    spike_right,
     _count,
 };
 
@@ -13,13 +17,22 @@ struct TileInfo
 {
     Tile tile;
     bool solid = false;
+    bool kills = false;
 
-    bool uses_dual_grid = false;
+    bool is_dual_grid_tile = false; // If true, rendered using a dual grid.
+
+    int spike_like_dir = -1;
+    int spike_like_tex = 0; // Texture index, if `spike_like_dir != -1`.
+
 };
 
 inline constexpr TileInfo tile_info[] = {
-    { .tile = Tile::air,  .solid = false, .uses_dual_grid = false, },
-    { .tile = Tile::wall, .solid = true,  .uses_dual_grid = true,  },
+    { .tile = Tile::air,         },
+    { .tile = Tile::wall,        .solid = true, .is_dual_grid_tile = true, },
+    { .tile = Tile::spike_up,    .kills = true, .spike_like_dir = 0, .spike_like_tex = 0, },
+    { .tile = Tile::spike_down,  .kills = true, .spike_like_dir = 2, .spike_like_tex = 0, },
+    { .tile = Tile::spike_left,  .kills = true, .spike_like_dir = 3, .spike_like_tex = 0, },
+    { .tile = Tile::spike_right, .kills = true, .spike_like_dir = 1, .spike_like_tex = 0, },
 };
 
 static_assert(std::size(tile_info) == std::size_t(Tile::_count), "In tile info array: incorrect array size.");
@@ -67,8 +80,6 @@ struct Map
     {
         return random.unsafe_at(mod_ex(pos, random.size()));
     }
-
-
 
     [[nodiscard]] ivec2 size() const
     {

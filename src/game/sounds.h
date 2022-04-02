@@ -3,14 +3,15 @@
 #include "game/main.h"
 
 #define SOUND_LIST(X) \
-    X( jump    , 0.3 ) \
+    X( jump    , 0.1 ) \
     X( landing , 0.3 ) \
+    X( death   , 0.2 ) \
 
 
 namespace Sounds
 {
     #define MAKE_SOUND(name, randpitch) \
-        std::shared_ptr<Audio::Source> name(std::optional<ivec2> pos, float volume = 1, float pitch = 1) \
+        std::shared_ptr<Audio::Source> name(std::optional<ivec2> pos, float volume = 1, float pitch = 0) \
         { \
             auto ret = audio_controller.Add(Audio::File<#name>()); \
             if (pos) \
@@ -20,7 +21,7 @@ namespace Sounds
             ret->volume(volume).pitch(pow(2, pitch - (ra.f.abs() <= randpitch))).play(); \
             return ret; \
         } \
-        std::shared_ptr<Audio::Source> name(float volume = 1, float pitch = 1) \
+        std::shared_ptr<Audio::Source> name(float volume = 1, float pitch = 0) \
         { \
             return name({}, volume, pitch); \
         }
