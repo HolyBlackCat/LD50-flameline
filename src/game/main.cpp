@@ -103,6 +103,8 @@ struct Application : Program::DefaultBasicState
     {
         ImGui::StyleColorsDark();
 
+        SDL_MaximizeWindow(window.Handle());
+
         // Load various small fonts
         auto monochrome_font_flags = ImGuiFreeTypeBuilderFlags_Monochrome | ImGuiFreeTypeBuilderFlags_MonoHinting;
 

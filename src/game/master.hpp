@@ -15,6 +15,7 @@
 #include "gameutils/fps_counter.h"
 #include "gameutils/render.h"
 #include "gameutils/state.h"
+#include "gameutils/tiled_map.h"
 #include "graphics/complete.h"
 #include "input/complete.h"
 #include "interface/gui.h"

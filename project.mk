@@ -40,6 +40,8 @@ endif
 
 # --- Project config ---
 
+ASSETS_IGNORED_PATTERNS += atlas.*
+
 _proj_cxxflags += -std=c++2b -pedantic-errors -Wall -Wextra -Wdeprecated -Wextra-semi -Wno-gnu-zero-variadic-macro-arguments
 _proj_cxxflags += -include src/program/common_macros.h -include src/program/parachute.h
 _proj_cxxflags += -Isrc -Ilib/include
@@ -109,14 +111,14 @@ ifneq ($(TARGET_OS),windows)
 _openal_flags += -DALSOFT_BACKEND_ALSA=FALSE -DALSOFT_BACKEND_OSS=FALSE -DALSOFT_BACKEND_PULSEAUDIO=FALSE -DALSOFT_BACKEND_SNDIO=FALSE
 endif
 
-$(call Library,box2d-2.4.1.tar.gz)
-  $(call LibrarySetting,cmake_flags,-DBOX2D_BUILD_UNIT_TESTS:BOOL=OFF -DBOX2D_BUILD_TESTBED:BOOL=OFF)
+# $(call Library,box2d-2.4.1.tar.gz)
+#   $(call LibrarySetting,cmake_flags,-DBOX2D_BUILD_UNIT_TESTS:BOOL=OFF -DBOX2D_BUILD_TESTBED:BOOL=OFF)
 
 
-$(call Library,bullet3-3.22b_no-examples.tar.gz)
-  # The `_no-examples` suffix on the archive indicates that following directories were removed from it: `./data`, and everything in `./examples` except `CommonInterfaces`.
-  # This decreases the archive size from 170+ mb to 10+ mb.
-  $(call LibrarySetting,cmake_flags,$(_bullet_flags))
+# $(call Library,bullet3-3.22b_no-examples.tar.gz)
+#   # The `_no-examples` suffix on the archive indicates that following directories were removed from it: `./data`, and everything in `./examples` except `CommonInterfaces`.
+#   # This decreases the archive size from 170+ mb to 10+ mb.
+#   $(call LibrarySetting,cmake_flags,$(_bullet_flags))
 $(call Library,double-conversion-3.2.0.tar.gz)
 $(call Library,fmt-8.1.1.zip)
   $(call LibrarySetting,cmake_flags,-DFMT_TEST=OFF)
