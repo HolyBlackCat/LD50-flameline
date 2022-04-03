@@ -3,9 +3,11 @@
 #include "game/main.h"
 
 #define SOUND_LIST(X) \
-    X( jump    , 0.1 ) \
-    X( landing , 0.3 ) \
-    X( death   , 0.2 ) \
+    X( jump       , 0.1 ) \
+    X( landing    , 0.3 ) \
+    X( death      , 0.2 ) \
+    X( time_stop  , 0.2 ) \
+    X( time_start , 0.2 ) \
 
 
 namespace Sounds

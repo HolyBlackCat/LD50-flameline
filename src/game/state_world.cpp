@@ -110,6 +110,8 @@ struct Ghost
 {
     int time_start = 0;
     std::vector<Player> states;
+
+    bool prev_visible = false;
 };
 struct TimeManager
 {
@@ -138,21 +140,25 @@ struct TimeManager
         ghosts.back().states.push_back(p);
     }
 
-    void AddGhostParticles(ParticleController &par) const
+    void AddGhostParticles(ParticleController &par)
     {
         const Ghost *last_ghost = FindNewestGhost();
 
-        for (const Ghost &ghost : ghosts)
+        for (Ghost &ghost : ghosts)
         {
-            if (&ghost == last_ghost)
-                continue;
             if (ghost.states.empty())
                 continue;
+            if (&ghost == last_ghost)
+                continue;
 
-            if (ghost.time_start == time || ghost.time_start + int(ghost.states.size()) - 1 == time)
+            int rel_time = time - ghost.time_start;
+
+            bool visible = time >= ghost.time_start && rel_time < int(ghost.states.size()) && ghost.states[rel_time].VisibleAsGhost();
+
+            if (visible != ghost.prev_visible)
             {
-                const Player &state = ghost.states[time - ghost.time_start];
-
+                const Player &state = ghost.states[clamp(rel_time, 0, int(ghost.states.size()) - 1)];
+                ghost.prev_visible = visible;
                 for (int i = 0; i < 24; i++)
                 {
                     fvec2 dir = fvec2::dir(ra.angle());
@@ -288,7 +294,14 @@ namespace States
                     time.positive_speed = 0;
 
                     if (!should_timeshift)
+                    {
                         time.NextTimeline();
+                        Sounds::time_start();
+                    }
+                    else
+                    {
+                        Sounds::time_stop();
+                    }
                 }
 
                 clamp_var(time.shifting_effects_alpha += time.shifting_now ? 0.013 : -0.008);
@@ -296,7 +309,11 @@ namespace States
 
                 if (!time.shifting_now)
                 {
-                    if (time.positive_speed >= 0.99f)
+                    if (p.dead && p.death_timer > 60)
+                    {
+                        positive_time_step_this_tick = false;
+                    }
+                    else if (time.positive_speed >= 0.99f)
                     {
                         time.positive_speed = 1;
                         positive_time_step_this_tick = true;
@@ -325,7 +342,7 @@ namespace States
                 else
                 {
                     if (timeshift_button_down)
-                        clamp_var_max(time.shifting_speed += 0.02, 4);
+                        clamp_var_max(time.shifting_speed += 0.02, time.time == 0 ? 0 : 4);
                     else
                         time.shifting_speed *= 0.97;
 
