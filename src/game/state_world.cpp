@@ -266,8 +266,19 @@ namespace States
 
         bool buffered_jump = false;
 
+        float fade = 1;
+        bool have_timeshift_ability = false;
+
+        std::string ability_message, ability_message2;
+        int ability_timer = 0;
+
+        bool seen_hint_death_rollback = false;
+        float hint_death_hollback = 0;
+
         World()
         {
+            p.lava_y = map.initial_lava_level;
+
             if (map.debug_player_start)
             {
                 p.pos = *map.debug_player_start;
@@ -277,7 +288,10 @@ namespace States
             {
                 p.pos = map.player_start;
             }
-            p.lava_y = map.initial_lava_level;
+
+            if (map.debug_start_with_timeshift)
+                have_timeshift_ability = true;
+
         }
 
         void Tick(std::string &next_state) override
@@ -291,10 +305,33 @@ namespace States
             // Timeless particles.
             par_timeless.Tick(camera_pos);
 
+            { // Gui. (should be nearly first)
+                // Abilities.
+                if (ability_timer > 0)
+                {
+                    ability_timer++;
+                    if (ability_timer > 500)
+                        ability_timer = 0;
+                    return;
+                }
+
+                // Hints.
+                if (!seen_hint_death_rollback && p.dead && have_timeshift_ability)
+                {
+                    if (time.shifting_now)
+                        seen_hint_death_rollback = true;
+                    clamp_var_max(hint_death_hollback += 0.01f);
+                }
+                else
+                {
+                    clamp_var_min(hint_death_hollback -= 0.01f);
+                }
+            }
+
             { // Time.
                 bool timeshift_button_down = con.timeshift.down();
                 bool should_timeshift = time.shifting_now;
-                if (timeshift_button_down && !p.in_prison)
+                if (timeshift_button_down && !p.in_prison && have_timeshift_ability)
                     should_timeshift = true;
                 else if (time.shifting_speed < 0.01)
                     should_timeshift = false;
@@ -322,11 +359,7 @@ namespace States
 
                 if (!time.shifting_now)
                 {
-                    if (p.dead && p.death_timer > 60)
-                    {
-                        positive_time_step_this_tick = false;
-                    }
-                    else if (time.positive_speed >= 0.99f)
+                    if (time.positive_speed >= 0.99f)
                     {
                         time.positive_speed = 1;
                         positive_time_step_this_tick = true;
@@ -340,6 +373,13 @@ namespace States
                         time.shifting_lag -= num_steps;
                         if (num_steps > 0) // Yep.
                             positive_time_step_this_tick = true;
+                    }
+
+                    // Block time when the player is dead. But keep the death timer.
+                    if (positive_time_step_this_tick && p.dead && p.death_timer > 60)
+                    {
+                        positive_time_step_this_tick = false;
+                        p.death_timer++;
                     }
 
                     if (positive_time_step_this_tick)
@@ -535,6 +575,39 @@ namespace States
                     }
                 }
 
+                // Getting abilities.
+                if (controllable)
+                {
+                    auto PickUpAbility = [&](std::optional<ivec2> &ability, std::string_view text, std::string_view text2) -> bool
+                    {
+                        if (!ability)
+                            return false;
+                        if ((abs(*ability - p.pos) < ivec2(6,10)).all())
+                        {
+                            for (int i = 0; i < 24; i++)
+                            {
+                                fvec2 dir = fvec2::dir(ra.angle());
+                                float dist = ra.f <= 1;
+                                float c = ra.f <= 1;
+                                fvec3 color(1 - c * 0.5f, 1 - c * 0.25f, 0);
+                                if (ra.boolean())
+                                    std::swap(color.x, color.z);
+                                par_timeless.Add(adjust(Particle{}, s.pos = *ability + dir * dist * 6, damp = 0.005, life = 20 <= ra.i <= 60, size = 1 <= ra.i <= 7, s.vel = dir * dist * 0.35, end_size = 1, color = color, beta = 0));
+                            }
+                            ability.reset();
+                            Sounds::got_item();
+                            ability_timer = 1;
+                            ability_message = text;
+                            ability_message2 = text2;
+                            return true;
+                        }
+                        return false;
+                    };
+
+                    if (PickUpAbility(map.ability_timeshift, "Timeshift", "Hold Z / L to travel back in time"))
+                        have_timeshift_ability = true;
+                }
+
                 // Death conditions.
                 if (controllable)
                 {
@@ -615,6 +688,20 @@ namespace States
                 buffered_jump = false;
             }
 
+            { // Fade.
+                bool death_fade = p.dead && p.death_timer >= 60 && !have_timeshift_ability;
+                if (death_fade)
+                {
+                    clamp_var_max(fade += 0.01f);
+                    if (fade >= 1)
+                        next_state = "World{}";
+                }
+                else
+                {
+                    clamp_var_min(fade -= 0.01f);
+                }
+            }
+
             { // Camera.
                 camera_pos = p.pos;
 
@@ -656,6 +743,26 @@ namespace States
                 {
                     r.iquad(prison_pos + p.prison_sprite_offset * (p.prison_anim_timer > 0), region.region(ivec2(0, size.y * !p.in_prison), size)).center();
                 }
+            }
+
+            { // Abilities.
+                static const auto &region = texture_atlas.Get("cube.png");
+
+                constexpr int offset_array[] = {0, -1, -1, -1, 0, 1, 1, 1};
+                constexpr int offset_len = 20;
+                int offset = offset_array[(time.time / offset_len) % std::size(offset_array)];
+
+                auto DrawAbility = [&](const std::optional<ivec2> &pos)
+                {
+                    if (!pos)
+                        return;
+                    ivec2 screen_pos = *pos - camera_pos;
+                    if ((abs(screen_pos) > screen_size / 2 + 16).any())
+                        return;
+
+                    r.iquad(screen_pos with(y += offset), region).center();
+                };
+                DrawAbility(map.ability_timeshift);
             }
 
             { // Player ghosts.
@@ -730,6 +837,51 @@ namespace States
                         }
                     }
                 }
+            }
+
+            { // Gui.
+                // Ability messages.
+                if (ability_timer > 0)
+                {
+                    constexpr int ticks_per_letter = 8;
+
+                    int bg_time = 30;
+                    int first_line_time = 60;
+
+                    ivec2 text_size = Graphics::Text(Fonts::main, ability_message).ComputeStats().size;
+                    Graphics::Text text(Fonts::main, ability_message.substr(0, clamp_min((ability_timer - first_line_time) / ticks_per_letter)));
+                    Graphics::Text text2(Fonts::main, ability_message2);
+
+                    r.iquad(ivec2(0, 0), ivec2(max(text_size.x, text2.ComputeStats().size.x) + 12, 64)).color(fvec3(0)).center().alpha(smoothstep(clamp((ability_timer - bg_time) / 30.f)));
+                    r.itext(-text_size/2 + ivec2(0, -8), text).align_x(-1).color(fvec3(255, 179, 26) / 255);
+
+                    int second_line_time = first_line_time + int(ability_message.size()) * ticks_per_letter + 30;
+
+                    if (ability_timer > second_line_time)
+                        r.itext(ivec2(0, 12), text2).alpha(clamp_max((ability_timer - second_line_time) / 60.f)).color(fvec3(255, 76, 5) / 255);
+                }
+
+                { // Hints.
+                    auto ShowHint = [&](std::string_view message, float t)
+                    {
+                        if (t < 0.001f)
+                            return;
+
+                        Graphics::Text text(Fonts::main, message);
+                        float alpha = smoothstep(clamp(t));
+
+                        for (int i = 0; i < 4; i++)
+                            r.itext(ivec2(0, screen_size.y/2) + ivec2::dir4(i), text).align_y(1).alpha(alpha * 0.5f).color(fvec3(0));
+                        r.itext(ivec2(0, screen_size.y/2), text).align_y(1).alpha(alpha).color(fvec3(255, 179, 26) / 255);
+                    };
+
+                    ShowHint("Hold Z / L to travel back in time", (p.death_timer - 90) / 60.f);
+                }
+            }
+
+            { // Fade.
+                if (fade > 0.001f)
+                    r.iquad(ivec2(), screen_size).center().color(fvec3(0)).alpha(smoothstep(fade));
             }
 
             { // Vignette.

@@ -12,7 +12,7 @@ Audio::SourceManager audio_controller;
 const Graphics::ShaderConfig shader_config = Graphics::ShaderConfig::Core();
 Interface::ImGuiController gui_controller(Poly::derived<Interface::ImGuiController::GraphicsBackend_Modern>, adjust_(Interface::ImGuiController::Config{}, shader_header = shader_config.common_header, store_state_in_file = {}));
 
-Graphics::FontFile Fonts::Files::main(Program::ExeDir() + "assets/Monocat_6x12.ttf", 12);
+Graphics::FontFile Fonts::Files::main(Program::ExeDir() + "assets/Monocat_7x14.ttf", 14);
 Graphics::Font Fonts::main;
 
 Graphics::TextureAtlas texture_atlas = []{
@@ -109,7 +109,7 @@ struct Application : Program::DefaultBasicState
         // Load various small fonts
         auto monochrome_font_flags = ImGuiFreeTypeBuilderFlags_Monochrome | ImGuiFreeTypeBuilderFlags_MonoHinting;
 
-        gui_controller.LoadFont(Program::ExeDir() + "assets/Monocat_6x12.ttf", 12.0f, adjust(ImFontConfig{}, FontBuilderFlags = monochrome_font_flags));
+        gui_controller.LoadFont(Program::ExeDir() + "assets/Monocat_7x14.ttf", 12.0f, adjust(ImFontConfig{}, FontBuilderFlags = monochrome_font_flags));
         gui_controller.LoadDefaultFont();
         gui_controller.RenderFontsWithFreetype();
 

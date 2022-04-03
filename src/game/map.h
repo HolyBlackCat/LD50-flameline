@@ -66,6 +66,9 @@ struct Map
     std::optional<ivec2> debug_player_start;
     float initial_lava_level = 0;
 
+    std::optional<ivec2> ability_timeshift;
+    bool debug_start_with_timeshift = false;
+
     MAYBE_CONST(
         [[nodiscard]] CV Cell &at(ivec2 pos) CV
         {

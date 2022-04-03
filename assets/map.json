@@ -73,6 +73,30 @@
                  "width":0,
                  "x":138,
                  "y":126
+                }, 
+                {
+                 "height":0,
+                 "id":4,
+                 "name":"ability_timeshift",
+                 "point":true,
+                 "rotation":0,
+                 "type":"",
+                 "visible":true,
+                 "width":0,
+                 "x":240,
+                 "y":96
+                }, 
+                {
+                 "height":0,
+                 "id":5,
+                 "name":"debug_give_timeshift",
+                 "point":true,
+                 "rotation":0,
+                 "type":"",
+                 "visible":true,
+                 "width":0,
+                 "x":108,
+                 "y":78
                 }],
          "opacity":1,
          "type":"objectgroup",
@@ -81,7 +105,7 @@
          "y":0
         }],
  "nextlayerid":3,
- "nextobjectid":4,
+ "nextobjectid":6,
  "orientation":"orthogonal",
  "renderorder":"right-down",
  "tiledversion":"1.8.4",

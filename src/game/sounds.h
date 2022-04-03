@@ -10,6 +10,7 @@
     X( time_start      , 0.2 ) \
     X( breaking_prison , 0.3 ) \
     X( broke_prison    , 0.2 ) \
+    X( got_item        , 0   ) \
 
 
 namespace Sounds
