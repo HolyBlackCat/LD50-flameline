@@ -6,6 +6,8 @@
 
 constexpr int max_timeshifts = 255;
 
+int real_world_time = 0;
+
 struct Controls
 {
     struct Button
@@ -345,6 +347,8 @@ namespace States
         bool buffered_jump = false;
 
         float fade = 1;
+        float exit_fade = 0;
+
         bool have_timeshift_ability = false;
         bool have_doublejump_ability = false;
         bool have_gun_ability = false;
@@ -359,6 +363,14 @@ namespace States
 
         bool seen_hint_jump = false;
         float hint_jump = 0;
+
+        static constexpr fvec3
+            sky_color = fvec3(0.6f, 0.935f, 1),
+            sky_color2 = fvec3(0.85f, 0.98f, 1);
+
+        static constexpr float
+            vignette_alpha = 0.35f;
+
 
         struct Hint
         {
@@ -402,7 +414,7 @@ namespace States
 
         void Tick(std::string &next_state) override
         {
-            (void)next_state;
+            real_world_time++;
 
             constexpr float gravity = 0.1, low_jump_gravity = 0.3;
 
@@ -1019,6 +1031,12 @@ namespace States
                 {
                     clamp_var_min(fade -= 0.01f);
                 }
+
+
+                exit_fade = clamp((map.exit_level - p.pos.y) / 300.f);
+                if (exit_fade > 0.999f)
+                    next_state = FMT("Ending{{bg_color={},vignette_alpha={},cur_secrets={},max_secrets={},time={},time_sub={}}}",
+                        Refl::ToString(sky_color2), vignette_alpha, map.num_secrets - int(map.secrets.size()), map.num_secrets, real_world_time, time.time);
             }
 
             { // Camera.
@@ -1050,6 +1068,20 @@ namespace States
                 for (ivec2 tile_pos : corner_a <= vector_range <= corner_b)
                 {
                     r.iquad(tile_pos * bg_region.size - bg_camera_pos, bg_region);
+                }
+            }
+
+            { // Fade (exit, bottom).
+                if (exit_fade > 0.001f)
+                {
+                    float alpha1 = clamp(Math::linear_mapping<float>(0   , 0.75, 0.f, 1.f)(exit_fade * 0.3f));
+                    float alpha2 = clamp(Math::linear_mapping<float>(0.25, 1   , 0.f, 1.f)(exit_fade * 0.3f));
+                    float c1     = clamp(Math::linear_mapping<float>(0.5 , 1   , 0.f, 1.f)(exit_fade * 0.3f));
+                    float c2     = clamp(Math::linear_mapping<float>(0.75, 1   , 0.f, 1.f)(exit_fade * 0.3f));
+                    fvec3 color1 = mix(c1, sky_color, sky_color2);
+                    fvec3 color2 = mix(c2, sky_color, sky_color2);
+
+                    r.iquad(ivec2(), screen_size).center().beta(1).alpha(alpha1, alpha1, alpha2, alpha2).color(color1, color1, color2, color2);
                 }
             }
 
@@ -1230,14 +1262,30 @@ namespace States
                 }
             }
 
-            { // Fade.
+            { // Fade (exit, top).
+                if (exit_fade > 0.001f)
+                {
+                    constexpr float delay = 0.35f;
+
+                    float alpha1 = clamp(Math::linear_mapping<float>(0   , 0.75, 0.f, 1.f)((exit_fade - delay) / (1 - delay)));
+                    float alpha2 = clamp(Math::linear_mapping<float>(0.25, 1   , 0.f, 1.f)((exit_fade - delay) / (1 - delay)));
+                    float c1     = clamp(Math::linear_mapping<float>(0.5 , 1   , 0.f, 1.f)((exit_fade - delay) / (1 - delay)));
+                    float c2     = clamp(Math::linear_mapping<float>(0.75, 1   , 0.f, 1.f)((exit_fade - delay) / (1 - delay)));
+                    fvec3 color1 = mix(c1, sky_color, sky_color2);
+                    fvec3 color2 = mix(c2, sky_color, sky_color2);
+
+                    r.iquad(ivec2(), screen_size).center().beta(1).alpha(alpha1, alpha1, alpha2, alpha2).color(color1, color1, color2, color2);
+                }
+            }
+
+            { // Fade (death and respawn).
                 if (fade > 0.001f)
                     r.iquad(ivec2(), screen_size).center().color(fvec3(0)).alpha(smoothstep(fade));
             }
 
             { // Vignette.
                 static const auto &region = texture_atlas.Get("vignette.png");
-                r.iquad(ivec2(), region).alpha(0.35).center();
+                r.iquad(ivec2(), region).alpha(vignette_alpha).center();
             }
 
             r.Finish();

@@ -78,6 +78,7 @@ struct Map
     ivec2 player_start;
     std::optional<ivec2> debug_player_start;
     float initial_lava_level = 0;
+    float exit_level = 0;
 
     std::optional<ivec2> ability_timeshift;
     bool debug_start_with_timeshift = false;
@@ -87,6 +88,9 @@ struct Map
 
     std::optional<ivec2> ability_gun;
     bool debug_start_with_gun = false;
+
+    std::vector<ivec2> secrets;
+    int num_secrets = 0;
 
     Tiled::PointLayer points;
 

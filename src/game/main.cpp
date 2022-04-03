@@ -83,6 +83,9 @@ struct Application : Program::DefaultBasicState
         audio_controller.Tick();
 
         Audio::CheckErrors();
+
+        if (!state_manager)
+            Program::Exit();
     }
 
     void Render() override

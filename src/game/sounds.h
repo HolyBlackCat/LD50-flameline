@@ -20,7 +20,7 @@
 namespace Sounds
 {
     #define MAKE_SOUND(name, randpitch) \
-        std::shared_ptr<Audio::Source> name(std::optional<ivec2> pos, float volume = 1, float pitch = 0) \
+        inline std::shared_ptr<Audio::Source> name(std::optional<ivec2> pos, float volume = 1, float pitch = 0) \
         { \
             auto ret = audio_controller.Add(Audio::File<#name>()); \
             if (pos) \
@@ -30,7 +30,7 @@ namespace Sounds
             ret->volume(volume).pitch(pow(2, pitch - (ra.f.abs() <= randpitch))).play(); \
             return ret; \
         } \
-        std::shared_ptr<Audio::Source> name(float volume = 1, float pitch = 0) \
+        inline std::shared_ptr<Audio::Source> name(float volume = 1, float pitch = 0) \
         { \
             return name({}, volume, pitch); \
         }

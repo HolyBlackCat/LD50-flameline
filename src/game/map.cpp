@@ -26,7 +26,9 @@ Map::Map(Stream::ReadOnlyData data)
 
     player_start = points.GetSinglePoint("player");
     debug_player_start = points.GetSinglePointOpt("debug_player");
+
     initial_lava_level = points.GetSinglePoint("lava").y;
+    exit_level = points.GetSinglePoint("exit").y;
 
     ability_timeshift = points.GetSinglePointOpt("ability_timeshift");
     debug_start_with_timeshift = points.GetSinglePointOpt("debug_give_timeshift").has_value();
@@ -36,6 +38,12 @@ Map::Map(Stream::ReadOnlyData data)
 
     ability_gun = points.GetSinglePointOpt("ability_gun");
     debug_start_with_gun = points.GetSinglePointOpt("debug_give_gun").has_value();
+
+    points.ForEachPointNamed("secret", [&](fvec2 pos)
+    {
+        secrets.push_back(pos);
+    });
+    num_secrets = int(secrets.size());
 }
 
 void Map::render(ivec2 camera_pos) const
