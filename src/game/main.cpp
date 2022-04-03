@@ -1,6 +1,5 @@
 #include "main.h"
 
-const ivec2 screen_size = ivec2(480, 270);
 const std::string_view window_name = "Iota";
 
 Interface::Window window(std::string(window_name), screen_size * 2, Interface::windowed, adjust_(Interface::WindowSettings{}, min_size = screen_size));

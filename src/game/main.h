@@ -1,6 +1,6 @@
 #pragma once
 
-extern const ivec2 screen_size;
+constexpr ivec2 screen_size(480, 270);
 extern const std::string_view window_name;
 
 extern Interface::Window window;

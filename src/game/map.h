@@ -14,6 +14,7 @@ enum class Tile
     box2,
     chain_h,
     chain_v,
+    breakable,
     _count,
 };
 
@@ -22,6 +23,7 @@ struct TileInfo
     Tile tile;
     bool solid = false;
     bool kills = false;
+    bool breakable = false;
 
     int simple_tex = -1; // If not -1, a texture index for simple drawing.
 
@@ -43,6 +45,7 @@ inline constexpr TileInfo tile_info[] = {
     { .tile = Tile::box2,        .solid = true, .spike_like_dir = 0, .spike_like_tex = 3, },
     { .tile = Tile::chain_h,                    .spike_like_dir = 0, .spike_like_tex = 5, .spike_like_merge_with_any_solid = true, },
     { .tile = Tile::chain_v,                    .spike_like_dir = 1, .spike_like_tex = 5, .spike_like_merge_with_any_solid = true, },
+    { .tile = Tile::breakable,   .solid = true, .breakable = true, .simple_tex = 7, },
 };
 
 static_assert(std::size(tile_info) == std::size_t(Tile::_count), "In tile info array: incorrect array size.");
@@ -81,6 +84,9 @@ struct Map
 
     std::optional<ivec2> ability_doublejump;
     bool debug_start_with_doublejump = false;
+
+    std::optional<ivec2> ability_gun;
+    bool debug_start_with_gun = false;
 
     Tiled::PointLayer points;
 

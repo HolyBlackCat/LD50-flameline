@@ -49,10 +49,28 @@ struct Controls
 
     Button left = {{Input::left, Input::a}};
     Button right = {{Input::right, Input::d}};
-    Button jump = {{Input::up, Input::w, Input::space, Input::c, Input::j}};
+    Button jump = {{Input::space, Input::c, Input::j}};
+    Button shoot = {{Input::x, Input::k}};
     Button timeshift = {{Input::z, Input::l}};
 };
 Controls con;
+
+struct Shot
+{
+    inline static const std::vector<ivec2> hitbox = {
+        ivec2(-4, -9), ivec2(3, -9),
+        ivec2(-4,  0), ivec2(3,  0),
+        ivec2(-4,  8), ivec2(3,  8),
+    };
+
+    static int GetAnimVariant(int time)
+    {
+        return time / 5 % 6;
+    }
+
+    fvec2 pos;
+    fvec2 vel;
+};
 
 // Note, this structure is copied into timelines...
 struct Player
@@ -109,6 +127,8 @@ struct Player
     ivec2 prison_sprite_offset;
     int prison_anim_timer = 0;
 
+    std::optional<Shot> shot;
+
     // This is here, because we need to save it to the timeline.
     float lava_y = 0;
 };
@@ -119,6 +139,7 @@ struct Ghost
     std::vector<Player> states;
 
     bool prev_visible = false;
+    bool prev_shot_visible = false;
 };
 struct TimeManager
 {
@@ -133,6 +154,8 @@ struct TimeManager
     float positive_speed = 1; // Used to slowly gain time speed after shift.
 
     float shifting_effects_alpha = 0;
+
+    std::map<ivec2, int> block_breaking_times;
 
     void NextTimeline()
     {
@@ -177,12 +200,43 @@ struct TimeManager
                     par.Add(adjust(Particle{}, s.pos = state.pos + dir * dist * fvec2(4, 8), damp = 0.015, life = 20 <= ra.i <= 60, size = 1 <= ra.i <= 5, s.vel = dir * dist * 0.15 + state.prev_vel * 0.05, end_size = 1, color = color, beta = 0));
                 }
             }
+
+            bool shot_visible = visible && ghost.states[rel_time].shot;
+            if (shot_visible != ghost.prev_shot_visible)
+            {
+                ghost.prev_shot_visible = shot_visible;
+
+                // Try to guess the shot pos.
+                int index = clamp(rel_time, 0, int(ghost.states.size()) - 1);
+                std::optional<fvec2> shot_pos;
+                if (const auto &opt = ghost.states[index].shot)
+                    shot_pos = opt->pos;
+                else if (index > 0 && ghost.states[index-1].shot)
+                    shot_pos = ghost.states[index-1].shot->pos;
+                else if (index + 1 < int(ghost.states.size()) && ghost.states[index+1].shot)
+                    shot_pos = ghost.states[index+1].shot->pos;
+
+                if (shot_pos)
+                {
+                    for (int i = 0; i < 12; i++)
+                    {
+                        fvec2 dir = fvec2::dir(ra.angle());
+                        float dist = ra.f <= 1;
+                        float c = ra.f <= 1;
+                        fvec3 color(1 - c * 0.5f, 1 - c * 0.25f, 0);
+                        if (ra.boolean())
+                            std::swap(color.x, color.z);
+                        par.Add(adjust(Particle{}, s.pos = *shot_pos + dir * dist * 2, damp = 0.015, life = 20 <= ra.i <= 60, size = 1 <= ra.i <= 3, s.vel = dir * dist * 0.15, end_size = 1, color = color, beta = 0));
+                    }
+                }
+            }
         }
     }
 
     void RenderGhosts(ivec2 camera_pos) const
     {
         static const auto &pl_region = texture_atlas.Get("player.png");
+        static const auto &shot_region = texture_atlas.Get("shot.png");
         constexpr ivec2 pl_size(36);
 
         const Ghost *last_ghost = FindNewestGhost();
@@ -217,7 +271,19 @@ struct TimeManager
 
                 const Player &p = ghost.states[this_rel_time];
 
-                r.iquad(p.pos - camera_pos, pl_region.region(pl_size * ivec2(p.anim_variant, p.anim_state), pl_size)).center().color(color).mix(0).alpha(alpha).beta(0).flip_x(p.facing_left);
+                { // Player.
+                    ivec2 rel_pos = p.pos - camera_pos;
+                    if ((rel_pos < screen_size / 2 + 24).all())
+                        r.iquad(p.pos - camera_pos, pl_region.region(pl_size * ivec2(p.anim_variant, p.anim_state), pl_size)).center().color(color).mix(0).alpha(alpha).beta(0).flip_x(p.facing_left);
+                }
+
+                // Shot.
+                if (p.shot)
+                {
+                    fvec2 rel_pos = p.shot->pos - camera_pos;
+                    if ((rel_pos <= screen_size / 2 + 16).all())
+                        r.fquad(rel_pos, shot_region.region(ivec2(shot_region.size.y * Shot::GetAnimVariant(time), 0), ivec2(shot_region.size.y))).center().flip_x(p.shot->vel.x < 0).color(color).mix(0).alpha(alpha).beta(0);
+                }
             }
         }
     }
@@ -263,6 +329,7 @@ namespace States
         MEMBERS()
 
         Map map = Stream::ReadOnlyData(Program::ExeDir() + "map.json");
+        Map map_orig = map;
 
         Player p;
         ParticleController par = true;
@@ -276,6 +343,7 @@ namespace States
         float fade = 1;
         bool have_timeshift_ability = false;
         bool have_doublejump_ability = false;
+        bool have_gun_ability = false;
 
         int time_since_got_timeshift = 0;
 
@@ -323,6 +391,8 @@ namespace States
                     have_timeshift_ability = true;
                 if (map.debug_start_with_doublejump)
                     have_doublejump_ability = true;
+                if (map.debug_start_with_gun)
+                    have_gun_ability = true;
             }
         }
 
@@ -447,6 +517,14 @@ namespace States
                         time.AddGhostParticles(par_timeless);
                         par.ReverseTick();
                     }
+                }
+            }
+
+            { // Restore block state from the timeline.
+                for (const auto &[pos, break_time] : time.block_breaking_times)
+                {
+                    if (time.time < break_time)
+                        map.at(pos).tile = map_orig.at(pos).tile;
                 }
             }
 
@@ -614,6 +692,22 @@ namespace States
                         fvec2 pos = p.pos with(y += 8 <= ra.f <= 10, x += ra.f.abs() <= 1);
                         par.Add(adjust(Particle{}, s.pos = pos, damp = 0.01, life = 20 <= ra.i <= 40, size = 1 <= ra.i <= 3, s.vel = fvec2(p.prev_vel.x * 0.3 + (ra.f.abs() <= 0.2), -0.7 <= ra.f <= 0), end_size = 1, color = color));
                     }
+
+                    // Shooting.
+                    if (have_gun_ability && con.shoot.pressed() && !p.shot)
+                    {
+                        int dir_x = p.facing_left ? -1 : 1;
+                        p.shot.emplace();
+                        p.shot->pos = p.pos + ivec2(4 * dir_x, -5);
+                        p.shot->vel = fvec2(2 * dir_x, 0);
+                        Sounds::pew(0.3f);
+
+                        for (int i = 0; i < 20; i++)
+                        {
+                            fvec3 color(1, ra.f <= 1, 0);
+                            par.Add(adjust(Particle{}, s.pos = p.shot->pos + (ra.fvec2.abs() <= 2), damp = 0.01, life = 20 <= ra.i <= 40, size = 1 <= ra.i <= 5, s.vel = p.prev_vel.x * 0.4 + fvec2::dir(ra.f.abs() <= f_pi / 10, ra.f <= 2) with(x *= dir_x), end_size = 1, color = color));
+                        }
+                    }
                 }
 
                 // Gravity.
@@ -700,6 +794,67 @@ namespace States
                         have_timeshift_ability = true;
                     if (PickUpAbility(map.ability_doublejump, "Doublejump", "Press [jump] to jump off of your past copy"))
                         have_doublejump_ability = true;
+                    if (PickUpAbility(map.ability_gun, "Blaster", "Press [X]/[K] to shoot"))
+                        have_gun_ability = true;
+                }
+
+                { // Tick the shot.
+                    if (p.shot)
+                    {
+                        p.shot->pos += p.shot->vel;
+                        ivec2 round_pos = iround(p.shot->pos);
+
+                        std::set<ivec2> breaking_tiles;
+                        bool dies = false;
+
+                        for (ivec2 point : p.shot->hitbox)
+                        {
+                            ivec2 tile_pos = div_ex(round_pos + point, tile_size);
+                            const TileInfo &info = map.at(tile_pos).info();
+                            if (info.breakable)
+                            {
+                                breaking_tiles.insert(tile_pos);
+                                dies = true;
+                            }
+                            else if (info.solid)
+                            {
+                                dies = true;
+                            }
+                        }
+
+                        if (!breaking_tiles.empty())
+                        {
+                            for (ivec2 tile : breaking_tiles)
+                            {
+                                if (map.cells.pos_in_range(tile))
+                                {
+                                    map.at(tile).tile = Tile::air;
+                                    time.block_breaking_times[tile] = time.time;
+
+                                    for (int i = 0; i < 15; i++)
+                                    {
+                                        fvec3 color(1, ra.f <= 1, 0);
+                                        par.Add(adjust(Particle{}, s.pos = tile * tile_size + (ra.fvec2 <= tile_size), s.acc = fvec2(0,0.01f), damp = 0.01, life = 20 <= ra.i <= 40, size = 1 <= ra.i <= 5, s.vel = fvec2::dir(ra.angle(), ra.f <= 0.23f), end_size = 1, color = color));
+                                    }
+                                }
+                            }
+                        }
+                        if (dies)
+                        {
+                            if (breaking_tiles.empty())
+                                Sounds::shot_dies(p.shot->pos, 0.4f);
+                            else
+                                Sounds::shot_breaks_block(p.shot->pos);
+
+                            for (int i = 0; i < 10; i++)
+                            {
+                                fvec3 color(1, ra.f <= 1, 0);
+                                par.Add(adjust(Particle{}, s.pos = p.shot->pos + (ra.fvec2.abs() <= 2), damp = 0.01, life = 20 <= ra.i <= 40, size = 1 <= ra.i <= 5, s.vel = fvec2::dir(ra.f.abs() <= f_pi / 2, ra.f <= 1.3f) with(x *= -sign(p.shot->vel.x)), end_size = 1, color = color));
+                            }
+
+                            p.shot.reset();
+                        }
+                    }
                 }
 
                 // Death conditions.
@@ -861,6 +1016,19 @@ namespace States
                 };
                 DrawAbility(map.ability_timeshift);
                 DrawAbility(map.ability_doublejump);
+                DrawAbility(map.ability_gun);
+            }
+
+            { // Shots.
+                static const auto &region = texture_atlas.Get("shot.png");
+                static const int size = region.size.y;
+
+                if (p.shot)
+                {
+                    fvec2 rel_pos = p.shot->pos - camera_pos;
+                    if ((rel_pos <= screen_size / 2 + 16).all())
+                        r.fquad(rel_pos, region.region(ivec2(size * Shot::GetAnimVariant(time.time), 0), ivec2(size))).center().flip_x(p.shot->vel.x < 0);
+                }
             }
 
             { // Player ghosts.

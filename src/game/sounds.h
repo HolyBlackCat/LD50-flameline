@@ -3,14 +3,17 @@
 #include "game/main.h"
 
 #define SOUND_LIST(X) \
-    X( jump            , 0.1 ) \
-    X( landing         , 0.3 ) \
-    X( death           , 0.2 ) \
-    X( time_stop       , 0.2 ) \
-    X( time_start      , 0.2 ) \
-    X( breaking_prison , 0.3 ) \
-    X( broke_prison    , 0.2 ) \
-    X( got_item        , 0   ) \
+    X( jump              , 0.1 ) \
+    X( landing           , 0.3 ) \
+    X( death             , 0.2 ) \
+    X( time_stop         , 0.2 ) \
+    X( time_start        , 0.2 ) \
+    X( breaking_prison   , 0.3 ) \
+    X( broke_prison      , 0.2 ) \
+    X( got_item          , 0   ) \
+    X( pew               , 0.3 ) \
+    X( shot_breaks_block , 0.2 ) \
+    X( shot_dies         , 0.2 ) \
 
 
 namespace Sounds

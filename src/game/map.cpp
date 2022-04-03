@@ -33,6 +33,9 @@ Map::Map(Stream::ReadOnlyData data)
 
     ability_doublejump = points.GetSinglePointOpt("ability_doublejump");
     debug_start_with_doublejump = points.GetSinglePointOpt("debug_give_doublejump").has_value();
+
+    ability_gun = points.GetSinglePointOpt("ability_gun");
+    debug_start_with_gun = points.GetSinglePointOpt("debug_give_gun").has_value();
 }
 
 void Map::render(ivec2 camera_pos) const
