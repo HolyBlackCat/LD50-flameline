@@ -643,8 +643,8 @@ namespace States
 
                             if (it != time.ghosts.end())
                             {
-                                int new_state_count = clamp_min(time.time - it->time_start, 1);
-                                it->states.resize(new_state_count);
+                                for (std::size_t i = time.time - it->time_start; i < it->states.size(); i++)
+                                    it->states[i].dead = true;
 
                                 can_jump = true;
                                 using_doublejump = true;
