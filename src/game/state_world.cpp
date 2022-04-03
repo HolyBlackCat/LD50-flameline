@@ -125,8 +125,6 @@ struct Player
 
     bool in_prison = true;
     int prison_hp_left = 3;
-    ivec2 prison_sprite_offset;
-    int prison_anim_timer = 0;
 
     std::optional<Shot> shot;
 
@@ -349,6 +347,10 @@ namespace States
         float fade = 1;
         float exit_fade = 0;
 
+        // Those are not in `Player`, because we don't want to roll them back.
+        ivec2 prison_sprite_offset;
+        int prison_anim_timer = 0;
+
         bool have_timeshift_ability = false;
         bool have_doublejump_ability = false;
         bool have_gun_ability = false;
@@ -436,7 +438,7 @@ namespace States
                 { // Hints.
                     auto ProcessHint = [](float &timer, bool increase)
                     {
-                        clamp_var(timer += 0.01f * (increase ? 1 : -1));
+                        clamp_var(timer += increase ? 0.025f : -0.01f);
                         return increase;
                     };
 
@@ -605,12 +607,12 @@ namespace States
                                 Sounds::breaking_prison();
                             }
 
-                            p.prison_sprite_offset = p.prison_hp_left == 1 ? ivec2(1, 0) : ivec2(-1, 0);
-                            p.prison_anim_timer = 10;
+                            prison_sprite_offset = p.prison_hp_left == 1 ? ivec2(1, 0) : ivec2(-1, 0);
+                            prison_anim_timer = 10;
                         }
                     }
-                    if (p.prison_anim_timer > 0)
-                        p.prison_anim_timer--;
+                    if (prison_anim_timer > 0)
+                        prison_anim_timer--;
                 }
 
                 // Controls.
@@ -1122,7 +1124,7 @@ namespace States
                 ivec2 prison_pos = map.player_start - camera_pos;
                 if ((abs(prison_pos) <= (screen_size + size) / 2).all())
                 {
-                    r.iquad(prison_pos + p.prison_sprite_offset * (p.prison_anim_timer > 0), region.region(ivec2(0, size.y * !p.in_prison), size)).center();
+                    r.iquad(prison_pos + prison_sprite_offset * (prison_anim_timer > 0), region.region(ivec2(0, size.y * !p.in_prison), size)).center();
                 }
             }
 

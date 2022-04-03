@@ -46,6 +46,12 @@ Input::Mouse mouse;
 Random::DefaultGenerator random_generator = Random::MakeGeneratorFromRandomDevice();
 Random::DefaultInterfaces<Random::DefaultGenerator> ra(random_generator);
 
+namespace Theme
+{
+    Audio::Buffer buf(Audio::Sound(Audio::ogg, Audio::stereo, Program::ExeDir() + "assets/gates_of_heck.ogg"));
+    Audio::Source src = adjust_(Audio::Source(buf), loop(), play());
+}
+
 struct Application : Program::DefaultBasicState
 {
     GameUtils::State::Manager<StateBase> state_manager;
@@ -97,10 +103,20 @@ struct Application : Program::DefaultBasicState
         if (!state_manager)
             Program::Exit();
 
+        // Toggle fullscreen.
         if ((Input::Button(Input::l_alt).down() || Input::Button(Input::r_alt).down()) && Input::Button(Input::enter).pressed())
         {
             now_windowed = !now_windowed;
             window.SetMode(now_windowed ? Interface::windowed : fullscreen_flavor);
+        }
+
+        // Toggle music.
+        if (Input::Button(Input::m).pressed())
+        {
+            if (Theme::src.IsPlaying())
+                Theme::src.pause();
+            else
+                Theme::src.play();
         }
     }
 
@@ -119,6 +135,8 @@ struct Application : Program::DefaultBasicState
 
     void Init()
     {
+        mouse.HideCursor();
+
         ImGui::StyleColorsDark();
         Audio::LoadMentionedFiles(Audio::LoadFromPrefixWithExt(Program::ExeDir() + "assets/"), Audio::mono, Audio::wav);
 
