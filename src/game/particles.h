@@ -34,10 +34,14 @@ class ParticleController
     std::vector<std::vector<Particle::State>> states;
     SparseSet<int> state_ids;
 
+    bool saves_timelines = false;
+
 public:
+    ParticleController(bool saves_timelines) : saves_timelines(saves_timelines) {}
+
     void Add(const Particle &par)
     {
-        if (state_ids.IsFull())
+        if (saves_timelines && state_ids.IsFull())
         {
             state_ids.Reserve((state_ids.Capacity() + 1) * 2);
             while (int(states.size()) < state_ids.Capacity())
@@ -48,8 +52,11 @@ public:
         }
 
         Particle &new_par = particles.emplace_back(par);
-        new_par.state_id = state_ids.InsertAny();
-        states[new_par.state_id].clear(); // This shouldn't reset capacity, this is intentional.
+        if (saves_timelines)
+        {
+            new_par.state_id = state_ids.InsertAny();
+            states[new_par.state_id].clear(); // This shouldn't reset capacity, this is intentional.
+        }
     }
 
     void Tick(ivec2 camera_pos);

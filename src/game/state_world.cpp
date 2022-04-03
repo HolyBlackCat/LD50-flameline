@@ -118,8 +118,10 @@ struct TimeManager
 
     bool shifting_now = false;
 
-    int shifting_timer = 0;
+    float shifting_speed = 0;
     float shifting_lag = 0;
+
+    float positive_speed = 1; // Used to slowly gain time speed after shift.
 
     float shifting_effects_alpha = 0;
 
@@ -136,14 +138,46 @@ struct TimeManager
         ghosts.back().states.push_back(p);
     }
 
+    void AddGhostParticles(ParticleController &par) const
+    {
+        const Ghost *last_ghost = FindNewestGhost();
+
+        for (const Ghost &ghost : ghosts)
+        {
+            if (&ghost == last_ghost)
+                continue;
+            if (ghost.states.empty())
+                continue;
+
+            if (ghost.time_start == time || ghost.time_start + int(ghost.states.size()) - 1 == time)
+            {
+                const Player &state = ghost.states[time - ghost.time_start];
+
+                for (int i = 0; i < 24; i++)
+                {
+                    fvec2 dir = fvec2::dir(ra.angle());
+                    float dist = ra.f <= 1;
+                    float c = ra.f <= 1;
+                    fvec3 color(1 - c * 0.5f, 1 - c * 0.25f, 0);
+                    if (ra.boolean())
+                        std::swap(color.x, color.z);
+                    par.Add(adjust(Particle{}, s.pos = state.pos + dir * dist * fvec2(4, 8), damp = 0.015, life = 20 <= ra.i <= 60, size = 1 <= ra.i <= 5, s.vel = dir * dist * 0.15 + state.prev_vel * 0.05, end_size = 1, color = color, beta = 0));
+                }
+            }
+        }
+    }
+
     void RenderGhosts(ivec2 camera_pos) const
     {
         static const auto &pl_region = texture_atlas.Get("player.png");
         constexpr ivec2 pl_size(36);
 
-        for (std::size_t ghost_index = 0; ghost_index + 1/*sic*/ < ghosts.size(); ghost_index++)
+        const Ghost *last_ghost = FindNewestGhost();
+
+        for (const Ghost &ghost : ghosts)
         {
-            const Ghost &ghost = ghosts[ghost_index];
+            if (&ghost == last_ghost)
+                continue; // Skip the last ghost.
 
             if (time < ghost.time_start)
                 continue; // Too early.
@@ -151,17 +185,33 @@ struct TimeManager
             if (rel_time >= int(ghost.states.size()))
                 continue; // Too late.
 
-            const Player &p = ghost.states[rel_time];
-            if (!p.VisibleAsGhost())
+            if (!ghost.states[rel_time].VisibleAsGhost())
                 continue; // Invisible, possibly dead.
 
-            r.iquad(p.pos - camera_pos, pl_region.region(pl_size * ivec2(p.anim_variant, p.anim_state), pl_size)).center().alpha(0.5);
+            constexpr int max_time_offset = 3;
+
+            for (int i = -max_time_offset; i <= max_time_offset; i++)
+            {
+                int this_rel_time = rel_time + i;
+                if (this_rel_time < 0 || this_rel_time >= int(ghost.states.size()))
+                    continue; // The time for this sprite is out of range.
+
+                float alpha = 0.45 - abs(i) * 0.1;
+
+                fvec3 color(1 - i / 4.f, 1 - i / 12.f, 0);
+                if (i > 0)
+                    std::swap(color.x, color.z);
+
+                const Player &p = ghost.states[this_rel_time];
+
+                r.iquad(p.pos - camera_pos, pl_region.region(pl_size * ivec2(p.anim_variant, p.anim_state), pl_size)).center().color(color).mix(0).alpha(alpha).beta(0).flip_x(p.facing_left);
+            }
         }
     }
 
-    // Find newest player state for the current time.
+    // Find newest ghost for the current time.
     // Returns null on failure.
-    const Player *FindNewestState() const
+    const Ghost *FindNewestGhost() const
     {
         for (std::size_t i = ghosts.size(); i-- > 0;)
         {
@@ -171,9 +221,19 @@ struct TimeManager
                 int rel_time = time - ghost.time_start;
                 if (rel_time >= int(ghost.states.size()))
                     return nullptr; // Note, not `continue`. This is more sane.
-                return &ghost.states[rel_time];
+                return &ghost;
             }
         }
+        return nullptr;
+    }
+
+    // Find newest player state for the current time.
+    // Returns null on failure.
+    const Player *FindNewestState() const
+    {
+        const Ghost *ret = FindNewestGhost();
+        if (ret)
+            return &ret->states[time - ret->time_start];
         return nullptr;
     }
 };
@@ -187,10 +247,13 @@ namespace States
         Map map = Stream::ReadOnlyData(Program::ExeDir() + "map.json");
 
         Player p;
-        ParticleController par;
+        ParticleController par = true;
+        ParticleController par_timeless = false;
         TimeManager time;
 
         ivec2 camera_pos;
+
+        bool buffered_jump = false;
 
         World()
         {
@@ -204,38 +267,85 @@ namespace States
 
             constexpr float gravity = 0.1, low_jump_gravity = 0.3;
 
+            bool positive_time_step_this_tick = false;
+
+            // Timeless particles.
+            par_timeless.Tick(camera_pos);
+
             { // Time.
-                time.shifting_now = con.timeshift.down();
+                bool timeshift_button_down = con.timeshift.down();
+                bool should_timeshift = time.shifting_now;
+                if (timeshift_button_down)
+                    should_timeshift = true;
+                else if (time.shifting_speed < 0.01)
+                    should_timeshift = false;
+
+                if (should_timeshift != time.shifting_now)
+                {
+                    time.shifting_now = should_timeshift;
+                    time.shifting_lag = 0;
+                    time.shifting_speed = 0;
+                    time.positive_speed = 0;
+
+                    if (!should_timeshift)
+                        time.NextTimeline();
+                }
+
                 clamp_var(time.shifting_effects_alpha += time.shifting_now ? 0.013 : -0.008);
 
-                if (con.timeshift.released())
-                    time.NextTimeline();
 
                 if (!time.shifting_now)
                 {
-                    time.time++;
-                    time.shifting_timer = 0;
+                    if (time.positive_speed >= 0.99f)
+                    {
+                        time.positive_speed = 1;
+                        positive_time_step_this_tick = true;
+                    }
+                    else
+                    {
+                        clamp_var_max(time.positive_speed += 0.01f);
 
-                    // Particles.
-                    par.Tick(camera_pos);
+                        time.shifting_lag += time.positive_speed;
+                        int num_steps = time.shifting_lag;
+                        time.shifting_lag -= num_steps;
+                        if (num_steps > 0) // Yep.
+                            positive_time_step_this_tick = true;
+                    }
+
+                    if (positive_time_step_this_tick)
+                    {
+                        time.time++;
+
+                        time.AddGhostParticles(par_timeless);
+
+                        // Particles.
+                        par.Tick(camera_pos);
+                    }
                 }
                 else
                 {
-                    float speed = clamp_max(time.shifting_timer / 100.f, 2);
-                    time.shifting_lag += speed;
+                    if (timeshift_button_down)
+                        clamp_var_max(time.shifting_speed += 0.02, 4);
+                    else
+                        time.shifting_speed *= 0.97;
+
+                    time.shifting_lag += time.shifting_speed;
                     int num_shifts = time.shifting_lag;
                     time.shifting_lag -= num_shifts;
-                    clamp_var_min(time.time -= num_shifts);
-                    time.shifting_timer++;
 
-                    // Particles.
-                    for (int i = 0; i < num_shifts; i++)
+                    while (num_shifts-- > 0 && time.time > 0)
+                    {
+                        time.time--;
+                        time.AddGhostParticles(par_timeless);
                         par.ReverseTick();
+                    }
                 }
             }
 
             // Player.
-            if (!time.shifting_now)
+            if (!time.shifting_now && con.jump.pressed())
+                buffered_jump = true;
+            if (positive_time_step_this_tick)
             {
                 constexpr float
                     max_speed_x = 4,
@@ -294,7 +404,7 @@ namespace States
                         p.walking_timer = 0;
 
                     // Jumping.
-                    if (p.ground && con.jump.pressed())
+                    if (p.ground && buffered_jump)
                     {
                         p.vel.y = -jump_speed;
                         Sounds::jump();
@@ -407,6 +517,8 @@ namespace States
 
                     if (time.time % 10 == 0)
                         p.lava_y -= 1;
+
+                    buffered_jump = false;
                 }
 
                 { // Determining the current sprite.
@@ -437,11 +549,13 @@ namespace States
                     }
                 }
             }
-            else
+            else if (time.shifting_now)
             {
                 // Try restoring the state from timeline.
                 if (const Player *state = time.FindNewestState())
                     p = *state;
+
+                buffered_jump = false;
             }
 
             { // Camera.
@@ -508,6 +622,9 @@ namespace States
             // Map.
             map.render(camera_pos);
 
+            // Timeless particles.
+            par_timeless.Render(camera_pos);
+
             // Particles.
             par.Render(camera_pos);
 
@@ -521,11 +638,23 @@ namespace States
 
                 if (t > 0)
                 {
-                    for (int i = 0; i < num_rays; i++)
-                    {
-                        float angle = time.time * 0.001f + i * 2 * f_pi / num_rays;
+                    float alpha1 = t * 0.3f;
+                    float alpha2 = t * 0.7f;
 
-                        r.fquad(fvec2(), fvec2(dist_max - dist_min, 1)).center(fvec2(-dist_min, 0.5f)).rotate(angle).color(fvec3(1)).alpha(0, t * 0.5, t * 0.5, 0).beta(1);
+                    constexpr int maxdelta = 2;
+
+                    for (int delta = -maxdelta; delta <= maxdelta; delta++)
+                    {
+                        fvec3 color(1 - delta / 4.f, 1 - delta / 12.f, 0);
+                        if (delta > 0)
+                            std::swap(color.x, color.z);
+
+                        for (int i = 0; i < num_rays; i++)
+                        {
+                            float angle = time.time * 0.001f + delta * (time.shifting_now ? time.shifting_speed : time.positive_speed) * 0.003f + i * 2 * f_pi / num_rays;
+
+                            r.fquad(fvec2(), fvec2(dist_max - dist_min, 1)).center(fvec2(-dist_min, 0.5f)).rotate(angle).color(color).alpha(alpha1, alpha2, alpha2, alpha1).beta(0);
+                        }
                     }
                 }
             }

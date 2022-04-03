@@ -9,7 +9,8 @@ void ParticleController::Tick(ivec2 camera_pos)
         par.s.vel *= 1 - par.damp;
         par.s.current_lifetime++;
 
-        states[par.state_id].push_back(par.s);
+        if (saves_timelines)
+            states[par.state_id].push_back(par.s);
     }
 
     std::erase_if(particles, [&](const Particle &par)
@@ -20,12 +21,12 @@ void ParticleController::Tick(ivec2 camera_pos)
         if ((abs(par.s.pos - camera_pos) > screen_size / 2 + 16).any())
             erase = true;
 
-        if (erase)
+        if (erase && saves_timelines)
             state_ids.EraseUnordered(par.state_id);
         return erase;
     });
 
-    ASSERT(int(particles.size()) == state_ids.ElemCount());
+    ASSERT(!saves_timelines || int(particles.size()) == state_ids.ElemCount());
 }
 
 void ParticleController::ReverseTick()
@@ -33,7 +34,7 @@ void ParticleController::ReverseTick()
     std::erase_if(particles, [&](const Particle &par)
     {
         bool erase = states[par.state_id].empty();
-        if (erase)
+        if (erase && saves_timelines)
             state_ids.EraseUnordered(par.state_id);
         return erase;
     });
@@ -47,7 +48,7 @@ void ParticleController::ReverseTick()
         state_vec.pop_back();
     }
 
-    ASSERT(int(particles.size()) == state_ids.ElemCount());
+    ASSERT(!saves_timelines || int(particles.size()) == state_ids.ElemCount());
 }
 
 void ParticleController::Render(ivec2 camera_pos) const
