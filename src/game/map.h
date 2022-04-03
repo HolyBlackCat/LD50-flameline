@@ -63,6 +63,7 @@ struct Map
     Array2D<unsigned char> random;
 
     ivec2 player_start;
+    std::optional<ivec2> debug_player_start;
     float initial_lava_level = 0;
 
     MAYBE_CONST(

@@ -25,6 +25,7 @@ Map::Map(Stream::ReadOnlyData data)
     auto points = Tiled::LoadPointLayer(Tiled::FindLayer(json.GetView(), "points"));
 
     player_start = points.GetSinglePoint("player");
+    debug_player_start = points.GetSinglePointOpt("debug_player");
     initial_lava_level = points.GetSinglePoint("lava").y;
 }
 

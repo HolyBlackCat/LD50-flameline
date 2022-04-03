@@ -80,7 +80,7 @@ struct Player
 
     [[nodiscard]] bool VisibleAsGhost() const
     {
-        return !dead;
+        return !dead && !in_prison;
     }
 
     ivec2 pos;
@@ -101,6 +101,11 @@ struct Player
 
     int anim_state = 0;
     int anim_variant = 0;
+
+    bool in_prison = true;
+    int prison_hp_left = 3;
+    ivec2 prison_sprite_offset;
+    int prison_anim_timer = 0;
 
     // This is here, because we need to save it to the timeline.
     float lava_y = 0;
@@ -263,7 +268,15 @@ namespace States
 
         World()
         {
-            p.pos = map.player_start;
+            if (map.debug_player_start)
+            {
+                p.pos = *map.debug_player_start;
+                p.in_prison = false;
+            }
+            else
+            {
+                p.pos = map.player_start;
+            }
             p.lava_y = map.initial_lava_level;
         }
 
@@ -281,7 +294,7 @@ namespace States
             { // Time.
                 bool timeshift_button_down = con.timeshift.down();
                 bool should_timeshift = time.shifting_now;
-                if (timeshift_button_down)
+                if (timeshift_button_down && !p.in_prison)
                     should_timeshift = true;
                 else if (time.shifting_speed < 0.01)
                     should_timeshift = false;
@@ -375,13 +388,16 @@ namespace States
                     vel_lag_damp = 0.01;
 
                 { // Save to the timeline. (should be first?)
-                    time.SavePlayer(p);
+                    if (!p.in_prison)
+                        time.SavePlayer(p);
                 }
+
+                bool controllable = !p.dead && !p.in_prison;
 
                 // Status.
                 p.prev_ground = p.ground;
                 p.ground = p.SolidAtOffset(map, ivec2(0, 1));
-                if (p.ground && !p.prev_ground)
+                if (p.ground && !p.prev_ground && controllable)
                 {
                     Sounds::landing(clamp((p.prev_vel.y - 1) / 3));
 
@@ -398,8 +414,32 @@ namespace States
                     }
                 }
 
+                { // Prison controls.
+                    if (p.in_prison)
+                    {
+                        if (con.jump.pressed())
+                        {
+                            p.prison_hp_left--;
+                            if (p.prison_hp_left <= 0)
+                            {
+                                p.in_prison = false;
+                                Sounds::broke_prison();
+                            }
+                            else
+                            {
+                                Sounds::breaking_prison();
+                            }
+
+                            p.prison_sprite_offset = p.prison_hp_left == 1 ? ivec2(1, 0) : ivec2(-1, 0);
+                            p.prison_anim_timer = 10;
+                        }
+                    }
+                    if (p.prison_anim_timer > 0)
+                        p.prison_anim_timer--;
+                }
+
                 // Controls.
-                if (!p.dead)
+                if (controllable)
                 {
                     // Walking.
                     int hc = con.right.down() - con.left.down();
@@ -445,7 +485,7 @@ namespace States
                 }
 
                 // Gravity.
-                if (!p.dead)
+                if (controllable)
                 {
                     if (p.vel.y < 0 && !con.jump.down())
                         p.vel.y += low_jump_gravity;
@@ -454,7 +494,7 @@ namespace States
                 }
 
                 // Apply velocity.
-                if (!p.dead)
+                if (controllable)
                 {
                     p.prev_vel = p.vel;
 
@@ -496,7 +536,7 @@ namespace States
                 }
 
                 // Death conditions.
-                if (!p.dead)
+                if (controllable)
                 {
                     // Spikes.
                     for (ivec2 offset : p.spike_hitbox)
@@ -504,7 +544,7 @@ namespace States
                             p.dead = true;
 
                     // Lava.
-                    if (p.pos.y > p.lava_y + 12)
+                    if (p.pos.y > p.lava_y + 4)
                         p.dead = true;
                 }
 
@@ -532,7 +572,7 @@ namespace States
                     if (p.dead)
                         p.death_timer++;
 
-                    if (time.time % 10 == 0)
+                    if (!p.in_prison && time.time % 10 == 0)
                         p.lava_y -= 1;
 
                     buffered_jump = false;
@@ -607,6 +647,17 @@ namespace States
                 }
             }
 
+            { // Prison.
+                static const auto &region = texture_atlas.Get("prison.png");
+                static const ivec2 size = region.size with(y /= 2);
+
+                ivec2 prison_pos = map.player_start - camera_pos;
+                if ((abs(prison_pos) <= (screen_size + size) / 2).all())
+                {
+                    r.iquad(prison_pos + p.prison_sprite_offset * (p.prison_anim_timer > 0), region.region(ivec2(0, size.y * !p.in_prison), size)).center();
+                }
+            }
+
             { // Player ghosts.
                 time.RenderGhosts(camera_pos);
             }
@@ -615,9 +666,10 @@ namespace States
                 static const auto &pl_region = texture_atlas.Get("player.png");
                 constexpr ivec2 pl_size(36);
 
-                float alpha = clamp_min(1 - p.death_timer / 10.f);
+                float alpha = p.in_prison ? 0 : clamp_min(1 - p.death_timer / 10.f);
 
-                r.iquad(p.pos - camera_pos, pl_region.region(pl_size * ivec2(p.anim_variant, p.anim_state), pl_size)).center().flip_x(p.facing_left).alpha(alpha);
+                if (alpha > 0.001f)
+                    r.iquad(p.pos - camera_pos, pl_region.region(pl_size * ivec2(p.anim_variant, p.anim_state), pl_size)).center().flip_x(p.facing_left).alpha(alpha);
             }
 
             { // Lava.
@@ -660,6 +712,10 @@ namespace States
 
                     constexpr int maxdelta = 2;
 
+                    float rot_speed = (time.shifting_now ? time.shifting_speed : time.positive_speed);
+
+                    float height = 1;
+
                     for (int delta = -maxdelta; delta <= maxdelta; delta++)
                     {
                         fvec3 color(1 - delta / 4.f, 1 - delta / 12.f, 0);
@@ -668,9 +724,9 @@ namespace States
 
                         for (int i = 0; i < num_rays; i++)
                         {
-                            float angle = time.time * 0.001f + delta * (time.shifting_now ? time.shifting_speed : time.positive_speed) * 0.003f + i * 2 * f_pi / num_rays;
+                            float angle = time.time * 0.001f - delta * rot_speed * 0.003f + i * 2 * f_pi / num_rays;
 
-                            r.fquad(fvec2(), fvec2(dist_max - dist_min, 1)).center(fvec2(-dist_min, 0.5f)).rotate(angle).color(color).alpha(alpha1, alpha2, alpha2, alpha1).beta(0);
+                            r.fquad(fvec2(), fvec2(dist_max - dist_min, height)).center(fvec2(-dist_min, height/2)).rotate(angle).color(color).alpha(alpha1, alpha2, alpha2, alpha1).beta(0);
                         }
                     }
                 }
