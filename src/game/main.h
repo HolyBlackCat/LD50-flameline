@@ -9,7 +9,6 @@ extern Audio::Context audio_context;
 extern Audio::SourceManager audio_controller;
 
 extern const Graphics::ShaderConfig shader_config;
-extern Interface::ImGuiController gui_controller;
 
 namespace Fonts
 {

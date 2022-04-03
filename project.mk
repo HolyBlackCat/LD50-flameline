@@ -53,7 +53,7 @@ endif
 
 _file_cxxflags = $(if $(filter lib/implementation.cpp lib/cglfl.cpp,$1),-g0 -O3)
 
-$(call Project,exe,imp-re)
+$(call Project,exe,flameline)
 $(call ProjectSetting,source_dirs,src lib)
 $(call ProjectSetting,common_flags,$(_proj_commonflags))
 $(call ProjectSetting,cxxflags,$(_proj_cxxflags))

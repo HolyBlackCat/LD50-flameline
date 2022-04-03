@@ -1,5 +1,6 @@
 #include "main.h"
 
+#include "game/buildnumber.h"
 #include "game/map.h"
 #include "game/particles.h"
 #include "game/sounds.h"
@@ -348,6 +349,7 @@ namespace States
         float exit_fade = 0;
 
         // Those are not in `Player`, because we don't want to roll them back.
+        int prison_timer = 0;
         ivec2 prison_sprite_offset;
         int prison_anim_timer = 0;
 
@@ -366,12 +368,16 @@ namespace States
         bool seen_hint_jump = false;
         float hint_jump = 0;
 
+        float logo_alpha = 1;
+
         static constexpr fvec3
             sky_color = fvec3(0.6f, 0.935f, 1),
             sky_color2 = fvec3(0.85f, 0.98f, 1);
 
         static constexpr float
             vignette_alpha = 0.35f;
+
+        static constexpr int ability_anim_len = 440;
 
 
         struct Hint
@@ -430,7 +436,7 @@ namespace States
                 if (ability_timer > 0)
                 {
                     ability_timer++;
-                    if (ability_timer > 440)
+                    if (ability_timer > ability_anim_len)
                         ability_timer = 0;
                     return;
                 }
@@ -449,7 +455,7 @@ namespace States
 
                     if (ProcessHint(hint_death_hollback, !seen_hint_death_rollback && p.dead && have_timeshift_ability && time.RemainingShifts() > 0 && p.death_timer > 90) && time.shifting_now)
                         seen_hint_death_rollback = true;
-                    if (ProcessHint(hint_jump, !seen_hint_jump) && !p.in_prison)
+                    if (ProcessHint(hint_jump, !seen_hint_jump && prison_timer > 240) && prison_anim_timer > 0)
                         seen_hint_jump = true;
                 }
             }
@@ -865,7 +871,7 @@ namespace States
                         return false;
                     };
 
-                    if (PickUpAbility(map.ability_timeshift, "Timeshift", FMT("Hold [Z]/[L] to travel back in time\n{} uses remaining", max_timeshifts)))
+                    if (PickUpAbility(map.ability_timeshift, "Timeshift", "Hold [Z]/[L] to travel back in time"))
                         have_timeshift_ability = true;
                     if (PickUpAbility(map.ability_doublejump, "Doublejump", "Press [jump] to jump off of your past copy"))
                         have_doublejump_ability = true;
@@ -874,7 +880,7 @@ namespace States
 
                     for (auto it = map.secrets.begin(); it != map.secrets.end();)
                     {
-                        if (p.ground &&(abs(*it - p.pos) < ivec2(6,10)).all())
+                        if (p.ground && (abs(*it - p.pos) < ivec2(6,10)).all())
                         {
                             for (int i = 0; i < 24; i++)
                             {
@@ -1005,6 +1011,9 @@ namespace States
                     if (have_timeshift_ability)
                         time_since_got_timeshift++;
 
+                    if (p.in_prison)
+                        prison_timer++;
+
                     buffered_jump = false;
                 }
 
@@ -1052,6 +1061,7 @@ namespace States
             }
 
             { // Fade.
+                // Death and respawn.
                 bool death_fade = p.dead && p.death_timer >= 60 && (!have_timeshift_ability || time.RemainingShifts() == 0);
                 if (death_fade)
                 {
@@ -1064,11 +1074,15 @@ namespace States
                     clamp_var_min(fade -= 0.01f);
                 }
 
-
+                // Exit.
                 exit_fade = clamp((map.exit_level - p.pos.y) / 300.f);
                 if (exit_fade > 0.999f)
                     next_state = FMT("Ending{{bg_color={},vignette_alpha={},cur_secrets={},max_secrets={},time={},time_sub={}}}",
                         Refl::ToString(sky_color2), vignette_alpha, map.num_secrets - int(map.secrets.size()), map.num_secrets, real_world_time, time.time);
+
+                // Logo.
+                if (p.prison_hp_left <= 1)
+                    clamp_var_min(logo_alpha -= 0.01f);
             }
 
             { // Camera.
@@ -1259,8 +1273,8 @@ namespace States
                     {
                         Graphics::Text text(Fonts::main, FMT("{}/{}", map.num_secrets - int(map.secrets.size()), map.num_secrets));
                         for (int i = 0; i < 4; i++)
-                            r.itext(ivec2(screen_size.x/2, -screen_size.y/2) + ivec2::dir4(i), text).align(ivec2(1,-1)).alpha(1).color(fvec3(0));
-                        r.itext(ivec2(screen_size.x/2, -screen_size.y/2), text).align(ivec2(1,-1)).alpha(1).color(fvec3(102, 252, 255) / 255);
+                            r.itext(ivec2(screen_size.x/2 - 1, -screen_size.y/2) + ivec2::dir4(i), text).align(ivec2(1,-1)).alpha(1).color(fvec3(0));
+                        r.itext(ivec2(screen_size.x/2 - 1, -screen_size.y/2), text).align(ivec2(1,-1)).alpha(1).color(fvec3(102, 252, 255) / 255);
                     }
                 }
 
@@ -1274,8 +1288,8 @@ namespace States
                         float alpha = smoothstep(clamp(t));
 
                         for (int i = 0; i < 4; i++)
-                            r.itext(ivec2(0, screen_size.y/2) + ivec2::dir4(i), text).align_y(1).alpha(alpha).color(fvec3(0));
-                        r.itext(ivec2(0, screen_size.y/2), text).align_y(1).alpha(alpha).color(fvec3(255, 179, 26) / 255);
+                            r.itext(ivec2(0, screen_size.y/2 - 1) + ivec2::dir4(i), text).align_y(1).alpha(alpha).color(fvec3(0));
+                        r.itext(ivec2(0, screen_size.y/2 - 1), text).align_y(1).alpha(alpha).color(fvec3(255, 179, 26) / 255);
                     };
 
                     ShowHint("Hold [Z]/[L] to travel back in time", hint_death_hollback);
@@ -1310,17 +1324,31 @@ namespace States
                 int bg_time = 30;
                 int first_line_time = 60;
 
+                float fin_text_alpha = 1 - clamp((ability_timer - (ability_anim_len - 60)) / 30.f);
+                float fin_bg_alpha = 1 - clamp((ability_timer - (ability_anim_len - 30)) / 30.f);
+
                 ivec2 text_size = Graphics::Text(Fonts::main, ability_message).ComputeStats().size;
                 Graphics::Text text(Fonts::main, ability_message.substr(0, clamp_min((ability_timer - first_line_time) / ticks_per_letter)));
                 Graphics::Text text2(Fonts::main, ability_message2);
 
-                r.iquad(ivec2(0, 0), ivec2(max(text_size.x, text2.ComputeStats().size.x) + 12, 64)).color(fvec3(0)).center().alpha(smoothstep(clamp((ability_timer - bg_time) / 30.f)));
-                r.itext(-text_size/2 + ivec2(0, ability_message2.empty() ? 8 : -8), text).align_x(-1).color(ability_message2.empty() ? fvec3(102, 252, 255) / 255 : fvec3(255, 179, 26) / 255);
+                r.iquad(ivec2(0, 0), ivec2(max(text_size.x, text2.ComputeStats().size.x) + 12, ability_message2.empty() ? 32 : 64)).color(fvec3(0)).center().alpha(smoothstep(clamp((ability_timer - bg_time) / 30.f) * fin_bg_alpha));
+                r.itext(-text_size/2 + ivec2(0, ability_message2.empty() ? 8 : -8), text).align_x(-1).color(ability_message2.empty() ? fvec3(102, 252, 255) / 255 : fvec3(255, 179, 26) / 255).alpha(fin_text_alpha);
 
                 int second_line_time = first_line_time + int(ability_message.size()) * ticks_per_letter + 30;
 
                 if (ability_timer > second_line_time)
-                    r.itext(ivec2(0, 12), text2).alpha(clamp_max((ability_timer - second_line_time) / 60.f)).color(fvec3(255, 76, 5) / 255);
+                    r.itext(ivec2(0, 12), text2).alpha(clamp_max((ability_timer - second_line_time) / 60.f) * fin_text_alpha).color(fvec3(255, 76, 5) / 255);
+            }
+
+            { // Menu logo and author info.
+                if (logo_alpha > 0.001f)
+                {
+                    static const auto &region = texture_atlas.Get("logo.png");
+                    r.iquad(ivec2(0, -52), region).center().alpha(smoothstep(logo_alpha));
+
+                    r.itext(ivec2(0, screen_size.y/2 - 28), Graphics::Text(Fonts::main, FMT("by HolyBlackCat for LD50, v1.{}", build_number)))
+                        .color(fvec3(143,0,0)/255).beta(0).alpha(0.361f * smoothstep(logo_alpha));
+                }
             }
 
             { // Fade (death and respawn).

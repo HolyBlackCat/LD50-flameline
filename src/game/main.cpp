@@ -10,7 +10,7 @@ constexpr bool is_debug =
 bool now_windowed = is_debug;
 constexpr auto fullscreen_flavor = Interface::borderless_fullscreen;
 
-const std::string_view window_name = "Iota";
+const std::string_view window_name = "Flameline";
 
 Interface::Window window(std::string(window_name), screen_size * 2, now_windowed ? Interface::windowed : fullscreen_flavor, adjust_(Interface::WindowSettings{}, min_size = screen_size));
 static Graphics::DummyVertexArray dummy_vao = nullptr;
@@ -19,13 +19,13 @@ Audio::Context audio_context = nullptr;
 Audio::SourceManager audio_controller;
 
 const Graphics::ShaderConfig shader_config = Graphics::ShaderConfig::Core();
-Interface::ImGuiController gui_controller(Poly::derived<Interface::ImGuiController::GraphicsBackend_Modern>, adjust_(Interface::ImGuiController::Config{}, shader_header = shader_config.common_header, store_state_in_file = {}));
 
 Graphics::FontFile Fonts::Files::main(Program::ExeDir() + "assets/Monocat_7x14.ttf", 14);
 Graphics::Font Fonts::main;
 
 Graphics::TextureAtlas texture_atlas = []{
-    Graphics::TextureAtlas ret(ivec2(2048), "assets/_images", Program::ExeDir() + "assets/atlas.png", Program::ExeDir() + "assets/atlas.refl", {{"/font_storage", ivec2(256)}});
+    std::string atlas_loc = is_debug ? "assets/assets" : Program::ExeDir() + "assets/";
+    Graphics::TextureAtlas ret(ivec2(2048), is_debug ? "assets/_images" : "", atlas_loc + "atlas.png", atlas_loc + "atlas.refl", {{"/font_storage", ivec2(256)}});
     auto font_region = ret.Get("/font_storage");
 
     Unicode::CharSet glyph_ranges;
@@ -78,13 +78,13 @@ struct Application : Program::DefaultBasicState
     void EndFrame() override
     {
         fps_counter.Update();
-        window.SetTitle(STR((window_name), " TPS:", (fps_counter.Tps()), " FPS:", (fps_counter.Fps()), " AUDIO:", (audio_controller.ActiveSources())));
+        if (is_debug)
+            window.SetTitle(STR((window_name), " TPS:", (fps_counter.Tps()), " FPS:", (fps_counter.Fps()), " AUDIO:", (audio_controller.ActiveSources())));
     }
 
     void Tick() override
     {
-        // window.ProcessEvents();
-        window.ProcessEvents({gui_controller.EventHook()});
+        window.ProcessEvents();
 
         if (window.ExitRequested())
             Program::Exit();
@@ -94,7 +94,6 @@ struct Application : Program::DefaultBasicState
             Graphics::Viewport(window.Size());
         }
 
-        gui_controller.PreTick();
         state_manager.Tick();
         audio_controller.Tick();
 
@@ -122,11 +121,9 @@ struct Application : Program::DefaultBasicState
 
     void Render() override
     {
-        gui_controller.PreRender();
         adaptive_viewport.BeginFrame();
         state_manager.Call(&StateBase::Render);
         adaptive_viewport.FinishFrame();
-        gui_controller.PostRender();
         Graphics::CheckErrors();
 
         window.SwapBuffers();
@@ -137,17 +134,10 @@ struct Application : Program::DefaultBasicState
     {
         mouse.HideCursor();
 
-        ImGui::StyleColorsDark();
         Audio::LoadMentionedFiles(Audio::LoadFromPrefixWithExt(Program::ExeDir() + "assets/"), Audio::mono, Audio::wav);
 
-        SDL_MaximizeWindow(window.Handle());
-
-        // Load various small fonts
-        auto monochrome_font_flags = ImGuiFreeTypeBuilderFlags_Monochrome | ImGuiFreeTypeBuilderFlags_MonoHinting;
-
-        gui_controller.LoadFont(Program::ExeDir() + "assets/Monocat_7x14.ttf", 12.0f, adjust(ImFontConfig{}, FontBuilderFlags = monochrome_font_flags));
-        gui_controller.LoadDefaultFont();
-        gui_controller.RenderFontsWithFreetype();
+        if (is_debug)
+            SDL_MaximizeWindow(window.Handle());
 
         Graphics::Blending::Enable();
         Graphics::Blending::FuncNormalPre();
