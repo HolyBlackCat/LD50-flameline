@@ -4,7 +4,7 @@
 #include "game/particles.h"
 #include "game/sounds.h"
 
-constexpr int max_timeshifts = 512;
+constexpr int max_timeshifts = 255;
 
 struct Controls
 {
@@ -58,9 +58,8 @@ Controls con;
 struct Shot
 {
     inline static const std::vector<ivec2> hitbox = {
-        ivec2(-4, -9), ivec2(3, -9),
-        ivec2(-4,  0), ivec2(3,  0),
-        ivec2(-4,  8), ivec2(3,  8),
+        ivec2(-3, -3), ivec2(-3,  2),
+        ivec2( 2, -3), ivec2( 2,  2),
     };
 
     static int GetAnimVariant(int time)
@@ -84,6 +83,8 @@ struct Player
     inline static const std::vector<ivec2> spike_hitbox = {
         ivec2(-4,  0), ivec2(3,  0),
     };
+
+    static constexpr ivec2 shot_hitbox_halfsize = ivec2(8,8);
 
     [[nodiscard]] static bool SolidAtPos(const Map &map, ivec2 pos)
     {
@@ -128,6 +129,9 @@ struct Player
     int prison_anim_timer = 0;
 
     std::optional<Shot> shot;
+
+    int remaining_boost_frames = 0;
+    fvec2 boost_vel;
 
     // This is here, because we need to save it to the timeline.
     float lava_y = 0;
@@ -628,8 +632,11 @@ namespace States
                         // Try to doublejump off of a ghost.
                         if (!can_jump && have_doublejump_ability)
                         {
+                            const Ghost *newest_ghost = time.FindNewestGhost();
                             auto it = std::find_if(time.ghosts.begin(), time.ghosts.end(), [&](const Ghost &ghost)
                             {
+                                if (&ghost == newest_ghost)
+                                    return false;
                                 if (time.time < ghost.time_start)
                                     return false;
                                 int rel_time = time.time - ghost.time_start;
@@ -698,7 +705,7 @@ namespace States
                     {
                         int dir_x = p.facing_left ? -1 : 1;
                         p.shot.emplace();
-                        p.shot->pos = p.pos + ivec2(4 * dir_x, -5);
+                        p.shot->pos = p.pos + ivec2(8 * dir_x, -5);
                         p.shot->vel = fvec2(2 * dir_x, 0);
                         Sounds::pew(0.3f);
 
@@ -719,9 +726,59 @@ namespace States
                         p.vel.y += gravity;
                 }
 
+                // Interaction with ghost shots.
+                if (controllable)
+                {
+                    for (Ghost &ghost : time.ghosts)
+                    {
+                        if (time.time < ghost.time_start)
+                            continue;
+                        int rel_time = time.time - ghost.time_start;
+                        if (rel_time >= int(ghost.states.size()))
+                            continue;
+                        Player &state = ghost.states[rel_time];
+                        if (!state.shot)
+                            continue;
+                        if ((abs(state.shot->pos - p.pos) < Player::shot_hitbox_halfsize).all())
+                        {
+                            Sounds::push();
+
+                            p.boost_vel = state.shot->vel.norm() * 4;
+                            p.remaining_boost_frames = 190;
+
+                            // Erase this shot from the future.
+                            for (std::size_t i = rel_time; i < ghost.states.size(); i++)
+                            {
+                                if (!ghost.states[i].shot)
+                                    break;
+                                ghost.states[i].shot.reset();
+                            }
+                        }
+                    }
+                }
+
                 // Apply velocity.
                 if (controllable)
                 {
+                    { // Velocity override.
+                        if (p.remaining_boost_frames > 0)
+                        {
+                            p.remaining_boost_frames--;
+                            p.vel = p.boost_vel;
+
+                            for (int i = 0; i < 4; i++)
+                            {
+                                float c = ra.f <= 1;
+                                fvec3 color(1 - c * 0.5f, 1 - c * 0.25f, 0);
+                                if (ra.boolean())
+                                    std::swap(color.x, color.z);
+                                par.Add(adjust(Particle{}, s.pos = p.pos + (ra.fvec2.abs() <= fvec2(4, 6)), damp = 0.015, life = 20 <= ra.i <= 60, size = 1 <= ra.i <= 3, s.vel = fvec2::dir(ra.angle(), 0.15f), end_size = 1, color = color, beta = 0));
+                            }
+                        }
+                    }
+
+                    bool hit_something = false;
+
                     p.prev_vel = p.vel;
 
                     fvec2 clamped_vel = clamp(p.vel, ivec2(-max_speed_x, -max_speed_y_up), ivec2(max_speed_x, max_speed_y_down));
@@ -751,6 +808,7 @@ namespace States
                             }
                             else
                             {
+                                hit_something = true;
                                 int_vel[i] = 0;
                                 if (p.vel[i] * s > 0)
                                     p.vel[i] = 0;
@@ -759,6 +817,9 @@ namespace States
                             }
                         }
                     }
+
+                    if (hit_something)
+                        p.remaining_boost_frames = 0;
                 }
 
                 // Getting abilities.
@@ -790,11 +851,11 @@ namespace States
                         return false;
                     };
 
-                    if (PickUpAbility(map.ability_timeshift, "Timeshift", "Hold [Z]/[L] to travel back in time"))
+                    if (PickUpAbility(map.ability_timeshift, "Timeshift", FMT("Hold [Z]/[L] to travel back in time\n{} uses remaining", max_timeshifts)))
                         have_timeshift_ability = true;
                     if (PickUpAbility(map.ability_doublejump, "Doublejump", "Press [jump] to jump off of your past copy"))
                         have_doublejump_ability = true;
-                    if (PickUpAbility(map.ability_gun, "Blaster", "Press [X]/[K] to shoot"))
+                    if (PickUpAbility(map.ability_gun, "Fireball", "Press [X]/[K] to shoot\nTouch your past shot to get a boost"))
                         have_gun_ability = true;
                 }
 
@@ -894,7 +955,7 @@ namespace States
                     if (p.dead)
                         p.death_timer++;
 
-                    if (!p.in_prison && time.time % 5 == 0)
+                    if (!p.in_prison && time.time % 7 == 0)
                         p.lava_y -= 1;
 
                     if (have_timeshift_ability)
@@ -910,7 +971,13 @@ namespace States
 
                     constexpr float jumping_variant_speeds[] = {-1, -0.5, 0.5};
 
-                    if (!p.ground)
+                    if (p.remaining_boost_frames > 0)
+                    {
+                        // Dash.
+                        p.anim_state = 2;
+                        p.anim_variant = 0;
+                    }
+                    else if (!p.ground)
                     {
                         // Jumping.
                         p.anim_state = 2;

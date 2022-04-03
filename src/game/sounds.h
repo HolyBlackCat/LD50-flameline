@@ -14,6 +14,7 @@
     X( pew               , 0.3 ) \
     X( shot_breaks_block , 0.2 ) \
     X( shot_dies         , 0.2 ) \
+    X( push              , 0.2 ) \
 
 
 namespace Sounds
