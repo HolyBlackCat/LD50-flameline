@@ -10,6 +10,10 @@ enum class Tile
     spike_down,
     spike_left,
     spike_right,
+    box1,
+    box2,
+    chain_h,
+    chain_v,
     _count,
 };
 
@@ -19,11 +23,13 @@ struct TileInfo
     bool solid = false;
     bool kills = false;
 
+    int simple_tex = -1; // If not -1, a texture index for simple drawing.
+
     bool is_dual_grid_tile = false; // If true, rendered using a dual grid.
 
     int spike_like_dir = -1;
     int spike_like_tex = 0; // Texture index, if `spike_like_dir != -1`.
-
+    bool spike_like_merge_with_any_solid = false;
 };
 
 inline constexpr TileInfo tile_info[] = {
@@ -33,6 +39,10 @@ inline constexpr TileInfo tile_info[] = {
     { .tile = Tile::spike_down,  .kills = true, .spike_like_dir = 2, .spike_like_tex = 0, },
     { .tile = Tile::spike_left,  .kills = true, .spike_like_dir = 3, .spike_like_tex = 0, },
     { .tile = Tile::spike_right, .kills = true, .spike_like_dir = 1, .spike_like_tex = 0, },
+    { .tile = Tile::box1,        .solid = true, .simple_tex = 2, },
+    { .tile = Tile::box2,        .solid = true, .spike_like_dir = 0, .spike_like_tex = 3, },
+    { .tile = Tile::chain_h,                    .spike_like_dir = 0, .spike_like_tex = 5, .spike_like_merge_with_any_solid = true, },
+    { .tile = Tile::chain_v,                    .spike_like_dir = 1, .spike_like_tex = 5, .spike_like_merge_with_any_solid = true, },
 };
 
 static_assert(std::size(tile_info) == std::size_t(Tile::_count), "In tile info array: incorrect array size.");

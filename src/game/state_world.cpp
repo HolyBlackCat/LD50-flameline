@@ -310,7 +310,7 @@ namespace States
                 if (ability_timer > 0)
                 {
                     ability_timer++;
-                    if (ability_timer > 500)
+                    if (ability_timer > 440)
                         ability_timer = 0;
                     return;
                 }

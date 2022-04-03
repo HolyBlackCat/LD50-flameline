@@ -51,8 +51,10 @@ void Map::render(ivec2 camera_pos) const
                 fmat2 mat(dir, dir.rot90());
                 ivec2 offset_a = ivec2(-1 * sign, 0).rot90(info.spike_like_dir);
                 ivec2 offset_b = ivec2( 1 * sign, 0).rot90(info.spike_like_dir);
-                bool same_a = at(tile_pos + offset_a).tile == cell.tile;
-                bool same_b = at(tile_pos + offset_b).tile == cell.tile;
+                const Cell &cell_a = at(tile_pos + offset_a);
+                const Cell &cell_b = at(tile_pos + offset_b);
+                bool same_a = cell_a.tile == cell.tile || (info.spike_like_merge_with_any_solid && cell_a.info().solid);
+                bool same_b = cell_b.tile == cell.tile || (info.spike_like_merge_with_any_solid && cell_b.info().solid);
 
                 ivec2 pixel_pos = tile_pos * tile_size + tile_size/2 - camera_pos;
                 r.iquad(pixel_pos, region.region(ivec2(0, tile_size * (info.spike_like_tex + same_a)), ivec2(tile_size) with(x /= 2))).center(ivec2(tile_size/2)).matrix(mat).flip_x(sign < 0);
@@ -86,6 +88,18 @@ void Map::render(ivec2 camera_pos) const
 
                 ivec2 dual_pixel_pos = tile_pos * tile_size + tile_size / 2 - camera_pos;
                 r.iquad(dual_pixel_pos, region.region((variant + ivec2(1, 0)) * tile_size, ivec2(tile_size)));
+            }
+        }
+    }
+
+    { // Top layer.
+        for (ivec2 tile_pos : corner_a <= vector_range <= corner_b)
+        {
+            const Cell &cell = at(tile_pos);
+            const TileInfo &info = cell.info();
+            if (info.simple_tex != -1)
+            {
+                r.iquad(tile_pos * tile_size - camera_pos, region.region(ivec2(0, tile_size * info.simple_tex), ivec2(tile_size)));
             }
         }
     }
