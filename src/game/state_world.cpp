@@ -56,13 +56,13 @@ Controls con;
 struct Player
 {
     inline static const std::vector<ivec2> hitbox = {
-        ivec2(-5, -9), ivec2(4, -9),
-        ivec2(-5,  0), ivec2(4,  0),
-        ivec2(-5,  8), ivec2(4,  8),
+        ivec2(-4, -9), ivec2(3, -9),
+        ivec2(-4,  0), ivec2(3,  0),
+        ivec2(-4,  8), ivec2(3,  8),
     };
 
     inline static const std::vector<ivec2> spike_hitbox = {
-        ivec2(-5,  0), ivec2(4,  0),
+        ivec2(-4,  0), ivec2(3,  0),
     };
 
     [[nodiscard]] static bool SolidAtPos(const Map &map, ivec2 pos)
@@ -275,23 +275,43 @@ namespace States
         bool seen_hint_death_rollback = false;
         float hint_death_hollback = 0;
 
+        bool seen_hint_jump = false;
+        float hint_jump = 0;
+
+        struct Hint
+        {
+            ivec2 pos;
+            std::string message;
+            float alpha = 0;
+        };
+        std::vector<Hint> hints;
+
         World()
         {
             p.lava_y = map.initial_lava_level;
 
-            if (map.debug_player_start)
+            map.points.ForEachPointWithNamePrefix("hint:", [&](std::string_view suffix, fvec2 pos)
             {
-                p.pos = *map.debug_player_start;
-                p.in_prison = false;
-            }
-            else
-            {
-                p.pos = map.player_start;
-            }
+                Hint new_hint;
+                new_hint.message = suffix;
+                new_hint.pos = pos;
+                hints.push_back(std::move(new_hint));
+            });
 
-            if (map.debug_start_with_timeshift)
-                have_timeshift_ability = true;
+            { // Debug features.
+                if (map.debug_player_start)
+                {
+                    p.pos = *map.debug_player_start;
+                    p.in_prison = false;
+                }
+                else
+                {
+                    p.pos = map.player_start;
+                }
 
+                if (map.debug_start_with_timeshift)
+                    have_timeshift_ability = true;
+            }
         }
 
         void Tick(std::string &next_state) override
@@ -315,16 +335,22 @@ namespace States
                     return;
                 }
 
-                // Hints.
-                if (!seen_hint_death_rollback && p.dead && have_timeshift_ability)
-                {
-                    if (time.shifting_now)
+                { // Hints.
+                    auto ProcessHint = [](float &timer, bool increase)
+                    {
+                        clamp_var(timer += 0.01f * (increase ? 1 : -1));
+                        return increase;
+                    };
+
+                    for (Hint &hint : hints)
+                    {
+                        ProcessHint(hint.alpha, !p.dead && ((p.pos - hint.pos).abs() < 12).all());
+                    }
+
+                    if (ProcessHint(hint_death_hollback, !seen_hint_death_rollback && p.dead && have_timeshift_ability && p.death_timer > 90) && time.shifting_now)
                         seen_hint_death_rollback = true;
-                    clamp_var_max(hint_death_hollback += 0.01f);
-                }
-                else
-                {
-                    clamp_var_min(hint_death_hollback -= 0.01f);
+                    if (ProcessHint(hint_jump, !seen_hint_jump) && !p.in_prison)
+                        seen_hint_jump = true;
                 }
             }
 
@@ -333,7 +359,7 @@ namespace States
                 bool should_timeshift = time.shifting_now;
                 if (timeshift_button_down && !p.in_prison && have_timeshift_ability)
                     should_timeshift = true;
-                else if (time.shifting_speed < 0.01)
+                else if (time.shifting_speed < 0.05)
                     should_timeshift = false;
 
                 if (should_timeshift != time.shifting_now)
@@ -604,7 +630,7 @@ namespace States
                         return false;
                     };
 
-                    if (PickUpAbility(map.ability_timeshift, "Timeshift", "Hold Z / L to travel back in time"))
+                    if (PickUpAbility(map.ability_timeshift, "Timeshift", "Hold [Z]/[L] to travel back in time"))
                         have_timeshift_ability = true;
                 }
 
@@ -645,7 +671,7 @@ namespace States
                     if (p.dead)
                         p.death_timer++;
 
-                    if (!p.in_prison && time.time % 10 == 0)
+                    if (!p.in_prison && time.time % 5 == 0)
                         p.lava_y -= 1;
 
                     buffered_jump = false;
@@ -871,11 +897,15 @@ namespace States
                         float alpha = smoothstep(clamp(t));
 
                         for (int i = 0; i < 4; i++)
-                            r.itext(ivec2(0, screen_size.y/2) + ivec2::dir4(i), text).align_y(1).alpha(alpha * 0.5f).color(fvec3(0));
+                            r.itext(ivec2(0, screen_size.y/2) + ivec2::dir4(i), text).align_y(1).alpha(alpha).color(fvec3(0));
                         r.itext(ivec2(0, screen_size.y/2), text).align_y(1).alpha(alpha).color(fvec3(255, 179, 26) / 255);
                     };
 
-                    ShowHint("Hold Z / L to travel back in time", (p.death_timer - 90) / 60.f);
+                    ShowHint("Hold [Z]/[L] to travel back in time", hint_death_hollback);
+                    ShowHint("Press [C]/[J]/[Space] to jump", hint_jump);
+
+                    for (const Hint &hint : hints)
+                        ShowHint(hint.message, hint.alpha);
                 }
             }
 

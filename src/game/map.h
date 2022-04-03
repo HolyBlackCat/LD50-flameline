@@ -79,6 +79,8 @@ struct Map
     std::optional<ivec2> ability_timeshift;
     bool debug_start_with_timeshift = false;
 
+    Tiled::PointLayer points;
+
     MAYBE_CONST(
         [[nodiscard]] CV Cell &at(ivec2 pos) CV
         {
