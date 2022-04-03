@@ -79,6 +79,9 @@ struct Map
     std::optional<ivec2> ability_timeshift;
     bool debug_start_with_timeshift = false;
 
+    std::optional<ivec2> ability_doublejump;
+    bool debug_start_with_doublejump = false;
+
     Tiled::PointLayer points;
 
     MAYBE_CONST(

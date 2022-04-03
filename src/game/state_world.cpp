@@ -4,6 +4,8 @@
 #include "game/particles.h"
 #include "game/sounds.h"
 
+constexpr int max_timeshifts = 512;
+
 struct Controls
 {
     struct Button
@@ -247,6 +249,11 @@ struct TimeManager
             return &ret->states[time - ret->time_start];
         return nullptr;
     }
+
+    int RemainingShifts() const
+    {
+        return clamp(max_timeshifts - int(ghosts.size()) + !shifting_now, 0, max_timeshifts);
+    }
 };
 
 namespace States
@@ -268,6 +275,9 @@ namespace States
 
         float fade = 1;
         bool have_timeshift_ability = false;
+        bool have_doublejump_ability = false;
+
+        int time_since_got_timeshift = 0;
 
         std::string ability_message, ability_message2;
         int ability_timer = 0;
@@ -311,6 +321,8 @@ namespace States
 
                 if (map.debug_start_with_timeshift)
                     have_timeshift_ability = true;
+                if (map.debug_start_with_doublejump)
+                    have_doublejump_ability = true;
             }
         }
 
@@ -347,7 +359,7 @@ namespace States
                         ProcessHint(hint.alpha, !p.dead && ((p.pos - hint.pos).abs() < 12).all());
                     }
 
-                    if (ProcessHint(hint_death_hollback, !seen_hint_death_rollback && p.dead && have_timeshift_ability && p.death_timer > 90) && time.shifting_now)
+                    if (ProcessHint(hint_death_hollback, !seen_hint_death_rollback && p.dead && have_timeshift_ability && time.RemainingShifts() > 0 && p.death_timer > 90) && time.shifting_now)
                         seen_hint_death_rollback = true;
                     if (ProcessHint(hint_jump, !seen_hint_jump) && !p.in_prison)
                         seen_hint_jump = true;
@@ -357,7 +369,7 @@ namespace States
             { // Time.
                 bool timeshift_button_down = con.timeshift.down();
                 bool should_timeshift = time.shifting_now;
-                if (timeshift_button_down && !p.in_prison && have_timeshift_ability)
+                if (timeshift_button_down && !p.in_prison && have_timeshift_ability && (time.RemainingShifts() > 0 || time.shifting_now))
                     should_timeshift = true;
                 else if (time.shifting_speed < 0.05)
                     should_timeshift = false;
@@ -453,6 +465,9 @@ namespace States
                     jump_speed = 3.56,
                     vel_lag_damp = 0.01;
 
+                constexpr ivec2
+                    ghost_hitbox_halfsize(12, 12);
+
                 { // Save to the timeline. (should be first?)
                     if (!p.in_prison)
                         time.SavePlayer(p);
@@ -527,17 +542,68 @@ namespace States
                         p.walking_timer = 0;
 
                     // Jumping.
-                    if (p.ground && buffered_jump)
+                    if (buffered_jump)
                     {
-                        p.vel.y = -jump_speed;
-                        Sounds::jump();
+                        bool can_jump = p.ground;
+                        bool using_doublejump = false;
 
-                        for (int i = 0; i < 8; i++)
+                        // Try to doublejump off of a ghost.
+                        if (!can_jump && have_doublejump_ability)
                         {
-                            float x = ra.f.abs() <= 1;
-                            fvec3 color(1, ra.f <= 1, 0);
-                            fvec2 pos = p.pos with(y += 8 <= ra.f <= 10, x += x * 3);
-                            par.Add(adjust(Particle{}, s.pos = pos, damp = 0.01, life = 20 <= ra.i <= 40, size = 1 <= ra.i <= 3, s.vel = fvec2(p.prev_vel.x * 0.4 + pow(abs(x), 2) * sign(x) * 0.5, -1.2 <= ra.f <= 0), end_size = 1, color = color));
+                            auto it = std::find_if(time.ghosts.begin(), time.ghosts.end(), [&](const Ghost &ghost)
+                            {
+                                if (time.time < ghost.time_start)
+                                    return false;
+                                int rel_time = time.time - ghost.time_start;
+                                if (rel_time >= int(ghost.states.size()))
+                                    return false;
+                                const Player &state = ghost.states[rel_time];
+                                if (!state.VisibleAsGhost())
+                                    return false;
+                                return (abs(state.pos - p.pos) < ghost_hitbox_halfsize).all();
+                            });
+
+                            if (it != time.ghosts.end())
+                            {
+                                int new_state_count = clamp_min(time.time - it->time_start, 1);
+                                it->states.resize(new_state_count);
+
+                                can_jump = true;
+                                using_doublejump = true;
+                            }
+                        }
+
+                        // Execute the jump.
+                        if (can_jump)
+                        {
+                            p.vel.y = -jump_speed;
+                            Sounds::jump();
+
+                            if (!using_doublejump)
+                            {
+                                for (int i = 0; i < 8; i++)
+                                {
+                                    float x = ra.f.abs() <= 1;
+                                    fvec3 color(1, ra.f <= 1, 0);
+                                    fvec2 pos = p.pos with(y += 8 <= ra.f <= 10, x += x * 3);
+                                    par.Add(adjust(Particle{}, s.pos = pos, damp = 0.01, life = 20 <= ra.i <= 40, size = 1 <= ra.i <= 3, s.vel = fvec2(p.prev_vel.x * 0.4 + pow(abs(x), 2) * sign(x) * 0.5, -1.2 <= ra.f <= 0), end_size = 1, color = color));
+                                }
+                            }
+                            else
+                            {
+                                for (int i = 0; i < 24; i++)
+                                {
+                                    constexpr float half_max_angle = f_pi / 3.2f;
+
+                                    fvec2 dir = fvec2::dir(f_pi/2 - half_max_angle <= ra.f <= f_pi/2 + half_max_angle);
+                                    float dist = ra.f <= 1;
+                                    float c = ra.f <= 1;
+                                    fvec3 color(1 - c * 0.5f, 1 - c * 0.25f, 0);
+                                    if (ra.boolean())
+                                        std::swap(color.x, color.z);
+                                    par.Add(adjust(Particle{}, s.pos = p.pos + (fvec2(-3, 6) <= ra.fvec2 <= fvec2(3, 10)), damp = 0.015, life = 20 <= ra.i <= 60, size = 1 <= ra.i <= 5, s.vel = dir * pow(dist, 1.9f) * 2, end_size = 1, color = color, beta = 0));
+                                }
+                            }
                         }
                     }
 
@@ -632,6 +698,8 @@ namespace States
 
                     if (PickUpAbility(map.ability_timeshift, "Timeshift", "Hold [Z]/[L] to travel back in time"))
                         have_timeshift_ability = true;
+                    if (PickUpAbility(map.ability_doublejump, "Doublejump", "Press [jump] to jump off of your past copy"))
+                        have_doublejump_ability = true;
                 }
 
                 // Death conditions.
@@ -674,6 +742,9 @@ namespace States
                     if (!p.in_prison && time.time % 5 == 0)
                         p.lava_y -= 1;
 
+                    if (have_timeshift_ability)
+                        time_since_got_timeshift++;
+
                     buffered_jump = false;
                 }
 
@@ -715,7 +786,7 @@ namespace States
             }
 
             { // Fade.
-                bool death_fade = p.dead && p.death_timer >= 60 && !have_timeshift_ability;
+                bool death_fade = p.dead && p.death_timer >= 60 && (!have_timeshift_ability || time.RemainingShifts() == 0);
                 if (death_fade)
                 {
                     clamp_var_max(fade += 0.01f);
@@ -789,6 +860,7 @@ namespace States
                     r.iquad(screen_pos with(y += offset), region).center();
                 };
                 DrawAbility(map.ability_timeshift);
+                DrawAbility(map.ability_doublejump);
             }
 
             { // Player ghosts.
@@ -866,6 +938,20 @@ namespace States
             }
 
             { // Gui.
+                { // HUD.
+                    // Remaining shifts.
+                    if (have_timeshift_ability)
+                    {
+                        int remaining = time.RemainingShifts();
+                        float alpha = smoothstep(clamp_max(time_since_got_timeshift / 60.f));
+
+                        Graphics::Text text(Fonts::main, FMT("{}", remaining));
+                        for (int i = 0; i < 4; i++)
+                            r.itext(ivec2(0, -screen_size.y/2) + ivec2::dir4(i), text).align(ivec2(0,-1)).alpha(alpha).color(fvec3(0));
+                        r.itext(ivec2(0, -screen_size.y/2), text).align(ivec2(0,-1)).alpha(alpha).color(remaining == 0 ? fvec3(1, window.Ticks() / 60 % 2, 0) : fvec3(255, 179, 26) / 255);
+                    }
+                }
+
                 // Ability messages.
                 if (ability_timer > 0)
                 {

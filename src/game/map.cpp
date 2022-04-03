@@ -27,8 +27,12 @@ Map::Map(Stream::ReadOnlyData data)
     player_start = points.GetSinglePoint("player");
     debug_player_start = points.GetSinglePointOpt("debug_player");
     initial_lava_level = points.GetSinglePoint("lava").y;
+
     ability_timeshift = points.GetSinglePointOpt("ability_timeshift");
     debug_start_with_timeshift = points.GetSinglePointOpt("debug_give_timeshift").has_value();
+
+    ability_doublejump = points.GetSinglePointOpt("ability_doublejump");
+    debug_start_with_doublejump = points.GetSinglePointOpt("debug_give_doublejump").has_value();
 }
 
 void Map::render(ivec2 camera_pos) const
