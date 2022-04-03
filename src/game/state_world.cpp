@@ -6,8 +6,6 @@
 
 constexpr int max_timeshifts = 255;
 
-int real_world_time = 0;
-
 struct Controls
 {
     struct Button
@@ -334,6 +332,8 @@ namespace States
     {
         MEMBERS()
 
+        int real_world_time = 0;
+
         Map map = Stream::ReadOnlyData(Program::ExeDir() + "map.json");
         Map map_orig = map;
 
@@ -519,7 +519,7 @@ namespace States
                 else
                 {
                     if (timeshift_button_down)
-                        clamp_var_max(time.shifting_speed += 0.02, time.time == 0 ? 0 : 4);
+                        clamp_var_max(time.shifting_speed += 0.02, time.time == 0 ? 0 : 4.5f);
                     else
                         time.shifting_speed *= 0.97;
 
@@ -834,14 +834,14 @@ namespace States
                         p.remaining_boost_frames = 0;
                 }
 
-                // Getting abilities.
+                // Getting abilities and secrets.
                 if (controllable)
                 {
                     auto PickUpAbility = [&](std::optional<ivec2> &ability, std::string_view text, std::string_view text2) -> bool
                     {
                         if (!ability)
                             return false;
-                        if ((abs(*ability - p.pos) < ivec2(6,10)).all())
+                        if (p.ground && (abs(*ability - p.pos) < ivec2(6,10)).all())
                         {
                             for (int i = 0; i < 24; i++)
                             {
@@ -869,6 +869,36 @@ namespace States
                         have_doublejump_ability = true;
                     if (PickUpAbility(map.ability_gun, "Fireball", "Press [X]/[K] to shoot\nTouch your past shot to get a boost"))
                         have_gun_ability = true;
+
+                    for (auto it = map.secrets.begin(); it != map.secrets.end();)
+                    {
+                        if (p.ground &&(abs(*it - p.pos) < ivec2(6,10)).all())
+                        {
+                            for (int i = 0; i < 24; i++)
+                            {
+                                fvec2 dir = fvec2::dir(ra.angle());
+                                float dist = ra.f <= 1;
+                                float c = ra.f <= 1;
+                                fvec3 color(1 - c * 0.5f, 1 - c * 0.25f, 0);
+                                if (ra.boolean())
+                                    std::swap(color.x, color.z);
+                                par_timeless.Add(adjust(Particle{}, s.pos = *it + dir * dist * 2, damp = 0.005, life = 20 <= ra.i <= 60, size = 1 <= ra.i <= 3, s.vel = dir * dist * 0.35, end_size = 1, color = color, beta = 0));
+                            }
+                            Sounds::got_item();
+
+                            if (int(map.secrets.size()) == map.num_secrets)
+                            {
+                                ability_timer = 1;
+                                ability_message = "Found a secret!";
+                                ability_message2 = "";
+                            }
+
+                            it = map.secrets.erase(it);
+                            continue;
+                        }
+
+                        it++;
+                    }
                 }
 
                 { // Tick the shot.
@@ -967,7 +997,7 @@ namespace States
                     if (p.dead)
                         p.death_timer++;
 
-                    if (!p.in_prison && time.time % 7 == 0)
+                    if (!p.in_prison && time.time % 9 == 0)
                         p.lava_y -= 1;
 
                     if (have_timeshift_ability)
@@ -1096,14 +1126,15 @@ namespace States
                 }
             }
 
-            { // Abilities.
-                static const auto &region = texture_atlas.Get("cube.png");
+            { // Abilities and secrets.
+                static const auto &reg_ability = texture_atlas.Get("ability.png");
+                static const auto &reg_secret = texture_atlas.Get("secret.png");
 
                 constexpr int offset_array[] = {0, -1, -1, -1, 0, 1, 1, 1};
                 constexpr int offset_len = 20;
                 int offset = offset_array[(time.time / offset_len) % std::size(offset_array)];
 
-                auto DrawAbility = [&](const std::optional<ivec2> &pos)
+                auto DrawPowerup = [&](const Graphics::TextureAtlas::Region &region, const std::optional<ivec2> &pos)
                 {
                     if (!pos)
                         return;
@@ -1113,9 +1144,12 @@ namespace States
 
                     r.iquad(screen_pos with(y += offset), region).center();
                 };
-                DrawAbility(map.ability_timeshift);
-                DrawAbility(map.ability_doublejump);
-                DrawAbility(map.ability_gun);
+                DrawPowerup(reg_ability, map.ability_timeshift);
+                DrawPowerup(reg_ability, map.ability_doublejump);
+                DrawPowerup(reg_ability, map.ability_gun);
+
+                for (ivec2 pos : map.secrets)
+                    DrawPowerup(reg_secret, std::optional(pos));
             }
 
             { // Shots.
@@ -1179,12 +1213,12 @@ namespace States
 
                 if (t > 0)
                 {
-                    float alpha1 = t * 0.3f;
+                    float alpha1 = t * 0.15f;
                     float alpha2 = t * 0.7f;
 
                     constexpr int maxdelta = 2;
 
-                    float rot_speed = (time.shifting_now ? time.shifting_speed : time.positive_speed);
+                    float rot_speed = clamp_max((time.shifting_now ? time.shifting_speed : time.positive_speed), 0.7f);
 
                     float height = 1;
 
@@ -1204,7 +1238,7 @@ namespace States
                 }
             }
 
-            { // Gui.
+            { // Gui
                 { // HUD.
                     // Remaining shifts.
                     if (have_timeshift_ability)
@@ -1217,27 +1251,15 @@ namespace States
                             r.itext(ivec2(0, -screen_size.y/2) + ivec2::dir4(i), text).align(ivec2(0,-1)).alpha(alpha).color(fvec3(0));
                         r.itext(ivec2(0, -screen_size.y/2), text).align(ivec2(0,-1)).alpha(alpha).color(remaining == 0 ? fvec3(1, window.Ticks() / 60 % 2, 0) : fvec3(255, 179, 26) / 255);
                     }
-                }
 
-                // Ability messages.
-                if (ability_timer > 0)
-                {
-                    constexpr int ticks_per_letter = 8;
-
-                    int bg_time = 30;
-                    int first_line_time = 60;
-
-                    ivec2 text_size = Graphics::Text(Fonts::main, ability_message).ComputeStats().size;
-                    Graphics::Text text(Fonts::main, ability_message.substr(0, clamp_min((ability_timer - first_line_time) / ticks_per_letter)));
-                    Graphics::Text text2(Fonts::main, ability_message2);
-
-                    r.iquad(ivec2(0, 0), ivec2(max(text_size.x, text2.ComputeStats().size.x) + 12, 64)).color(fvec3(0)).center().alpha(smoothstep(clamp((ability_timer - bg_time) / 30.f)));
-                    r.itext(-text_size/2 + ivec2(0, -8), text).align_x(-1).color(fvec3(255, 179, 26) / 255);
-
-                    int second_line_time = first_line_time + int(ability_message.size()) * ticks_per_letter + 30;
-
-                    if (ability_timer > second_line_time)
-                        r.itext(ivec2(0, 12), text2).alpha(clamp_max((ability_timer - second_line_time) / 60.f)).color(fvec3(255, 76, 5) / 255);
+                    // Remaining secrets.
+                    if (int(map.secrets.size()) < map.num_secrets)
+                    {
+                        Graphics::Text text(Fonts::main, FMT("{}/{}", map.num_secrets - int(map.secrets.size()), map.num_secrets));
+                        for (int i = 0; i < 4; i++)
+                            r.itext(ivec2(screen_size.x/2, -screen_size.y/2) + ivec2::dir4(i), text).align(ivec2(1,-1)).alpha(1).color(fvec3(0));
+                        r.itext(ivec2(screen_size.x/2, -screen_size.y/2), text).align(ivec2(1,-1)).alpha(1).color(fvec3(102, 252, 255) / 255);
+                    }
                 }
 
                 { // Hints.
@@ -1276,6 +1298,27 @@ namespace States
 
                     r.iquad(ivec2(), screen_size).center().beta(1).alpha(alpha1, alpha1, alpha2, alpha2).color(color1, color1, color2, color2);
                 }
+            }
+
+            // Ability and secret messages.
+            if (ability_timer > 0)
+            {
+                constexpr int ticks_per_letter = 8;
+
+                int bg_time = 30;
+                int first_line_time = 60;
+
+                ivec2 text_size = Graphics::Text(Fonts::main, ability_message).ComputeStats().size;
+                Graphics::Text text(Fonts::main, ability_message.substr(0, clamp_min((ability_timer - first_line_time) / ticks_per_letter)));
+                Graphics::Text text2(Fonts::main, ability_message2);
+
+                r.iquad(ivec2(0, 0), ivec2(max(text_size.x, text2.ComputeStats().size.x) + 12, 64)).color(fvec3(0)).center().alpha(smoothstep(clamp((ability_timer - bg_time) / 30.f)));
+                r.itext(-text_size/2 + ivec2(0, ability_message2.empty() ? 8 : -8), text).align_x(-1).color(ability_message2.empty() ? fvec3(102, 252, 255) / 255 : fvec3(255, 179, 26) / 255);
+
+                int second_line_time = first_line_time + int(ability_message.size()) * ticks_per_letter + 30;
+
+                if (ability_timer > second_line_time)
+                    r.itext(ivec2(0, 12), text2).alpha(clamp_max((ability_timer - second_line_time) / 60.f)).color(fvec3(255, 76, 5) / 255);
             }
 
             { // Fade (death and respawn).

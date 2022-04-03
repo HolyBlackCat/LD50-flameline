@@ -1,8 +1,18 @@
 #include "main.h"
 
+constexpr bool is_debug =
+#ifdef NDEBUG
+    false;
+#else
+    true;
+#endif
+
+bool now_windowed = is_debug;
+constexpr auto fullscreen_flavor = Interface::borderless_fullscreen;
+
 const std::string_view window_name = "Iota";
 
-Interface::Window window(std::string(window_name), screen_size * 2, Interface::windowed, adjust_(Interface::WindowSettings{}, min_size = screen_size));
+Interface::Window window(std::string(window_name), screen_size * 2, now_windowed ? Interface::windowed : fullscreen_flavor, adjust_(Interface::WindowSettings{}, min_size = screen_size));
 static Graphics::DummyVertexArray dummy_vao = nullptr;
 
 Audio::Context audio_context = nullptr;
@@ -86,6 +96,12 @@ struct Application : Program::DefaultBasicState
 
         if (!state_manager)
             Program::Exit();
+
+        if ((Input::Button(Input::l_alt).down() || Input::Button(Input::r_alt).down()) && Input::Button(Input::enter).pressed())
+        {
+            now_windowed = !now_windowed;
+            window.SetMode(now_windowed ? Interface::windowed : fullscreen_flavor);
+        }
     }
 
     void Render() override
