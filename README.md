@@ -18,11 +18,13 @@ Make sure the source directory path doesn't contain spaces.
 
 You need at least following: latest `clang` (tested on Clang 14; on Windows prefer the version from MSYS2 repos), GCC 11 (for libstdc++), `lld`, `make`, `cmake`, `zip`, `unzip`, `tar`, `zstd`, `rsync`, `patchelf` (on linux only), `ldd`**/**`ntldd` (for linux and windows respectively).
 
-On Linux you also need to install the dependencies of SDL2, listed somewhere in [`project.mk`](/project.mk) (or in its readme). On Windows we use prebuild SDL2, so no dependencies are needed.
+On Linux you also need to install the dependencies of SDL2, listed somewhere in [`project.mk`](/project.mk) (or in SDL2 docs). On Windows we use prebuilt SDL2, so no dependencies are needed.
+
+To build and run, simply do `make`. No `-j...` necessary.
 
 If you get weird makefile errors, you might need to update `make`. Get source [here](http://ftp.gnu.org/gnu/make/), compile using `./configure && make && sudo make install`.
 
-To build and run, simply do `make`. No `-j...` necessary.
+If you get "permission denied" for `/dev/pts/0`, add `MAKE_TERMOUT=` to `make` flags.
 
 ---
 
