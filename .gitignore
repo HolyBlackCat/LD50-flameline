@@ -5,8 +5,6 @@
 /dist/**
 /obj/**
 
-/assets/assets/atlas.*
-
 *.tar.gz
 *.tar.zst
 *.zip
