@@ -113,6 +113,8 @@ struct Player
     bool ground = false;
     bool prev_ground = false;
 
+    bool doublejump_recharged = false;
+
     bool facing_left = false;
 
     bool is_walking = false;
@@ -596,6 +598,8 @@ namespace States
                         }
                     }
                 }
+                if (p.ground)
+                    p.doublejump_recharged = true;
 
                 { // Prison controls.
                     if (p.in_prison)
@@ -650,7 +654,7 @@ namespace States
                         bool using_doublejump = false;
 
                         // Try to doublejump off of a ghost.
-                        if (!can_jump && have_doublejump_ability)
+                        if (!can_jump && have_doublejump_ability && p.doublejump_recharged)
                         {
                             const Ghost *newest_ghost = time.FindNewestGhost();
                             auto it = std::find_if(time.ghosts.begin(), time.ghosts.end(), [&](const Ghost &ghost)
@@ -675,6 +679,7 @@ namespace States
 
                                 can_jump = true;
                                 using_doublejump = true;
+                                p.doublejump_recharged = false;
                             }
                         }
 

@@ -88,7 +88,7 @@ src/icon.ico: $(wildcard src/icon_*.png)
 
 # --- Libraries ---
 
-DIST_DEPS_ARCHIVE := https://github.com/HolyBlackCat/imp-re/releases/download/deps-sources/deps_v1.zip
+DIST_DEPS_ARCHIVE := https://github.com/HolyBlackCat/LD50-flameline/releases/download/v1.0/deps_v1.zip
 
 _win_is_x32 :=
 _win_sdl2_arch := $(if $(_win_is_x32),i686-w64-mingw32,x86_64-w64-mingw32)
