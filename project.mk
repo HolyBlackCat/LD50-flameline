@@ -155,15 +155,15 @@ ifeq ($(TARGET_OS),windows)
 $(call Library,SDL2-devel-2.0.20-mingw.tar.gz)
   $(call LibrarySetting,build_system,copy_files)
   $(call LibrarySetting,copy_files,$(_win_sdl2_arch)->.)
-$(call Library,SDL2_net-devel-2.0.1-mingw.tar.gz)
-  $(call LibrarySetting,build_system,copy_files)
-  $(call LibrarySetting,copy_files,$(_win_sdl2_arch)->.)
+# $(call Library,SDL2_net-devel-2.0.1-mingw.tar.gz)
+#   $(call LibrarySetting,build_system,copy_files)
+#   $(call LibrarySetting,copy_files,$(_win_sdl2_arch)->.)
 else
 $(call Library,SDL2-2.0.20.tar.gz)
   # Allow SDL to see system packages. If we were using `configure+make`, we'd need `configure_vars = env -uPKG_CONFIG_PATH -uPKG_CONFIG_LIBDIR` instead.
   $(call LibrarySetting,cmake_flags,-DCMAKE_FIND_USE_CMAKE_SYSTEM_PATH=ON)
-$(call Library,SDL2_net-2.0.1.tar.gz)
-  $(call LibrarySetting,deps,SDL2-2.0.20)
+# $(call Library,SDL2_net-2.0.1.tar.gz)
+#   $(call LibrarySetting,deps,SDL2-2.0.20)
 endif
 $(call Library,zlib-1.2.12.tar.gz)
   # CMake support in ZLib is jank. On MinGW it builds `libzlib.dll`, but pkg-config says `-lz`. Last checked on 1.2.12.
