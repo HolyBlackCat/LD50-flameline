@@ -62,7 +62,13 @@ $(call ProjectSetting,flags_func,_file_cxxflags)
 $(call ProjectSetting,pch,src/game/*->src/game/master.hpp)
 $(call ProjectSetting,libs,*)
 $(call ProjectSetting,bad_lib_flags,-Dmain=%>>>-DIMP_ENTRY_POINT_OVERRIDE=%)
+ifeq ($(TARGET_OS),windows)
+$(call ProjectSetting,sources,src/icon.ico)
+endif
 
+src/icon.ico: $(wildcard src/icon_*.png)
+	$(info [Png to icon] $@)
+	@convert $^ $@
 
 
 # --- Dependencies ---

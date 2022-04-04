@@ -12,7 +12,7 @@ constexpr auto fullscreen_flavor = Interface::borderless_fullscreen;
 
 const std::string_view window_name = "Flameline";
 
-Interface::Window window(std::string(window_name), screen_size * 2, now_windowed ? Interface::windowed : fullscreen_flavor, adjust_(Interface::WindowSettings{}, min_size = screen_size));
+Interface::Window window(std::string(window_name), screen_size * 2, Interface::windowed, adjust_(Interface::WindowSettings{}, min_size = screen_size));
 static Graphics::DummyVertexArray dummy_vao = nullptr;
 
 Audio::Context audio_context = nullptr;
@@ -24,7 +24,7 @@ Graphics::FontFile Fonts::Files::main(Program::ExeDir() + "assets/Monocat_7x14.t
 Graphics::Font Fonts::main;
 
 Graphics::TextureAtlas texture_atlas = []{
-    std::string atlas_loc = is_debug ? "assets/assets" : Program::ExeDir() + "assets/";
+    std::string atlas_loc = is_debug ? "assets/assets/" : Program::ExeDir() + "assets/";
     Graphics::TextureAtlas ret(ivec2(2048), is_debug ? "assets/_images" : "", atlas_loc + "atlas.png", atlas_loc + "atlas.refl", {{"/font_storage", ivec2(256)}});
     auto font_region = ret.Get("/font_storage");
 
@@ -49,7 +49,7 @@ Random::DefaultInterfaces<Random::DefaultGenerator> ra(random_generator);
 namespace Theme
 {
     Audio::Buffer buf(Audio::Sound(Audio::ogg, Audio::stereo, Program::ExeDir() + "assets/gates_of_heck.ogg"));
-    Audio::Source src = adjust_(Audio::Source(buf), loop(), play());
+    Audio::Source src = adjust_(Audio::Source(buf), loop(), volume(0.9f), play());
 }
 
 struct Application : Program::DefaultBasicState
@@ -133,6 +133,11 @@ struct Application : Program::DefaultBasicState
     void Init()
     {
         mouse.HideCursor();
+
+        if (!now_windowed)
+            window.SetMode(fullscreen_flavor);
+
+        Audio::Volume(1.2f);
 
         Audio::LoadMentionedFiles(Audio::LoadFromPrefixWithExt(Program::ExeDir() + "assets/"), Audio::mono, Audio::wav);
 

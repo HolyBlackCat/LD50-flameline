@@ -50,7 +50,7 @@ struct Controls
 
     Button left = {{Input::left, Input::a}};
     Button right = {{Input::right, Input::d}};
-    Button jump = {{Input::space, Input::c, Input::j}};
+    Button jump = {{Input::space, Input::c, Input::j, Input::up, Input::w}};
     Button shoot = {{Input::x, Input::k}};
     Button timeshift = {{Input::z, Input::l}};
 };
@@ -727,7 +727,7 @@ namespace States
                         p.shot.emplace();
                         p.shot->pos = p.pos + ivec2(8 * dir_x, -5);
                         p.shot->vel = fvec2(2 * dir_x, 0);
-                        Sounds::pew(0.3f);
+                        Sounds::pew(0.65f);
 
                         for (int i = 0; i < 20; i++)
                         {
@@ -785,6 +785,8 @@ namespace States
                         {
                             p.remaining_boost_frames--;
                             p.vel = p.boost_vel;
+
+                            p.facing_left = p.vel.x < 0;
 
                             for (int i = 0; i < 4; i++)
                             {
