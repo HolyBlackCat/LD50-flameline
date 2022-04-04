@@ -14,7 +14,9 @@ Grab the latest binaries at [itch.io](https://holyblackcat.itch.io/flameline) or
 
 MSVC is not supported. On Windows you need [MSYS2](https://stackoverflow.com/q/30069830). To cross-compile from Linux prefer [Quasi-MSYS2](https://github.com/HolyBlackCat/quasi-msys2).
 
-You need at least following: latest `clang` (tested on Clang 14; on Windows prefer the version from MSYS2 repos), GCC 11 (for libstdc++), `make`, `cmake`, `zip`, `unzip`, `tar`, `zstd`, `rsync`, `patchelf` (on linux only), `ldd`**/**`ntldd` (for linux and windows respectively).
+Make sure the source directory path doesn't contain spaces.
+
+You need at least following: latest `clang` (tested on Clang 14; on Windows prefer the version from MSYS2 repos), GCC 11 (for libstdc++), `lld`, `make`, `cmake`, `zip`, `unzip`, `tar`, `zstd`, `rsync`, `patchelf` (on linux only), `ldd`**/**`ntldd` (for linux and windows respectively).
 
 On Linux you also need to install the dependencies of SDL2, listed somewhere in [`project.mk`](/project.mk) (or in its readme). On Windows we use prebuild SDL2, so no dependencies are needed.
 
