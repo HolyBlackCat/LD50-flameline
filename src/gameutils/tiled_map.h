@@ -41,7 +41,7 @@ namespace Tiled
             auto begin = points.lower_bound(prefix);
             while (begin != points.end() && begin->first.starts_with(prefix))
             {
-                func(std::string_view(begin->first.begin() + prefix.size(), begin->first.end()), begin->second);
+                func(std::string_view(begin->first.data() + prefix.size(), begin->first.size() - prefix.size()), begin->second);
                 begin++;
             }
         }

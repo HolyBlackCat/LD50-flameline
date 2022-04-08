@@ -49,10 +49,10 @@ namespace Audio
         // This is not listed in the original AL spec and was found by looking at the code.
         // Defaults to 1 (see AL_DEFAULT_METERS_PER_UNIT).
         // It seems to affect air absorption calculations, reverb, HRTF ("head-related transfer function", aka improved headphone sound), and possibly something else.
-        inline void MetersPerUnit(float n)
-        {
-            alListenerf(AL_METERS_PER_UNIT, n);
-        }
+        // inline void MetersPerUnit(float n)
+        // {
+        //     alListenerf(AL_METERS_PER_UNIT, n);
+        // }
 
 
         enum Model

@@ -338,11 +338,17 @@ export CC ?=
 export CXX ?=
 export CPP ?=
 export LD ?=
+export AR ?=
+export LD ?=
+export NM ?=
+export RANLIB ?=
+export LDSHARED ?= $(CC)
 export CFLAGS :=
 export CXXFLAGS :=
 export CPPFLAGS :=
 export LDFLAGS :=
-export LDSHARED ?= $(CC)
+
+CMAKE := cmake
 
 # LDD. We don't care about the Quasi-MSYS2's `win-ldd` wrapper since we can convert paths ourselves. We need it for the native Winwdows anyway.
 # Also an optional program to preprocess the paths from LDD.
@@ -378,13 +384,13 @@ override PKG_CONFIG_LIBDIR :=
 export PKG_CONFIG_LIBDIR
 
 # A list of those variables, and a string suitable to set them in a shell.
-override exported_env_vars_list := CC CXX CPP LD CFLAGS CXXFLAGS CPPFLAGS LDFLAGS
+override exported_env_vars_list := CC CXX CPP LD CFLAGS CXXFLAGS CPPFLAGS LDFLAGS AR LD NM RANLIB LDSHARED
 override env_vars_for_shell = $(foreach x,$(exported_env_vars_list),$x=$(call quote,$($x)))
 
 MODE :=# Build mode.
 CMAKE_GENERATOR :=# CMake generator, not quoted. Optional.
 COMMON_FLAGS :=# Used both when compiling and linking.
-LINKER :=# E.g. `lld` or `lld-13`. Can be empty to use the default one.
+LINKER := GUESS# E.g. `lld` or `lld-13`. Can be `GUESS` to use the default one.
 ALLOW_PCH := 1# If 0 or empty, disable PCH.
 
 # Used both when compiling and linking. Those are set automatically.
@@ -521,7 +527,7 @@ endif
 ifeq ($(CXX),)
 override CXX := $(call find_versioned_tool,clang++)
 endif
-ifeq ($(LINKER),)
+ifeq ($(LINKER),GUESS)
 override LINKER := $(call find_versioned_tool,lld)
 endif
 
@@ -1256,7 +1262,7 @@ override buildsystem-cmake = \
 	$(call log_now,[Library] >>> Configuring CMake...)\
 	$(call, ### Add dependency include directories to compiler flags. Otherwise OpenAL can't find SDL2.)\
 	$(call var,__include_paths := $(foreach x,$(call lib_name_to_prefix,$(__libsetting_deps_$(__lib_name))),-I$(call quote,$(abspath $x)/include)))\
-	$(call safe_shell_exec,cmake\
+	$(call safe_shell_exec,$(CMAKE)\
 		-S $(call quote,$(__source_dir))\
 		-B $(call quote,$(__build_dir))\
 		-Wno-dev\

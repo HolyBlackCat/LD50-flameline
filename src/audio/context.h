@@ -26,10 +26,10 @@ namespace Audio
         // but this flag lets you force enable or disable it. Pass null to restore the setting to the default value,
         // which is "don't care".
         // If you're going to add it to the game options, consider a tristate switch (on/off/auto).
-        [[nodiscard]] static ContextAttr Hrtf(std::optional<bool> enable)
-        {
-            return {ALC_HRTF_SOFT, enable.value_or(ALC_DONT_CARE_SOFT)};
-        }
+        // [[nodiscard]] static ContextAttr Hrtf(std::optional<bool> enable)
+        // {
+        //     return {ALC_HRTF_SOFT, enable.value_or(ALC_DONT_CARE_SOFT)};
+        // }
     };
 
     class Context
@@ -143,13 +143,13 @@ namespace Audio
 
         // Changes configuration for an existing context.
         // Note that we pass the vector by value, because we need to append a null element at the end before passing it to AL.
-        void Reconfigure(attribute_list_t attributes)
-        {
-            if (!attributes.empty())
-                attributes.emplace_back().key = 0;
+        // void Reconfigure(attribute_list_t attributes)
+        // {
+        //     if (!attributes.empty())
+        //         attributes.emplace_back().key = 0;
 
-            if (alcResetDeviceSOFT(data.device, attributes.empty() ? nullptr : &attributes.front().key))
-                Program::Error("Unable to change an audio device configuration.");
-        }
+        //     if (alcResetDeviceSOFT(data.device, attributes.empty() ? nullptr : &attributes.front().key))
+        //         Program::Error("Unable to change an audio device configuration.");
+        // }
     };
 }

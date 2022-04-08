@@ -178,10 +178,9 @@ namespace Strings
                 return false;
             }
         }
-        else if constexpr (sizeof(T) <= sizeof(long double))
+        else if constexpr (sizeof(T) <= sizeof(long double) && std::numeric_limits<double>::digits * 2 >= std::numeric_limits<long double>::digits)
         {
             // Check if any long double can be represented exactly as a sum of two regular doubles.
-            static_assert(std::numeric_limits<double>::digits * 2 >= std::numeric_limits<long double>::digits, "Your long doubles are too large!");
 
             if (buffer_size == 0) // See above for explanation.
                 return false;
@@ -321,7 +320,7 @@ namespace Strings
                 impl::ConversionFailure<T>(str);
             return result;
         }
-        else // sizeof(T) <= sizeof(long double)
+        else if constexpr (sizeof(T) <= sizeof(long double) && std::numeric_limits<double>::digits * 2 >= std::numeric_limits<long double>::digits)
         {
             auto separator_pos = str.find_first_of(impl::char_long_double_parts_sep);
             if (separator_pos == str.npos)
@@ -334,6 +333,10 @@ namespace Strings
                 impl::ConversionFailure<T>(str, STR("incorrect usage of ", (impl::char_long_double_parts_sep)));
 
             return (long double)FromString<double>(str.substr(0, separator_pos)) + FromString<double>(str.substr(separator_pos+1));
+        }
+        else
+        {
+            static_assert(Meta::value<false, T>, "This type is not supported.");
         }
     }
 

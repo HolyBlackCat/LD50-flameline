@@ -13,6 +13,12 @@ $(call NewMode,debug_soft)
 $(Mode)COMMON_FLAGS := -g
 $(Mode)CXXFLAGS := -D_GLIBCXX_ASSERTIONS
 
+$(call NewMode,dev)
+$(Mode)COMMON_FLAGS := -O3
+$(Mode)CXXFLAGS := -DNDEBUG
+$(Mode)LDFLAGS := -s
+$(Mode)_proj_win_subsystem := -mwindows
+
 $(call NewMode,release)
 $(Mode)COMMON_FLAGS := -O3
 $(Mode)_proj_commonflags := -flto
@@ -40,12 +46,21 @@ endif
 
 # --- Project config ---
 
-# ASSETS_IGNORED_PATTERNS += atlas.*
+ASSETS_IGNORED_PATTERNS += flameline.* index.html
 
 _proj_cxxflags += -std=c++2b -pedantic-errors -Wall -Wextra -Wdeprecated -Wextra-semi -Wno-gnu-zero-variadic-macro-arguments
 _proj_cxxflags += -include src/program/common_macros.h -include src/program/parachute.h
 _proj_cxxflags += -Isrc -Ilib/include
-_proj_cxxflags += -Ilib/include/cglfl_gl3.2_core # OpenGL version
+_proj_cxxflags += -Ilib/include/cglfl_gles2.0 # OpenGL version
+
+_proj_commonflags += -sUSE_VORBIS=1 -sUSE_ZLIB=1 -sUSE_FREETYPE=1 -sUSE_SDL=2 -sUSE_OGG=1
+_proj_commonflags += -sNO_DISABLE_EXCEPTION_CATCHING
+_proj_ldflags += -sALLOW_MEMORY_GROWTH=1
+_proj_ldflags += --emrun
+_proj_ldflags += --preload-file assets@/
+_proj_ldflags += --shell-file shell_minimal.html
+_proj_cxxflags += -DIMP_PLATFORM_FLAG_unknown_os
+_proj_cxxflags += -DIMP_PLATFORM_FLAG_mobile
 
 ifeq ($(TARGET_OS),windows)
 _proj_ldflags += $(_proj_win_subsystem)
@@ -128,45 +143,45 @@ endif
 $(call Library,double-conversion-3.2.0.tar.gz)
 $(call Library,fmt-8.1.1.zip)
   $(call LibrarySetting,cmake_flags,-DFMT_TEST=OFF)
-$(call Library,freetype-2.12.0.tar.gz)
-  $(call LibrarySetting,deps,zlib-1.2.12)
-  # When using CMake, freetype generates a broken `.pc` file. First seen on Freetype 2.12.0. Last tested on 2.12.0.
-  $(call LibrarySetting,build_system,configure_make)
-  # Freetype manages to find system zlib and bzip2, despite the automatic prefix configuration.
-  # Specifying a custom zlib as dependency overrides it, but we don't ship bzip2, so we need to explicitly disable it.
-  # It seems their tasks for other libraries respect our prefix, so we don't disable them explicitly.
-  $(call LibrarySetting,configure_flags,--without-bzip2)
-$(call Library,libogg-1.3.5.tar.gz)
-  # When built with CMake on MinGW, ogg/vorbis can't decide whether to prefix the libraries with `lib` or not.
-  # The resulting executable doesn't find libraries because of this inconsistency.
-  $(call LibrarySetting,build_system,configure_make)
-$(call Library,libvorbis-1.3.7.tar.gz)
-  $(call LibrarySetting,deps,ogg-1.3.5)
-  # See vorbis for why we use configure+make.
-  $(call LibrarySetting,build_system,configure_make)
-$(call Library,openal-soft-1.21.1.tar.bz2)
+# $(call Library,freetype-2.12.0.tar.gz)
+#   $(call LibrarySetting,deps,zlib-1.2.12)
+#   # When using CMake, freetype generates a broken `.pc` file. First seen on Freetype 2.12.0. Last tested on 2.12.0.
+#   $(call LibrarySetting,build_system,configure_make)
+#   # Freetype manages to find system zlib and bzip2, despite the automatic prefix configuration.
+#   # Specifying a custom zlib as dependency overrides it, but we don't ship bzip2, so we need to explicitly disable it.
+#   # It seems their tasks for other libraries respect our prefix, so we don't disable them explicitly.
+#   $(call LibrarySetting,configure_flags,--without-bzip2)
+# $(call Library,libogg-1.3.5.tar.gz)
+#   # When built with CMake on MinGW, ogg/vorbis can't decide whether to prefix the libraries with `lib` or not.
+#   # The resulting executable doesn't find libraries because of this inconsistency.
+#   $(call LibrarySetting,build_system,configure_make)
+# $(call Library,libvorbis-1.3.7.tar.gz)
+#   $(call LibrarySetting,deps,ogg-1.3.5)
+#   # See vorbis for why we use configure+make.
+#   $(call LibrarySetting,build_system,configure_make)
+# $(call Library,openal-soft-1.21.1.tar.bz2)
+# ifeq ($(TARGET_OS),windows)
+#   $(call LibrarySetting,deps,SDL2-devel-2.0.20-mingw)
+# else
+#   $(call LibrarySetting,deps,SDL2-2.0.20)
+# endif
+#   $(call LibrarySetting,cmake_flags,$(_openal_flags))
 ifeq ($(TARGET_OS),windows)
-  $(call LibrarySetting,deps,SDL2-devel-2.0.20-mingw)
-else
-  $(call LibrarySetting,deps,SDL2-2.0.20)
-endif
-  $(call LibrarySetting,cmake_flags,$(_openal_flags))
-ifeq ($(TARGET_OS),windows)
-$(call Library,SDL2-devel-2.0.20-mingw.tar.gz)
-  $(call LibrarySetting,build_system,copy_files)
-  $(call LibrarySetting,copy_files,$(_win_sdl2_arch)->.)
+# $(call Library,SDL2-devel-2.0.20-mingw.tar.gz)
+#   $(call LibrarySetting,build_system,copy_files)
+#   $(call LibrarySetting,copy_files,$(_win_sdl2_arch)->.)
 # $(call Library,SDL2_net-devel-2.0.1-mingw.tar.gz)
 #   $(call LibrarySetting,build_system,copy_files)
 #   $(call LibrarySetting,copy_files,$(_win_sdl2_arch)->.)
 else
-$(call Library,SDL2-2.0.20.tar.gz)
-  # Allow SDL to see system packages. If we were using `configure+make`, we'd need `configure_vars = env -uPKG_CONFIG_PATH -uPKG_CONFIG_LIBDIR` instead.
-  $(call LibrarySetting,cmake_flags,-DCMAKE_FIND_USE_CMAKE_SYSTEM_PATH=ON)
+# $(call Library,SDL2-2.0.20.tar.gz)
+#   # Allow SDL to see system packages. If we were using `configure+make`, we'd need `configure_vars = env -uPKG_CONFIG_PATH -uPKG_CONFIG_LIBDIR` instead.
+#   $(call LibrarySetting,cmake_flags,-DCMAKE_FIND_USE_CMAKE_SYSTEM_PATH=ON)
 # $(call Library,SDL2_net-2.0.1.tar.gz)
 #   $(call LibrarySetting,deps,SDL2-2.0.20)
 endif
-$(call Library,zlib-1.2.12.tar.gz)
-  # CMake support in ZLib is jank. On MinGW it builds `libzlib.dll`, but pkg-config says `-lz`. Last checked on 1.2.12.
-  $(call LibrarySetting,build_system,configure_make)
-  # Need to set `cc`, otherwise their makefile uses the executable named `cc` to link, which doesn't support `-fuse-ld=lld-N`, it seems. Last tested on 1.2.12.
-  $(call LibrarySetting,configure_vars,cc="$$CC")
+# $(call Library,zlib-1.2.12.tar.gz)
+#   # CMake support in ZLib is jank. On MinGW it builds `libzlib.dll`, but pkg-config says `-lz`. Last checked on 1.2.12.
+#   $(call LibrarySetting,build_system,configure_make)
+#   # Need to set `cc`, otherwise their makefile uses the executable named `cc` to link, which doesn't support `-fuse-ld=lld-N`, it seems. Last tested on 1.2.12.
+#   $(call LibrarySetting,configure_vars,cc="$$CC")

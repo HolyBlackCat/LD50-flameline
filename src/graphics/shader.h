@@ -1,5 +1,6 @@
 #pragma once
 
+#include <iostream>
 #include <string>
 #include <type_traits>
 #include <utility>
@@ -178,7 +179,7 @@ namespace Graphics
                     constexpr bool uni_frag = Refl::Class::member_has_attrib<T, i, Frag>;
                     static_assert(!(uni_vert && uni_frag), "Can't have both `Vert` and `Frag` attributes on a single member. To use it in both shaders, remove both attributes.");
 
-                    if ((!uni_vert || !uni_frag) || (uni_vert && is_vertex) || (uni_frag && !is_vertex))
+                    if ((!uni_vert && !uni_frag) || (uni_vert && is_vertex) || (uni_frag && !is_vertex))
                     {
                         header += cfg.uniform;
                         header += ' ';

@@ -44,7 +44,7 @@ namespace Audio
                 {
                     char chunk_name_buf[4];
                     input.Read(chunk_name_buf, sizeof chunk_name_buf);
-                    std::string_view chunk_name(chunk_name_buf, chunk_name_buf + sizeof chunk_name_buf);
+                    std::string_view chunk_name(chunk_name_buf, sizeof chunk_name_buf);
 
                     auto chunk_size = input.ReadLittle<std::uint32_t>();
                     if (chunk_size > input.RemainingBytes())

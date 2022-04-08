@@ -6,7 +6,8 @@ namespace Program
 {
     const std::string &ExeDir()
     {
-        static const std::string ret = SDL_GetBasePath();
+        // I think `SDL_GetBasePath()` worked fine, but just in case.
+        static const std::string ret;// = SDL_GetBasePath();
         return ret;
     }
 }

@@ -1,11 +1,7 @@
 #include "main.h"
+#include <emscripten/emscripten.h>
 
-constexpr bool is_debug =
-#ifdef NDEBUG
-    false;
-#else
-    true;
-#endif
+constexpr bool is_debug = false;
 
 bool now_windowed = is_debug;
 constexpr auto fullscreen_flavor = Interface::borderless_fullscreen;
@@ -18,28 +14,22 @@ static Graphics::DummyVertexArray dummy_vao = nullptr;
 Audio::Context audio_context = nullptr;
 Audio::SourceManager audio_controller;
 
-const Graphics::ShaderConfig shader_config = Graphics::ShaderConfig::Core();
+const Graphics::ShaderConfig shader_config = {
+                "",
+                "/* vertex */",
+                "/* fragment */ precision mediump float;",
+                "attribute",
+                "uniform",
+            };
 
-Graphics::FontFile Fonts::Files::main(Program::ExeDir() + "assets/Monocat_7x14.ttf", 14);
+Graphics::FontFile Fonts::Files::main;
 Graphics::Font Fonts::main;
 
-Graphics::TextureAtlas texture_atlas = []{
-    std::string atlas_loc = is_debug ? "assets/assets/" : Program::ExeDir() + "assets/";
-    Graphics::TextureAtlas ret(ivec2(2048), is_debug ? "assets/_images" : "", atlas_loc + "atlas.png", atlas_loc + "atlas.refl", {{"/font_storage", ivec2(256)}});
-    auto font_region = ret.Get("/font_storage");
+Graphics::TextureAtlas texture_atlas;
+Graphics::Texture texture_main;
 
-    Unicode::CharSet glyph_ranges;
-    glyph_ranges.Add(Unicode::Ranges::Basic_Latin);
-
-    Graphics::MakeFontAtlas(ret.GetImage(), font_region.pos, font_region.size, {
-        {Fonts::main, Fonts::Files::main, glyph_ranges, Graphics::FontFile::monochrome_with_hinting},
-    });
-    return ret;
-}();
-Graphics::Texture texture_main = Graphics::Texture(nullptr).Wrap(Graphics::clamp).Interpolation(Graphics::nearest).SetData(texture_atlas.GetImage());
-
-GameUtils::AdaptiveViewport adaptive_viewport(shader_config, screen_size);
-Render r = adjust_(Render(0x2000, shader_config), SetTexture(texture_main), SetMatrix(adaptive_viewport.GetDetails().MatrixCentered()));
+GameUtils::AdaptiveViewport adaptive_viewport;
+Render r;
 
 Input::Mouse mouse;
 
@@ -48,8 +38,8 @@ Random::DefaultInterfaces<Random::DefaultGenerator> ra(random_generator);
 
 namespace Theme
 {
-    Audio::Buffer buf(Audio::Sound(Audio::ogg, Audio::stereo, Program::ExeDir() + "assets/gates_of_heck.ogg"));
-    Audio::Source src = adjust_(Audio::Source(buf), loop(), volume(0.9f), play());
+    Audio::Buffer buf;
+    Audio::Source src;
 }
 
 struct Application : Program::DefaultBasicState
@@ -117,6 +107,9 @@ struct Application : Program::DefaultBasicState
             else
                 Theme::src.play();
         }
+
+        if (mouse.left.pressed())
+            window.SetMode(fullscreen_flavor);
     }
 
     void Render() override
@@ -151,11 +144,53 @@ struct Application : Program::DefaultBasicState
     }
 };
 
+Application app;
+
+void iter()
+{
+    app.BeginFrame();
+    app.Tick();
+    app.Render();
+    app.EndFrame();
+}
+
 IMP_MAIN(,)
 {
-    Application app;
-    app.Init();
-    app.Resize();
-    app.RunMainLoop();
+    try
+    {
+        Fonts::Files::main = {Program::ExeDir() + "assets/Monocat_7x14.ttf", 14};
+
+        texture_atlas = []{
+            std::string atlas_loc = is_debug ? "assets/assets/" : Program::ExeDir() + "assets/";
+            Graphics::TextureAtlas ret(ivec2(2048), is_debug ? "assets/_images" : "", atlas_loc + "atlas.png", atlas_loc + "atlas.refl", {{"/font_storage", ivec2(256)}});
+            auto font_region = ret.Get("/font_storage");
+
+            Unicode::CharSet glyph_ranges;
+            glyph_ranges.Add(Unicode::Ranges::Basic_Latin);
+
+            Graphics::MakeFontAtlas(ret.GetImage(), font_region.pos, font_region.size, {
+                {Fonts::main, Fonts::Files::main, glyph_ranges, Graphics::FontFile::monochrome_with_hinting},
+            });
+            return ret;
+        }();
+        texture_main = Graphics::Texture(nullptr).Wrap(Graphics::clamp).Interpolation(Graphics::nearest).SetData(texture_atlas.GetImage());
+
+        adaptive_viewport = {shader_config, screen_size};
+        r = adjust_(Render(0x2000, shader_config), SetTexture(texture_main), SetMatrix(adaptive_viewport.GetDetails().MatrixCentered()));
+
+        app.Init();
+        app.Resize();
+
+        Theme::buf = Audio::Sound(Audio::ogg, Audio::stereo, Program::ExeDir() + "assets/gates_of_heck.ogg");
+        Theme::src = adjust_(Audio::Source(Theme::buf), loop(), volume(0.9f), play());
+
+        emscripten_set_main_loop(iter, 60, true);
+    }
+    catch (std::exception &e)
+    {
+        std::cout << e.what() << '\n';
+    }
+
+    // app.RunMainLoop();
     return 0;
 }
