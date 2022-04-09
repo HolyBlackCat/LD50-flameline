@@ -11,8 +11,6 @@
 
 /.vscode/launch.json
 
-local_config.mk
-
 compile_commands.json
 gmon.out
 imgui.ini
