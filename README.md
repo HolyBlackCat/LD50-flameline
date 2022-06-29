@@ -18,6 +18,10 @@ Make sure the source directory path doesn't contain spaces.
 
 You need at least following: latest `clang` (tested on Clang 14; on Windows prefer the version from MSYS2 repos), GCC 11 (for libstdc++), `lld`, `make`, `cmake`, `zip`, `unzip`, `tar`, `zstd`, `rsync`, `patchelf` (on linux only), `ldd`**/**`ntldd` (for linux and windows respectively).
 
+On Windows, install those from following MSYS2 packages: `git make mingw-w64-x86_64-clang mingw-w64-x86_64-cmake mingw-w64-x86_64-imagemagick mingw-w64-x86_64-lld mingw-w64-x86_64-ntldd rsync tar unzip wget zip zstd`.
+
+On Windows, make sure you build from the `MINGW64` MSYS2 shell, as indicated by the magenta text in the shell prompt.
+
 On Linux you also need to install the dependencies of SDL2, listed somewhere in [`project.mk`](/project.mk) (or in SDL2 docs). On Windows we use prebuilt SDL2, so no dependencies are needed.
 
 To build and run, simply do `make`. No `-j...` necessary.
