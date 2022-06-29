@@ -117,8 +117,15 @@ ifneq ($(TARGET_OS),windows)
 _openal_flags += -DALSOFT_BACKEND_ALSA=FALSE -DALSOFT_BACKEND_OSS=FALSE -DALSOFT_BACKEND_PULSEAUDIO=FALSE -DALSOFT_BACKEND_SNDIO=FALSE
 endif
 
+# Need to set `cc`, otherwise Zlib makefile uses the executable named `cc` to link, which doesn't support `-fuse-ld=lld-N`, it seems. Last tested on 1.2.12.
+_zlib_env_vars := cc="$$CC"
+ifeq ($(TARGET_OS),windows)
+# They have an uname check that tells you to use a special makefile for Windows. Seems to be pointless though.
+_zlib_env_vars += uname=linux
+endif
+
 # $(call Library,box2d-2.4.1.tar.gz)
-#   $(call LibrarySetting,cmake_flags,-DBOX2D_BUILD_UNIT_TESTS:BOOL=OFF -DBOX2D_BUILD_TESTBED:BOOL=OFF)
+#  $(call LibrarySetting,cmake_flags,-DBOX2D_BUILD_UNIT_TESTS:BOOL=OFF -DBOX2D_BUILD_TESTBED:BOOL=OFF)
 
 
 # $(call Library,bullet3-3.22b_no-examples.tar.gz)
@@ -169,4 +176,4 @@ $(call Library,zlib-1.2.12.tar.gz)
   # CMake support in ZLib is jank. On MinGW it builds `libzlib.dll`, but pkg-config says `-lz`. Last checked on 1.2.12.
   $(call LibrarySetting,build_system,configure_make)
   # Need to set `cc`, otherwise their makefile uses the executable named `cc` to link, which doesn't support `-fuse-ld=lld-N`, it seems. Last tested on 1.2.12.
-  $(call LibrarySetting,configure_vars,cc="$$CC")
+  $(call LibrarySetting,configure_vars,$(_zlib_env_vars))

@@ -1252,16 +1252,24 @@ override buildsystem-copy_files = \
 	$(call safe_shell_exec,rm -rf $(call quote,$(__source_dir)))\
 	$(file >$(__log_path),)
 
+# List separator for CMake. This does indeed look backwards.
+ifeq ($(HOST_OS),windows)
+cmake_host_sep := :
+else
+cmake_host_sep := ;
+endif
+
 override buildsystem-cmake = \
 	$(call log_now,[Library] >>> Configuring CMake...)\
 	$(call, ### Add dependency include directories to compiler flags. Otherwise OpenAL can't find SDL2.)\
-	$(call var,__include_paths := $(foreach x,$(call lib_name_to_prefix,$(__libsetting_deps_$(__lib_name))),-I$(call quote,$(abspath $x)/include)))\
+	$(call, ### Note that we're not single-quoting paths here, as it doesn't work in native Windows builds. Should probably use double-quotes, but junk in paths doesn't work anyway because of Zlib and such.)\
+	$(call var,__include_paths := $(foreach x,$(call lib_name_to_prefix,$(__libsetting_deps_$(__lib_name))),-I$(call abs_path_to_host,$(abspath $x)/include)))\
 	$(call safe_shell_exec,cmake\
 		-S $(call quote,$(__source_dir))\
 		-B $(call quote,$(__build_dir))\
 		-Wno-dev\
-		-DCMAKE_C_COMPILER=$(call quote,$(subst $(space),;,$(CC)))\
-		-DCMAKE_CXX_COMPILER=$(call quote,$(subst $(space),;,$(CXX)))\
+		-DCMAKE_C_COMPILER=$(call quote,$(subst $(space),$(cmake_host_sep),$(CC)))\
+		-DCMAKE_CXX_COMPILER=$(call quote,$(subst $(space),$(cmake_host_sep),$(CXX)))\
 		-DCMAKE_C_FLAGS=$(call quote,$(CFLAGS) $(__include_paths))\
 		-DCMAKE_CXX_FLAGS=$(call quote,$(CXXFLAGS) $(__include_paths))\
 		-DCMAKE_EXE_LINKER_FLAGS=$(call quote,$(LDFLAGS))\
@@ -1274,7 +1282,7 @@ override buildsystem-cmake = \
 		-DCMAKE_INSTALL_PREFIX=$(call quote,$(__install_dir))\
 		$(call, ### I'm not sure why abspath is needed here, but stuff doesn't work otherwise. Tested on libvorbis depending on libogg.)\
 		$(call, ### Note the fancy logic that attempts to support spaces in paths.)\
-		-DCMAKE_PREFIX_PATH=$(call quote,$(abspath $(__install_dir))$(subst $(space);,;,$(foreach x,$(call lib_name_to_prefix,$(__libsetting_deps_$(__lib_name))),;$(abspath $x))))\
+		-DCMAKE_PREFIX_PATH=$(call quote,$(abspath $(__install_dir))$(subst $(space)$(cmake_host_sep),$(cmake_host_sep),$(foreach x,$(call lib_name_to_prefix,$(__libsetting_deps_$(__lib_name))),$(cmake_host_sep)$(abspath $x))))\
 		$(call, ### Prevent CMake from finding system packages. Tested on freetype2, which finds system zlib otherwise.)\
 		-DCMAKE_FIND_USE_CMAKE_SYSTEM_PATH=OFF\
 		$(call, ### This is only useful when cross-compiling, to undo the effects of CMAKE_FIND_ROOT_PATH in a toolchain file, which otherwise restricts library search to that path.)\
